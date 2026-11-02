@@ -16,7 +16,8 @@ Later ideas live as one-page stubs in [docs/phases/](docs/phases/). Build one on
 
 - Prefer the smallest change that meets the task. Drop an older convention when it fights that.
 - Before building a feature, ask: is it core, or an add-on? The default is add-on. Follow [Core or add-on](CONVENTIONS.md#core-or-add-on), and say which in the phase doc. When a plugin can't do what it needs, widen the plugin API with the smallest hook it needs, not the feature.
-- `main` holds releases only. Commit to the open `release/<next version>` branch, never to `main`; the owner merges and releases ([README: Releasing](README.md#releasing)). Until 0.1.0 is released, `main` is that branch.
+- `main` holds releases only. Commit to the open `release/<next version>` branch, never to `main`; the owner merges and releases ([README: Releasing](README.md#releasing)).
+- Commit as you go. When a piece of work is done and its checks pass, commit it on the open release branch, with a message that says what changed, so the owner only has to push. Keep unrelated changes in separate commits. Don't push, merge, or tag unless the owner asks.
 - A schema change is a new numbered file in `packages/sdk/src/migrations/`. Never edit or remove one that has shipped in a release. Note it under `## Unreleased` in `CHANGELOG.md`, for the release's Before upgrading list.
 - The stack is Vite, React, shadcn/ui, and a tiny Node server around libfx. Do not add Next.js, the Vercel AI SDK, a second agent runtime, or Hermes Agent.
 - Agent logic, storage, and input checks belong in `@fxbot/sdk`. The server only adds HTTP. The UI imports only `@fxbot/sdk/client`, never the SDK's main entry.
