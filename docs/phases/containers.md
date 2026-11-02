@@ -19,7 +19,7 @@ None of them lets the app update its own containers.
 - **CopilotKit OpenBot** publishes `ghcr.io/copilotkit/openbot` per version, with the digests in each release. It is one Ubuntu container whose supervisor runs the API, Chromium, and an optional Postgres. Its development compose uses `pgvector/pgvector:pg17`. A "supervisor" service holds the Docker socket for bots' computers, and its comments call that "still root-equivalent". To update, the owner pulls a new tag.
 - **OpenDots** builds from `node:24-bookworm-slim`, keeps SQLite in a volume, binds to 127.0.0.1, and refuses to start without `${OWNER_TOKEN:?}`. Updating means a rebuild. **OpenDuet** publishes no image. **openmuse** deploys to Render.
 - **eve** runs as a Node server under the owner's process manager, with no image or compose file. Its docs warn that changing the eve version strands sessions that were running.
-- **fx** and **Pi** are command-line tools that update themselves (`fx upgrade`, `pi update`). **fx0**, **durable-harness**, **agent-desktop**, and **agent-browser** have no container deployment.
+- **fx** and **Pi** are command-line tools that update themselves (`fx upgrade`, `pi update`). **Grok bot** is hosted by xAI, with nothing to install. **fx0**, **durable-harness**, **agent-desktop**, and **agent-browser** have no container deployment.
 
 ### Self-hosted apps that run as compose stacks
 
