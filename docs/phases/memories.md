@@ -162,11 +162,11 @@ EmbeddingGemma 2 scores 68.5 on the English MTEB v2 mean, and Qwen3-Embedding-0.
 
 - Memory is 378 MB with `-b 2048 -ub 2048`, and 1.25 GB with 8,192.
 - A 40,000-character input fails with 500 and "input (9443 tokens) is too large to process".
-- In `pgvector/pgvector:0.8.7-pg17`, the role that `POSTGRES_USER` names is a superuser, `0005_memories` applies after 0001–0004 and creates the extension (0.8.7), and the fused query from [Search](#search) ranks a word-and-meaning match first, finds a match by meaning alone, and leaves out another bot's rows and another model's vectors. Exact search over one bot's 100,000 random 768-dimension vectors took about 230 ms, and over 10,000 about 37 ms. Each vector row took about 4 KB on disk.
+- In `pgvector/pgvector:0.8.7-pg17` (the Debian 12 build; the install uses its `-trixie` twin), the role that `POSTGRES_USER` names is a superuser, `0005_memories` applies after 0001–0004 and creates the extension (0.8.7), and the fused query from [Search](#search) ranks a word-and-meaning match first, finds a match by meaning alone, and leaves out another bot's rows and another model's vectors. Exact search over one bot's 100,000 random 768-dimension vectors took about 230 ms, and over 10,000 about 37 ms. Each vector row took about 4 KB on disk.
 
 **GPUs in containers.** Podman reaches an NVIDIA GPU with `--device nvidia.com/gpu=all`, from a CDI spec that `nvidia-ctk cdi generate` writes. Docker uses `--gpus all`, or `deploy.resources.reservations.devices` in compose. No one compose syntax works with every podman-compose and Docker Compose that the distros ship, so each needs a small GPU override file. A trial run such as `podman run --rm --device nvidia.com/gpu=all ubuntu nvidia-smi -L` shows whether the GPU path works.
 
-**Compose under podman.** `podman compose` runs docker-compose when it's installed, and podman-compose otherwise. podman-compose before 1.1 ignores `profiles` and starts every service, so the embedder's variants are override files passed with `-f`, not profiles.
+**Compose.** fxbot runs Compose v2 on podman and docker alike ([containers](containers.md)). The GPU device syntax differs between them (`devices: [nvidia.com/gpu=all]` for podman, `deploy.resources.reservations.devices` for docker), so the GPU variant is an override file per engine.
 
 ### fxbot today
 
@@ -277,7 +277,7 @@ or secrets. Change one with replaces, remove a wrong one with memory_forget, and
   - Other kinds can't be picked.
 - **Off:** words only.
 
-**Which local embedder runs** is chosen when the containers start, not by the page: one `embed` service, on the CPU or the GPU, at `FXBOT_EMBED_URL` (default `http://embed:8080/v1`). Settings shows the one that answers, by its model, and offers the other with the command that switches to it. Starting containers from Settings is the [containers](containers.md) phase's question.
+**Which local embedder runs** is one `embed` service, on the CPU or the GPU, at `FXBOT_EMBED_URL` (default `http://embed:8080/v1`). Settings shows the one that answers, by its model. Picking the other writes an `embedder.json` request through the [containers](containers.md) phase's request channel: the host command checks for a working GPU with a trial run, switches the compose files, and recreates `embed`. Picking Off or Remote leaves `embed` out.
 
 **The call:** `POST <base>/embeddings` with `{ model, input: [texts] }`, from the server only.
 - **Prefixes:** fxbot adds each model's query and document prefixes from a small table in `embeddings.ts`, for EmbeddingGemma, Qwen3-Embedding, nomic, and bge. Other models get none.
@@ -299,7 +299,7 @@ or secrets. Change one with replaces, remove a wrong one with memory_forget, and
   - each memory with its date and who wrote it ("Saved by Bob" or "Added by you"), an edit button that opens the text in a dialog, and Delete
   - an edit or add by the owner reaches the bot's next turn
 - **Settings, under Providers:** a Memory search section.
-  - Where vectors come from: Local (CPU), Local (GPU), Remote, or Off. A local choice that isn't running shows the command that starts it.
+  - Where vectors come from: Local (CPU), Local (GPU), Remote, or Off. Switching asks the host, and the section shows its progress. Local (GPU) shows why when the trial run finds no GPU.
   - For Remote: a provider from those that can embed, and a model field, prefilled per kind: `text-embedding-3-small` for OpenAI, and `openai/text-embedding-3-small` for OpenRouter and AI Gateway.
   - Message vectors: on or off, and how many characters of each message (8,000 by default).
   - A status line, such as "On: embeddinggemma-2 on the CPU. 1,204 of 5,690 messages have vectors", or "Off: memories and earlier chats are searched by words", or the last error.
@@ -318,7 +318,7 @@ A memory is `{ id, text, savedBy, createdAt, updatedAt, messageId }`. `@fxbot/sd
 
 ### Install and update
 
-- **The database** is the [containers](containers.md) install's, in pgvector's image (`pgvector/pgvector:0.8.7-pg17`). fxbot connects as the role `POSTGRES_USER` names, which is a superuser in the image, so `0005_memories` creates the extension itself.
+- **The database** is the [containers](containers.md) install's, in pgvector's image (`pgvector/pgvector:0.8.7-pg17-trixie`). fxbot connects as the role `POSTGRES_USER` names, which is a superuser in the image, so `0005_memories` creates the extension itself.
 - **The embedder** is the `embed` service in the same compose file, on the CPU, or on a GPU through an override file. Its model downloads into a `models` volume on first start. fxbot doesn't wait for it: until it answers, searches use words and the loop waits. See [Embeddings](#embeddings-packagessdksrcembeddingsts).
 - **Updating from 0.2** goes through the containers phase's move into the database container. `0005_memories` then runs like any migration, after a backup. The changelog's Before upgrading names it.
 - **A checkout** runs the database and the embedder from the compose file, and `npm run dev` on the machine.
@@ -438,5 +438,4 @@ Decided by the owner on 2026-11-02:
 | Where vectors come from | A local embedder on the CPU by default. Settings can pick a local GPU embedder, or a provider's API. |
 | The CPU model | EmbeddingGemma 2. |
 
-Still open, with the default the build follows:
-1. **Switching between the CPU and the GPU from Settings.** *Default:* Settings shows the command, and `setup.sh` makes the switch. Starting containers from the page waits for the [containers](containers.md) phase to decide whether fxbot may use the podman or docker socket.
+The [containers](containers.md) plan answers the last open question: Settings switches the embedder through its request file and host command, with no socket in the app.
