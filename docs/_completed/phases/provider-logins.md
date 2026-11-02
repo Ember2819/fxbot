@@ -265,7 +265,7 @@ The server runs as `fxbot` and owns `data/` with mode 700. Agents run as another
   - Its definition is `{ name: "chat_history", description, inputSchema: { query: string, limit?: 1–20 }, idempotent: true }`.
   - The bot comes from the session's `context` (`agent.session(id, { context: { bot } })`), never from the model's input. A bot searches only its own messages, across all of its sessions.
   - Its query is `where profile_id = $bot and tsv @@ websearch_to_tsquery('simple', $q)`, ordered by `ts_rank_cd`, then newest. It returns the date, role, and a `ts_headline` snippet.
-  - Vector search arrives with [memories](../../phases/memories.md).
+  - Vector search arrives with [memories](memories.md).
 
 ### API, SDK, and client
 

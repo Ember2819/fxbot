@@ -28,7 +28,7 @@ const features: { shape: Shape; color: Color; title: string; link: string; body:
     link: "/docs/explanation/bots-and-chats/",
     body: (
       <>
-        Give each bot a name, instructions, a provider and model, and a look: one of {shapeCount} shapes in {colorCount} colors. Its chat streams, survives reloads and restarts, and takes images and text files. A <code>chat_history</code> tool lets it search its own past.
+        Give each bot a name, instructions, a provider and model, and a look: one of {shapeCount} shapes in {colorCount} colors. Its chat streams, survives reloads and restarts, and takes images and text files. It keeps what it learns as memories you can edit, and searches them and its past chats.
       </>
     ),
   },

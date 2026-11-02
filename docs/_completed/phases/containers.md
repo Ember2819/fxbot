@@ -2,7 +2,7 @@
 
 fxbot runs as containers. `setup.sh` uses podman, or docker when only docker is installed, and one compose file runs fxbot and its database. Settings' Update asks the machine to move to the next release. A small host command does the work, and puts the old release back if the new one doesn't start.
 
-Status: built on 2026-11-02, on `release/0.3.0`. The human checks at the end of the checklist are still open. Planned the same day; the owner decided the shape the same day: podman first, docker as the fallback, and one compose file for fxbot, its database (pgvector's image), and the local embedder that [memories](../../phases/memories.md) adds. This phase builds fxbot and the database; memories adds the embedder.
+Status: built on 2026-11-02, on `release/0.3.0`. The human checks at the end of the checklist are still open. Planned the same day; the owner decided the shape the same day: podman first, docker as the fallback, and one compose file for fxbot, its database (pgvector's image), and the local embedder that [memories](memories.md) adds. This phase builds fxbot and the database; memories adds the embedder.
 
 ## 0. Core or add-on
 
@@ -163,7 +163,7 @@ volumes: { pgdata: {} }
 - **`/etc/fxbot/fxbot.env`** keeps the owner's optional settings, such as `FXBOT_LISTS_URL` and `FXBOT_VERCEL_CLIENT_ID`, as today.
 - **The database** isn't published to the machine. Only the app container reaches it, by service name.
 - **The key** stays `/etc/fxbot/secret.key`, owned by `fxbot` and readable by it alone. Compose mounts it read-only.
-- [Memories](../../phases/memories.md) adds the `embed` service to this file, and its GPU override files beside it.
+- [Memories](memories.md) adds the `embed` service to this file, and its GPU override files beside it.
 
 ### The host command (`deploy/fxbot`, installed as `/opt/fxbot/fxbot` and `/usr/local/bin/fxbot`)
 
@@ -310,7 +310,7 @@ metadata-action adds `latest` for a stable version only. A prerelease such as `0
 
 ### Not in this phase
 
-- The embedder and its GPU files: [memories](../../phases/memories.md).
+- The embedder and its GPU files: [memories](memories.md).
 - Updates on their own: Settings still shows the release, and the owner chooses.
 - Quadlets, `podman auto-update`, and rootless podman.
 - Distros without Compose v2 packages, other than through Docker's repository.

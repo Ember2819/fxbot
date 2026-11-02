@@ -16,7 +16,7 @@ On the machine, run:
 curl -fsSL https://raw.githubusercontent.com/iammrduncan/fxbot/main/setup.sh | sudo bash
 ```
 
-The script names each step in bold as it goes: the container engine, the fxbot user and its key, the release, and the services. fxbot runs as two containers, the app and its database. The script uses podman, or docker when only docker is installed, and installs podman when neither is. Downloading the two images can take a few minutes. It ends with:
+The script names each step in bold as it goes: the container engine, the fxbot user and its key, the release, and the services. fxbot runs as three containers: the app, its database, and the local embedder for memory search. The script uses podman, or docker when only docker is installed, and installs podman when neither is. Downloading the three images can take a few minutes, and the embedder downloads its model, 310 MB, on its first start. It ends with:
 
 ```
 fxbot <version> runs on http://127.0.0.1:8787
@@ -36,7 +36,7 @@ It answers `{"ok":true,"version":"<version>"}`. fxbot is running, but only this 
 sudo fxbot status
 ```
 
-It names the version and the engine, then lists two containers, `fxbot` and `db`.
+It names the version, the engine, and where the local embedder runs, then lists three containers, `fxbot`, `db`, and `embed`.
 
 ## Reach it from your phone
 
@@ -86,4 +86,4 @@ A release of fxbot, served on your tailnet and installed on your phone, with a p
 - [Add a skill](/docs/how-to/add-a-skill/) to give your bots instructions for a kind of task.
 - [Add an MCP server](/docs/how-to/add-an-mcp-server/) to give your bots tools.
 - [Serve fxbot at its own name](/docs/how-to/tailscale-service/), such as `bot.<tailnet>.ts.net`, or [reach it another way](/docs/how-to/reach-it/).
-- Read about [bots, chats, and the library](/docs/explanation/bots-and-chats/), and the [security model](/docs/explanation/security/).
+- Read about [bots, chats, memories, and the library](/docs/explanation/bots-and-chats/), and the [security model](/docs/explanation/security/).

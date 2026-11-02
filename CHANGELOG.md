@@ -4,7 +4,11 @@ Each release of fxbot, newest first. A release that adds migrations, bumps libfx
 
 ## Unreleased
 
-**Before upgrading.** fxbot now runs as containers. To move a 0.2 install, run `setup.sh` again: it copies the database into the database container, and keeps the chats, key, and settings. Settings' Update in 0.2 can't make this move.
+**Before upgrading.** fxbot now runs as containers. To move a 0.2 install, run `setup.sh` again: it copies the database into the database container, and keeps the chats, key, and settings. Settings' Update in 0.2 can't make this move. Migration `0005_memories` adds memories and vectors, and needs pgvector, which the database container has: on the machine's own Postgres, it stops and says to run `setup.sh`. The local embedder downloads its 310 MB model on its first start, holds about 380 MB, and fills in vectors for existing messages in the background.
+
+- **Memories.** Each bot keeps what it learns: it saves one fact at a time with `memory_save`, finds them with `memory_search`, and removes wrong ones with `memory_forget`, which the chat shows as sentences. The newest are in its instructions on every turn, within 2% of the model's context window, and the owner sees, adds, edits, and deletes them in the bot panel's Memories tab.
+- **Memory search by meaning.** Memory search and `chat_history` match by meaning as well as by words. The vectors come from a local embedder (EmbeddingGemma 2 on the CPU, or Qwen3-Embedding on an NVIDIA GPU), from a provider's embedding model, or from none, picked in Settings' Memory search, or with `sudo fxbot embedder`. Chat messages get vectors too, from their first 8,000 characters, which Settings can change or turn off.
+- `sudo fxbot rotate-key` seals every stored key and token again under a new key on a container install.
 
 - **Containers.** `setup.sh` installs fxbot as containers, with podman, or docker when only docker is installed: fxbot's image from ghcr.io, for amd64 and arm64, and pgvector's Postgres image. It no longer installs Node or the distro's Postgres. `sudo fxbot` runs them: `status`, `logs`, `update`, `up`, `down`, and `restore`.
 - Settings' Update asks the machine, which starts the new release and waits until it answers. If it doesn't, the old release comes back by itself, on the backup taken before the new one's migrations, and Settings shows why. The database keeps running, and running chats finish first.

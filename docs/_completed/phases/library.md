@@ -208,7 +208,7 @@ These are read from source and docs, as of November 2026. Each path is relative 
 6. **Every image block names its item, `sourceRef: "library:<id>"`.** That is the use libfx documents. When libfx cannot send an image, the model gets the reference, and `library_read` returns the copy.
 7. **Search with Postgres full text.**
    - It covers the name and a document's text, split at ASCII separators, with prefix matching and the text capped at 200,000 characters.
-   - An image is found by its name, as in ChatGPT's Library. Vectors and image descriptions wait for [memories](../../phases/memories.md) and the [knowledge base](../../phases/knowledge-base.md).
+   - An image is found by its name, as in ChatGPT's Library. Vectors and image descriptions wait for [memories](memories.md) and the [knowledge base](../../phases/knowledge-base.md).
 8. **Serve files as data.**
    - Check images from their bytes. Serve documents as `text/plain`, with `nosniff` and a `sandbox` CSP, as GitHub, fx0, and openbot do.
    - Use `private, no-cache` with the SHA-256 as ETag, so a deleted item stops showing (openbot's lesson).
@@ -447,7 +447,7 @@ What the build found or changed, checked against libfx 0.0.16, Postgres 17, and 
 - **[Voice memos](../../phases/voice-memos.md):** `audio` items, `uploaded`.
 - **[Pages](../../phases/pages.md):** `page` items, with their own format, a sandboxed viewer, and whether a page has versions.
 - **[Past sessions](../../phases/past-sessions.md):** a tag's chat link goes to that tag's own session, not only the bot's current one.
-- **[Memories](../../phases/memories.md) and the [knowledge base](../../phases/knowledge-base.md):** search by meaning, with vectors over library documents.
+- **[Memories](memories.md) and the [knowledge base](../../phases/knowledge-base.md):** search by meaning, with vectors over library documents.
 
 ### Security
 

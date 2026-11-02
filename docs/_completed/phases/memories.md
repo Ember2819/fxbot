@@ -2,16 +2,16 @@
 
 Each bot keeps what it learns: the owner's preferences, facts about them and their work, decisions, and corrections. It saves them during its own turns. The newest are in its instructions in every turn, and it searches for the rest. The owner sees, edits, adds, and deletes them in the bot's panel. Memory search and `chat_history` match by meaning as well as by words, with vectors from a local embedder on the machine or a provider's API.
 
-Status: planned, not built. Research and plan only, written on 2026-11-02 and updated the same day with the owner's answers. It runs on the [containers](../_completed/phases/containers.md) install, whose database image has pgvector. It builds on what [provider logins](../_completed/phases/provider-logins.md) decided: memories live in Postgres, search is hybrid (pgvector plus full-text, fused with reciprocal rank fusion), the embedding model is picked in Settings from any provider that serves `/embeddings`, and `chat_history` gains its vector half here.
+Status: built on 2026-11-02, on `release/0.3.0`. The human checks at the end of the checklist are still open. Planned the same day, and updated with the owner's answers. It runs on the [containers](containers.md) install, whose database image has pgvector. It builds on what [provider logins](provider-logins.md) decided: memories live in Postgres, search is hybrid (pgvector plus full-text, fused with reciprocal rank fusion), the embedding model is picked in Settings from any provider that serves `/embeddings`, and `chat_history` gains its vector half here.
 
 ## 0. Core or add-on
 
-**Core.** Every bot needs to keep what it learns ([Core or add-on](../../CONVENTIONS.md#core-or-add-on)), and memories are a bot's own data, like its chat and its files. The core is storing a bot's memories, finding them, and putting them back in front of the bot, plus the owner's view of them and the embedding model that search uses.
+**Core.** Every bot needs to keep what it learns ([Core or add-on](../../../CONVENTIONS.md#core-or-add-on)), and memories are a bot's own data, like its chat and its files. The core is storing a bot's memories, finding them, and putting them back in front of the bot, plus the owner's view of them and the embedding model that search uses.
 
-These are add-ons, on hooks in the [plugin API](plugins.md):
+These are add-ons, on hooks in the [plugin API](../../phases/plugins.md):
 - Saving memories automatically, such as a review after turns (mem0, Hermes) or a nightly pass that tidies them ("dreams"). A plugin can do it on `turn.end` or a schedule.
 - Memories shared by a team of bots.
-- Other ways to organize what a bot knows, such as a [knowledge graph](knowledge-base.md).
+- Other ways to organize what a bot knows, such as a [knowledge graph](../../phases/knowledge-base.md).
 - Importing memories from another assistant.
 
 ## 1. Research
@@ -89,7 +89,7 @@ Checked on 2026-11-02 against each project's docs and source. Where a point is m
 
 Checked on 2026-11-02 against package indexes, pgvector's source, and a throwaway Postgres 17 cluster in the scratchpad.
 
-**The database image.** Distro packages vary: Debian 12 and Ubuntu 22.04 have no pgvector, and Ubuntu 24.04 has 0.6.0. The [containers](../_completed/phases/containers.md) install avoids them all. pgvector's own image, `pgvector/pgvector`, is Postgres with pgvector built in, for amd64 and arm64 (`0.8.7-pg17`, about 160 MB).
+**The database image.** Distro packages vary: Debian 12 and Ubuntu 22.04 have no pgvector, and Ubuntu 24.04 has 0.6.0. The [containers](containers.md) install avoids them all. pgvector's own image, `pgvector/pgvector`, is Postgres with pgvector built in, for amd64 and arm64 (`0.8.7-pg17`, about 160 MB).
 
 **Not a trusted extension.** `vector.control` has no `trusted` line, so only a superuser can run `CREATE EXTENSION vector`. In the image, the role that `POSTGRES_USER` names is a superuser, so fxbot's migration can create it.
 
@@ -166,15 +166,15 @@ EmbeddingGemma 2 scores 68.5 on the English MTEB v2 mean, and Qwen3-Embedding-0.
 
 **GPUs in containers.** Podman reaches an NVIDIA GPU with `--device nvidia.com/gpu=all`, from a CDI spec that `nvidia-ctk cdi generate` writes. Docker uses `--gpus all`, or `deploy.resources.reservations.devices` in compose. No one compose syntax works with every podman-compose and Docker Compose that the distros ship, so each needs a small GPU override file. A trial run such as `podman run --rm --device nvidia.com/gpu=all ubuntu nvidia-smi -L` shows whether the GPU path works.
 
-**Compose.** fxbot runs Compose v2 on podman and docker alike ([containers](../_completed/phases/containers.md)). The GPU device syntax differs between them (`devices: [nvidia.com/gpu=all]` for podman, `deploy.resources.reservations.devices` for docker), so the GPU variant is an override file per engine.
+**Compose.** fxbot runs Compose v2 on podman and docker alike ([containers](containers.md)). The GPU device syntax differs between them (`devices: [nvidia.com/gpu=all]` for podman, `deploy.resources.reservations.devices` for docker), so the GPU variant is an override file per engine.
 
 ### fxbot today
 
-- `messages` holds every message as plain text, with a generated `tsvector` and a GIN index. `chat_history` ranks prefix matches of any word with `ts_rank_cd`, finds only the session's bot (from the session's `context`, never the model's input), and reads a message's neighbours with `around` ([`history.ts`](../../packages/sdk/src/history.ts)).
-- Every turn opens the session with the bot's instructions, the handoff summary, and the skills catalog, which takes 1% of the model's context window at 4 characters a token, or 8,000 characters when the window is unknown ([`index.ts`](../../packages/sdk/src/index.ts)). A bot's own instructions may be up to 64 KiB.
-- The library's tools are `library_search`, `library_read`, and `library_save`. The chat shows each fxbot tool as a sentence ([`steps.tsx`](../../packages/ui/src/steps.tsx)).
+- `messages` holds every message as plain text, with a generated `tsvector` and a GIN index. `chat_history` ranks prefix matches of any word with `ts_rank_cd`, finds only the session's bot (from the session's `context`, never the model's input), and reads a message's neighbours with `around` ([`history.ts`](../../../packages/sdk/src/history.ts)).
+- Every turn opens the session with the bot's instructions, the handoff summary, and the skills catalog, which takes 1% of the model's context window at 4 characters a token, or 8,000 characters when the window is unknown ([`index.ts`](../../../packages/sdk/src/index.ts)). A bot's own instructions may be up to 64 KiB.
+- The library's tools are `library_search`, `library_read`, and `library_save`. The chat shows each fxbot tool as a sentence ([`steps.tsx`](../../../packages/ui/src/steps.tsx)).
 - The bot panel has two tabs, Details and Library. Settings holds the default provider (`settings` table).
-- Migrations are numbered SQL files, run in one transaction after a backup. The newest is `0004_skills`, so this phase adds `0005_memories`, and [plugins](plugins.md) takes `0006`.
+- Migrations are numbered SQL files, run in one transaction after a backup. The newest is `0004_skills`, so this phase adds `0005_memories`, and [plugins](../../phases/plugins.md) takes `0006`.
 
 ## 2. Key takeaways
 
@@ -277,7 +277,7 @@ or secrets. Change one with replaces, remove a wrong one with memory_forget, and
   - Other kinds can't be picked.
 - **Off:** words only.
 
-**Which local embedder runs** is one `embed` service, on the CPU or the GPU, at `FXBOT_EMBED_URL` (default `http://embed:8080/v1`). Settings shows the one that answers, by its model. Picking the other writes an `embedder.json` request through the [containers](../_completed/phases/containers.md) phase's request channel: the host command checks for a working GPU with a trial run, switches the compose files, and recreates `embed`. Picking Off or Remote leaves `embed` out.
+**Which local embedder runs** is one `embed` service, on the CPU or the GPU, at `FXBOT_EMBED_URL` (default `http://embed:8080/v1`). Settings shows the one that answers, by its model. Picking the other writes an `embedder.json` request through the [containers](containers.md) phase's request channel: the host command checks for a working GPU with a trial run, switches the compose files, and recreates `embed`. Picking Off or Remote leaves `embed` out.
 
 **The call:** `POST <base>/embeddings` with `{ model, input: [texts] }`, from the server only.
 - **Prefixes:** fxbot adds each model's query and document prefixes from a small table in `embeddings.ts`, for EmbeddingGemma, Qwen3-Embedding, nomic, and bge. Other models get none.
@@ -318,7 +318,7 @@ A memory is `{ id, text, savedBy, createdAt, updatedAt, messageId }`. `@fxbot/sd
 
 ### Install and update
 
-- **The database** is the [containers](../_completed/phases/containers.md) install's, in pgvector's image (`pgvector/pgvector:0.8.7-pg17-trixie`). fxbot connects as the role `POSTGRES_USER` names, which is a superuser in the image, so `0005_memories` creates the extension itself.
+- **The database** is the [containers](containers.md) install's, in pgvector's image (`pgvector/pgvector:0.8.7-pg17-trixie`). fxbot connects as the role `POSTGRES_USER` names, which is a superuser in the image, so `0005_memories` creates the extension itself.
 - **The embedder** is the `embed` service in the same compose file, on the CPU, or on a GPU through an override file. Its model downloads into a `models` volume on first start. fxbot doesn't wait for it: until it answers, searches use words and the loop waits. See [Embeddings](#embeddings-packagessdksrcembeddingsts).
 - **Updating from 0.2** goes through the containers phase's move into the database container. `0005_memories` then runs like any migration, after a backup. The changelog's Before upgrading names it.
 - **A checkout** runs the database and the embedder from the compose file, and `npm run dev` on the machine.
@@ -345,9 +345,9 @@ A memory is `{ id, text, savedBy, createdAt, updatedAt, messageId }`. `@fxbot/sd
   - `steps.tsx`: three sentences
   - `memory-search.tsx`: the Settings section
 - **Elsewhere:**
-  - the compose file's `embed` service and its GPU override files, which the [containers](../_completed/phases/containers.md) phase's `setup.sh` chooses between
+  - the compose file's `embed` service and its GPU override files, which the [containers](containers.md) phase's `setup.sh` chooses between
   - the README's checkout setup and `CHANGELOG.md`
-  - the site's docs: a Memories section in [bots and chats](../../packages/website/docs/explanation/bots-and-chats.md), and a how-to for choosing where vectors come from
+  - the site's docs: a Memories section in [bots and chats](../../../packages/website/docs/explanation/bots-and-chats.md), and a how-to for choosing where vectors come from
 
 ### Speed
 
@@ -357,6 +357,19 @@ A memory is `{ id, text, savedBy, createdAt, updatedAt, messageId }`. `@fxbot/sd
 - **In the background:** the loop runs only while vectors are missing, at one request per 32 rows. On the CPU it embeds about 600 tokens a second on 6 cores. A 2,000-character reply takes under a second. Filling in 1,000 existing messages of about 1,000 characters takes about 7 minutes, and a 2-core machine about three times as long. The chat doesn't wait for it.
 - **A search** with meaning adds one embedding request for the query, plus the scan.
 - **The machine:** the local embedder holds about 380 MB, measured here. Each message's vector adds about 4 KB to the database. Off or Remote leaves the `embed` service out of compose, and it costs nothing.
+
+### Changed while building
+
+- **Meaning matches stay near the nearest.** Without a cutoff, a search returned every memory, ranked. Distances aren't comparable across queries, so the cutoff is relative: within 0.05 cosine distance of the nearest vector. With EmbeddingGemma 2, a query's match sat 0.20 to 0.30 away and unrelated notes 0.29 to 0.41.
+- **`memory_search` names the message** a memory was saved in (`from msg:<id>`), so the bot can read it with `chat_history`'s `around`. The section in the instructions leaves it out, to save room.
+- **The local embedder is a compose profile,** `embed`, on unless `FXBOT_EMBEDDER` in `.env` is `off`, and the GPU file joins the compose files when it's `gpu`. `fxbot embedder cpu|gpu|off` switches it, after a trial run for a GPU, and writes `embedder-status.json`. Settings sends `local` with its change, and the server writes the `embedder.json` request.
+- **Starts and updates wait for the app alone,** so a model download never holds up `fxbot up` or fails an update.
+- **The local source isn't tested when it's picked.** It may still be downloading its model; the status line says when it answers. A remote source is tested first, as planned.
+- **The fill-in loop compares `updated_at` as text.** postgres.js turns a timestamp through a JavaScript date, which drops Postgres's microseconds, so a changed memory never matched and the loop spun. A pass that saves nothing now stops.
+- **The status retries the fill-in** when it finds the embedder answering again, so an old error clears without waiting a minute. When the machine runs no embedder but Settings asks for one, the status says so.
+- **`open()` reads the context window on every turn,** for the memory budget, from the cached model list. Before, it read it only for a bot with skills.
+- **`0005_memories` checks for pgvector first.** On a Postgres without it, such as a 0.2 install that updated in place, it stops with a message that says to run `setup.sh`.
+- **The embedding status has its own route,** `GET /api/settings/embedding`, so reading settings stays one query.
 
 ### Not in this phase
 
@@ -368,54 +381,54 @@ A memory is `{ id, text, savedBy, createdAt, updatedAt, messageId }`. `@fxbot/sd
 
 ### Size
 
-About 950 lines: the SDK about 480 (memories 220, embeddings 190 with the prefix table, and the rest in `history.ts`, `index.ts`, and types), the server 50, the UI 320, and the migration 30. The compose service and its GPU override files are about 30 lines, in the [containers](../_completed/phases/containers.md) phase's files. Plus docs.
+Built: about 1,080 lines added and 60 removed in the SDK, server, page, `deploy/`, and `setup.sh`, plus the 43-line migration. Planned: about 950 lines, the SDK about 480 (memories 220, embeddings 190 with the prefix table, and the rest in `history.ts`, `index.ts`, and types), the server 50, the UI 320, and the migration 30. The compose service and its GPU override files are about 30 lines, in the [containers](containers.md) phase's files. Plus docs.
 
 ## 4. Checklist
 
 Checks use a disposable database in the pgvector image, the mock model (which can call tools), a mock embeddings server whose vectors put chosen words close together, the real CPU embedder, and Playwright. This machine has podman 5.4.2 and both images.
 
 **M1. Memories and tools**
-- [ ] `0005_memories` applies to a database from 0.2.1 in the pgvector image, after a backup, and creates the extension.
-- [ ] Through the mock model, `memory_save` saves for the session's bot:
+- [x] On a database at 0004 with a bot and a message, in the pgvector image, the server backed up (`before-0005_memories`), applied `0005_memories` alone, and created pgvector 0.8.7. The message was kept. On a Postgres without pgvector, it stopped with the setup.sh message and created nothing.
+- [x] Through the mock model, `memory_save` saves for the session's bot:
   - an `id` or bot in the input changes nothing
   - over 1,000 characters is refused with the reason
   - the same text with other case and spaces answers "Already saved as mem:<id>"
   - `replaces` changes the text and `updated_at`
   - the row records the turn's message
-- [ ] `memory_forget` removes a memory. Another bot's id, or an unknown one, says it has no such memory.
-- [ ] The next turn's request to the mock model has the section with each `mem:<id>` and date. Another bot's request doesn't.
-- [ ] With more memories than the budget: the newest show, then "N older memories don't fit here". With 64 KiB of bot instructions, the whole request stays under libfx's limit.
-- [ ] Two turns with no memory change send the same instructions, byte for byte. A save changes them on the next turn.
-- [ ] `memory_search` finds a memory by the start of a word, best first, with ids and dates.
-- [ ] Deleting the bot deletes its memories.
-- [ ] The chat shows "Saved a memory", "Searched memories", and "Forgot a memory", with the text.
+- [x] `memory_forget` removes a memory. Another bot's id, or an unknown one, says it has no such memory.
+- [x] The next turn's request to the mock model has the section with each `mem:<id>` and date. Another bot's request doesn't.
+- [x] With more memories than the budget: the newest show, then "30 older memories don't fit here", in 7,772 bytes of the 8,000. With 64 KiB of bot instructions, the turn ran and the section stepped aside.
+- [x] Two turns with no memory change send the same instructions, byte for byte. A save changes them on the next turn.
+- [x] `memory_search` finds a memory by the start of a word ("electr"), best first, with ids and dates.
+- [x] Deleting the bot deletes its memories.
+- [x] The chat shows "Saved a memory", with the text, "Searched memories", and "Forgot a memory" (Chromium).
 
 **M2. The owner's view**
-- [ ] The four routes work with `curl`: a missing bot is 404, an empty or too-long text is 400, and another bot's memory is 404.
-- [ ] The Memories tab lists, searches, adds, edits, and deletes. An owner's edit reaches the next turn's instructions.
-- [ ] "Saved by <bot>" and "Added by you" show. At phone width, the tab fits with no sideways scroll.
+- [x] The four routes work with `curl`: a missing bot is 404, an empty or too-long text is 400, and another bot's memory is 404 to an edit or a delete.
+- [x] In Chromium, the Memories tab lists, searches, adds, edits, and deletes. An owner's edit reaches the next turn's instructions.
+- [x] "Saved by Ann" and "Added by you" show. At 375 pixels wide, the tab fits with no sideways scroll. Settings shows the status line, and the page logs no errors.
 
 **M3. Embeddings**
-- [ ] With the mock embeddings server as the local embedder, the test call learns the dimensions. A failing server keeps the old setting and shows its error.
-- [ ] Prefixes: the mock server receives EmbeddingGemma's query prefix on a search and its document prefix on a message. A model with no entry gets none.
-- [ ] An input the mock server calls "too large" is retried at half the length.
-- [ ] The loop fills memories, then messages, 32 at a time. Settings shows the count rising. It stops when done, and starts again for a new memory.
-- [ ] With message vectors off, only memories get vectors, and `chat_history` searches by words. A new character count applies to messages embedded after it.
-- [ ] Remote: a mock provider with a key works the same way. The key never appears in a response.
-- [ ] A change from local to remote fills new vectors, and searches still answer while it runs. Removing the remote provider turns meaning search off.
-- [ ] With the local embedder still loading, searches use words and the loop waits.
-- [ ] The real `embed` service, on the CPU, answers fxbot's call with 768 dimensions, and a fill-in at low CPU weight leaves the chat responsive.
+- [x] A remote source embeds a test string before it's kept. A failing server (503) kept the old setting, and Settings said why. The local source isn't tested when picked (see Changed while building).
+- [x] Prefixes: the mock server received EmbeddingGemma's query prefix on a search and its document prefix on every document. The remote model, with no entry, got none in 157 inputs.
+- [x] An input the mock server called "too large" was sent alone at 465, then 242, then 131 characters, and got its vector.
+- [x] The loop filled the new memory, then 70 messages in batches of 32, 32, and 6. It stops when done, and a new memory starts it again.
+- [x] With message vectors off, new messages got none, and `chat_history` asked the embedder nothing. A count of 50 applied to the next message.
+- [x] Remote: a mock provider with a key works the same way, with its key on every request and never in a response.
+- [x] A change from local to remote filled new vectors for 88 messages and 3 memories, and a search answered in 306 ms meanwhile. Removing the remote provider turned meaning search off, and words still found.
+- [x] With the local embedder down or still downloading, searches use words (in 278 ms), and the status says it isn't answering yet.
+- [x] The real `embed` service, on the CPU, filled 768-dimension vectors. During a fill-in of 1,500 long messages, chat turns took 229–272 ms, against 199–243 ms idle.
 
 **M4. Hybrid search**
-- [ ] With the mock vectors, `memory_search` finds a memory that shares no word with the query, and a row in both lists ranks first.
-- [ ] `chat_history` finds a message by meaning the same way, and its `around` is unchanged.
-- [ ] With the embeddings server down, both search by words, and answer within 5 seconds of the timeout.
-- [ ] The time for a search over 100,000 messages of one bot is logged.
+- [x] With the mock vectors, `memory_search` found "The owner has an electric car." for "vehicle", and a row in both lists ranked first. With the real embedder, "dog", "cello", and "vehicle" each found their memory.
+- [x] `chat_history` found "We talked about the electric car." for "vehicle", and left the unrelated messages out. Its `around` is unchanged.
+- [x] With the embeddings server down, both search by words, in under a second.
+- [x] The meaning half of `chat_history` over 100,000 messages of one bot, with 768 dimensions: 200–275 ms.
 
 **M5. Install and docs**
-- [ ] The compose file's `embed` service and its GPU override files are written, with pinned tags. Remote or Off leaves the service out.
-- [ ] The README's checkout setup, the changelog, and the docs are written, and `npm run build-site` passes.
-- [ ] `npm run typecheck`, `npm run build`, and `git diff --check` pass.
+- [x] The `embed` service and its GPU files are written, with the `b12033` tags, and merge cleanly under podman and docker. Through the app's requests and `fxbot apply`: a GPU trial that failed here with its reason, Off removing the container, and the CPU starting it again. `fxbot up` returned in 8 s while the model downloaded.
+- [x] The README, the changelog, AGENTS.md, and the site are written: a Memories section, a how-to for choosing where vectors come from, and the commands, install layout, configuration, and providers references. `npm run build-site` passes.
+- [x] `npm run typecheck`, `npm run build`, `git diff --check`, and `bash -n` on both scripts pass.
 
 **Human checks**
 - [ ] With the local embedder on the CPU, a bot saves a fact on its own, a new chat uses it, and a search finds it by meaning. How long the owner's machine takes to fill its existing messages is noted.
@@ -434,8 +447,8 @@ Decided by the owner on 2026-11-02:
 | Background review | Not in core. Add-ons can add it, such as a nightly pass ("dreams"). |
 | The budget in the instructions | 2% of the context window, to start. |
 | Vectors for every message | Yes by default, from the first 8,000 characters. Settings can turn them off, or change the number of characters. |
-| pgvector on every distro | The database runs in pgvector's image ([containers](../_completed/phases/containers.md)). |
+| pgvector on every distro | The database runs in pgvector's image ([containers](containers.md)). |
 | Where vectors come from | A local embedder on the CPU by default. Settings can pick a local GPU embedder, or a provider's API. |
 | The CPU model | EmbeddingGemma 2. |
 
-The [containers](../_completed/phases/containers.md) plan answers the last open question: Settings switches the embedder through its request file and host command, with no socket in the app.
+The [containers](containers.md) plan answers the last open question: Settings switches the embedder through its request file and host command, with no socket in the app.

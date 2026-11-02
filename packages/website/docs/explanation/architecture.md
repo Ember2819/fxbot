@@ -4,7 +4,7 @@ fxbot is one Node server around [libfx](https://fx.sh/docs/lib), Postgres, and a
 
 ## One process
 
-A release runs one Node process, in a container beside its database's. It serves the built page and its API on the machine's 127.0.0.1, runs every bot's agent, and holds every key. There is no second service and no queue. Podman or docker restarts a container that crashes, and systemd starts both at boot. Records live in Postgres, and libfx keeps each chat's session in files.
+A release runs one Node process, in a container beside its database's. It serves the built page and its API on the machine's 127.0.0.1, runs every bot's agent, and holds every key. A third container, unless it's turned off, runs the local embedder, llama.cpp's server, which turns text into vectors for memory search. There is no other service and no queue. Podman or docker restarts a container that crashes, and systemd starts them at boot. Records live in Postgres, and libfx keeps each chat's session in files.
 
 ## The packages
 
@@ -12,7 +12,7 @@ The repository is a TypeScript monorepo, laid out after [eve](https://eve.dev): 
 
 | Package | What it holds |
 | --- | --- |
-| `@fxbot/sdk` | The agent system: providers and their sign-ins, one libfx agent per provider, bots, settings, the library, MCP servers, each bot's durable chat, and its searchable history. It keeps the records in Postgres, seals the secrets, and runs the migrations. |
+| `@fxbot/sdk` | The agent system: providers and their sign-ins, one libfx agent per provider, bots, settings, the library, MCP servers, each bot's durable chat, its memories, and its searchable history, with the vectors that search by meaning uses. It keeps the records in Postgres, seals the secrets, and runs the migrations. |
 | `@fxbot/sdk/client` | A typed client for the server's API, with the stream reader and the turn reducer a UI needs. It carries no credentials. |
 | `@fxbot/server` | HTTP and nothing more: `node:http` routes over the SDK, body limits, and status codes. It reads the settings, serves the page, and asks the machine for updates. |
 | `@fxbot/ui` | The app: Vite, React, and shadcn/ui, built on `@fxbot/sdk/client` alone. |
@@ -23,7 +23,7 @@ Everything about bots lives in the SDK, so another server or UI could be built o
 ## A message, end to end
 
 1. The page sends a message with an id it made, to `/api/profiles/<bot>/messages`.
-2. The SDK hands it to the libfx agent of the bot's provider, and answers once libfx has stored the prompt. The same id sent again runs nothing new.
+2. The SDK hands it to the libfx agent of the bot's provider, with the bot's instructions, its newest memories, and its list of skills, and answers once libfx has stored the prompt. The same id sent again runs nothing new.
 3. The page reads the chat as a stream of lines, from the start and then as they come. After a dropped connection it picks up where it left off.
 4. libfx runs the turn, calling tools as the model asks, and writes each step to the session's files.
 

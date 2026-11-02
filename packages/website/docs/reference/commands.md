@@ -29,20 +29,21 @@ The command for an install made by `setup.sh`: `/opt/fxbot/fxbot`, linked as `/u
 
 | Command | What it does |
 | --- | --- |
-| `sudo fxbot status` | The version, the engine, and the containers. After a move from 0.2, it also prints the commands that remove what 0.2 left. |
-| `sudo fxbot logs [<service>]` | Follows the containers' logs, from the last 100 lines. `<service>` is `fxbot` or `db`. |
+| `sudo fxbot status` | The version, the engine, the local embedder, and the containers. After a move from 0.2, it also prints the commands that remove what 0.2 left. |
+| `sudo fxbot logs [<service>]` | Follows the containers' logs, from the last 100 lines. `<service>` is `fxbot`, `db`, or `embed`. |
 | `sudo fxbot update [<version>]` | Moves to the newest stable release, or the one named. See below. |
-| `sudo fxbot up` | Starts the containers, and waits up to 5 minutes until they are healthy. `fxbot.service` runs it at boot. |
+| `sudo fxbot up` | Starts the containers, and waits up to 5 minutes until the app is healthy. The embedder may still be downloading its model. `fxbot.service` runs it at boot. |
 | `sudo fxbot down` | Stops and removes the containers. The database's volume stays. |
 | `sudo fxbot apply` | Carries out the app's requests in `/var/lib/fxbot/control/requests`. `fxbot-control.service` runs it. |
 | `sudo fxbot restore <folder>` | Puts a backup in place of the database and the chat files. See below. |
 | `sudo fxbot rotate-key` | Seals every stored secret again under a new key. See below. |
+| `sudo fxbot embedder cpu\|gpu\|off` | Runs memory search's local embedder on the CPU, on a GPU, or not at all. See below. |
 
 ### fxbot update
 
 Moves to the newest stable release, or the one named, such as `0.3.1` or `0.4.0-rc.1`. In order, it:
 
-1. downloads the release's `compose.yaml` and `fxbot` command, and pulls the images it doesn't have yet
+1. downloads the release's `compose.yaml`, its GPU file for the engine, and its `fxbot` command, and pulls the images it doesn't have yet
 2. writes the new version into `/opt/fxbot/.env`, and puts the new files in place
 3. recreates the containers that changed, and waits up to 5 minutes for the app to be healthy. The new app backs up and migrates the database as it starts.
 
@@ -67,6 +68,16 @@ Stops the app, starts the database if it isn't running, drops the database, and 
 ### fxbot rotate-key
 
 Seals every stored key and token again, providers' and MCP servers' alike, under a new key, for when the old one may have leaked. It stops the app, makes a new `/etc/fxbot/secret.key`, seals everything again in one transaction, and starts the app. The old key stays beside it as `/etc/fxbot/secret.key.old`: remove it once fxbot works. If sealing fails, nothing changes, and the old key still works.
+
+### fxbot embedder
+
+```sh
+sudo fxbot embedder gpu
+```
+
+Runs the local embedder for memory search on the CPU (`cpu`), on an NVIDIA GPU (`gpu`), or not at all (`off`), and writes the choice into `/opt/fxbot/.env` as `FXBOT_EMBEDDER`. For `gpu`, it first makes a trial run, `nvidia-smi` in llama.cpp's CUDA image with the GPU, and changes nothing when no GPU answers. Then it recreates the `embed` container on the new compose files, or, for `off`, removes it. Its state goes to `/var/lib/fxbot/control/embedder-status.json`, which Settings shows. Settings' **Memory search** asks for the same through a request, which `fxbot apply` carries out.
+
+It changes what the machine runs, not where the app takes its vectors from: after `off`, pick **Off** in Settings as well. A new embedder is a new model, so the app gives every memory and message a new vector. See [Choose where memory search's vectors come from](/docs/how-to/memory-search/).
 
 ## npm scripts
 

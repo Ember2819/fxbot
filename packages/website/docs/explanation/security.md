@@ -42,6 +42,6 @@ A skill is someone else's instructions, which a bot follows like its own. fxbot 
 
 ## What it doesn't cover
 
-- Each message goes to the provider its bot uses, which sees the chat. Only a local model server keeps it on your network.
+- Each message goes to the provider its bot uses, which sees the chat. Only a local model server keeps it on your network. With a provider's embedding model for memory search, that provider also receives the text of every memory and message it turns into a vector.
 - There are no users, roles, or audit log inside fxbot.
 - The backups taken before migrations hold the database and the chat files, readable only by `fxbot`. The secrets in them stay sealed.

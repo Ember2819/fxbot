@@ -1,14 +1,15 @@
 # What setup.sh creates
 
-An install made by [`setup.sh`](/docs/reference/commands/#setupsh), on Debian or Ubuntu. fxbot runs as two containers, from one compose file, under podman or docker.
+An install made by [`setup.sh`](/docs/reference/commands/#setupsh), on Debian or Ubuntu. fxbot runs as three containers, from one compose file, under podman or docker: the app, its database, and the local embedder for memory search, which can be turned off.
 
 ## Files and folders
 
 | Path | What it is | Owner, mode |
 | --- | --- | --- |
 | `/opt/fxbot/` | The install | `root`, 755 |
-| `/opt/fxbot/compose.yaml` | The release's compose file: the app and its database | `root` |
-| `/opt/fxbot/.env` | The install's settings for compose: `FXBOT_VERSION`, `FXBOT_UID` and `FXBOT_GID` (the `fxbot` user's), `FXBOT_ENGINE` (`podman` or `docker`), and a random `FXBOT_DB_PASSWORD` | `root`, 600 |
+| `/opt/fxbot/compose.yaml` | The release's compose file: the app, its database, and the local embedder | `root` |
+| `/opt/fxbot/compose.gpu.podman.yaml` or `compose.gpu.docker.yaml` | The release's GPU file for the engine, which runs the local embedder on an NVIDIA GPU. The `fxbot` command adds it when `FXBOT_EMBEDDER` is `gpu`. | `root` |
+| `/opt/fxbot/.env` | The install's settings for compose: `FXBOT_VERSION`, `FXBOT_UID` and `FXBOT_GID` (the `fxbot` user's), `FXBOT_ENGINE` (`podman` or `docker`), `FXBOT_EMBEDDER` (`cpu`, `gpu`, or `off`: where the local embedder runs), and a random `FXBOT_DB_PASSWORD` | `root`, 600 |
 | `/opt/fxbot/fxbot` | The [`fxbot` command](/docs/reference/commands/#fxbot), linked as `/usr/local/bin/fxbot` | `root`, 755 |
 | `/opt/fxbot/.update.lock` | Held while an update runs, so a second one waits | `root` |
 | `/etc/fxbot/` | The settings and the key | `root`, 755 |
@@ -17,7 +18,7 @@ An install made by [`setup.sh`](/docs/reference/commands/#setupsh), on Debian or
 | `/var/lib/fxbot/` | The `fxbot` user's home | `fxbot`, 700 |
 | `/var/lib/fxbot/data/` | libfx's session files for each chat (`FXBOT_DATA`) | `fxbot`, 700 |
 | `/var/lib/fxbot/backups/` | Backups taken before migrations change a database in use, the last five (`FXBOT_BACKUPS`) | `fxbot`, 700 |
-| `/var/lib/fxbot/control/` | The app's update requests, in `requests/`, and the machine's `status.json`, which Settings shows during an update (`FXBOT_CONTROL`) | `fxbot`, 755 |
+| `/var/lib/fxbot/control/` | The app's requests, in `requests/`, for an update or a new place for the local embedder. The machine's answers: `status.json`, which Settings shows during an update, and `embedder-status.json`, for a switch of the embedder (`FXBOT_CONTROL`) | `fxbot`, 755 |
 | `/etc/systemd/system/fxbot.service` | Starts the containers at boot | `root` |
 | `/etc/systemd/system/fxbot-control.path` and `fxbot-control.service` | Run `fxbot apply` when the app writes a request | `root` |
 
@@ -27,19 +28,20 @@ Each backup is a folder named `<date>-before-<migration>`, holding `database.dum
 
 ## The containers
 
-The compose project is `fxbot`, with two services:
+The compose project is `fxbot`, with three services:
 
 | Service | What it is |
 | --- | --- |
 | `fxbot` | The app: `ghcr.io/iammrduncan/fxbot:<version>`, for amd64 and arm64, with Node 22, the server, the built page, and Postgres 17's `pg_dump`. It runs as the `fxbot` user's ids, and listens on `127.0.0.1:8787` on the machine. `GET /api/health` answers `{"ok":true,"version":"<version>"}`. |
 | `db` | The database: `pgvector/pgvector:0.8.7-pg17-trixie`, Postgres 17 with pgvector. Its database and role are both `fxbot`, with the password in `/opt/fxbot/.env`. Its data is in the named volume `pgdata`, not a folder on the machine. It has no port on the machine, and the app reaches it as `db`. |
+| `embed` | The local embedder for memory search: llama.cpp's server, `ghcr.io/ggml-org/llama.cpp:server-b12033`, with EmbeddingGemma 2 (`ggml-org/embeddinggemma-2-GGUF:Q8_0`). On its first start, it downloads the model, 310 MB, into the named volume `models`. It holds about 380 MB of memory, and runs at a low CPU weight (`cpu_shares: 256`), so it gives way to the rest. It has no port on the machine, and the app reaches it at `http://embed:8080/v1` (`FXBOT_EMBED_URL`). With the GPU file, it runs `server-cuda-b12033` with Qwen3-Embedding-0.6B (`Qwen/Qwen3-Embedding-0.6B-GGUF:Q8_0`) instead. With `FXBOT_EMBEDDER=off`, it doesn't run. |
 
 | Setting | Value |
 | --- | --- |
 | Restarts | After a crash (`restart: unless-stopped`) |
 | Stops | The app gets 90 seconds for running chats to finish, and the database a minute |
-| Health | The app when its port answers, which it opens after its migrations. The database when `pg_isready` answers. |
-| Log | `sudo fxbot logs`, or one container's with `sudo fxbot logs fxbot` or `sudo fxbot logs db` |
+| Health | The app when its port answers, which it opens after its migrations. The database when `pg_isready` answers. The embedder when its `/health` answers. The app doesn't wait for the embedder, and searches by words until it answers. |
+| Log | `sudo fxbot logs`, or one container's, such as `sudo fxbot logs fxbot`, `sudo fxbot logs db`, or `sudo fxbot logs embed` |
 
 ## The services
 
@@ -53,7 +55,7 @@ The user `fxbot` is a system user, with its home in `/var/lib/fxbot` and no logi
 
 ## Packages
 
-`ca-certificates` and `curl`, from apt. When the machine has neither podman nor docker, `podman` and Compose v2: `docker-compose` on Debian 13, or `docker-compose-v2` on Ubuntu 24.04. When it has podman without Compose v2, only Compose v2. With podman, `setup.sh` enables `podman.socket`, which Compose reaches podman through.
+`ca-certificates` and `curl`, from apt. When the machine has neither podman nor docker, `podman` and Compose v2: `docker-compose` on Debian 13, or `docker-compose-v2` on Ubuntu 24.04. When it has podman without Compose v2, only Compose v2. With podman, `setup.sh` enables `podman.socket`, which Compose reaches podman through. It installs nothing for a GPU: the local embedder on one needs NVIDIA's driver and container toolkit, which you install yourself ([On a GPU](/docs/how-to/memory-search/#on-a-gpu)).
 
 ## After a move from 0.2
 

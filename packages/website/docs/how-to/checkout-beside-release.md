@@ -1,8 +1,8 @@
 # Run a checkout beside a release install
 
-Work on fxbot from a git checkout, as yourself, on a machine that also runs a release. The checkout uses its own database container, key, and ports, so the two never touch: the release keeps the `fxbot` containers, `/etc/fxbot`, and port 8787.
+Work on fxbot from a git checkout, as yourself, on a machine that also runs a release. The checkout uses its own database and embedder containers, key, and ports, so the two never touch: the release keeps the `fxbot` containers, `/etc/fxbot`, and port 8787.
 
-You need Node 22.18 or newer, and podman or docker for the checkout's database. A release install already has one of them. Backups before migrations use the machine's `pg_dump`, which must be Postgres 17's.
+You need Node 22.18 or newer, and podman or docker for the checkout's database and embedder. A release install already has one of them. Backups before migrations use the machine's `pg_dump`, which must be Postgres 17's.
 
 1. Clone the repository:
 
@@ -19,16 +19,18 @@ You need Node 22.18 or newer, and podman or docker for the checkout's database. 
    sudo install -d -o "$USER" -m 700 /etc/fxbot-dev
    openssl rand -base64 32 > /etc/fxbot-dev/secret.key && chmod 400 /etc/fxbot-dev/secret.key
    pw=$(openssl rand -hex 16)
-   printf '%s\n' "FXBOT_DB_PASSWORD=$pw" "FXBOT_DATABASE_URL=postgres://fxbot:$pw@127.0.0.1:5433/fxbot_dev" FXBOT_SECRET_KEY_FILE=/etc/fxbot-dev/secret.key > .env
+   printf '%s\n' "FXBOT_DB_PASSWORD=$pw" "FXBOT_DATABASE_URL=postgres://fxbot:$pw@127.0.0.1:5433/fxbot_dev" FXBOT_EMBED_URL=http://127.0.0.1:8081/v1 FXBOT_SECRET_KEY_FILE=/etc/fxbot-dev/secret.key > .env
    ```
 
-3. Start the database, `fxbot_dev` on 127.0.0.1:5433, in a compose project of its own, `fxbot-dev`:
+3. Start the database, `fxbot_dev` on 127.0.0.1:5433, and the local embedder for memory search, on 127.0.0.1:8081, in a compose project of their own, `fxbot-dev`:
 
    ```sh
    podman compose -f deploy/compose.dev.yaml --env-file .env up -d        # or docker compose
    ```
 
    With podman as yourself, Compose reaches podman through your own socket. If it can't connect, turn the socket on once with `systemctl --user enable --now podman.socket`.
+
+   The embedder downloads its model, 310 MB, on its first start, and until it answers, memory search uses words alone. To put it on another port, set `FXBOT_EMBED_PORT` in `.env`, and the same port in `FXBOT_EMBED_URL`.
 
 4. Start fxbot:
 
@@ -50,8 +52,8 @@ An app installed from the development address is the development page: every cha
 
 Before 0.3, a checkout's `fxbot_dev` database was on the machine's own Postgres. To move it into the container:
 
-1. In `.env`, put the `FXBOT_DB_PASSWORD` and `FXBOT_DATABASE_URL` lines from step 2 in place of the old `FXBOT_DATABASE_URL` and `PGHOST`. Keep `FXBOT_SECRET_KEY_FILE` and its key, which sealed the keys and tokens in that database.
-2. Start the database, as in step 3.
+1. In `.env`, put the `FXBOT_DB_PASSWORD`, `FXBOT_DATABASE_URL`, and `FXBOT_EMBED_URL` lines from step 2 in place of the old `FXBOT_DATABASE_URL` and `PGHOST`. Keep `FXBOT_SECRET_KEY_FILE` and its key, which sealed the keys and tokens in that database.
+2. Start the database and the embedder, as in step 3.
 3. Copy the old database across:
 
    ```sh

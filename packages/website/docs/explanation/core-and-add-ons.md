@@ -8,7 +8,7 @@ The core is what every bot needs, and what fxbot needs to run:
 - bots, each with its instructions and one long-running chat
 - providers: accounts, keys, and local model servers
 - the library, one copy of every file the chats hold
-- each bot's history, which the bot can search
+- each bot's memories, and its history, which the bot can search by words and by meaning
 - the app, which installs on phones and desktops
 - releases, updates, and the database's migrations
 - keys and tokens, sealed in Postgres

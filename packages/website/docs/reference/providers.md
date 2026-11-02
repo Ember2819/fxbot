@@ -30,3 +30,17 @@ The kinds of provider in **Add provider…**, in Settings. Each bot runs on one 
 - models.dev is read at most once a day.
 - The model picker takes a model id that the list lacks.
 - A provider's **Context window**, on Ollama, LM Studio, and Other server, overrides what the server reports, for every model it serves.
+
+## Embeddings
+
+Memory search can take its vectors from a provider's embedding model, picked in Settings' **Memory search** ([Choose where memory search's vectors come from](/docs/how-to/memory-search/)).
+
+| Kind | Embeddings from |
+| --- | --- |
+| OpenAI key, OpenRouter key, Ollama, LM Studio, Other server | `/embeddings` under its base URL |
+| AI Gateway key, Vercel account | `https://ai-gateway.vercel.sh/v1/embeddings`. A Vercel account is untested. |
+| ChatGPT plan, Grok plan, OpenCode Zen key, OpenCode Go key | None |
+
+- The model's id is typed in, as the provider names it.
+- Picking one embeds a test string first. If that fails, the old setting stays.
+- Removing the provider turns search by meaning off, until another is picked.

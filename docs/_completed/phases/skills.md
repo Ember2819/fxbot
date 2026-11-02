@@ -309,4 +309,4 @@ This is the first idea of this page: a bot writes down what worked as a skill, s
 - A bot proposes a skill through a write tool. Its row has the bot as author instead of an add-on.
 - The owner reads it and approves it, and then it joins that bot's catalog.
 
-It needs its own plan, and sits close to [memories](../../phases/memories.md).
+It needs its own plan, and sits close to [memories](memories.md).

@@ -143,7 +143,7 @@ These are read from docs, source, and read-only requests to public APIs, as of N
 
 ### The add-on page
 
-Opening a card fetches the add-on's definition and shows its page. The definition is a registry entry, a plugin at its pin, or a skill at its commit. Nothing is saved yet. The page for herdr, the first plugin ([plugins](../../phases/plugins.md#fxbots-extension)):
+Opening a card fetches the add-on's definition and shows its page. The definition is a registry entry, a plugin at its pin, or a skill at its commit. Nothing is saved yet. The page for herdr, the first plugin ([plugins](../../phases/plugins.md#a-plugin)):
 
 ```text
 herdr                                                         [Add]
@@ -172,7 +172,7 @@ Information
 - **Sections,** each shown only when the add-on has one:
   - **MCP servers:** each server's name, host, and sign-in (none, keys, or OAuth, found by probing it). See [mcp.md](mcp.md#adding-a-server).
   - **Skills:** each skill's name and description, five at a time, each opening its text. See [skills.md](skills.md#ui).
-  - **Runs on this machine, Hooks, and Setup:** every command with its arguments, untruncated. `sh -c`, `curl | sh`, and `sudo` are flagged. See [plugins.md](../../phases/plugins.md#installing).
+  - **Runs on this machine, Hooks, and Setup:** every command with its arguments, untruncated. `sh -c`, `curl | sh`, and `sudo` are flagged. See [plugins.md](../../phases/plugins.md#installing-updating-and-removing).
   - **Not used by fxbot:** a count of each part that fxbot doesn't run, such as commands, agents, LSP servers, and other clients' hooks.
   - **Information:**
     - what it includes

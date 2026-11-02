@@ -16,7 +16,7 @@ An install stays on its release until someone chooses the next one. fx, which fx
 
 ## An image per release
 
-An install runs two containers, from the release's compose file: the app, from fxbot's image for that version, and its database, from pgvector's Postgres image. Every machine then runs the same Node, the same Postgres, and pgvector, whatever its distro ships. `/opt/fxbot/.env` names the version that runs.
+An install runs three containers, from the release's compose file: the app, from fxbot's image for that version, its database, from pgvector's Postgres image, and the local embedder for memory search, from llama.cpp's server image, unless it's turned off. Every machine then runs the same Node, the same Postgres, and pgvector, whatever its distro ships. `/opt/fxbot/.env` names the version that runs.
 
 The app doesn't start containers itself, and has no podman or docker socket. Settings' **Update** writes a request into a folder the app shares with the machine. systemd sees it and runs the machine's `fxbot` command, as root, which takes only a version from the request. The command downloads the release's compose file and itself, pulls the images it doesn't have yet, writes the new version, and recreates the app's container. Running chats get up to 90 seconds to finish, the database keeps running, and the app is down for a few seconds. The command writes each step to a status file, which Settings shows, and the page reloads onto the new version once it answers.
 

@@ -18,6 +18,7 @@ export const groups = [
       { slug: "how-to/add-a-provider", label: "Add a provider" },
       { slug: "how-to/add-a-skill", label: "Add a skill" },
       { slug: "how-to/add-an-mcp-server", label: "Add an MCP server" },
+      { slug: "how-to/memory-search", label: "Choose memory search's vectors" },
       { slug: "how-to/reach-it", label: "Reach it from other devices" },
       { slug: "how-to/tailscale-service", label: "Serve it at its own name" },
       { slug: "how-to/update", label: "Update to a new release" },
@@ -46,7 +47,7 @@ export const groups = [
       { slug: "explanation/security", label: "Security model" },
       { slug: "explanation/releases", label: "Releases and updates" },
       { slug: "explanation/architecture", label: "Architecture" },
-      { slug: "explanation/bots-and-chats", label: "Bots, chats, and the library" },
+      { slug: "explanation/bots-and-chats", label: "Bots, chats, memories, and the library" },
     ],
   },
 ];
