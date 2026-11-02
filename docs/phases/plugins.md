@@ -322,7 +322,7 @@ A plugin runs with everything fxbot can reach, as Pi, opencode, and eve plugins 
 
 ### Not in this phase
 
-- Local MCP servers (stdio), setup steps that install tooling, and npm dependencies ([question 4](#5-open-questions)). A plugin can start a process from its own server code.
+- Local MCP servers (stdio), setup steps that install tooling, and npm dependencies ([question 4](#5-open-questions)). A plugin can start a process from its own server code. Installed programs belong on the [agent computer](computer.md), a plugin that other plugins build on.
 - Claude-format plugins and marketplaces. A plugin's own skills and remote servers already use the shared format.
 - Hooks inside a model request, which libfx doesn't offer.
 - Hooks for compaction. [Context management](context-management.md) adds one when it builds compaction.
@@ -414,7 +414,7 @@ Each has a default.
 1. **Where fxbot's own plugins live.** *Default:* `plugins/<name>/` in this repository, outside the workspaces and never imported by the core, added from GitHub like anyone's. The alternative is a repository of their own.
 2. **The namespace.** *Default:* `io.github.iammrduncan.fxbot`, which the project's GitHub account controls, until the project's domain is ready.
 3. **Dependencies.** *Default:* none installed. A plugin bundles what it needs. Pi installs `dependencies`, which brings install scripts and a slower add.
-4. **Local MCP servers and setup steps.** *Default:* a later phase. A plugin that needs a process starts it from its own code, as herdr's talks to a socket instead of running herdr-mcp.
+4. **Local MCP servers and setup steps.** *Default:* the [agent computer](computer.md) phase. A plugin that needs a process starts it from its own code, as herdr's talks to a socket instead of running herdr-mcp.
 5. **How page code loads.** *Default:* a CommonJS bundle run with the app's `require`, as opencode does. The alternative is ES modules with an import map, which needs files that re-export the app's React, made at build time.
 6. **Who answers in a room.** *Default:* each member bot answers each of the owner's messages once, in turn, and bots never start rounds. Later choices could be only the bot that's named, or bots answering each other with a cap on rounds.
 7. **Turns a plugin starts in a bot's own chat.** *Default:* shown with "From <plugin>" on the message.

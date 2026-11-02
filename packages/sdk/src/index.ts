@@ -41,7 +41,7 @@ export type FxbotOptions = {
   registryUrl?: string;
   /** The official MCP registry, searched only when asked to search everything. Default `https://registry.modelcontextprotocol.io`. */
   everythingUrl?: string;
-  /** The site that publishes fxbot's own lists, `mcp-registry.json` and `skills-registry.json`, read hourly. Without it, the lists this release shipped with. */
+  /** The site that publishes fxbot's own lists, `mcp-registry.json` and `skills-registry.json`, read hourly. Default fxbot's, `https://fxbot.sh`. Until a read succeeds, the lists this release shipped with. */
   listsUrl?: string;
   /** Mirror the registry at start and hourly. Default true; checks turn it off and sync by hand. */
   syncRegistry?: boolean;
@@ -89,13 +89,14 @@ export async function createFxbot(options: FxbotOptions) {
   // again, one change at a time.
   const registryUrl = options.registryUrl ?? "https://api.mcp.github.com";
   const everythingUrl = options.everythingUrl ?? "https://registry.modelcontextprotocol.io";
-  const lists = options.listsUrl?.replace(/\/+$/, "");
+  const lists = (options.listsUrl ?? "https://fxbot.sh").replace(/\/+$/, "");
   const registry = createRegistry({
     sql: store.sql,
     fetch,
     mirrorUrl: registryUrl,
     everythingUrl,
-    ...(lists ? { fxbotUrl: `${lists}/mcp-registry.json`, fxbotSkillsUrl: `${lists}/skills-registry.json` } : {}),
+    fxbotUrl: `${lists}/mcp-registry.json`,
+    fxbotSkillsUrl: `${lists}/skills-registry.json`,
   });
   if (options.syncRegistry !== false) void registry.sync();
   const mcp = await createMcp({

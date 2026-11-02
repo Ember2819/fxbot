@@ -2,6 +2,11 @@
 
 Each release of fxbot, newest first. A release that adds migrations, bumps libfx, or needs a step by hand opens with **Before upgrading**. Lines for the next release collect under Unreleased, and the release workflow publishes a version's section as its notes.
 
+## Unreleased
+
+- The website's top bar and the README link to the Hackers in the Loop community on [Discord](https://discord.gg/3Qs2uejUf9).
+- fxbot reads its own lists of MCP servers and skills from its site, https://fxbot.sh, every hour, so new picks show up between releases. Before, it read them only with `FXBOT_LISTS_URL` set, which now points it at another site.
+
 ## 0.2.1 (2026-11-02)
 
 A website release. The app is the same as 0.2.0.

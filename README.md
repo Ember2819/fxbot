@@ -1,5 +1,7 @@
 # fxbot
 
+Join the Hackers in the Loop community on [Discord](https://discord.gg/3Qs2uejUf9) to talk about fxbot, share what you build with it, and get help.
+
 fxbot is your bot, built and configured how you want it. It starts simple, with a lean, fast core: bots, their chats, and their files. Make each bot yours, from its look and instructions to its model and tools. Grow fxbot with only the add-ons you want: skills and MCP servers today, and plugins that change the app itself next.
 
 fxbot is local first. One Node server and Postgres run on your own machine, and the browser is the UI on desktop and mobile. [libfx](https://fx.sh/docs/lib) sends each chat to the provider its bot uses: a local model server such as Ollama or LM Studio, an API key, or a ChatGPT, Grok, or Vercel account signed in with a device code.
@@ -33,22 +35,21 @@ In order of execution priority. Checked phases are built. Each is marked **core*
 - [x] [Releases](docs/_completed/phases/releases.md) (core): install a release, and update when the next one is ready
 - [x] [Add-ons](docs/_completed/phases/addons.md) (core seam): search GitHub's MCP registry, add a server from its page, and update installed ones
 - [x] [Skills](docs/_completed/phases/skills.md) (core seam): instructions bots read when a task needs them, from fxbot's list and skills.sh
-- [ ] [Plugins](docs/phases/plugins.md) (core: the plugin API): add-ons that change the app, with hooks, tools, data, and screens of their own; chat rooms and herdr first
 - [ ] [Memories](docs/phases/memories.md) (core): each bot keeps what it has learned
-- [ ] [Cross-bot messaging](docs/phases/cross-bot-messaging.md) (add-on): bots message each other
-- [ ] [Knowledge base](docs/phases/knowledge-base.md) (add-on): knowledge the bots draw on
+- [ ] [Plugins](docs/phases/plugins.md) (core: the plugin API): add-ons that change the app, with hooks, tools, data, and screens of their own; [chat rooms](docs/phases/chat-rooms.md) and herdr first
+- [ ] [Agent computer](docs/phases/computer.md) (add-on, a plugin others build on): a shell, files, and programs for bots, for the add-ons that need one
 - [ ] [Permissions](docs/phases/permissions.md) (add-on, on a core hook): ask, auto, and yolo modes for tool calls
-- [ ] [Bot tools](docs/phases/tools.md) (core, for core data only): host tools bots call during a turn
-- [ ] [Web search](docs/phases/web-search.md) (add-on): bots search and read the web, and cite it
-- [ ] [Context management](docs/phases/context-management.md) (core): one never-ending chat that fits the model's context window
-- [ ] [Past sessions](docs/phases/past-sessions.md) (core): earlier conversations stay browsable
-- [ ] [Soul](docs/phases/soul.md) (add-on): a written persona behind each bot's system prompt
+- [ ] [Cross-bot messaging](docs/phases/cross-bot-messaging.md) (add-on): bots message each other
 - [ ] [Routines](docs/phases/routines.md) (add-on): saved tasks a bot runs on a schedule
 - [ ] [Triggers](docs/phases/triggers.md) (add-ons): webhooks and new email start a bot's turn
-- [ ] [Chat rooms](docs/phases/chat-rooms.md) (add-on): more than one bot in a conversation, built with plugins
+- [ ] [Soul](docs/phases/soul.md) (add-on): a written persona behind each bot's system prompt
+- [ ] [Context management](docs/phases/context-management.md) (core): one never-ending chat that fits the model's context window, past the compaction libfx does
+- [ ] [Past sessions](docs/phases/past-sessions.md) (core): earlier conversations stay browsable
+- [ ] [Knowledge base](docs/phases/knowledge-base.md) (add-on): knowledge the bots draw on
 - [ ] [Pages](docs/phases/pages.md) (add-on): reports and guides bots write for reading outside the chat
 - [ ] [herdr screen](docs/phases/herdr-screen.md) (add-on): the [herdr](https://herdr.dev) interface in the app, from the herdr plugin
 - [ ] [Remote control](docs/phases/remote-control.md) (add-on): heavy work handed to coding agents through herdr
+- [ ] [Web search](docs/phases/web-search.md) (add-on): bots search and read the web, and cite it
 - [ ] [Vault](docs/phases/vault.md) (add-on): saved secrets and details bots use when allowed
 - [ ] [1Password](docs/phases/1password.md) (add-on): bots use stored logins and items from 1Password
 - [ ] [Image and video generation](docs/phases/media-generation.md) (add-on): bots create images and video
@@ -156,7 +157,7 @@ The server reads these from the environment, or from an uncommitted `.env` in th
 | `FXBOT_CLIENT_METADATA_URL` | Optional. The project's published OAuth client document, for MCP servers that sign in with one. Without it, fxbot registers itself with each server |
 | `FXBOT_MCP_REGISTRY` | Optional. The MCP registry that fxbot mirrors hourly for search, and that registry entries come from. Default GitHub's, `https://api.mcp.github.com` |
 | `FXBOT_MCP_EVERYTHING` | Optional. The registry that Search everything asks, once per search. Default the official one, `https://registry.modelcontextprotocol.io` |
-| `FXBOT_LISTS_URL` | Optional. The site that publishes fxbot's own lists of MCP servers and skills, such as `https://<domain>`. fxbot reads its `mcp-registry.json` and `skills-registry.json` hourly. Without it, the lists the release shipped with |
+| `FXBOT_LISTS_URL` | Optional. The site that publishes fxbot's own lists of MCP servers and skills. fxbot reads its `mcp-registry.json` and `skills-registry.json` hourly, and keeps the lists the release shipped with until a read succeeds. Default fxbot's site, `https://fxbot.sh` |
 | `FXBOT_BACKUPS` | Where the database and chat files are backed up before migrations run. Default `./backups` |
 | `FXBOT_UPDATE_CHECK` | `off` stops the daily check for a newer release, which asks GitHub about the repository in `package.json` |
 | `FXBOT_RELEASES_URL` | Optional. Where that check reads the newest release, in the shape of GitHub's `releases/latest`, for a fork or a mirror |

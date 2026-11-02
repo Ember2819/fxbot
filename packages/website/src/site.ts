@@ -1,5 +1,7 @@
 // Facts every page shares.
 export const repo = "https://github.com/iammrduncan/fxbot";
+// The Hackers in the Loop community's Discord, where fxbot is talked about.
+export const discord = "https://discord.gg/3Qs2uejUf9";
 export const installCommand = "curl -fsSL https://raw.githubusercontent.com/iammrduncan/fxbot/main/setup.sh | sudo bash";
 
 // Where the site is published. Canonical links, the social card, and the sitemap give full addresses on it.
