@@ -35,6 +35,7 @@ In order of execution priority. Checked phases are built. Each is marked **core*
 - [x] [Releases](docs/_completed/phases/releases.md) (core): install a release, and update when the next one is ready
 - [x] [Add-ons](docs/_completed/phases/addons.md) (core seam): search GitHub's MCP registry, add a server from its page, and update installed ones
 - [x] [Skills](docs/_completed/phases/skills.md) (core seam): instructions bots read when a task needs them, from fxbot's list and skills.sh
+- [ ] [Containers](docs/phases/containers.md) (core): podman or docker, and one compose file for fxbot, its database with pgvector, and its local embedder
 - [ ] [Memories](docs/phases/memories.md) (core): each bot keeps what it has learned
 - [ ] [Plugins](docs/phases/plugins.md) (core: the plugin API): add-ons that change the app, with hooks, tools, data, and screens of their own; [chat rooms](docs/phases/chat-rooms.md) and herdr first
 - [ ] [Agent computer](docs/phases/computer.md) (add-on, a plugin others build on): a shell, files, and programs for bots, for the add-ons that need one
