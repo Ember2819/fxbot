@@ -1,0 +1,19 @@
+# A checkout's database, for npm run dev and npm run server, on the machine's loopback beside a release install.
+# The checkout's .env sets FXBOT_DB_PASSWORD, and FXBOT_DATABASE_URL to
+# postgres://fxbot:<that password>@127.0.0.1:5433/fxbot_dev. From the checkout's folder:
+#
+#   podman compose -f deploy/compose.dev.yaml --env-file .env up -d        (or docker compose)
+name: fxbot-dev
+services:
+  db:
+    image: docker.io/pgvector/pgvector:0.8.7-pg17-trixie
+    environment:
+      POSTGRES_USER: fxbot
+      POSTGRES_DB: fxbot_dev
+      POSTGRES_PASSWORD: ${FXBOT_DB_PASSWORD:?set FXBOT_DB_PASSWORD in .env}
+    ports: [ "127.0.0.1:${FXBOT_DB_PORT:-5433}:5432" ]
+    volumes: [ pgdata:/var/lib/postgresql/data ]
+    healthcheck: { test: [ CMD, pg_isready, -h, 127.0.0.1, -U, fxbot, -d, fxbot_dev ], interval: 3s }
+    restart: unless-stopped
+volumes:
+  pgdata: {}

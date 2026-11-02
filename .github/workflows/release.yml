@@ -1,8 +1,9 @@
 name: release
 
 # A release is a version in package.json that has no tag yet, on main. It is tagged and published only after it
-# typechecks and builds, with its section of CHANGELOG.md as the notes; a version such as 0.3.0-rc.1 is published as a
-# prerelease. Every other push to main does nothing, and release branches, where work happens, never run it.
+# typechecks and builds, and its image is on ghcr.io, with its section of CHANGELOG.md as the notes; a version such as
+# 0.3.0-rc.1 is published as a prerelease. Every other push to main does nothing, and release branches, where work
+# happens, never run it.
 on:
   push:
     branches: [main]
@@ -80,8 +81,40 @@ jobs:
           fi
           { echo "notes<<FXBOT_NOTES"; printf '%s\n' "$notes"; echo "FXBOT_NOTES"; } >> "$GITHUB_OUTPUT"
 
-  publish:
+  # fxbot's image for amd64 and arm64, tagged x.y.z, x.y, and latest for a stable version. The page is built on the
+  # runner's own CPU (see the Dockerfile), so QEMU runs only the last stage's apt-get.
+  image:
     needs: check
+    if: needs.check.outputs.release == 'true'
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - uses: docker/setup-qemu-action@99012661954931238ded8c8b007157a8430204e1 # v4.4.0
+      - uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
+      - uses: docker/login-action@81c6f93d4bc991e510b342a00b419b3bb4efc5c6 # v4.7.0
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ github.token }}
+      - id: meta
+        uses: docker/metadata-action@dc802804100637a589fabce1cb79ff13a1411302 # v6.2.0
+        with:
+          images: ghcr.io/${{ github.repository }}
+          tags: |
+            type=semver,pattern={{version}},value=${{ needs.check.outputs.tag }}
+            type=semver,pattern={{major}}.{{minor}},value=${{ needs.check.outputs.tag }}
+      - uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
+        with:
+          platforms: linux/amd64,linux/arm64
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+
+  # Settings offers a release only once its image is there.
+  publish:
+    needs: [check, image]
     if: needs.check.outputs.release == 'true'
     runs-on: ubuntu-latest
     permissions:
