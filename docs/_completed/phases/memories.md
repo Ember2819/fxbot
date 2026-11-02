@@ -369,6 +369,8 @@ A memory is `{ id, text, savedBy, createdAt, updatedAt, messageId }`. `@fxbot/sd
 - **The status retries the fill-in** when it finds the embedder answering again, so an old error clears without waiting a minute. When the machine runs no embedder but Settings asks for one, the status says so.
 - **`open()` reads the context window on every turn,** for the memory budget, from the cached model list. Before, it read it only for a bot with skills.
 - **`0005_memories` checks for pgvector first.** On a Postgres without it, such as a 0.2 install that updated in place, it stops with a message that says to run `setup.sh`.
+- **The two lists are fused in the SDK** (`fuse()` in `embeddings.ts`), from two queries run at once, not in one statement. The same function serves memories and `chat_history`.
+- **A checkout with no `FXBOT_EMBED_URL`** and Local picked says so in Settings, instead of waiting.
 - **The embedding status has its own route,** `GET /api/settings/embedding`, so reading settings stays one query.
 
 ### Not in this phase

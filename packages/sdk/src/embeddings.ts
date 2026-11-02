@@ -82,7 +82,7 @@ export function createEmbeddings({ sql, fetch, localUrl, target }: { sql: Sql; f
       const where = await target(chosen.embeddingProvider);
       return { model: chosen.embeddingModel, url: where.url, headers: where.apiKey ? { authorization: `Bearer ${where.apiKey}` } : {}, fetch: where.fetch };
     }
-    if (!localUrl) return null;
+    if (!localUrl) throw failure("This fxbot has no local embedder. Set FXBOT_EMBED_URL, or pick a provider's model or Off.");
     return { model: await localModel(), url: `${localUrl}/embeddings`, headers: {}, fetch };
   }
 
