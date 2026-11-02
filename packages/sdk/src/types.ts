@@ -32,12 +32,12 @@ export type Settings = { defaultProvider: string };
 // A release of fxbot: its version, its notes, and its page.
 export type Release = { version: string; notes: string; url: string };
 // The running version, the newest release when it is newer, and whether Settings can update to it: only in an install
-// made by setup.sh, under systemd. `updating` is an update's steps so far, its error, or its restart.
+// made by setup.sh, where the machine carries out the update. `updating` is its steps so far, and its error.
 export type UpdateStatus = {
   version: string;
   latest: Release | null;
   canUpdate: boolean;
-  updating: { to: string; steps: string[]; error?: string; restarting?: boolean } | null;
+  updating: { to: string; steps: string[]; error?: string } | null;
 };
 
 // A file sent with a message: `data` is base64 on the way in, and `url` is its library file once fxbot keeps it.

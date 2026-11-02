@@ -5,7 +5,7 @@ import { extname, join, normalize } from "node:path";
 import { Readable } from "node:stream";
 import { pipeline } from "node:stream/promises";
 import type { ReadableStream } from "node:stream/web";
-import { installed, repository, update, version } from "./update.ts";
+import { canUpdate, lastUpdate, repository, requestUpdate, version, waiting } from "./control.ts";
 
 // Loopback by default. Other devices reach it through `tailscale serve`; the page never holds a secret. In its container
 // it listens on FXBOT_HOST, 0.0.0.0, and compose publishes the port on the machine's loopback only. FXBOT_PORT lets a
@@ -237,34 +237,30 @@ const server = createServer(async (req, res) => {
 
 server.listen(port, host, () => console.log(`fxbot server on http://${host}:${port}`));
 
-// Stop taking requests, then let libfx finish the turns this process started. 75 asks systemd for a restart.
-async function shutdown(code = 0) {
+// Stop taking requests, then let libfx finish the turns this process started.
+async function shutdown() {
   server.close();
   server.closeAllConnections();
   await fxbot.close();
-  process.exit(code);
+  process.exit(0);
 }
 
-// Settings updates only an install made by setup.sh, under systemd (which sets INVOCATION_ID), since systemd starts the
-// new release once this one exits. Elsewhere Settings shows the commands.
-const canUpdate = Boolean(process.env.INVOCATION_ID && installed());
-let updating: UpdateStatus["updating"] = null;
-const updateStatus = (): UpdateStatus => ({ ...fxbot.release(), canUpdate, updating });
+// Settings updates an install made by setup.sh, by asking the machine (control.ts). An update that reached the running
+// version is over, and one that failed shows only while its release is still the newest.
+function updateStatus(): UpdateStatus {
+  const release = fxbot.release();
+  const asked = canUpdate ? waiting() : null;
+  if (asked) return { ...release, canUpdate, updating: { to: asked, steps: ["Asking the machine to update"] } };
+  const run = canUpdate ? lastUpdate() : null;
+  const shown = run && (run.state === "working" || (run.state !== "done" && run.to === release.latest?.version));
+  return { ...release, canUpdate, updating: shown ? { to: run.to, steps: run.steps, ...(run.error ? { error: run.error } : {}) } : null };
+}
 function startUpdate() {
   const { latest } = fxbot.release();
-  if (!canUpdate) fail(400, "Settings can update an install made by setup.sh. Here, use npm run update or git.");
+  if (!canUpdate) fail(400, "Settings updates an install made by setup.sh. Update a checkout with git.");
   if (!latest) fail(400, `fxbot ${version} is the newest release.`);
-  if (updating && !updating.error) fail(409, "An update is running.");
-  const now: NonNullable<UpdateStatus["updating"]> = { to: latest!.version, steps: [] };
-  updating = now;
-  update({ to: latest!.version, log: (step) => now.steps.push(step) }).then(
-    () => {
-      now.restarting = true;
-      // Long enough for the page's next poll to see it.
-      setTimeout(() => void shutdown(75), 1500);
-    },
-    (error: Error) => (now.error = error.message),
-  );
+  if (waiting() || lastUpdate()?.state === "working") fail(409, "An update is running.");
+  requestUpdate(latest!.version);
   return updateStatus();
 }
 process.once("SIGINT", () => void shutdown());

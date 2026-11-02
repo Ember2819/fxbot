@@ -9,8 +9,8 @@ import { pageVersion, reloadNow } from "./pwa.ts";
 const wait = (ms: number) => new Promise((done) => setTimeout(done, ms));
 
 // Settings' version row. When a newer release is out it shows the notes, and Update in an install made by setup.sh,
-// or the command anywhere else. During an update it shows each step, waits through the restart, and reloads the page
-// once the server names the new version.
+// where the machine carries out the update. During an update it shows each step the machine reports, waits while the
+// app restarts, and reloads the page once the server names the new version, or shows why it went back.
 export function Version() {
   const [status, setStatus] = useState<UpdateStatus | null>(null);
   const [error, setError] = useState("");
@@ -24,25 +24,27 @@ export function Version() {
     const timer = setInterval(() => client.update.get().then(setStatus, () => setRestarting(true)), 1000);
     return () => clearInterval(timer);
   }, [running, restarting]);
-  useEffect(() => {
-    if (status?.updating?.restarting) setRestarting(true);
-  }, [status]);
-  // The old server stops, systemd starts the new one, and its migrations run first.
+  // The machine stops the app and starts the new release, whose migrations run first. If it doesn't start, the old one
+  // comes back with the reason.
   useEffect(() => {
     if (!restarting || !status) return;
     let stopped = false;
     void (async () => {
       while (!stopped) {
         await wait(1500);
-        const now = await client.health().catch(() => null);
+        const now = await client.update.get().catch(() => null);
         if (now && now.version !== status.version) return void reloadNow();
+        if (now?.updating?.error) {
+          setStatus(now);
+          return setRestarting(false);
+        }
       }
     })();
     return () => void (stopped = true);
   }, [restarting]);
 
   const start = () => {
-    if (!confirm(`Update fxbot to ${status!.latest!.version}? It restarts when the new version is ready, and running chats finish first.`)) return;
+    if (!confirm(`Update fxbot to ${status!.latest!.version}? The machine downloads it, then fxbot restarts, and running chats finish first.`)) return;
     client.update.start().then(setStatus, (e: Error) => setError(e.message));
   };
   if (!status) return error ? <p className="text-sm text-destructive">{error}</p> : null;
@@ -83,9 +85,7 @@ export function Version() {
               Update to {latest.version}
             </Button>
           ) : (
-            <p className="text-muted-foreground">
-              Update from the machine fxbot runs on: <code className="font-mono">npm run update</code>, then restart fxbot.
-            </p>
+            <p className="text-muted-foreground">Settings updates an install made by setup.sh. This checkout updates with git.</p>
           )}
         </>
       )}
@@ -93,7 +93,7 @@ export function Version() {
         <ol className="grid gap-1.5">
           {updating.steps.map((step, i) => (
             <li key={i} className="flex items-center gap-2">
-              {i < updating.steps.length - 1 || updating.restarting ? <CheckIcon className="size-4" /> : updating.error ? <span className="size-4" /> : <LoaderCircleIcon className="size-4 animate-spin" />}
+              {i < updating.steps.length - 1 || restarting ? <CheckIcon className="size-4" /> : updating.error ? <span className="size-4" /> : <LoaderCircleIcon className="size-4 animate-spin" />}
               {step}
             </li>
           ))}
