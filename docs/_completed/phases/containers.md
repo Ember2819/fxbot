@@ -321,6 +321,8 @@ About 650 lines added and 200 removed:
 - **Added:** `Dockerfile` 30, `deploy/compose.yaml` 40, `deploy/compose.dev.yaml` 15, `deploy/fxbot` 150, `deploy/health` 2, `setup.sh` about 200 (rewritten), the workflow 30, `control.ts` 50, and changes in `index.ts` and `release.tsx`.
 - **Removed:** `update.ts` (128 lines), most of the old `setup.sh`, and `npm run update`.
 
+Built: 549 lines added and 276 removed across the image, `deploy/`, `setup.sh`, the workflow, and the app, not counting docs.
+
 ## 4. Checklist
 
 Checks run on this machine, which has podman 5.4.2 and Docker Compose, beside the owner's 0.2 install, with other names and ports, and are removed after. Writing systemd units or packages to this machine needs the owner's go-ahead. The rest is checked here, and the full `setup.sh` on a fresh machine is a human check.
