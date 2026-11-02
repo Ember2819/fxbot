@@ -1,0 +1,42 @@
+# fxbot's release install: the app and its database. setup.sh puts this file in /opt/fxbot beside an .env that sets
+# FXBOT_VERSION, FXBOT_UID and FXBOT_GID (the fxbot user's), FXBOT_DB_PASSWORD, and FXBOT_ENGINE. The fxbot command
+# there runs it. FXBOT_ROOT puts the machine's folders under another root, for checks.
+name: fxbot
+services:
+  fxbot:
+    image: ${FXBOT_IMAGE:-ghcr.io/iammrduncan/fxbot}:${FXBOT_VERSION:?set FXBOT_VERSION}
+    user: "${FXBOT_UID:?set FXBOT_UID}:${FXBOT_GID:?set FXBOT_GID}"
+    env_file: [ "${FXBOT_ROOT:-}/etc/fxbot/fxbot.env" ]
+    environment:
+      FXBOT_DATABASE_URL: postgres://fxbot:${FXBOT_DB_PASSWORD:?set FXBOT_DB_PASSWORD}@db/fxbot
+      FXBOT_SECRET_KEY_FILE: /run/secrets/fxbot_key
+      FXBOT_DATA: /var/lib/fxbot/data
+      FXBOT_BACKUPS: /var/lib/fxbot/backups
+      FXBOT_CONTROL: /var/lib/fxbot/control
+    secrets: [fxbot_key]
+    volumes:
+      - ${FXBOT_ROOT:-}/var/lib/fxbot/data:/var/lib/fxbot/data
+      - ${FXBOT_ROOT:-}/var/lib/fxbot/backups:/var/lib/fxbot/backups
+      - ${FXBOT_ROOT:-}/var/lib/fxbot/control:/var/lib/fxbot/control
+    # The machine's loopback only, as fxbot always listened. Tailscale or a proxy reaches it there.
+    ports: [ "127.0.0.1:${FXBOT_PORT:-8787}:8787" ]
+    depends_on:
+      db: { condition: service_healthy }
+    healthcheck: { test: [ CMD, fxbot-health ], interval: 3s, timeout: 2s, retries: 3 }
+    restart: unless-stopped
+  # Reached only by the app, by its name: no port on the machine.
+  db:
+    image: docker.io/pgvector/pgvector:0.8.7-pg17-trixie
+    environment:
+      POSTGRES_USER: fxbot
+      POSTGRES_DB: fxbot
+      POSTGRES_PASSWORD: ${FXBOT_DB_PASSWORD:?set FXBOT_DB_PASSWORD}
+    volumes: [ pgdata:/var/lib/postgresql/data ]
+    # Over TCP: during its first start the database answers on its socket before it's ready.
+    healthcheck: { test: [ CMD, pg_isready, -h, 127.0.0.1, -U, fxbot, -d, fxbot ], interval: 3s }
+    stop_grace_period: 1m
+    restart: unless-stopped
+secrets:
+  fxbot_key: { file: "${FXBOT_ROOT:-}/etc/fxbot/secret.key" }
+volumes:
+  pgdata: {}
