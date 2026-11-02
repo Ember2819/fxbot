@@ -34,9 +34,9 @@ export function pages() {
     head: `<title>${escape(title)}</title>\n    <meta name="description" content="${escape(description)}" />`,
     body: renderToStaticMarkup(body),
   });
-  const about = "fxbot is a small self-hosted web app for long-running chats with bot profiles, on a machine of your own.";
+  const about = "fxbot is your bot, built and configured how you want it: a lean, local-first core that works with local models and grows with the add-ons you pick.";
   return [
-    page("index.html", "fxbot: your bots, on your own machine", about, <Home />),
+    page("index.html", "fxbot: your bot, built how you want it", about, <Home />),
     ...docs.map((doc) => page(`${doc.path}index.html`, `${doc.title} · fxbot docs`, doc.description || about, <DocPage doc={doc} />)),
     page("404.html", "Not found · fxbot", about, <NotFound />),
   ];

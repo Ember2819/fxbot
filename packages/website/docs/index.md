@@ -1,5 +1,5 @@
 # fxbot docs
 
-fxbot is a small web app for long-running chats with bot profiles. You run it on a machine of your own, and open it there, or from your phone and other devices: Tailscale is the recommended way in, and [other ways](/docs/how-to/reach-it/) work too.
+fxbot is your bot, built and configured how you want it. It starts with a lean, fast core, works with local models as well as hosted ones, and grows with the [add-ons](/docs/explanation/core-and-add-ons/) you pick. You run it on a machine of your own, and open it there, or from your phone and other devices: Tailscale is the recommended way in, and [other ways](/docs/how-to/reach-it/) work too.
 
 New to it? Start with the tutorial, [Your first fxbot](/docs/tutorials/first-fxbot/). The docs are in four parts, each for a different need.

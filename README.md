@@ -1,10 +1,12 @@
 # fxbot
 
-fxbot is a small installable web app for long-running chats with bot profiles. The browser is the UI on desktop and mobile. One Node server runs [libfx](https://fx.sh/docs/lib) and sends each conversation to the provider its bot uses: a ChatGPT, Grok, or Vercel account signed in with a device code, an API key, or a local model server.
+fxbot is your bot, built and configured how you want it. It starts simple, with a lean, fast core: bots, their chats, and their files. Make each bot yours, from its look and instructions to its model and tools. Grow fxbot with only the add-ons you want: skills and MCP servers today, and plugins that change the app itself next.
+
+fxbot is local first. One Node server and Postgres run on your own machine, and the browser is the UI on desktop and mobile. [libfx](https://fx.sh/docs/lib) sends each chat to the provider its bot uses: a local model server such as Ollama or LM Studio, an API key, or a ChatGPT, Grok, or Vercel account signed in with a device code.
 
 ![fxbot in a desktop browser: Bob's chat open, with Fernando and Securely in the sidebar](docs/screenshot.png)
 
-Simplicity is the rule: a small core, few dependencies, and no abstraction until a second real use. The core is what every bot needs. Everything else is an add-on that you add only if you want it: a skill, an MCP server, or, once plugins are built, a plugin that changes the app itself. See [CONVENTIONS.md](CONVENTIONS.md#core-or-add-on).
+Simplicity is the rule: a small core, few dependencies, and no abstraction until a second real use. The core is what every bot needs, and everything else is an add-on. See [Core or add-on](CONVENTIONS.md#core-or-add-on).
 
 ## Stack
 
