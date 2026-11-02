@@ -1,144 +1,115 @@
 # Plugins
 
-A plugin bundles [MCP servers](../_completed/phases/mcp.md) and [skills](skills.md) in the format that Cursor, Codex, Grok, and Claude Code share. In fxbot, a plugin can also:
-- launch local MCP servers
-- install the tooling they need, such as [herdr](https://herdr.dev)
-- hook into a bot's turns
+A plugin is code that changes fxbot itself, the way [Pi's](https://github.com/earendil-works/pi) extensions change Pi. It runs inside fxbot's server and in its page. Through the plugin API it can:
+- hook into a bot's turns and tool calls
+- add tools, routes, data, and settings of its own
+- add screens, sidebar entries, and controls to the app
+- start bots' turns
 
-Plugins are found and added through [add-ons](../_completed/phases/addons.md), whose page lists every part before anything is saved. A plugin made only of remote servers and skills runs nothing on this machine. One with local servers, setup, or hooks does, and the first plugin, herdr, has all three, so most of this page is about doing that safely.
+A plugin can also carry [skills](../_completed/phases/skills.md) and remote [MCP servers](../_completed/phases/mcp.md), in the format other agents share. It is found and added through [add-ons](../_completed/phases/addons.md).
 
-Status: planned, not built. Research and plan only. It builds on [add-ons](../_completed/phases/addons.md), [MCP servers](../_completed/phases/mcp.md), and [skills](skills.md), and shares one hook seam with [permissions](permissions.md). Its first plugin is herdr ([fxbot's extension](#fxbots-extension)).
+Status: planned, not built. Research and plan only, replanned on 2026-11-02 after the owner asked for plugins that change the app rather than sit beside it. It builds on [add-ons](../_completed/phases/addons.md), [skills](../_completed/phases/skills.md), and [MCP servers](../_completed/phases/mcp.md). This phase proves the API with two plugins of fxbot's own: [chat rooms](chat-rooms.md) and herdr.
+
+## 0. Core or add-on
+
+**Core: the plugin API.** The API is the seam every other add-on phase plugs into: [chat rooms](chat-rooms.md), [routines](routines.md), [triggers](triggers.md), [soul](soul.md), [permissions](permissions.md), and the rest. Chat rooms and herdr are add-ons, and the core never names them ([Core or add-on](../../CONVENTIONS.md#core-or-add-on)).
 
 ## 1. Research
 
-These are read from specs, source, docs, and the installed libfx, as of November 2026. Paths are relative to each repository.
+Read from source, docs, and the installed libfx, as of November 2026.
 
-**Plugin formats**
-- **Agent Plugins 1.0.0** ([site](https://agent-plugins.org/); `agentplugins/agent-plugins-spec` at `ff8ab5e`, `spec/1.0.0.md`). It is "the current published release", and 1.1.0 is a working draft.
-  - **Manifest.** A root `plugin.json` with `$schema` and `name`. Its schema is closed. A client's own data goes under `extensions`, keyed by a reverse-domain namespace, and its files go in a top-level folder of that name.
-  - **Parts.** It defines "exactly two component types: **skills** and **MCP servers**", at fixed locations.
-    - Skills are `skills/<name>/SKILL.md`, and clients "MUST NOT recursively search deeper".
-    - MCP servers are in `mcp.json`, as `stdio`, `streamable-http`, or `sse` entries.
-    - Commands, hooks, agents, rules, and LSP servers "remain too client-specific", and clients "MUST ignore component types they do not support".
-  - **Local servers.** A stdio `command` is "a single executable token, not a shell command string".
-    - Clients set `PLUGIN_ROOT` and `PLUGIN_DATA`, and keep `PLUGIN_DATA` across updates.
-    - Only `${PLUGIN_ROOT}` and `${PLUGIN_DATA}` are expanded, in `args`, `env`, and `cwd`: "Clients MUST NOT perform any other placeholder or environment-variable expansion".
-  - **Secrets and sign-in.** Plugins "MUST NOT embed credentials or other secrets" in `env` or headers. The spec "defines no OAuth configuration": sign-in is the client's job.
-- **Who reads what.**
-  - Codex: the root `plugin.json` is "the portable entry point", `.codex-plugin/plugin.json` is "a compatibility fallback", and Claude-compatible manifests and `.claude-plugin/marketplace.json` are read too ([Codex](https://developers.openai.com/plugins/build/plugins)).
-  - Cursor: a root `plugin.json` or `.cursor-plugin/plugin.json` ([Cursor](https://cursor.com/docs/plugins)). Grok Bot's apps come from Cursor's catalog ([add-ons](../_completed/phases/addons.md#1-research)).
-  - Grok Build looks for `plugin.json`, `.grok-plugin/plugin.json`, and `.claude-plugin/plugin.json` (`xai-org/grok-build`, `crates/codegen/xai-grok-agent/src/plugins/manifest.rs`).
-  - Claude Code keeps `.claude-plugin/plugin.json`, and so does Anthropic's marketplace. 192 of its 315 plugins hold only MCP servers and skills ([add-ons](../_completed/phases/addons.md#1-research)).
-- **Twilio's plugin** (`twilio/ai`, at the marketplace's pin `8aba46f`).
-  - Its `.claude-plugin/plugin.json` lists `"skills": ["./skills/twilio", "./skills/sendgrid"]`, and an inline server, `{ "type": "http", "url": "https://mcp.twilio.com/docs" }`, which needs no sign-in (`mcp/README.md`).
-  - Its 57 skills sit two levels down, so Agent Plugins' strict discovery would miss them. Later commits add Codex and Cursor manifests.
+**Pi** (`earendil-works/pi`: `packages/coding-agent/docs/extensions.md` and `docs/packages.md`; read in the scratchpad)
+- **What it is.** "A minimal, extensible agent harness that you can make your own." Extensions are "TypeScript modules that extend Pi's behavior", run "inside the Pi process with the same operating-system permissions".
+- **Hooks that change things:**
+  - `input` can transform a prompt, or handle it without the model.
+  - `before_agent_start` can change the system prompt and inject a message.
+  - `context` and `context_with_system` can modify the messages of each model request.
+  - `tool_call` "can block or mutate input". `tool_result` "can modify the result".
+  - `session_before_compact` can cancel or customize compaction.
+  - Handlers chain in load order. "Extension errors are logged, agent continues", and "`tool_call` errors block the tool (fail-safe)".
+- **What it registers:** tools, commands, shortcuts, flags, providers, MCP servers, and renderers for messages and tool calls (`registerMessageRenderer`, `registerToolRenderer`).
+- **Its own UI:** dialogs, widgets, a footer, and replacing the editor (`ctx.ui.custom()`). Pi's UI is a terminal UI.
+- **Turns from a plugin:**
+  - `pi.sendUserMessage()` and `pi.sendMessage(…, { triggerTurn, deliverAs: "steer" | "followUp" | "nextTurn" })` start or queue turns.
+  - `pi.appendEntry()` keeps data in the session that the model never sees.
+- **Packages.** A package bundles extensions, skills, prompts, and themes, installed with `pi install npm:…@1.0.0` or `git:…@v1`. Host packages are `peerDependencies`, "do not bundle them". A package can carry its own dependencies.
 
-**Claude Code plugins** ([manifest](https://code.claude.com/docs/en/plugins/manifest-reference), [components](https://code.claude.com/docs/en/plugins/components), [hooks](https://code.claude.com/docs/en/hooks), [security](https://code.claude.com/docs/en/plugins/security))
-- **Layout.** Its manifest, `.claude-plugin/plugin.json`, is optional, and requires a `name` when present. The standard layout is:
-  - `skills/`, `commands/`, `agents/`, `hooks/hooks.json`, `.mcp.json`, `.lsp.json`, and `bin/`
-- **MCP servers.** stdio servers look like `{"command": "node", "args": ["${CLAUDE_PLUGIN_ROOT}/server.js"], "env": {…}}`.
-  - `${CLAUDE_PLUGIN_DATA}` is kept across plugin updates.
-  - A `userConfig` option marked `sensitive` is masked, and kept in secure storage instead of `settings.json`.
-- **Hooks.** Each of 33 events (PreToolUse, PostToolUse, UserPromptSubmit, Stop, SessionStart, and more) maps to `[{matcher, hooks: [{type: "command", command, timeout}]}]`. Exit code 2 blocks where the event allows it, and JSON output can return `permissionDecision`, `updatedInput`, or `additionalContext`.
-- **Trust.** A plugin "can execute arbitrary code on your machine with your user privileges", and Claude Code runs its hooks and MCP servers "outside the sandbox".
-  - Before install, a **Will install** list shows the commands, agents, skills, hooks, and MCP and LSP servers it adds.
-  - Plugins from npm are fetched with `npm pack --ignore-scripts` and checked against their integrity, so install scripts never run ([changelog](https://code.claude.com/docs/en/changelog)). Without a `version`, the commit SHA is the version.
+**opencode** (`packages/plugin` 2.2.5, `packages/core/src/plugin`, `packages/app/src/runtime/plugin`)
+- **Plugins load in-process:** `Plugin.define({ id, setup: async (ctx) => cleanup })`. Installs from npm use `ignoreScripts: true`.
+- **Reloads.** A changed local file reloads with a cache-busting import URL. If the new revision fails, the previous one is restored. A transform that fails disables its plugin.
+- **Transforms** (`ctx.<domain>.transform`): add or change tools, commands, agents, MCP servers, providers, models, skills, and web search.
+- **Runtime hooks** mutate their event in place:
+  - `tool` `execute.before` can rewrite the input or reject the call. `execute.after` can change the result or the error.
+  - `session` `prompt` can change the prompt. `context` can change the system prompt, the messages, and the tools. `compaction` can supply its own result.
+- **Plugin state:** `ctx.storage` is a JSON key-value store, kept under `plugin:<id>:`. `ctx.session` can create sessions and prompt them, from a timer or anything else.
+- **UI.** The TUI has named slots, such as `sidebar.content`, `session.composer.top`, and `home.footer`, plus pages, dialogs, and panels. The desktop app has registries for commands, panels, settings pages, composer pills, and styles.
+- **How it loads UI code.** The server reads the plugin's prebuilt CommonJS bundle. The window runs it with `new Function("require","module","exports", code)`, and that `require` hands over the host's own `solid-js` and client, so plugins share one copy (`src/gui/host.ts:248-251`, `app/src/runtime/plugin/module.ts:11-26`). "The bundle's code is trusted as much as the server that runs the app."
 
-**opencode v2** (`packages/plugin/src/README.md`, `packages/core/src/mcp/stdio.ts`)
-- **Plugins run in the host's process.** `Plugin.define({ id, setup(ctx) })` grants plugins "the same two in-process capabilities" as the host.
-- **Hooks.** Transforms: agent, command, integration, mcp, model, provider, skill, tool, and websearch. At runtime: `tool` execute before and after, `session` context and model requests, `permission.evaluate`, `shell` create, and `event.subscribe`.
-- **MCP.** Local servers are `{command[], cwd, environment}` and inherit the whole host environment (`extendEnv: true`). Remote servers are `{url, headers, oauth}`.
-- **Installs** run with `ignoreScripts: true`. The Figma plugin is a remote MCP server plus skills (`packages/plugins/figma/index.ts`).
+**eve** (`docs/extensions/index.md`, `docs/guides/hooks.md`, `packages/eve/src/discover/discover-agent.ts`)
+- **Contributions are folders.** An extension adds tools, channels (HTTP routes), connections, skills, schedules, subagents, instructions, and hooks. It runs in the app's process.
+- **Hooks only observe.** "Return values are ignored", and hooks "can't add text to the model's context". Instructions change through `defineDynamic` instead, which runs before every model call.
+- **What else it offers:**
+  - Tool names take the mount's prefix (`crm__`).
+  - State is per session (`defineState`). Extensions get no database, and "may not declare memory".
+  - No UI contributions.
 
-**eve** (`docs/extensions/index.md`, `docs/install-integrations.mdx`, `docs/guides/hooks.md`)
-- **Extensions.** An extension is an npm package exporting `defineExtension({ config })`. It can add tools, channels, connections, skills, schedules, subagents, instructions, and hooks, with names prefixed (`crm__`).
-- **Install.** `/add` asks whether to "skip those packages, allow their build scripts, or abort", and says to "Never pass a secret in `--answer`".
-- **Hooks** run "after the agent records an event". They can cancel or continue, but "can't add text to the model's context".
+**The shared format** (Agent Plugins 1.0.0 at `agentplugins/agent-plugins-spec` `ff8ab5e`; Claude Code's plugin docs; read for the first plan)
+- **The manifest.** A root `plugin.json` with a closed schema, which Codex, Cursor, and Grok Build read. A client's own fields go under `extensions`, keyed by a reverse-domain namespace, and its files go in a folder of that name.
+- **Its two parts are skills and MCP servers.** Skills are `skills/<name>/SKILL.md`; MCP servers are in `mcp.json`. Clients "MUST ignore component types they do not support".
+- **Claude Code** keeps `.claude-plugin/plugin.json`, and runs hooks as shell commands. Its plugins "can execute arbitrary code on your machine with your user privileges".
 
-**libfx 0.0.16 and the fx CLI** (installed package; `vercel-labs/fx`)
-- **Tools.** A host tool is `{ name, description, inputSchema, idempotent, execute(input, { signal, sessionId, context }) }`. Authorization happens "inside `execute`".
-  - The tool list is fixed when an agent is made.
-- **MCP.** `libfx/mcp` adapts a client that fxbot owns ([mcp.md](../_completed/phases/mcp.md#1-research)). fxbot starts and stops local server processes itself.
-- **Hooks.** `hooks.onEvent` reports turn, step, model, tool, permission, and MCP events. "libfx doesn't await their promises", so hooks there can only observe.
-- **The fx CLI.**
-  - `fx mcp add NAME -- CMD` adds a stdio server, and a project's servers wait for `fx mcp approve` (`src/core/mcp_host/verbs.zig`).
-  - Each server gets its own process group, "so a wrapper (npx, uvx, a shell) and the server it starts stop together" (`src/mcp/io/process.zig`).
-  - Its hooks are internal, including a herdr reporter (`src/builtins/hooks/herdr.zig`).
+**libfx 0.0.16** (installed types, `node_modules/libfx/types/libfx.d.cts`)
+- **Hooks only observe.** `hooks.onEvent` is "called in event order, but returned promises are not awaited". It reports `turn.*`, `model.*`, `tool.*`, and `mcp.*`.
+- **What fxbot itself controls:**
+  - the prompt it passes to `session.prompt()`
+  - `instructions`, `model`, and `context` per `agent.session()` call, which "apply to the turns this session object starts"
+  - every host tool's `execute()`
+  - `session.steer()`, which joins a running turn
+- **What it doesn't.** No seam rewrites the messages of a model request, as Pi's `context` hook does. A tool list is fixed when an agent is made, and fxbot remakes the agents when tools change (`providers.retool`).
+- **Sessions.** An agent opens any number of sessions (`agent.session(id)`, `newSessionId()`). A session runs only on the agent that started it.
 
-**herdr** ([herdr.dev](https://herdr.dev), [repo](https://github.com/herdrdev/herdr), [socket API](https://herdr.dev/docs/socket-api))
-- **What it is.** A Rust "runtime your coding agents live on" (its README). It owns their terminals and reaches other machines over SSH.
-- **Install.** `curl -fsSL https://herdr.dev/install.sh | sh`, `brew install herdr`, `mise use -g herdr`, or release binaries.
-  - herdr.dev now presents "a native app for running coding agents", which agents drive with an `hc` CLI (`hc run`, `hc send`).
-- **Control.** A newline-delimited JSON socket at `~/.config/herdr/herdr.sock`, with commands such as `pane.send_keys` and `agent.prompt`. No auth is documented.
-- **MCP.** herdr ships no MCP server. A third-party one, `aelaguiz/herdr-mcp`, is stdio, run with `uvx --from git+https://github.com/aelaguiz/herdr-mcp herdr-mcp`. It needs `herdr` on the PATH, talks to whatever session "the `herdr` CLI resolves from the environment", and says "No auth, no sandbox".
-- **A herdr skill** installs with `npx skills add herdrdev/herdr --skill herdr -g` ([agent skill](https://herdr.dev/docs/agent-skill/)).
+**fxbot today** (the places a hook would go)
+- `packages/sdk/src/index.ts`:
+  - `send()` checks a message, expands named skills, attaches files, and prompts the bot's one session.
+  - `open()` builds the instructions: the bot's own, the handoff summary, and the skills catalog.
+  - `toolsNow()` lists every tool: `chat_history`, the library's, `skill`, and MCP servers'.
+  - `finish()` reads a turn to its end, and records the reply.
+- `packages/server/src/index.ts` matches routes by hand, under `/api/<resource>/<id>/<action>`.
+- `packages/ui/src/app.tsx`:
+  - It picks the screen from `location.pathname`, with one `if` per path.
+  - The sidebar has pinned bots, then the bot list, then a footer row: Settings, Library, and Add-ons.
+- The page has no content security policy, so `new Function` runs. The service worker precaches the build, and never answers `/api/`.
+- Add-ons already have a `kind`, a choice of all bots or each, and per-bot switches (`addons`, `profile_addons`), and the SDK can fetch a pinned GitHub commit (`archive.ts`).
 
-**Running local servers safely**
-- **The MCP spec** ([security best practices](https://modelcontextprotocol.io/specification/2026-07-28/basic/security_best_practices)).
-  - Before a local server runs, clients MUST "Show the exact command that will be executed, without truncation" and get explicit approval. They SHOULD flag `sudo` and `rm -rf`, and run servers sandboxed with minimal privileges.
-  - Its section on stdio proxies fits fxbot, a server that starts processes for a web page. Script injected into the page could have it run commands, so the spec recommends a Content Security Policy, sandboxed processes, and extra authorization for dangerous commands.
-- **The SDK's stdio transport** (read in `@modelcontextprotocol/sdk` 1.32.2). It spawns with `shell: false`, passes only `HOME`, `LOGNAME`, `PATH`, `SHELL`, `TERM`, and `USER` plus the declared environment, and stops only its direct child. It has no process-group option.
-- **Pinning.** `npx -y pkg@x.y.z`, `uvx --from git+…@<sha>`, `docker run --rm img@sha256:…`, and `.mcpb` bundles with `fileSha256`.
-- **Isolation in the references.**
-  - durable-harness refuses environment variables with credential-like names or values (`packages/harness-sandbox/src/env-check.ts`), and checks its pinned CLIs by sha512 (`packages/harness-sandbox/src/base.ts`). In its VM, commands run with a minimal environment "as an unprivileged user with no sudo" (`packages/sandbox-host/src/local-sandbox.ts`).
-  - agent-browser's plugins "remain trusted local executables" (`README.md`).
-  - OpenDots approval "runs the stored request, never arguments sent with the approval" (`docs/CONNECTIONS.md`).
-- **fxbot itself.** The server holds the database URL and the secret key file. A child process running as the same OS user can read that key file, whatever its environment ([provider logins](../_completed/phases/provider-logins.md)).
+**herdr** ([herdr.dev](https://herdr.dev), [socket API](https://herdr.dev/docs/socket-api); read for the first plan)
+- **It is controlled through a socket.** A newline-delimited JSON socket at `~/.config/herdr/herdr.sock` takes commands such as `pane.send_keys` and `agent.prompt`. No auth is documented.
+- **No MCP server of its own.** The third-party `aelaguiz/herdr-mcp` is stdio, run through `uvx`.
 
 ## 2. Key takeaways
 
-1. **Read the shared format; don't invent one.** Its two portable parts, MCP servers and skills, are exactly what fxbot runs.
-   - fxbot reads Agent Plugins (`plugin.json`, `mcp.json`, and `skills/`), and Claude's layout (`.claude-plugin/plugin.json`), which Anthropic's marketplace uses.
-   - Other parts are counted on the add-on page as not used.
-2. **fxbot's extras go in the format's extension slot,** under fxbot's namespace in `extensions`, and in a folder of that name:
-   - required binaries and their setup
-   - settings for secrets
-   - read-only hints
-   - hooks
-3. **Code runs here only for local parts.** A plugin of remote servers and skills needs none of the rules below. Local servers, setup steps, and hooks do.
-4. **Local code runs as the agents' OS user, never as fxbot's own.** fxbot's user can read the secret key and reach Postgres. The plugin is pinned, and everything it runs is shown before it runs.
-5. **Keep plugins out of fxbot's process.** Hooks are commands that read and write JSON, not JavaScript loaded into the server. opencode and eve load plugin code in-process, but fxbot's process holds the keys to everything.
-6. **Hooks go only where real seams exist:**
-   - `tool.before` and `tool.after` in fxbot's wrapper around every tool's `execute()`. That is libfx's only blocking point, and the same seam [permissions](permissions.md) needs, so it is built once.
-   - `turn.start` and `turn.end` from libfx's `hooks.onEvent`. These only observe.
-   - Prompt, context, and model transforms wait, because libfx has no seam for them.
-7. **Install only fetches files.** No package scripts run. Setup steps, like installing herdr, run only when the owner clicks, and never with sudo.
-8. **Supervise local MCP processes carefully:**
-   - `shell: false`
-   - only the declared environment
-   - their own process group
-   - restarts with capped backoff
-   - recent stderr shown in the UI
-9. **The first plugin is herdr,** which the owner already uses. It checks for the binary, installs it on request, and runs a pinned herdr-mcp.
+1. **Plugins run in fxbot's process, as in Pi, opencode, and eve.** A server module gets the plugin API; a page bundle gets the app's API. No sandbox and no second process: that is what lets a plugin change the app, and it keeps plugins light.
+2. **Hooks change things where fxbot's own code runs, and chain in order.** Before a message runs, when instructions are built, before and after every tool call, and after a turn. libfx has no seam inside a model request, so fxbot has no `context` hook: a plugin changes what a bot knows through instructions and messages instead, as eve does.
+3. **Load page code the way opencode does.** The server serves the plugin's prebuilt bundle. The page runs it with a `require` that hands over the app's own React, its components, and its client. No import maps, no build step at install, and one copy of React.
+4. **Places in the app are named, and few.** Use opencode's slot idea, but only the places the first plugins need: a route, the sidebar, a footer button, the message box, a tool call's view, Settings, and a bot's settings. A new place comes with the plugin that needs it.
+5. **Each plugin gets its own Postgres schema,** made by its own migrations and dropped when it is removed. That keeps its data out of core migrations, and it can't collide with core tables or with another plugin.
+6. **A plugin starts turns in sessions of its own.** It can make sessions for a bot, prompt them, and read their streams. A plugin's turns run through the same `send()`, with the same hooks and history, and are marked with where they came from.
+7. **Keep the shared format.** `plugin.json` is Agent Plugins' manifest, so a plugin's skills and remote servers also work in other agents. fxbot's code parts go under its namespace in `extensions`.
+8. **Install only fetches files.** A plugin is pinned to a commit and ships ready to run: plain JavaScript, or TypeScript that Node runs as it is. Nothing is installed or built, and it never updates on its own.
 
 ## 3. Implementation
 
-### The format
-
-`plugins.ts` reads a plugin from its pinned archive, in this order:
-- **Manifest.** The root `plugin.json` when its `$schema` is Agent Plugins'. Otherwise `.claude-plugin/plugin.json`. Otherwise none, and the name comes from the marketplace entry or the folder.
-- **MCP servers.**
-  - Agent Plugins: `mcp.json`.
-  - Claude: the manifest's `mcpServers` (inline, or a path), otherwise `.mcp.json`. Claude's `"type": "http"` means `streamable-http`, and an entry with a `command` is stdio.
-  - Remote servers go through the [MCP flow](../_completed/phases/mcp.md#adding-a-server), sign-in included. Local ones run as described under Running.
-- **Skills.** `skills/<name>/SKILL.md`, plus each folder that the manifest or the marketplace entry lists in `skills`. A listed folder is a skill, or holds skills one level down, like Twilio's `./skills/twilio`. They load as [skills](skills.md#adding-skills) do.
-- **Placeholders.** `${PLUGIN_ROOT}` and `${PLUGIN_DATA}`, and Claude's `${CLAUDE_PLUGIN_ROOT}` and `${CLAUDE_PLUGIN_DATA}`, are expanded in `args`, `env`, and `cwd`. Nothing else is.
-- **Not used by fxbot.** Commands, agents, LSP servers, monitors, `bin/`, and other clients' hooks are counted on the add-on page.
-- **Registry packages.** A registry `packages` entry becomes a one-server plugin.
-  - npm becomes `npx -y <package>@<version>`, and PyPI becomes `uvx <package>==<version>`.
-  - Its `environmentVariables` move into fxbot's extension.
-  - Other package types are shown, but can't be added yet.
-
-### fxbot's extension
-
-The herdr plugin, fxbot's first plugin, published in the project's marketplace ([add-ons, question 2](../_completed/phases/addons.md#5-open-questions)):
+### A plugin
 
 ```text
-herdr/
+chat-rooms/
 ├── plugin.json
-├── mcp.json
-├── skills/herdr/SKILL.md
-└── <namespace>/hooks/report.js
+├── skills/…                     optional, as Agent Plugins has them
+├── mcp.json                     optional: remote servers only in this phase
+└── fxbot/
+    ├── server.ts                its server code
+    ├── page.js                  its page code: one CommonJS bundle
+    ├── page.css                 optional
+    └── migrations/0001_rooms.sql
 ```
 
 `plugin.json`:
@@ -146,185 +117,304 @@ herdr/
 ```json
 {
   "$schema": "https://agent-plugins.org/schemas/1.0.0/plugin.schema.json",
-  "name": "herdr",
+  "name": "chat-rooms",
   "version": "0.1.0",
-  "description": "Drive herdr agents and panes from a bot",
-  "homepage": "https://herdr.dev",
+  "description": "Rooms where several bots talk with you",
   "extensions": {
-    "<namespace>": {
-      "requires": [
-        { "bin": "herdr", "check": ["herdr", "--version"], "install": ["sh", "-c", "curl -fsSL https://herdr.dev/install.sh | sh"] },
-        { "bin": "uvx", "check": ["uvx", "--version"] }
-      ],
-      "readOnly": { "herdr": ["list_agents", "read_pane"] },
-      "hooks": { "turn.end": [{ "command": ["node", "./<namespace>/hooks/report.js"] }] }
+    "io.github.iammrduncan.fxbot": {
+      "server": "./fxbot/server.ts",
+      "page": "./fxbot/page.js",
+      "css": "./fxbot/page.css",
+      "migrations": "./fxbot/migrations",
+      "settings": [{ "name": "replyTo", "description": "Who answers a message", "default": "everyone" }]
     }
   }
 }
 ```
 
-`mcp.json`:
+- **The name.** The plugin's name is its id in fxbot, `^[a-z0-9]+(-[a-z0-9]+)*$`, up to 40 characters. Its tools are `<name>_<tool>`, as MCP servers' tools take their prefix. Its routes live under `/api/plugins/<name>/`, its page paths under `/<name>/`, and its schema is `plugin_<name>` with `_` for `-`.
+- **The namespace** is a reverse-domain name the project controls ([question 2](#5-open-questions)).
+- **The code parts:**
+  - `server` is plain JavaScript, or TypeScript that Node 22 strips as it runs, with no other build.
+  - `page` is a CommonJS bundle that leaves `react`, `react/jsx-runtime`, and `@fxbot/app` out, for example `esbuild page.tsx --bundle --format=cjs --external:react --external:react/jsx-runtime --external:@fxbot/app`.
+  - Other dependencies are bundled in. fxbot installs none ([question 3](#5-open-questions)).
 
-```json
-{
-  "$schema": "https://agent-plugins.org/schemas/1.0.0/mcp.schema.json",
-  "mcpServers": {
-    "herdr": {
-      "type": "stdio",
-      "command": "uvx",
-      "args": ["--from", "git+https://github.com/aelaguiz/herdr-mcp@<commit>", "herdr-mcp"]
-    }
-  }
+### The server API (`packages/sdk/src/plugins.ts`)
+
+`server.ts` exports one function. fxbot calls it when the plugin loads:
+
+```ts
+import type { PluginApi } from "../../../packages/sdk/src/plugin-api.ts"; // types only
+
+export default async function setup(fx: PluginApi) {
+  fx.on("message", async (e) => { if (e.text === "/ping") return { handled: true }; });
+  fx.on("instructions", (e) => { if (e.session === roomSession) e.instructions.push("You are in the Design room."); });
+  fx.on("tool.before", (e) => (e.tool === "library_save" && tooBig(e.input) ? { block: "Too big for this bot." } : undefined));
+  fx.on("turn.end", async (e) => { await fx.sql`insert into messages ${fx.sql({ room, author: e.bot, text: e.reply })}`; });
+  fx.tool({ name: "say", description: "…", inputSchema: {…}, idempotent: false, execute: async (input, { bot, session }) => "…" });
+  fx.route("GET", "/rooms/:id", async (req, { id }) => Response.json(await rooms.get(id)));
+  return () => clearInterval(timer); // cleanup, when the plugin is removed or updated
 }
 ```
 
-herdr-mcp talks to whatever session the `herdr` CLI finds. By default that is the socket in the plugin user's home, so it needs no settings. The extension's fields:
-- **`requires`.** Each binary's `check` runs on its own. An `install` runs only when the owner clicks.
-- **`environmentVariables`.** Per server, in server.json's shape: `name`, `description`, `isRequired`, `isSecret`, and `default`.
-  - Agent Plugins allows no secrets in `env` and no other placeholders, so settings live here.
-  - The add-on asks for them, seals the secret ones, and passes them only to that server.
-- **`readOnly`.** Per server, the tools that count as read-only, and so are allowed until the owner picks ([mcp.md](../_completed/phases/mcp.md#built)), when the server doesn't mark them itself.
-- **`hooks`.** The events are `tool.before`, `tool.after`, `turn.start`, and `turn.end`.
-  - Each event takes commands as argv arrays, with an optional tool-name `match`.
-  - Hook scripts live in the namespace's folder.
-- **The namespace** is a reverse-domain name on a domain the project controls ([question 7](#5-open-questions)).
+**Hooks** (`fx.on(event, handler)`) run in the order the plugins were added. Each handler sees what the one before it changed:
 
-### Installing
+| Event | When | Gets | Can |
+| --- | --- | --- | --- |
+| `message` | In `send()`, before skills, files, and the prompt | `bot`, `session`, `text`, `files`, `from` | Change `text` and `files`. Or answer `{ handled: true }`, and no turn runs. |
+| `instructions` | In `open()`, each time a session opens | `bot`, `session`, `instructions` (an array) | Add, change, or remove entries |
+| `tool.before` | Before every tool's `execute()`: core, MCP, skill, and plugin tools | `bot`, `session`, `tool`, `input` | Change `input`. Or answer `{ block: reason }`, which the model gets as a failed call. |
+| `tool.after` | After it | the same, with `result` or `error` | Change `result` |
+| `turn.start` | Once libfx accepts the prompt | `bot`, `session`, `messageId`, `text`, `from` | Observe |
+| `turn.end` | When `finish()` reads the end | the same, with `reply` | Observe |
 
-1. **A source.** Sources are listed in [add-ons](../_completed/phases/addons.md#sources-packagessdksrcregistryts):
-   - a marketplace entry, pinned by `sha`, or by the marketplace's own commit
-   - a registry `packages` entry
-   - a git URL pinned to a commit
-   - Local parts from an unreviewed source can't run without `FXBOT_UNREVIEWED_PLUGINS=1` in the server's environment. Unreviewed means a URL, an added marketplace, or the official registry. Remote servers and skills from it still work, with consent ([question 2](#5-open-questions)).
-2. **Fetch.** `archive.ts` downloads the pinned archive, shared with [skills](skills.md#adding-skills).
-   - An npm source is the registry's tarball, checked against its `integrity`.
-   - Nothing is executed: no `npm install` scripts, and no build.
-   - Only a plugin with local parts is unpacked, to `FXBOT_DATA/plugins/<id>/<version>/`, with regular files only, no links, and every path inside.
-3. **Validate.**
-   - Commands are argv tokens, with no shell strings outside an explicit `sh -c`.
-   - Paths stay inside the plugin.
-   - Each bad server or skill is skipped and reported, as Agent Plugins requires.
-4. **The add-on page** lists every part ([add-ons](../_completed/phases/addons.md#the-add-on-page)):
-   - every command and argument, untruncated
-   - environment variable names
-   - URLs
-   - secrets requested
-   - hooks
-   - setup steps
-   - It flags `sh -c`, `curl … | sh`, `sudo`, and network installers. Add records the definition's hash.
-5. **Settings form.** The `environmentVariables`. Secret fields are write-only and sealed.
-6. **Checks.** Each `requires.check` runs. A missing binary shows its `install` step behind a **Run setup** button.
-   - The output streams to the page, and the step runs as the plugin user.
-   - If the step needs root, fxbot shows the command for the owner to run instead.
-7. **Enable.** Local servers start, remote ones connect, skills join the catalogs, and tools join the agents ([add-ons: bots](../_completed/phases/addons.md#bots-and-add-ons)).
+- **Plugin hooks and tools apply only to its bots.** That is the add-on's choice of all bots, or each, as for MCP servers and skills.
+- **Its page parts are for everyone.**
+- **Core tools pass through the same tool hooks.** So do new core features, which use these hooks instead of private ones.
 
-### Running (`packages/sdk/src/plugins.ts`)
+**The rest of `fx`:**
+- **`fx.tool(def)`** adds a tool, named `<plugin>_<name>`. Adding the plugin remakes the agents once (`retool`).
+- **`fx.route(method, path, handler)`** answers under `/api/plugins/<name>/`, with web `Request` and `Response`. A streamed `Response` body streams to the page.
+- **`fx.sql`** is a `postgres` client whose `search_path` is the plugin's schema, with two connections at most.
+- **`fx.settings`** holds its settings, with secrets opened. `fx.on("settings", …)` hears a change.
+- **`fx.bots.list()` and `fx.bots.get(id)`** read bots.
+- **`fx.chats`** holds sessions and turns ([below](#starting-turns)).
+- **`fx.log(…)`** writes to the add-on's log, which shows on its row.
+- **`fx.signal`** aborts when the plugin unloads.
 
-- **Files.** A plugin's files are owned by `fxbot` and read-only to everyone else, so the files that run are the approved ones.
-  - `FXBOT_DATA` itself is traverse-only, and its session files stay private to `fxbot`.
-  - `PLUGIN_ROOT` is the unpacked folder. `PLUGIN_DATA` is `~/.local/share/fxbot/<id>/` in the plugin user's home, which is also the working directory, and survives updates.
-- **The OS user.** Processes run as the agents' OS user, through `sudo -n -u <FXBOT_PLUGIN_USER> -- env -i <env> <command>`. That needs one sudoers rule that lets the `fxbot` user run commands as that user.
-  - The plugin user cannot read the key file or the session files, or reach Postgres.
-  - Without `FXBOT_PLUGIN_USER`, local processes don't start ([question 1](#5-open-questions)).
-- **Processes.**
-  - `plugins.ts` spawns each local MCP server itself, with `shell: false` and in a new process group, and hands its pipes to the MCP client through a small stdio transport. The SDK's own transport can't start a group.
-  - The environment is that user's `HOME`, `LOGNAME`, `PATH`, `SHELL`, `TERM`, and `USER`, plus `PLUGIN_ROOT`, `PLUGIN_DATA`, the declared `env`, and the settings. No `FXBOT_*` or `PG*` variables are passed.
-  - fxbot can't signal another user's processes. To stop a server, it closes stdin, then signals the server's process group as the plugin user (`sudo -n -u <user> -- kill`), TERM first and KILL later. That also stops the server behind a wrapper such as npx or uvx.
-- **Supervision.** A crashed server restarts with backoff: 1, 2, 4… up to 60 seconds. It gives up after 5 failures in 10 minutes. The last 50 lines of stderr show on the add-on.
-- **Hooks.**
-  - Each hook is run as `argv` with JSON on stdin, for example `{ event, bot, tool, input }`, with a 10-second timeout, as the plugin user.
-  - `tool.before` may answer `{ "decision": "deny", "reason": "…" }`, and the tool call fails with that reason. Exit code 2 does the same.
-  - `tool.after` and the turn hooks only observe, and run without blocking the turn.
-- **Removal.** Removing a plugin stops its processes, and deletes its files, skills, and secrets. Tooling that a setup step installed stays, and the page says so.
+### Starting turns
+
+- **`fx.chats.newSession(bot)`** makes a session on the bot's current provider and returns its id. The plugin keeps the id.
+- **`fx.chats.send(bot, { text, files?, session?, messageId? })`** runs `send()` with `from` set to the plugin's name.
+  - Without `session`, the turn goes to the bot's own chat, whose bubble shows "From chat-rooms". The `from` is saved with the message in `sent`, as a message's files are.
+  - With `session`, it goes to the plugin's session. Either way, the hooks, history (so `chat_history` finds it), the library, and `busy` work as they do for the owner's messages.
+- **`fx.chats.stream(bot, session, cursor)`** gives that session's lines, like `/api/profiles/:id/stream`. A plugin route can pass them on to its page, where the client's `applyLine` builds the turns.
+- **A plugin's session belongs to the provider it started on.** After the bot moves to another provider, `send` to it fails with 409, and the plugin makes a new session.
+
+### Data
+
+- **Schemas and migrations.** Adding a plugin makes the schema `plugin_<name>`, then runs the plugin's `migrations/*.sql` in name order, each in a transaction, with `search_path` set to that schema. The names applied are kept in its `_migrations` table.
+- **Updates** run only the new files. A plugin never changes a file that has shipped, as fxbot's own migrations don't.
+- **Removing a plugin** drops its schema (`drop schema … cascade`).
+- **Core table changes** (core migration `0005_plugins`):
+  - add-ons take `kind` `plugin`, with the plugin's files and parts in `config`
+  - `sent` gains `from`
+  - Plugin secrets use `addon_secrets`, as MCP servers' do
+
+### Settings
+
+- **Declared in `plugin.json`.** Each has `name`, `description`, `default`, `isRequired`, and `isSecret`, in server.json's `environmentVariables` shape.
+- **The add-on's page shows a form for them.** Secrets are sealed and write-only, as MCP headers are.
+- **Plugin code reads them** through `fx.settings`, on the server only. The page never gets a secret.
+
+### The page API (`packages/ui/src/plugins.tsx`)
+
+- **Loading.** After the bots, the page reads `GET /api/plugins`, which lists each added plugin's name, version, page URL, and CSS URL.
+- **Each bundle** is fetched and run with `new Function("require", "module", "exports", code)`, as opencode does.
+- **The `require` it gets** returns only:
+  - the app's own `react` and `react/jsx-runtime`
+  - `@fxbot/app`
+  - Anything else throws.
+- **Its default export** is called with the app's API, scoped to that plugin.
+- **Its CSS** goes in as a `<link>`, and can use the app's CSS variables (`--primary`, `--sidebar`, …). The app's Tailwind build holds only the app's own classes, so a plugin brings its own styles, or uses the app's components.
+
+Every call is optional. This sample makes all of them:
+
+```tsx
+const { useState } = require("react");
+
+module.exports = function setup(app) {
+  app.route("/rooms/:id", RoomScreen);                          // the page at /<plugin>/rooms/<id>
+  app.sidebar(RoomsGroup);                                      // a group in the sidebar, after the bots
+  app.nav({ icon: "users", label: "Rooms", path: "/rooms" });   // a button in the sidebar's footer row
+  app.composer(Button);                                         // a control beside the attach button: gets { bot, setDraft, attach }
+  app.toolView("say", SayStep);                                 // how a call of <plugin>_say shows in a reply
+  app.settings(RoomsSettings);                                  // a section in Settings
+  app.botSettings(RoomsForBot);                                 // a section in a bot's settings: gets { bot }
+};
+```
+
+`@fxbot/app` gives a plugin:
+- **`client`:** the app's `@fxbot/sdk/client`, with `applyLine`
+- **`api(path, init)`:** fetches the plugin's own routes
+- **`go(path)` and `useBots()`**
+- **`ui`:** the app's shadcn components (Button, Input, Textarea, Dialog, Card, Badge, Switch, Field, Sidebar parts, Attachment parts), and `Streamdown` for Markdown
+
+**How the app runs plugin parts:**
+- **The routes** are `/<plugin>/…`, checked after the core's paths.
+- **Each part sits in an error boundary.** A plugin that throws shows a short card in its place, and the rest of the app keeps working.
+- **Adding, updating, or removing a plugin** reloads the plugin list. Its old code stays loaded until the page reloads.
+
+### Installing, updating, and removing
+
+- **Sources:**
+  - **fxbot's list:** `plugins-registry.json` on the site, next to the other two lists (`FXBOT_LISTS_URL`). Each entry is `{ name, description, repo, path }`, tagged **fxbot**.
+  - **A GitHub repository,** with an optional folder: `owner/repo` or `owner/repo/path/to/plugin`.
+  - **A folder on this machine,** for writing a plugin: `FXBOT_PLUGIN_DIRS` lists folders in the server's environment, which load at start, unpinned, tagged **local**. `npm run dev` also restarts the API when files in them change.
+- **The preview** (the add-on page) pins the source's HEAD commit, then reads the plugin through `archive.ts`. Plugins get their own limits: 2 MiB a file, text only, 20 MB in all.
+- **The page shows:**
+  - its description and `plugin.json`
+  - that it **runs code inside fxbot**, naming its server and page files, each readable
+  - its settings, its migrations (readable), and its skills and remote servers
+  - what's not used yet, such as stdio servers
+- **Add** checks the hash the page saw, then:
+  1. writes the files to `FXBOT_DATA/plugins/<name>/<commit>/`
+  2. makes the schema and runs the migrations
+  3. saves the add-on and its secrets
+  4. imports the server module, calls `setup`, and remakes the agents if it added tools
+- **The row** then shows what the plugin registered: its tools, hooks, routes, and page places.
+- **Updates.** The hourly check of skills' repositories covers plugins too. A newer commit that changes the plugin's files marks **Update available**. Its page shows what changed, and **Update** cleans up the old code, runs the new migrations, and loads the new commit. A failed load keeps the old one running.
+- **Removing a plugin:** cleanup, then its hooks, tools, and routes go. fxbot drops its schema, and deletes its files, its secrets, and its bot switches.
+
+### Failures and speed
+
+- **A hook that throws is logged and skipped,** except `tool.before`, where it blocks the call, as in Pi. The add-on's row shows its last error.
+- **Time limits.** A `message`, `instructions`, or `tool.before` handler gets 5 seconds, and is then treated as if it threw. `turn.*` and `tool.after` handlers don't hold up the stream.
+- **A plugin whose `setup` throws, or whose migrations fail,** stays added but off, with the error on its row. The rest of fxbot starts.
+- **No plugins, no cost.** Hook lists are empty arrays, the page loads no plugin code, and there are no timers.
+
+### Trust
+
+A plugin runs with everything fxbot can reach, as Pi, opencode, and eve plugins do. The add-on page says so before **Add**. Plugins are pinned to a commit, ask again before any change, and never update on their own.
 
 ### API, SDK, and client
 
-Adding a plugin goes through the [add-ons](../_completed/phases/addons.md#api-sdk-and-client) preview and Add. These routes are the plugin's own:
-
 | Route | SDK call |
 | --- | --- |
-| `PUT /api/addons/:id/settings` | `plugins.configure(id, settings)`: secrets write-only |
-| `POST /api/addons/:id/setup/:step` | `plugins.setup(id, step)`: runs a manifest step by index, never a command from the page |
-| `GET /api/addons/:id/logs` | `plugins.logs(id)`: recent stderr and setup output |
+| `GET /api/plugins` | `plugins.list()`: name, version, page and CSS URLs, for the page |
+| `GET /api/plugins/:name/files/*` | `plugins.file(name, path)`: the plugin's page code and CSS, `cache-control: immutable` under the commit |
+| `* /api/plugins/:name/*` | the plugin's own routes |
+| `POST /api/addons/preview`, `POST /api/addons`, … | the [add-ons](../_completed/phases/addons.md) calls, with `{ plugin: "owner/repo/path" }` as a ref |
+| `PUT /api/addons/:id/settings` | `addons.configure(id, settings)`: secrets write-only |
+| `GET /api/addons/:id/log` | `addons.log(id)`: recent log lines and errors |
 
 ### Where the code goes
 
-- **`packages/sdk`:** `plugins.ts` (reading the format, the extension, processes, and hooks). It uses `archive.ts` and `skills.ts` from [skills](skills.md), and `mcp.ts`. `registry.ts` gains the marketplace sync described in [add-ons](../_completed/phases/addons.md#sources-packagessdksrcregistryts).
-- **`packages/server`:** the routes above.
-- **`packages/ui`:** the settings form, setup output, and process status and logs. The add-on page is in [add-ons](../_completed/phases/addons.md#ui).
+- **`packages/sdk`:**
+  - `plugins.ts`: loading, the server API, hooks, schemas and migrations, settings, and install, update, and remove
+  - `plugin-api.ts`: its types
+  - In `index.ts`: the hook sites, `from`, sessions for plugins, and tools through the wrapper. Also `registry.ts` (the plugins list), `archive.ts` (per-caller limits), and `0005_plugins.sql`.
+- **`packages/server`:** the routes above, and `FXBOT_PLUGIN_DIRS`.
+- **`packages/ui`:**
+  - `plugins.tsx`: the loader, `@fxbot/app`, and the error boundaries
+  - the places in `app.tsx` and `steps.tsx`
+  - the plugin parts of the add-on pages
+  - `vite.config.ts`: watching `FXBOT_PLUGIN_DIRS`
+- **`plugins/chat-rooms/` and `plugins/herdr/`:** fxbot's own plugins, in this repository but outside the workspaces, and never imported by the core ([question 1](#5-open-questions)). Each is added from GitHub like anyone's.
 
-### Security
+### The first plugins
 
-- **A plugin runs as the plugin user,** which cannot read fxbot's key, its session files, or Postgres (peer auth admits only `fxbot`). An agent running as root can still read everything, as [provider logins](../_completed/phases/provider-logins.md#security) says.
-- **The page never sends a command.** The API takes references, approved hashes, and setup step numbers, so only commands from a fetched, pinned plugin can run.
-- **Script in the page is the risk** that the MCP spec's proxy section describes. Approval is an API call, so injected script could approve a plugin just as the owner can. Three things limit that:
-  - The page renders no untrusted HTML. Registry text, tool results, skills, and replies show as text or sanitized markdown.
-  - Local parts from unreviewed sources need `FXBOT_UNREVIEWED_PLUGINS=1`, which only the server's environment can set ([question 2](#5-open-questions)).
-  - Plugin code runs as the plugin user.
-- **The approved files are the files that run.** fxbot pins and verifies the fetch, runs no install scripts, asks again on any change, and never updates on its own.
-- **Secrets are sealed,** and reach only the server that declared them, through its environment.
-- **A plugin's tools are untrusted** like any MCP tool. Only their read-only ones are allowed until the owner picks ([mcp.md](../_completed/phases/mcp.md#tools-for-bots)), and the [permissions](permissions.md) phase adds asking.
-- **herdr in particular.** Its socket has no auth, so a bot with herdr tools can type into any herdr pane. The herdr plugin starts read-only, with only `list_agents` and `read_pane`.
+**Chat rooms** ([stub](chat-rooms.md)) uses every part of the API:
+- **Tables:** `rooms` (id, name), `members` (room, bot), `messages` (id, room, author, text, at), and `sessions` (room, bot, session).
+- **Page:** a **Rooms** group in the sidebar, with a **+** that names a room and picks its bots. The room at `/chat-rooms/rooms/<id>` shows its messages and a message box, made from the app's components.
+- **A message in a room:**
+  1. The owner's message is saved.
+  2. Each member bot answers once, in turn, in its own session for that room. That session is made with `fx.chats.newSession` and prompted with the room's messages since its last turn.
+  3. The `instructions` hook tells it which room it is in, and who else is there. `turn.end` saves its reply to the room.
+  4. Bots don't start new rounds, so the room never runs on by itself ([question 6](#5-open-questions)).
+- **Live view:** a room route streams the replying bot's session lines, so its reply shows as it is written.
+
+**herdr** is small, and proves tools, settings, and a tool view:
+- **Tools:** `herdr_list_agents` and `herdr_read_pane` talk to herdr's socket directly, so no MCP server is needed. Both are read-only.
+- **A setting** holds the socket's path. A release runs as the `fxbot` user, so the owner points it at a socket that user can reach.
+- **A tool view** shows the agents as a table.
+- **A skill** says when to use the tools.
+
+### Not in this phase
+
+- Local MCP servers (stdio), setup steps that install tooling, and npm dependencies ([question 4](#5-open-questions)). A plugin can start a process from its own server code.
+- Claude-format plugins and marketplaces. A plugin's own skills and remote servers already use the shared format.
+- Hooks inside a model request, which libfx doesn't offer.
+- Hooks for compaction. [Context management](context-management.md) adds one when it builds compaction.
+- Any page place a first plugin doesn't need, such as a full-screen route for the [herdr screen](herdr-screen.md).
 
 ### Size
 
-About 620 lines, the largest add-on phase:
+The plugin API is about 750 lines:
 
 | Part | Lines |
 | --- | --- |
-| `plugins.ts` | about 380 |
-| Routes | about 40 |
-| Client | about 20 |
-| UI | about 180 |
+| `plugins.ts` and `plugin-api.ts` | about 380 |
+| Hook sites, sessions, and `from` in the SDK | about 80 |
+| Routes | about 50 |
+| Page loader, places, and add-on pages | about 240 |
 
-The process and hook code is where most of the risk is, and should not be trimmed.
+The plugins themselves add about 350 lines for chat rooms and about 120 for herdr.
 
 ## 4. Checklist
 
-Checks use plugin repos and a marketplace in the scratchpad, a tiny stdio MCP server, disposable Postgres, and a plugin OS user created for the checks. Nothing installs real tooling except the human's herdr check.
+Checks use a sample plugin in the scratchpad that uses every hook and place, disposable Postgres, the mock model, and Playwright. Nothing reaches the real herdr except the human's check.
 
-**M1. Format and install**
-- [ ] The herdr plugin, with a stub `herdr` and a tiny stdio server in place of herdr-mcp: its server, skill, setup steps, and hook all show on the add-on page, with `curl … | sh` flagged.
-- [ ] The mock marketplace syncs at its commit, and its plugins join the add-on search. An entry without a pin shows, but can't be added.
-- [ ] A Claude-format plugin (listed skill folders, an inline `http` server) installs with all its skills. It needs no plugin user, and nothing is unpacked to disk.
-- [ ] Commands, agents, and an LSP server are counted as not used. A bad server or skill is skipped and reported.
-- [ ] A changed commit, integrity, or sha256 is refused. No package script runs (checked with a package whose `postinstall` writes a marker file).
-- [ ] Changing the plugin asks again, and nothing updates on its own.
-- [ ] Without `FXBOT_UNREVIEWED_PLUGINS`, a plugin from a URL keeps its remote server and skills, but its local server, setup, and hooks are refused by the API, whatever the page sends.
+**M1. Loading and hooks**
+- [ ] A plugin in `FXBOT_PLUGIN_DIRS` loads at start. Its tool reaches its bots and no others, named `<plugin>_<tool>`.
+- [ ] `message` hooks:
+  - A change to the text reaches the model; checked in the mock model's request.
+  - `{ handled: true }` runs no turn.
+  - Two plugins' changes chain in the order they were added.
+- [ ] `instructions` adds a line that the mock model sees, for the session the hook picked and no other.
+- [ ] Tool hooks:
+  - `tool.before` changes a core tool's input, and blocks an MCP tool's call with its reason.
+  - A `tool.before` that throws blocks.
+  - `tool.after` changes a result.
+- [ ] `turn.start` and `turn.end` fire with the bot, the session, and the reply, without holding up the stream.
+- [ ] A hook that throws, or takes over 5 seconds, is logged on the row, and the turn goes on.
+- [ ] A `setup` that throws leaves the plugin off with its error, and fxbot starts.
 
-**M2. Processes**
-- [ ] A local MCP server starts as `FXBOT_PLUGIN_USER` (`ps -o user`), with `PLUGIN_ROOT` and `PLUGIN_DATA` set. Its environment has none of `FXBOT_*` or `PG*`, and it cannot read the key file or the session files.
-- [ ] Without `FXBOT_PLUGIN_USER`, nothing starts, and the page says why.
-- [ ] Killing the server restarts it with backoff, and five crashes stop it with the stderr shown.
-- [ ] Stopping a server started through a wrapper (`sh -c`, or a node wrapper) leaves no child running.
+**M2. Data, settings, routes, and turns**
+- [ ] The migrations make tables in `plugin_<name>`, and `fx.sql` reaches them unqualified. An update runs only new files.
+- [ ] Removing the plugin drops the schema.
+- [ ] A secret setting reaches `fx.settings`, is never in any response, and is sealed in Postgres.
+- [ ] `GET /api/plugins/<name>/…` reaches its route, and a streamed response streams.
+- [ ] Turns from a plugin:
+  - `fx.chats.send` without a session shows in the bot's chat with "From <plugin>".
+  - With a session from `newSession`, it stays out of that chat, and `chat_history` finds it.
+  - After a provider switch, `send` to the old session answers 409.
 
-**M3. Hooks and settings**
-- [ ] A `tool.before` hook that denies fails the call with its reason, and the bot sees the reason.
-- [ ] A hook that times out does not hang the turn.
-- [ ] `turn.end` runs after a reply, with the bot and message ids.
-- [ ] A secret setting reaches only its server's environment, and is never returned to the page.
+**M3. The page**
+- [ ] A plugin's page bundle loads with the app's React: its component uses `useState`, and React reports one copy.
+- [ ] Each place renders:
+  - a route, the sidebar, and a footer button
+  - a composer control that sets the draft
+  - a tool view, Settings, and a bot's settings
+- [ ] A plugin part that throws shows its card, and the chat still works.
+- [ ] With no plugins added, the page loads no plugin code (checked in Playwright's request log).
+- [ ] Phone width: the sidebar group, the footer button, and a route fit.
 
-**M4. Setup, UI, and docs**
-- [ ] A `requires` check finds a missing binary. **Run setup** runs the manifest's step and streams its output. A step needing root shows the command instead.
-- [ ] Playwright: the add-on page, settings with a secret, setup output, status, logs, a per-bot switch, and removal.
-- [ ] Registry text and a tool result holding `<img src=x onerror=alert(1)>` render as text.
-- [ ] `npm run typecheck`, `npm run build`, and `git diff --check` pass.
+**M4. Installing**
+- [ ] Mock GitHub (the skills checks' mocks) serves a plugin repository with a folder.
+- [ ] The add-on page:
+  - Its preview pins the commit, says the plugin runs code inside fxbot, and lists its files, settings, migrations, and skills.
+  - It counts a stdio server as not used.
+- [ ] Add, the row's parts, and a per-bot switch work. The plugin's skills join the catalog, and its remote server connects.
+- [ ] The check marks an update when the plugin's files change, and its page lists the changed files.
+- [ ] A failed load during an update keeps the old version running.
+- [ ] Remove cleans up: the schema, the files, the secrets, and the switches are gone, and its cleanup ran.
+- [ ] fxbot's list serves `plugins-registry.json` in the mock site, and its plugins are tagged **fxbot** on the Plugins tab.
+
+**M5. The first plugins, docs, and checks**
+- [ ] Chat rooms against the mock model:
+  - A room with two bots: each answers once, in order. The second sees the first's reply, and the room shows both as they stream.
+  - Removing a bot from the room stops its answers.
+- [ ] herdr against a stub socket: list agents and read a pane, with the table view, a socket path setting, and a missing socket answered clearly.
+- [ ] Docs:
+  - The site gains a how-to, "Add a plugin", and a reference page, "Plugin API", for authors.
+  - The Core and add-ons page names plugins.
+  - The README's variables table lists `FXBOT_PLUGIN_DIRS`.
+  - The CHANGELOG notes `0005_plugins`.
+- [ ] `npm run typecheck`, `npm run build`, `npm run build-site`, and `git diff --check` pass.
 
 **The human runs these:**
-- Create the plugin user and its sudoers rule. Keep `FXBOT_DATA` outside any private home directory, so that user can reach `plugins/`.
-- Publish the project's marketplace with the herdr plugin.
-- Add the herdr plugin on the real machine, run its setup if herdr is missing, and list agents from a bot.
-- Decide whether to allow herdr's write tools.
+- Add chat rooms from GitHub, make a room with two bots, and talk with them.
+- Add herdr, point it at their socket, and ask a bot what herdr is running.
 
 ## 5. Open questions
 
 Each has a default.
 
-1. **The OS user for plugins.** *Default:* required. Local processes and hooks run only as `FXBOT_PLUGIN_USER`, and without it fxbot refuses them. The alternative is running as `fxbot`'s own user with a warning, which gives plugins the secret key.
-2. **Unreviewed sources.** *Default:* the project's marketplace, Anthropic's marketplace, and GitHub's registry count as curated. Local parts from anywhere else need `FXBOT_UNREVIEWED_PLUGINS=1` in the server's environment, so script in the page cannot turn them on.
-3. **Setup steps.** *Default:* run on click as the plugin user, never with sudo. Root-level installs (`apt`, a system-wide `brew`) are shown as commands for the owner to run.
-4. **The hook set.** *Default:* `tool.before`, `tool.after`, `turn.start`, and `turn.end`. Context and model transforms wait for a libfx seam.
-5. **Claude Code's hooks.** *Default:* not run. They expect Claude Code's tools and events, so they're counted as not used.
-6. **Which herdr.** The herdr TUI, or the newer app with `hc`? *Default:* the TUI and its socket, with the third-party herdr-mcp pinned to a commit. The owner confirms.
-7. **fxbot's namespace.** *Default:* a reverse-domain name on the project's public site, chosen with the [CIMD document's](../_completed/phases/mcp.md#5-open-questions) home.
-8. **Updates.** *Default:* none on their own. A newer pin shows Update, which goes through the add-on page again.
+1. **Where fxbot's own plugins live.** *Default:* `plugins/<name>/` in this repository, outside the workspaces and never imported by the core, added from GitHub like anyone's. The alternative is a repository of their own.
+2. **The namespace.** *Default:* `io.github.iammrduncan.fxbot`, which the project's GitHub account controls, until the project's domain is ready.
+3. **Dependencies.** *Default:* none installed. A plugin bundles what it needs. Pi installs `dependencies`, which brings install scripts and a slower add.
+4. **Local MCP servers and setup steps.** *Default:* a later phase. A plugin that needs a process starts it from its own code, as herdr's talks to a socket instead of running herdr-mcp.
+5. **How page code loads.** *Default:* a CommonJS bundle run with the app's `require`, as opencode does. The alternative is ES modules with an import map, which needs files that re-export the app's React, made at build time.
+6. **Who answers in a room.** *Default:* each member bot answers each of the owner's messages once, in turn, and bots never start rounds. Later choices could be only the bot that's named, or bots answering each other with a cap on rounds.
+7. **Turns a plugin starts in a bot's own chat.** *Default:* shown with "From <plugin>" on the message.

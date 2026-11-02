@@ -1,6 +1,6 @@
 import { readFileSync } from "node:fs";
 import type { Sql } from "./store.ts";
-import type { AddonCard, AddonFrom, AddonInfo, AddonMark, AddonSearch } from "./types.ts";
+import type { AddonCard, AddonFrom, AddonInfo, AddonMark, AddonSearch, SkillCard, SkillSearch } from "./types.ts";
 
 type Fetch = typeof fetch;
 const hour = 60 * 60 * 1000;
@@ -73,12 +73,53 @@ export function cardOf(entry: Entry, from: AddonFrom): AddonCard {
 // fxbot's own list, as this release shipped it: one page of the registry's `/v0.1/servers`, in its format.
 const shipped = () => (JSON.parse(readFileSync(new URL("./mcp-registry.json", import.meta.url), "utf8")) as { servers: Entry[] }).servers;
 
+// A skill as skills.sh lists it, `<owner>/<repo>/<skillId>` from a GitHub repository. fxbot's skills list adds a
+// description, which skills.sh doesn't give.
+export type SkillEntry = { id: string; source: string; skillId: string; name: string; description?: string; installs?: number };
+const skillId = /^[A-Za-z0-9-]{1,39}\/[A-Za-z0-9._-]{1,100}\/[A-Za-z0-9._-]{1,100}$/;
+const skillEntry = (e: SkillEntry) =>
+  typeof e?.id === "string" && skillId.test(e.id) && e.id === `${e.source}/${e.skillId}` && typeof e.name === "string" && (e.description === undefined || typeof e.description === "string");
+const shippedSkills = () => (JSON.parse(readFileSync(new URL("./skills-registry.json", import.meta.url), "utf8")) as { skills: SkillEntry[] }).skills.filter(skillEntry);
+const skillCard = (e: SkillEntry, from: SkillCard["from"]): SkillCard => ({
+  kind: "skill",
+  id: e.id,
+  name: e.name.slice(0, 64),
+  repository: e.source,
+  from,
+  ...(e.description ? { description: e.description.slice(0, 1024) } : {}),
+  ...(typeof e.installs === "number" ? { installs: e.installs } : {}),
+});
+
 // Three sources of MCP servers. fxbot's own list ships with each release, and with `fxbotUrl`, its published copy
 // replaces it every hour. GitHub's registry is mirrored into Postgres every hour, so that search stays on this
 // machine: every page the first time, then what changed since the last sync began. A rate limit or a 429 waits until
 // the registry says. A failed sync keeps what it had. The official registry is searched only when asked, once per
 // search, for 5 minutes. A server in more than one shows once, from fxbot's list first.
-export function createRegistry({ sql, fetch, mirrorUrl, everythingUrl, fxbotUrl, fxbotList = shipped() }: { sql: Sql; fetch: Fetch; mirrorUrl: string; everythingUrl: string; fxbotUrl?: string; fxbotList?: Entry[] }) {
+// Skills come from fxbot's skills list, kept in memory and read again every hour when it is published, and from
+// skills.sh's search, asked once per search.
+export function createRegistry({
+  sql,
+  fetch,
+  mirrorUrl,
+  everythingUrl,
+  fxbotUrl,
+  fxbotList = shipped(),
+  skillsUrl = "https://skills.sh",
+  fxbotSkillsUrl,
+  fxbotSkills = shippedSkills(),
+}: {
+  sql: Sql;
+  fetch: Fetch;
+  mirrorUrl: string;
+  everythingUrl: string;
+  fxbotUrl?: string;
+  fxbotList?: Entry[];
+  skillsUrl?: string;
+  fxbotSkillsUrl?: string;
+  fxbotSkills?: SkillEntry[];
+}) {
+  let ourSkills = fxbotSkills;
+  const skillSearches = new Map<string, { at: number; entries: SkillEntry[] }>();
   let notBefore = 0;
   let running: Promise<void> | undefined;
   const searches = new Map<string, { at: number; cards: AddonCard[] }>();
@@ -133,6 +174,15 @@ export function createRegistry({ sql, fetch, mirrorUrl, everythingUrl, fxbotUrl,
     return new Map((rows.length ? rows.map((r) => r.entry) : fxbotList.filter(valid)).map((e) => [e.server.name, e]));
   }
 
+  // The published skills list replaces the one in memory; a failed fetch keeps it.
+  async function syncSkills() {
+    if (!fxbotSkillsUrl) return;
+    const res = await get(fxbotSkillsUrl).catch(() => null);
+    const page = res?.ok ? ((await res.json().catch(() => null)) as { skills?: unknown } | null) : null;
+    if (Array.isArray(page?.skills)) ourSkills = (page.skills as SkillEntry[]).filter(skillEntry);
+    else console.error(`fxbot's skills list didn't answer${res ? ` (HTTP ${res.status})` : ""}; keeping the one it had.`);
+  }
+
   async function syncMirror() {
     if (Date.now() < notBefore) return;
     const [state] = await sql<{ syncedAt: Date | null; startedAt: Date | null }[]>`select synced_at, started_at from registry_syncs where source = ${mirrorUrl}`;
@@ -160,7 +210,7 @@ export function createRegistry({ sql, fetch, mirrorUrl, everythingUrl, fxbotUrl,
       await sql`insert into registry_syncs (source, error) values (${mirrorUrl}, ${message}) on conflict (source) do update set error = excluded.error`;
     }
   }
-  const sync = () => (running ??= Promise.all([syncList(), syncMirror()]).then(() => {}).finally(() => (running = undefined)));
+  const sync = () => (running ??= Promise.all([syncList(), syncSkills(), syncMirror()]).then(() => {}).finally(() => (running = undefined)));
 
   // The official registry's own search: a name's substring, at least 3 characters.
   async function everythingFor(text: string) {
@@ -176,6 +226,21 @@ export function createRegistry({ sql, fetch, mirrorUrl, everythingUrl, fxbotUrl,
     const cards = (((await res.json()) as { servers?: Entry[] }).servers ?? []).filter(valid).map((e) => cardOf(e, "official")).filter((c) => c.status !== "deleted");
     searches.set(key, { at: Date.now(), cards });
     return cards;
+  }
+
+  // skills.sh's own search, cached for 5 minutes. Results that don't name a GitHub repository's skill are left out.
+  async function skillsFor(text: string) {
+    const key = text.toLowerCase();
+    const hit = skillSearches.get(key);
+    if (hit && Date.now() - hit.at < cacheMs) return hit.entries;
+    const url = new URL(`${skillsUrl}/api/search`);
+    url.searchParams.set("q", text);
+    url.searchParams.set("limit", "20");
+    const res = await get(url).catch(() => null);
+    if (!res?.ok) throw new Error(res ? `skills.sh answered HTTP ${res.status}.` : "skills.sh didn't answer.");
+    const entries = (((await res.json()) as { skills?: SkillEntry[] }).skills ?? []).filter(skillEntry);
+    skillSearches.set(key, { at: Date.now(), entries });
+    return entries;
   }
 
   // An official entry's newest version, for an add-on from it, asked at most hourly. Null when the registry has none.
@@ -274,6 +339,24 @@ export function createRegistry({ sql, fetch, mirrorUrl, everythingUrl, fxbotUrl,
         }),
       );
     },
+    // fxbot's skills that match first, all of them with no words, then skills.sh's for 2 characters or more. A skill on
+    // both shows once, as fxbot's.
+    async searchSkills(q: unknown): Promise<SkillSearch> {
+      const text = typeof q === "string" ? q.trim().slice(0, 100) : "";
+      const words = text.toLowerCase();
+      const ours = ourSkills.filter((e) => !words || [e.name, e.id, e.description ?? ""].some((t) => t.toLowerCase().includes(words)));
+      const result: SkillSearch = { cards: ours.map((e) => skillCard(e, "fxbot")) };
+      if (text.length < 2) return result;
+      try {
+        const have = new Set(ours.map((e) => e.id));
+        result.cards.push(...(await skillsFor(text)).filter((e) => !have.has(e.id)).map((e) => skillCard(e, "skills.sh")));
+      } catch (error) {
+        result.error = (error as Error).message;
+      }
+      return result;
+    },
+    // A skill in fxbot's list, for its page.
+    ourSkill: (id: string) => ourSkills.find((e) => e.id === id),
     close: () => clearInterval(timer),
   };
 }

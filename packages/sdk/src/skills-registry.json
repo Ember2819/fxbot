@@ -1,0 +1,25 @@
+{
+  "skills": [
+    {
+      "id": "humanlayer/skills/show-me",
+      "source": "humanlayer/skills",
+      "skillId": "show-me",
+      "name": "show-me",
+      "description": "Explains the topic at hand with the smallest picture that makes it clear: a call tree, a file tree, Mermaid, or a diff."
+    },
+    {
+      "id": "anthropics/skills/frontend-design",
+      "source": "anthropics/skills",
+      "skillId": "frontend-design",
+      "name": "frontend-design",
+      "description": "Direction for distinctive, intentional interface design: aesthetics, typography, color, and layout."
+    },
+    {
+      "id": "mattpocock/skills/grilling",
+      "source": "mattpocock/skills",
+      "skillId": "grilling",
+      "name": "grilling",
+      "description": "Interviews you about a plan, decision, or idea, round by round, until it holds up."
+    }
+  ]
+}

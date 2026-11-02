@@ -28,7 +28,7 @@ const fxbot = await createFxbot({
   clientMetadataUrl: process.env.FXBOT_CLIENT_METADATA_URL || undefined,
   registryUrl: process.env.FXBOT_MCP_REGISTRY || undefined,
   everythingUrl: process.env.FXBOT_MCP_EVERYTHING || undefined,
-  fxbotUrl: process.env.FXBOT_MCP_FXBOT || undefined,
+  listsUrl: process.env.FXBOT_LISTS_URL || undefined,
 });
 
 // The ui package's build, served beside the API.
@@ -125,6 +125,7 @@ async function api(req: IncomingMessage, res: ServerResponse, url: URL) {
     if (id && !action && method === "PATCH") return json(res, 200, await fxbot.addons.change(id, await body(req)));
     if (id && !action && method === "DELETE") return json(res, 200, (await fxbot.addons.remove(id), ok));
     if (id && action === "secrets" && method === "PUT") return json(res, 200, await fxbot.addons.setSecrets(id, await body(req)));
+    if (id && action === "skills" && method === "GET") return json(res, 200, { text: fxbot.addons.readSkill(id, url.searchParams.get("file") ?? undefined) });
     // The checked origin is where the sign-in comes back to.
     if (id && action === "sign-in" && method === "POST") return json(res, 201, await fxbot.oauth.start(id, req.headers.origin));
     return fail(404, "not found");
@@ -187,6 +188,8 @@ async function api(req: IncomingMessage, res: ServerResponse, url: URL) {
     return json(res, 200, await fxbot.send(id, await body(req, 12 << 20)));
   } else if (action === "earlier" && method === "GET") {
     return json(res, 200, await fxbot.profiles.earlier(id));
+  } else if (action === "skills" && method === "GET") {
+    return json(res, 200, await fxbot.profiles.skills(id));
   } else if (action === "stream" && method === "GET") {
     const lines = await fxbot.stream(id, Number(url.searchParams.get("cursor") ?? 0));
     res.writeHead(200, { "content-type": "application/x-ndjson", "cache-control": "no-store" }).flushHeaders();

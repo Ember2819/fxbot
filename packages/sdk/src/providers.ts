@@ -305,6 +305,13 @@ export async function createProviders({ store, secretKey, dataDir, vercelClientI
       const current = await record(id);
       return models.list(current, await access(current));
     },
+    // A model's context window, from the provider's own setting or its kept model list, when either knows it.
+    async contextWindow(id: string, model: string) {
+      const current = await record(id);
+      if (current.contextWindow) return current.contextWindow;
+      const list = await access(current).then((a) => models.list(current, a), () => []);
+      return list.find((m) => m.id === model)?.contextWindow;
+    },
 
     async teams(id: string) {
       const current = await record(id);

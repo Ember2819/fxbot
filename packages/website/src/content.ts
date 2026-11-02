@@ -16,6 +16,7 @@ export const groups = [
     about: "Steps for one task, when you know what you want.",
     pages: [
       { slug: "how-to/add-a-provider", label: "Add a provider" },
+      { slug: "how-to/add-a-skill", label: "Add a skill" },
       { slug: "how-to/add-an-mcp-server", label: "Add an MCP server" },
       { slug: "how-to/reach-it", label: "Reach it from other devices" },
       { slug: "how-to/tailscale-service", label: "Serve it at its own name" },
@@ -41,6 +42,7 @@ export const groups = [
     title: "Explanation",
     about: "How fxbot works, and why it works that way.",
     pages: [
+      { slug: "explanation/core-and-add-ons", label: "Core and add-ons" },
       { slug: "explanation/security", label: "Security model" },
       { slug: "explanation/releases", label: "Releases and updates" },
       { slug: "explanation/architecture", label: "Architecture" },

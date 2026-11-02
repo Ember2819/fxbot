@@ -2,7 +2,7 @@
 
 One place to find and add the things that work with fxbot. A search box over live registries lists MCP servers, skills, and plugins, and one Add puts them into fxbot.
 - An [MCP server](mcp.md) gives bots tools from a remote service.
-- A [skill](../../phases/skills.md) is instructions that a bot reads when a task needs them.
+- A [skill](skills.md) is instructions that a bot reads when a task needs them.
 - A [plugin](../../phases/plugins.md) bundles MCP servers and skills. It can also run code on this machine: local MCP servers, tooling such as herdr, and hooks.
 
 Every add-on has a page that lists what it installs, like Grok Bot's plugin page.
@@ -15,7 +15,7 @@ This page owns what they share:
 
 Status: built on 2026-11-02, for MCP servers. The [MCP phase](mcp.md) built the add-on records, consent by hash, per-bot choice, and allowed tools. This phase added fxbot's own list of MCP servers, the mirror of GitHub's registry, everything mode, search, the add-on page for a registry entry, marks on installed add-ons, and Update. The Add-ons page is now a search above four tabs: Installed, Skills, MCP, and Plugins.
 
-What this page says about skills and plugins (their sources, page sections, and records) is not built. [Skills](../../phases/skills.md) and [plugins](../../phases/plugins.md) add them to the same search and page; until then, their tabs say they aren't in fxbot yet.
+[Skills](skills.md) joined the same search and records after, with fxbot's skills list and skills.sh. What this page says about plugins (their marketplaces, page sections, and records) is not built; until [plugins](../../phases/plugins.md) are, their tab says they aren't in fxbot yet.
 
 ## 1. Research
 
@@ -61,7 +61,7 @@ These are read from docs, source, and read-only requests to public APIs, as of N
   - `twilio-developer-kit` is one of them, pinned to `twilio/ai` at `8aba46f`.
 
 **Skill sources**
-- **skills.sh** answers `GET /api/search?q=` with no key. Each result is `{ id, source, skillId, name, installs }`, where `source` is a GitHub `owner/repo`, and has no description ([skills](../../phases/skills.md#1-research)).
+- **skills.sh** answers `GET /api/search?q=` with no key. Each result is `{ id, source, skillId, name, installs }`, where `source` is a GitHub `owner/repo`, and has no description ([skills](skills.md#1-research)).
 - **Others.** ClawHub documents a public search API, which answered 500 when tried here. A draft RFC proposes `/.well-known/agent-skills/index.json` for websites. The MCP registries list no skills.
 
 **How clients present catalogs**
@@ -89,7 +89,7 @@ These are read from docs, source, and read-only requests to public APIs, as of N
 2. **Install from what entries already say.**
    - A registry entry's `remotes` become an [MCP server](mcp.md).
    - Its `packages` mean a process on this machine, so they install as a [plugin](../../phases/plugins.md).
-   - A marketplace entry is a plugin, and a skills.sh result is a [skill](../../phases/skills.md).
+   - A marketplace entry is a plugin, and a skills.sh result is a [skill](skills.md).
 3. **Plugins come from marketplaces in Claude's format,** which Codex and Grok Build read too. The defaults:
    - Anthropic's official marketplace: 315 plugins, all pinned, and 192 of them only MCP servers and skills.
    - The project's own marketplace, for fxbot plugins such as herdr.
@@ -108,7 +108,7 @@ These are read from docs, source, and read-only requests to public APIs, as of N
 
 - **fxbot's list.** The project's own picks, in `packages/sdk/src/mcp-registry.json`: one page of the registry's `/v0.1/servers`, each entry a standard `server.json`.
   - Each release ships with the file, and `npm run build-site` publishes it as `out/mcp-registry.json`.
-  - With `FXBOT_MCP_FXBOT` set to the published copy, such as `https://<domain>/mcp-registry.json`, the server reads it every hour and it replaces the shipped one. A failed fetch keeps the last copy read. Without it, the shipped copy is the list.
+  - With `FXBOT_LISTS_URL` set to the site that publishes it, such as `https://<domain>`, the server reads its `mcp-registry.json` every hour and it replaces the shipped one. A failed fetch keeps the last copy read. Without it, the shipped copy is the list.
   - Each copy is the whole list: an entry it lacks is gone, and an add-on from it is marked removed. A newer `version` marks the add-on for Update.
   - It is kept in `registry_entries` under the source `fxbot`. Its first entries are alphaXiv and Keiro, under their publishers' namespaces, `org.alphaxiv` and `cloud.keirolabs`.
 - **MCP servers.** Every hour, the SDK reads `<registry>/v0.1/servers?version=latest&limit=100`, page by page, then incrementally with `updated_since`.
@@ -171,7 +171,7 @@ Information
 
 - **Sections,** each shown only when the add-on has one:
   - **MCP servers:** each server's name, host, and sign-in (none, keys, or OAuth, found by probing it). See [mcp.md](mcp.md#adding-a-server).
-  - **Skills:** each skill's name and description, five at a time, each opening its text. See [skills.md](../../phases/skills.md#adding-skills).
+  - **Skills:** each skill's name and description, five at a time, each opening its text. See [skills.md](skills.md#ui).
   - **Runs on this machine, Hooks, and Setup:** every command with its arguments, untruncated. `sh -c`, `curl | sh`, and `sudo` are flagged. See [plugins.md](../../phases/plugins.md#installing).
   - **Not used by fxbot:** a count of each part that fxbot doesn't run, such as commands, agents, LSP servers, and other clients' hooks.
   - **Information:**
@@ -219,7 +219,7 @@ registry_syncs  (source text primary key, synced_at timestamptz, started_at time
 - `addons`, `addon_secrets`, and `profile_addons` are the MCP phase's (`0001_baseline`). `registry_entries` and `registry_syncs` are migration `0003_registry_entries`.
 - A registry add-on's `source` is `{ registry, version, everything? }`: its entry's name and the version added.
 - `addon_secrets` uses `seal` and `unseal` from `secrets.ts`, with the add-on id as AAD. It holds header values, OAuth tokens, registered clients, and plugin settings marked secret.
-- Skills are kept in the `skills` table ([skills](../../phases/skills.md#records-packagessdksrcskillsts)).
+- Skills are kept in the `skills` table ([skills](skills.md#records-packagessdksrcskillsts-migration-0004_skills)).
 
 ### API, SDK, and client
 
@@ -236,7 +236,7 @@ Built here marks what this phase added: two routes, the marks, and the Informati
 | `PUT /api/profiles/:id/addons/:addon` | `addons.forBot(profile, addon, enabled)` | MCP phase |
 | `DELETE /api/addons/:id` | `addons.remove(id)`: stops processes, deletes secrets and skills | MCP phase |
 
-The routes that sign in, set secrets, read skills, and run setup are in [mcp.md](mcp.md#api-sdk-and-client), [skills.md](../../phases/skills.md#api-sdk-and-client), and [plugins.md](../../phases/plugins.md#api-sdk-and-client).
+The routes that sign in, set secrets, read skills, and run setup are in [mcp.md](mcp.md#api-sdk-and-client), [skills.md](skills.md#api-sdk-and-client), and [plugins.md](../../phases/plugins.md#api-sdk-and-client).
 
 ### UI
 
@@ -279,7 +279,7 @@ Add-ons
   2. **Opening a card** shows its add-on page in a dialog. **Add** saves it, then runs the add-on's own flow: for an MCP server, its key fields or its sign-in. The page then shows Installed.
   3. **Search everything (unmoderated)** adds the official registry's results.
   4. **Add by address** opens the MCP phase's form, for a server no registry lists.
-- **Skills and Plugins** say they aren't in fxbot yet, until their phases.
+- **Skills** is the [skills phase's](skills.md#ui): fxbot's skills list and skills.sh. **Plugins** says it isn't in fxbot yet, until its phase.
 - **The edit dialog** (the MCP phase's) gains, for an add-on from a registry, its Information at the version it is on, and when there is a newer one, **Update to <version>**. That shows what changes (the version, address, sign-in, and headers), and nothing moves until **Update**.
 - **Bot settings** are unchanged: a switch for each add-on given to chosen bots, and "All bots" for the rest.
 - Components come from shadcn only.
@@ -315,11 +315,11 @@ Planned at about 420 lines. Built in about 570, mostly in the UI, which became a
 | The migration, two routes, types, and the client | about 30 | about 60 |
 | UI: search, tabs, the cards, the add-on page, the marks, and the tool count | about 180 | about 250 |
 
-Plus [skills.md](../../phases/skills.md#size) and [plugins.md](../../phases/plugins.md#size), which add their own sources and page sections.
+Plus [skills.md](skills.md#size) and [plugins.md](../../phases/plugins.md#size), which add their own sources and page sections.
 
 ## 4. Checklist
 
-All checked on 2026-11-02: 37 checks in the SDK, 35 in a browser, and the MCP phase's 67 again. Checks use disposable Postgres, the [MCP checks'](mcp.md#4-checklist) mock server, and a mock registry served from the scratchpad. Nothing reaches the live sources except the human's checks. [Skills](../../phases/skills.md#4-checklist) and [plugins](../../phases/plugins.md#4-checklist) check their own sources when they join the search.
+All checked on 2026-11-02: 37 checks in the SDK, 35 in a browser, and the MCP phase's 67 again. Checks use disposable Postgres, the [MCP checks'](mcp.md#4-checklist) mock server, and a mock registry served from the scratchpad. Nothing reaches the live sources except the human's checks. [Skills](skills.md#4-checklist) and [plugins](../../phases/plugins.md#4-checklist) check their own sources when they join the search.
 
 **M1. Sources**
 - [x] A sync reads every page of the mock registry, then only `updated_since` changes.

@@ -111,26 +111,22 @@ export type Team = { id: string; name: string };
 export type SignIn = { id: string; verificationUrl: string; userCode: string; expiresAt: number };
 export type SignInStatus = { status: "waiting" | "done" | "failed"; provider?: string; error?: string };
 
-// An add-on gives bots more to use. So far the one kind is a remote MCP server. `auth` is how it signs in: not at
-// all, with headers whose values fxbot keeps sealed, or with OAuth. `signedIn` says it has its token or header values.
-// Bots get only the tools in `allowed`, which are the read-only ones until the person picks. `bots` is "all", or "each"
-// for only the bots in `on`. `status` says "Connected", or what it waits for.
+// An add-on gives bots more to use: a remote MCP server, or a skill. `bots` is "all", or "each" for only the bots in
+// `on`. `status` says what it waits for, if anything. A mark is what the hourly check found.
+type AddonCommon = { id: string; name: string; enabled: boolean; bots: "all" | "each"; on: string[]; status: string; mark?: AddonMark };
+// A remote MCP server. `auth` is how it signs in: not at all, with headers whose values fxbot keeps sealed, or with
+// OAuth. `signedIn` says it has its token or header values. Bots get only the tools in `allowed`, which are the
+// read-only ones until the person picks. Its `status` says "Connected" once it is.
 export type AddonTool = { name: string; description: string; readOnly: boolean };
 export type Transport = "streamable-http" | "sse";
-export type Addon = {
-  id: string;
+export type McpAddon = AddonCommon & {
   kind: "mcp";
-  name: string;
   url: string;
   transport: Transport;
   auth: "none" | "headers" | "oauth";
   headers: string[];
   allowLocal: boolean;
-  enabled: boolean;
-  bots: "all" | "each";
-  on: string[];
   allowed: string[];
-  status: string;
   tools: AddonTool[];
   signedIn: boolean;
   ownClient: boolean;
@@ -138,23 +134,48 @@ export type Addon = {
   source?: { registry: string; version: string; from: AddonFrom };
   /** What its source says about it now. */
   info?: AddonInfo;
-  mark?: AddonMark;
 };
+// A skill, installed as skills.sh installs it: `<owner>/<repo>/<skillId>`, from the repository at `commit`, found in
+// fxbot's own list or on skills.sh.
+export type SkillSource = { skill: string; commit: string; from: "fxbot" | "skills.sh" };
+// A file of a skill: its path in the skill's folder, its size, and a hash of it, to show what an update changes.
+export type SkillFile = { path: string; size: number; hash: string };
+// A skill as installed. `manual` is one only a person calls by name, which bots don't see in their list.
+export type SkillAddon = AddonCommon & { kind: "skill"; source: SkillSource; description: string; files: SkillFile[]; license?: string; manual?: boolean };
+export type Addon = McpAddon | SkillAddon;
 // Where a registry entry comes from: fxbot's own list, GitHub's registry, or the official one, unmoderated.
 export type AddonFrom = "fxbot" | "github" | "official";
 // What the page asks to add: a server by its URL, with the names of any headers it needs, or a registry entry, from
 // GitHub's registry unless `from` says otherwise.
 export type AddonRef =
   | { url: string; transport?: Transport; headers?: string[]; allowLocal?: boolean }
-  | { registry: string; version?: string; allowLocal?: boolean; from?: AddonFrom };
+  | { registry: string; version?: string; allowLocal?: boolean; from?: AddonFrom }
+  | SkillRef;
+// A skill by its skills.sh id, `<owner>/<repo>/<skillId>`, as found in fxbot's list or on skills.sh.
+export type SkillRef = { skill: string; from?: SkillSource["from"] };
 // The add-on page: what probing the server found, and for a registry entry, what the registry says about it. Add sends
 // `hash` back, and fails if the server changed since. `local` is an entry that runs only on this machine, which can't
 // be added before plugins.
-export type AddonPreview = Omit<Addon, "id" | "kind" | "headers" | "enabled" | "bots" | "on" | "allowed" | "status" | "tools" | "signedIn" | "ownClient" | "source" | "mark"> & {
+export type AddonPreview = Omit<McpAddon, "id" | "kind" | "headers" | "enabled" | "bots" | "on" | "allowed" | "status" | "tools" | "signedIn" | "ownClient" | "source" | "mark"> & {
   hash: string;
   headers: { name: string; secret: boolean; description?: string }[];
   tools: AddonTool[] | null;
   local?: boolean;
+};
+// A skill's page, from its repository's current commit: its SKILL.md in full, its other files, and the files passed
+// over and why. Add sends `hash` back, and fails if the skill changed since. A skill that can't be added has an `error`
+// and no hash.
+export type SkillPreview = {
+  hash: string;
+  name: string;
+  description: string;
+  source: SkillSource;
+  text: string;
+  files: SkillFile[];
+  skipped: { path: string; why: string }[];
+  license?: string;
+  manual?: boolean;
+  error?: string;
 };
 // A registry entry as the registry describes it. `namespace` is its publisher, verified by the registry; `domain` is
 // the domain a reverse-DNS namespace names, which a remote's host should be on.
@@ -180,6 +201,11 @@ export type AddonCard = AddonInfo & { kind: "mcp"; url?: string; host?: string; 
 export type AddonMark = { kind: "update"; version: string } | { kind: "deprecated" } | { kind: "removed" };
 // A search's cards, and the mirror's state: when it last synced, and why the last try failed.
 export type AddonSearch = { cards: AddonCard[]; syncedAt: string | null; error?: string; everythingError?: string };
+// A skill found in fxbot's list or on skills.sh. skills.sh gives installs but no description; fxbot's list gives one.
+export type SkillCard = { kind: "skill"; id: string; name: string; repository: string; from: SkillSource["from"]; description?: string; installs?: number };
+export type SkillSearch = { cards: SkillCard[]; error?: string };
+// A skill a bot has, as its chat's picker lists it: `$name` in a message, or `/name` at its start, sends it along.
+export type BotSkill = { name: string; description: string; manual?: boolean };
 // Write-only: header values, or the person's own OAuth client for a server that registers none itself.
 export type AddonSecrets = { headers?: Record<string, string>; clientId?: string; clientSecret?: string };
 // An OAuth sign-in as the page sees it. "redirect" comes back on its own; "paste" needs the address of the page that

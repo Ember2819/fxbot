@@ -74,7 +74,7 @@ export function Results({ search, everything, onEverything, added, onOpen, onAdd
 }
 
 // The add-on's initial, in place of a remote icon, which would tell its host who looked.
-const Initial = ({ title }: { title: string }) => (
+export const Initial = ({ title }: { title: string }) => (
   <span aria-hidden className="flex size-9 shrink-0 items-center justify-center rounded-md bg-muted font-medium">
     {(title.trim()[0] ?? "?").toUpperCase()}
   </span>
@@ -111,6 +111,22 @@ function Card({ card, added, onOpen }: { card: AddonCard; added: boolean; onOpen
   );
 }
 
+// Terms and their values, leaving out those without one.
+export function Details({ rows }: { rows: [string, ReactNode][] }) {
+  return (
+    <dl className="grid grid-cols-[6.5rem_minmax(0,1fr)] gap-x-3 gap-y-1.5 text-sm">
+      {rows
+        .filter(([, value]) => value !== undefined && value !== "")
+        .map(([term, value]) => (
+          <div key={term} className="contents">
+            <dt className="text-muted-foreground">{term}</dt>
+            <dd className="min-w-0">{value}</dd>
+          </div>
+        ))}
+    </dl>
+  );
+}
+
 // An entry's Information: who published it, where it comes from, and its registry's notes.
 export function Information({ info }: { info: AddonInfo }) {
   const link = (url?: string) => (url && /^https?:\/\//.test(url) ? <a href={url} target="_blank" rel="noopener noreferrer" className="break-all underline underline-offset-4">{url.replace(/^https?:\/\//, "")}</a> : url);
@@ -124,18 +140,7 @@ export function Information({ info }: { info: AddonInfo }) {
     ["Status", info.status === "active" ? "Active" : info.status === "deprecated" ? "Deprecated" : "Removed"],
     ["Source", fromText[info.from]],
   ];
-  return (
-    <dl className="grid grid-cols-[6.5rem_minmax(0,1fr)] gap-x-3 gap-y-1.5 text-sm">
-      {rows
-        .filter(([, value]) => value !== undefined && value !== "")
-        .map(([term, value]) => (
-          <div key={term} className="contents">
-            <dt className="text-muted-foreground">{term}</dt>
-            <dd className="min-w-0">{value}</dd>
-          </div>
-        ))}
-    </dl>
-  );
+  return <Details rows={rows} />;
 }
 
 // A registry entry's page, and the consent to add it. It looks at the server first; nothing is saved before Add, and

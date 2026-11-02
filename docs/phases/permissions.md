@@ -8,4 +8,6 @@ When a tool call needs approval — any call in ask mode, or anything the auto-m
 
 This follows the fx CLI modes (ask / auto / full-access) and reviewer models documented at https://fx.sh/docs/configure-fx/permissions, and libfx host tools at https://fx.sh/docs/lib/tools. The libfx API exposes `permission.start` / `permission.end` and `wait.start` / `wait.end` events; whether those can be used for this is unverified. Keep it a thin wrapper around every tool's `execute()`, under the simplicity rule.
 
+**Add-on, on a core hook.** The hook before every tool call, which can block it, is part of the [plugin API](plugins.md), and core tools pass through it too. Ask, auto, and yolo are a plugin on that hook. The rule built with [MCP servers](../_completed/phases/mcp.md), that bots get only a server's read-only tools until the owner allows more, stays in core.
+
 Not planned yet.

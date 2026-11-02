@@ -1,6 +1,6 @@
 # MCP servers
 
-Add any remote MCP server to fxbot, by its URL or from [add-ons](addons.md). fxbot connects from the server, signs in with OAuth when the server asks, and gives the server's tools to the bots that use it. A server can also serve [skills](../../phases/skills.md). Local MCP servers, which run code on this machine, come in [plugins](../../phases/plugins.md), and plugins can bundle remote servers too.
+Add any remote MCP server to fxbot, by its URL or from [add-ons](addons.md). fxbot connects from the server, signs in with OAuth when the server asks, and gives the server's tools to the bots that use it. A server can also serve [skills](skills.md). Local MCP servers, which run code on this machine, come in [plugins](../../phases/plugins.md), and plugins can bundle remote servers too.
 
 The hard part is signing in. fxbot runs on a tailnet or on localhost, with no public address, and the project should not have to register its own OAuth client with every MCP provider. This page answers that: [section 2](#2-key-takeaways) in short, [OAuth sign-in](#oauth-sign-in) in full.
 
@@ -23,7 +23,7 @@ These are read from specs, source, docs, and read-only requests, as of November 
 - **Flow.** Discovery uses RFC 9728 protected resource metadata (the `resource_metadata` in a 401's `WWW-Authenticate`), then RFC 8414 or OIDC discovery. The `resource` parameter (RFC 8707) and PKCE S256 are required. Redirect URIs are localhost or HTTPS.
 - **No device flow.** The authorization pages have none.
 - **[Lifecycle](https://modelcontextprotocol.io/specification/2026-07-28/basic/lifecycle).** Servers "MUST implement `server/discover`", and requests carry their own `_meta` in place of an `initialize` session. Clients that support both eras probe with `server/discover`, and fall back to `initialize` for servers on 2025-11-25 and earlier.
-- **Skills.** The `io.modelcontextprotocol/skills` extension lets a server serve skills through `skills/list`, `skills/get`, and `resources/read` ([skills](../../phases/skills.md#1-research)).
+- **Skills.** The `io.modelcontextprotocol/skills` extension lets a server serve skills through `skills/list`, `skills/get`, and `resources/read` ([skills](skills.md#1-research)).
 - **[Security best practices](https://modelcontextprotocol.io/specification/2026-07-28/basic/security_best_practices).**
   - Discovery makes the client fetch URLs that a server names (`resource_metadata`, authorization servers), so a client on a server must guard against SSRF.
   - Script injected into a web client can run commands through a proxy that starts local servers. That matters for [plugins](../../phases/plugins.md).
@@ -157,7 +157,7 @@ The fixed-port URI is for servers that match ports exactly. Until the document e
   3. The [permissions](../../phases/permissions.md) check, when that phase ships.
 - `idempotent` stays `false`, except for tools with `readOnlyHint: true` and `idempotentHint: true`.
 - The adapter's `instructions` go into the instructions of bots that use the server.
-- **Skills.** When the server declares the skills extension, its skills join the add-on, labelled with the server, and bots read them through it ([skills](../../phases/skills.md#adding-skills)).
+- **Skills.** When the server declares the skills extension, its skills join the add-on, labelled with the server, and bots read them through it ([skills](skills.md#5-open-questions)).
 - **Changes.** Adding, removing, enabling a server, or changing its allowed tools rebuilds every provider agent with the new tool list, since libfx fixes tools when an agent is made. Rebuilding closes each agent first, which waits for its running turns.
 - **Connections.** A dropped connection is retried with backoff. Its tools then fail with "<server> is unreachable", and the add-on shows the error.
 
@@ -223,7 +223,7 @@ What the build found or changed, checked against `@modelcontextprotocol/client` 
   - `bots` is `all` or `each`. With `each`, a bot gets the server only when switched on, in the server's settings or the bot's. Switching to `each` starts with no bot chosen.
   - The page is a list with an edit button per server, an Add dialog that asks only for the address (the local-address switch shows once one is refused), and one field for a key: a bearer token, or `Name: value` for another header. The person's own OAuth app is asked for only when a sign-in cannot start.
   - The service worker no longer answers `/callback`, so a loopback sign-in in the installed production app reaches the server.
-- **Skills from servers wait for the [skills](../../phases/skills.md) phase.** The probe doesn't report whether a server serves skills yet, and none are read.
+- **Skills from servers wait for the [skills](skills.md) phase.** The probe doesn't report whether a server serves skills yet, and none are read.
 - **Wording.** A server whose renewal was refused shows "Sign in to use it", with a Sign in button, rather than "Sign in again". A server with no client to register shows its callback URL in the sign-in error, and the card takes the person's own client.
 - **Secrets.** `createSecrets` takes the table now: add-ons seal into `addon_secrets`, with the add-on id as AAD, and `rotateSecrets` seals both tables again.
 - **The page.** The puzzle button beside the library opens Add-ons, and a bot's settings list every server with a switch. shadcn's Switch and Checkbox were added for them.

@@ -75,6 +75,7 @@ Open the bot panel with the button at the top right of the chat, then **Edit**. 
 
 A release of fxbot, served on your tailnet and installed on your phone, with a provider and a bot that keeps its chat. From here:
 
+- [Add a skill](/docs/how-to/add-a-skill/) to give your bots instructions for a kind of task.
 - [Add an MCP server](/docs/how-to/add-an-mcp-server/) to give your bots tools.
 - [Serve fxbot at its own name](/docs/how-to/tailscale-service/), such as `bot.<tailnet>.ts.net`, or [reach it another way](/docs/how-to/reach-it/).
 - Read about [bots, chats, and the library](/docs/explanation/bots-and-chats/), and the [security model](/docs/explanation/security/).

@@ -1,6 +1,6 @@
 # Security model
 
-fxbot is built for one person's machine, where agents may run too. It keeps every secret on the server, sealed, and leaves who reaches it to you. This page is about why it works that way, and where its edges are.
+fxbot is built for one person's machine. It keeps every secret on the server, sealed, and leaves who reaches it to you. This page is about why it works that way, and where its edges are.
 
 ## Loopback only, with no login
 
@@ -12,7 +12,7 @@ The cost is that whoever reaches the address can use all of fxbot: every bot, ev
 
 Every key and token fxbot stores is sealed in the SDK with AES-256-GCM before it reaches Postgres, with a fresh nonce each time, and bound to the record it belongs to. Postgres holds only ciphertext and never sees the key. fxbot doesn't use pgcrypto, whose key would travel inside SQL and could reach Postgres's logs.
 
-The key is a file, `/etc/fxbot/secret.key` in a release install, that only the server's user reads. Tools such as fx and opencode keep sign-ins in a file with mode 600, which any agent running as the same user can read. fxbot puts its secrets where such an agent can't.
+The key is a file, `/etc/fxbot/secret.key` in a release install, that only the server's user reads.
 
 `npm run rotate-key` seals everything again under a new key, for when the old one may have leaked. See [Commands](/docs/reference/commands/#npm-run-rotate-key).
 
@@ -20,13 +20,7 @@ The key is a file, `/etc/fxbot/secret.key` in a release install, that only the s
 
 The page sends a key once, and never gets it back: a provider in a list says only whether it has a key or a sign-in. Device code and OAuth sign-ins run on the server, as attempts the page checks on. The page sees a link and a code, and never a verifier or a token.
 
-The page's code carries no credentials, and its build reads no `.env`. A page left open, a browser extension, or the app's offline copy holds nothing worth taking.
-
-## Agents on their own user
-
-Coding agents and other tools may run on the same machine, as your user or one of their own. A release install runs as the `fxbot` user, which alone reads the key in `/etc/fxbot`, the chats in `/var/lib/fxbot`, and reaches the `fxbot` database, through Postgres's peer auth. An agent running as any other user that isn't root reaches none of them.
-
-Root reaches everything, and fxbot doesn't try to defend against it. A checkout run as yourself doesn't have this separation either: its key and database are yours, so any agent running as you can read them. That is why everyday use is a release install.
+The page's code carries no credentials, and its build reads no `.env`.
 
 ## Files served as data
 
@@ -39,6 +33,10 @@ A remote MCP server's tools are code fxbot doesn't control, and a call may not b
 Adding a server makes fxbot's server fetch its address. So fxbot takes HTTPS only, and refuses local and private addresses, the tailnet's included, unless you allow one for a server you run. A server's key, headers, and OAuth client are sealed like a provider's.
 
 A registry entry says who published it, checked by the registry, but not that its server is safe or theirs. Its page shows the server's host, in red when it isn't on the publisher's domain, and nothing is saved before **Add**. If the entry changes between the page and **Add**, fxbot refuses and shows the page again. fxbot fetches GitHub's MCP registry every hour, its own list of servers when an address for it is set, and the official registry only when you tick **Search everything**, which sends it your search words. It loads no icons from them.
+
+## Skills
+
+A skill is someone else's instructions, which a bot follows like its own. fxbot shows a skill's `SKILL.md` before you add it, and keeps it pinned to the commit of its repository that page came from. When its files change there, it waits for you to update it. Nothing in a skill runs: fxbot keeps only its text files, and bots read its scripts as text. Each skills search on the Skills tab sends its words to skills.sh, and adding a skill fetches its repository from GitHub.
 
 ## What it doesn't cover
 

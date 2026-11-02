@@ -48,6 +48,7 @@ import { follow, go } from "./nav.ts";
 import { ModelField, Providers } from "./providers.tsx";
 import { install, keepDraft, reload, takeDraft, useInstall, useNewVersion } from "./pwa.ts";
 import { useTurnStream } from "./use-turn-stream.ts";
+import { leadingSkills, SkillChips, SkillMenu, useSkillPicker } from "./skill-picker.tsx";
 
 export function App() {
   const [path, setPath] = useState(location.pathname);
@@ -502,6 +503,8 @@ function Chat({ id, profiles, onChange }: { id: string; profiles: Profile[] | nu
   const [notice, setNotice] = useState("");
   const box = useRef<HTMLTextAreaElement>(null);
   const picker = useRef<HTMLInputElement>(null);
+  const skills = useSkillPicker(id, box, draft, setDraft);
+  const skillNames = new Set(skills.skills.map((s) => s.name));
   const { turns, setTurns, connected } = useTurnStream(id, Boolean(profile?.sessionId));
   const panel = usePanel();
   // A provider switch starts a new chat. The earlier ones stay readable above the handoff, though the bot now sees only
@@ -565,12 +568,15 @@ function Chat({ id, profiles, onChange }: { id: string; profiles: Profile[] | nu
     }
   }
 
+  // Picked skills go first, as $name, which the server sends along with the message.
   function submit(event: { preventDefault(): void }) {
     event.preventDefault();
-    if ((!draft.trim() && !attached.length) || stuck) return;
-    send(draft, newMessageId(), attached);
+    if ((!draft.trim() && !attached.length && !skills.picked.length) || stuck) return;
+    send([...skills.picked.map((name) => `$${name}`), draft].filter((part) => part.trim()).join(" "), newMessageId(), attached);
     setDraft("");
     setAttached([]);
+    skills.setPicked([]);
+    skills.close();
     setNotice("");
   }
 
@@ -648,23 +654,27 @@ function Chat({ id, profiles, onChange }: { id: string; profiles: Profile[] | nu
                 <MessageScrollerViewport>
                   <MessageScrollerContent className="mx-auto w-full max-w-3xl gap-6 px-4 py-4">
                     {earlier.map((turn) => (
-                      <TurnView key={turn.messageId} turn={turn} color={profile?.color} />
+                      <TurnView key={turn.messageId} turn={turn} color={profile?.color} skills={skillNames} />
                     ))}
                     {profile?.handoff && <Handoff text={profile.handoff} />}
                     {turns.map((turn) => (
-                      <TurnView key={turn.messageId} turn={turn} color={profile?.color} retry={() => send(turn.text, turn.messageId, turn.files ?? [])} />
+                      <TurnView key={turn.messageId} turn={turn} color={profile?.color} skills={skillNames} retry={() => send(turn.text, turn.messageId, turn.files ?? [])} />
                     ))}
                   </MessageScrollerContent>
                 </MessageScrollerViewport>
                 <MessageScrollerButton />
               </MessageScroller>
             )}
-            <form onSubmit={submit} className="mx-auto w-full max-w-3xl px-4 pb-[max(1rem,env(safe-area-inset-bottom))]">
+            <form onSubmit={submit} className="relative mx-auto w-full max-w-3xl px-4 pb-[max(1rem,env(safe-area-inset-bottom))]">
+              <SkillMenu picker={skills} />
               {notice && <p className="px-4 pb-2 text-sm text-destructive">{notice}</p>}
               {/* Wraps so the files take the first row and the text and buttons the second; the buttons stay at the bottom as the text grows. */}
               <InputGroup className="h-auto flex-wrap items-end rounded-3xl bg-background px-1">
-                {attached.length > 0 && (
-                  <Files className="order-first w-full px-2 pt-2" files={attached} remove={(i) => setAttached((all) => all.toSpliced(i, 1))} />
+                {(attached.length > 0 || skills.picked.length > 0) && (
+                  <div className="order-first flex w-full flex-wrap gap-2 px-2 pt-2">
+                    {skills.picked.length > 0 && <SkillChips names={skills.picked} remove={(name) => skills.setPicked((all) => all.filter((n) => n !== name))} />}
+                    {attached.length > 0 && <Files files={attached} remove={(i) => setAttached((all) => all.toSpliced(i, 1))} />}
+                  </div>
                 )}
                 <InputGroupAddon align="inline-start" className="pb-1.5">
                   <input ref={picker} type="file" multiple hidden onChange={(e) => attach([...(e.target.files ?? [])]).then(() => (e.target.value = ""))} />
@@ -677,10 +687,17 @@ function Chat({ id, profiles, onChange }: { id: string; profiles: Profile[] | nu
                   rows={1}
                   aria-label="Message"
                   className="max-h-48 min-h-0 py-3"
-                  placeholder={profile ? (stuck ? "No provider yet" : `Message ${profile.name}`) : "Loading…"}
+                  placeholder={profile ? (stuck ? "No provider yet" : `Message ${profile.name}${skills.skills.length ? ", or $ for a skill" : ""}`) : "Loading…"}
                   value={draft}
-                  onChange={(e) => setDraft(e.target.value)}
-                  onKeyDown={(e) => e.key === "Enter" && !e.shiftKey && !e.nativeEvent.isComposing && submit(e)}
+                  role="combobox"
+                  aria-autocomplete="list"
+                  aria-expanded={skills.open}
+                  aria-controls="skill-picker"
+                  aria-activedescendant={skills.open && skills.matches.length ? `skill-option-${skills.active}` : undefined}
+                  onChange={(e) => (setDraft(e.target.value), skills.track(e.target.value, e.target.selectionStart))}
+                  onFocus={() => void skills.load()}
+                  onBlur={() => skills.close()}
+                  onKeyDown={(e) => skills.key(e) || (e.key === "Enter" && !e.shiftKey && !e.nativeEvent.isComposing && submit(e))}
                   onPaste={(e) => {
                     if (!e.clipboardData.files.length) return;
                     // Text pasted with a picture of itself, as from a spreadsheet, keeps the text as well.
@@ -690,7 +707,7 @@ function Chat({ id, profiles, onChange }: { id: string; profiles: Profile[] | nu
                   disabled={stuck}
                 />
                 <InputGroupAddon align="inline-end" className="pb-1.5">
-                  <InputGroupButton type="submit" variant="default" size="icon-sm" className="rounded-full" disabled={stuck || (!draft.trim() && !attached.length)} aria-label="Send">
+                  <InputGroupButton type="submit" variant="default" size="icon-sm" className="rounded-full" disabled={stuck || (!draft.trim() && !attached.length && !skills.picked.length)} aria-label="Send">
                     <ArrowUpIcon />
                   </InputGroupButton>
                 </InputGroupAddon>
@@ -720,19 +737,21 @@ function ink(color: Color) {
   return 1.05 / (light + 0.05) >= (light + 0.05) / (dark + 0.05) ? "#ffffff" : "#1f1f1f";
 }
 
-// Messages to the bot are drawn in the bot's own color.
-function TurnView({ turn, color, retry }: { turn: Turn; color?: Color; retry?: () => void }) {
+// Messages to the bot are drawn in the bot's own color. Skills the message starts with show as chips.
+function TurnView({ turn, color, skills, retry }: { turn: Turn; color?: Color; skills: Set<string>; retry?: () => void }) {
+  const named = leadingSkills(turn.text, skills);
   return (
     <>
       {turn.text || turn.files?.length ? (
         <MessageScrollerItem messageId={`${turn.messageId}-user`} scrollAnchor>
           <Message align="end">
             <MessageContent>
+              {named.skills.length ? <SkillChips className="flex-wrap justify-end" names={named.skills} /> : null}
               {turn.files?.length ? <Files className="flex-wrap justify-end" files={turn.files} /> : null}
-              {turn.text && (
+              {named.rest && (
                 <Bubble align="end" variant="muted">
                   <BubbleContent className="whitespace-pre-wrap" style={color && { background: colors[color], color: ink(color) }}>
-                    {turn.text}
+                    {named.rest}
                   </BubbleContent>
                 </Bubble>
               )}

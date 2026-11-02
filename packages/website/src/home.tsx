@@ -56,9 +56,9 @@ const features: { shape: Shape; color: Color; title: string; link: string; body:
   {
     shape: "flower",
     color: "purple",
-    title: "MCP servers",
-    link: "/docs/how-to/add-an-mcp-server/",
-    body: <>Find a remote MCP server in GitHub's registry, or add one by its address. fxbot signs in with OAuth or a key, and gives the tools you allow to all bots or the ones you choose. Read-only tools come first.</>,
+    title: "Add-ons",
+    link: "/docs/explanation/core-and-add-ons/",
+    body: <>Skills from fxbot's picks or skills.sh, which bots read when a task needs them. Remote MCP servers from GitHub's registry or by address, with only the tools you allow. Each goes to all bots or the ones you choose, and costs nothing until you add it.</>,
   },
   {
     shape: "hexagon",
@@ -71,13 +71,6 @@ const features: { shape: Shape; color: Color; title: string; link: string; body:
       </>
     ),
   },
-];
-
-const safety: { title: string; body: string }[] = [
-  { title: "Sealed in Postgres", body: "Keys and tokens are sealed with AES-256-GCM before they are stored. Postgres holds only ciphertext, and the key that seals them is a file only fxbot reads." },
-  { title: "Never on the page", body: "The page sends a key once and never gets it back. Sign-ins run on the server, and the page sees only a link and a code." },
-  { title: "You choose who reaches it", body: "fxbot listens on 127.0.0.1 and has no login of its own. Use it on the machine itself, or let Tailscale, or a proxy with its own login, decide who gets in." },
-  { title: "Its own user", body: "A release runs as the fxbot user, which alone reads the key, the database, and the chats. Agents that run as other users reach none of them." },
 ];
 
 const steps: { title: string; command?: string; body: ReactNode }[] = [
@@ -190,7 +183,7 @@ export function Home() {
 
         <section className="mx-auto max-w-6xl px-4 pt-20 sm:px-6 sm:pt-28">
           <SectionTitle eyebrow="What it does" title="Bots you keep talking to">
-            Each bot is a profile with one long-running chat. All of this ships in the current release.
+            Each bot is a profile with one long-running chat. The core stays small, and the rest comes as add-ons you pick. All of this ships in the current release.
           </SectionTitle>
           <ul className="mt-10 grid gap-px overflow-hidden rounded-xl border bg-border sm:grid-cols-2 lg:grid-cols-3">
             {features.map((feature) => (
@@ -206,24 +199,6 @@ export function Home() {
               </li>
             ))}
           </ul>
-        </section>
-
-        <section className="mx-auto max-w-6xl px-4 pt-20 sm:px-6 sm:pt-28">
-          <SectionTitle eyebrow="Security model" title="Keys stay on the server">
-            Agents may run on the same machine, so fxbot keeps its secrets where they cannot read them.
-          </SectionTitle>
-          <dl className="mt-10 grid gap-8 sm:grid-cols-2 lg:grid-cols-4">
-            {safety.map((item) => (
-              <div key={item.title} className="border-t pt-4">
-                <dt className="font-semibold">{item.title}</dt>
-                <dd className="mt-2 text-sm leading-6 text-pretty text-muted-foreground">{item.body}</dd>
-              </div>
-            ))}
-          </dl>
-          <a href={href("/docs/explanation/security/")} className={cn(buttonVariants({ variant: "link" }), "mt-6 px-0")}>
-            The security model in full
-            <ArrowRight aria-hidden="true" />
-          </a>
         </section>
 
         <section className="mx-auto max-w-6xl px-4 py-20 sm:px-6 sm:py-28">

@@ -8,34 +8,34 @@ import { Input } from "@/components/ui/input";
 import { SidebarTrigger } from "@/components/ui/sidebar";
 import { Switch } from "@/components/ui/switch";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import type { Addon, AddonCard, AddonMark, AddonPreview, OAuthAttempt, OAuthStatus, Profile } from "@fxbot/sdk/client";
+import type { Addon, AddonCard, AddonMark, AddonPreview, McpAddon, OAuthAttempt, OAuthStatus, Profile, SkillCard } from "@fxbot/sdk/client";
 import { AddressDialog, bearer, EntryDialog, heading, hint, hostOf, Information, label, Results, signsIn, useSearch } from "./addon-add.tsx";
 import { Blob } from "./blob.tsx";
 import { client } from "./client.ts";
+import { SkillDialog, SkillResults, SkillSettings, useSkillSearch } from "./skills.tsx";
 
 // Past this many, the page says how many tools reach the bots: each one's schema rides along with every message.
 const toolBudget = 40;
-const markText: Record<AddonMark["kind"], string> = { update: "Update available", deprecated: "Deprecated", removed: "Removed from the registry" };
 
-// Under a server's name: how it is, how many of its tools bots get, and which bots.
+// Under an add-on's name: what it is, or how a server is and how many of its tools bots get, and which bots.
 function summary(addon: Addon, profiles: Profile[] | null) {
   if (!addon.enabled) return "Off";
-  const allowed = addon.tools.filter((t) => addon.allowed.includes(t.name)).length;
   const chosen = profiles?.filter((p) => addon.on.includes(p.id)).length ?? addon.on.length;
-  return [
-    addon.status,
-    addon.tools.length ? `${allowed} of ${addon.tools.length} tools` : "",
-    addon.bots === "all" ? "All bots" : `${chosen} bot${chosen === 1 ? "" : "s"}`,
-  ]
-    .filter(Boolean)
-    .join(" · ");
+  const bots = addon.bots === "all" ? "All bots" : `${chosen} bot${chosen === 1 ? "" : "s"}`;
+  if (addon.kind === "skill") return `Skill · ${bots}`;
+  const allowed = addon.tools.filter((t) => addon.allowed.includes(t.name)).length;
+  return [addon.status, addon.tools.length ? `${allowed} of ${addon.tools.length} tools` : "", bots].filter(Boolean).join(" · ");
 }
+const markText: Record<Addon["kind"], Record<AddonMark["kind"], string>> = {
+  mcp: { update: "Update available", deprecated: "Deprecated", removed: "Removed from the registry" },
+  skill: { update: "Update available", deprecated: "Deprecated", removed: "Removed from its repository" },
+};
 
 type Tab = "installed" | "skills" | "mcp" | "plugins";
 
-// One search over every kind of add-on, with a tab for what is installed and one per kind. Installed lists the
-// servers, one row each with a switch and an edit button that opens the server's settings. The MCP tab searches the
-// registry; skills and plugins aren't built yet.
+// One search over every kind of add-on, with a tab for what is installed and one per kind. Installed lists servers
+// and skills, one row each with a switch and an edit button that opens its settings. The Skills tab searches fxbot's
+// skills list and skills.sh, and the MCP tab the MCP registries; plugins aren't built yet.
 export function AddonsPage({ profiles }: { profiles: Profile[] | null }) {
   const [addons, setAddons] = useState<Addon[] | null>(null);
   const [error, setError] = useState("");
@@ -43,10 +43,12 @@ export function AddonsPage({ profiles }: { profiles: Profile[] | null }) {
   const [everything, setEverything] = useState(false);
   const [chosen, setChosen] = useState<Tab | null>(null);
   const [entry, setEntry] = useState<AddonCard | null>(null);
+  const [skill, setSkill] = useState<SkillCard | null>(null);
   const [byAddress, setByAddress] = useState(false);
   const [openId, setOpenId] = useState<string | null>(null);
-  const [signingIn, setSigningIn] = useState<Addon | null>(null);
+  const [signingIn, setSigningIn] = useState<McpAddon | null>(null);
   const search = useSearch(query, everything);
+  const skillSearch = useSkillSearch(query);
   const load = () => client.addons.list().then((list) => (setAddons(list), setError("")), (e: Error) => setError(e.message));
   useEffect(() => void load(), []);
   // A server's status changes by itself while it connects.
@@ -57,23 +59,29 @@ export function AddonsPage({ profiles }: { profiles: Profile[] | null }) {
   }, [addons]);
   const replace = (next: Addon) => setAddons((all) => all?.map((a) => (a.id === next.id ? next : a)) ?? null);
   const open = addons?.find((a) => a.id === openId);
-  const reaching = (addons ?? []).filter((a) => a.enabled).reduce((n, a) => n + a.tools.filter((t) => a.allowed.includes(t.name)).length, 0);
-  const signIn = (addon: Addon) => (setOpenId(null), setSigningIn(addon));
+  const servers = (addons ?? []).flatMap((a) => (a.kind === "mcp" ? [a] : []));
+  const reaching = servers.filter((a) => a.enabled).reduce((n, a) => n + a.tools.filter((t) => a.allowed.includes(t.name)).length, 0);
+  const signIn = (addon: McpAddon) => (setOpenId(null), setSigningIn(addon));
   // Installed first when there is anything installed, else the registry.
   const tab = chosen ?? (addons?.length ? "installed" : "mcp");
   const words = query.trim().toLowerCase();
-  const mine = (addons ?? []).filter((a) => !words || [a.name, a.source?.registry ?? "", hostOf(a.url)].some((text) => text.toLowerCase().includes(words)));
+  const mine = (addons ?? []).filter(
+    (a) => !words || (a.kind === "mcp" ? [a.name, a.source?.registry ?? "", hostOf(a.url)] : [a.name, a.source.skill, a.description]).some((text) => text.toLowerCase().includes(words)),
+  );
   const found = words && search.result ? search.result.cards.length : undefined;
+  const skillsFound = words && skillSearch.result ? skillSearch.result.cards.length : undefined;
   // The mirror gives 20 at most.
   const count = (n: number) => <span className="text-muted-foreground tabular-nums">{n >= 20 ? "20+" : n}</span>;
-  const added = new Set((addons ?? []).flatMap((a) => [a.url, ...(a.source ? [a.source.registry] : [])]));
+  const added = new Set(servers.flatMap((a) => [a.url, ...(a.source ? [a.source.registry] : [])]));
+  const skillsAdded = new Set((addons ?? []).flatMap((a) => (a.kind === "skill" ? [a.source.skill] : [])));
   const onAdded = (addon: Addon) => {
     setEntry(null);
+    setSkill(null);
     setByAddress(false);
     setAddons((all) => [...(all ?? []), addon]);
     setQuery("");
     setChosen("installed");
-    if (addon.auth === "oauth") signIn(addon);
+    if (addon.kind === "mcp" && addon.auth === "oauth") signIn(addon);
   };
 
   return (
@@ -87,12 +95,12 @@ export function AddonsPage({ profiles }: { profiles: Profile[] | null }) {
           <div className="relative">
             <SearchIcon className="absolute top-2.5 left-2.5 size-4 text-muted-foreground" />
             <Input enterKeyHint="search" aria-label="Search add-ons" placeholder="Search add-ons" className="pl-8" value={query} onChange={(e) => setQuery(e.target.value)} />
-            {search.busy && words && <LoaderCircleIcon className="absolute top-2.5 right-3 size-4 animate-spin text-muted-foreground" />}
+            {(tab === "skills" ? skillSearch.busy : search.busy) && words && <LoaderCircleIcon className="absolute top-2.5 right-3 size-4 animate-spin text-muted-foreground" />}
           </div>
           <Tabs value={tab} onValueChange={(next) => setChosen(next as Tab)}>
             <TabsList className="w-full">
               <TabsTrigger value="installed">Installed{words && addons?.length ? count(mine.length) : null}</TabsTrigger>
-              <TabsTrigger value="skills">Skills</TabsTrigger>
+              <TabsTrigger value="skills">Skills{skillsFound !== undefined ? count(skillsFound) : null}</TabsTrigger>
               <TabsTrigger value="mcp">MCP{found !== undefined ? count(found) : null}</TabsTrigger>
               <TabsTrigger value="plugins">Plugins</TabsTrigger>
             </TabsList>
@@ -105,16 +113,25 @@ export function AddonsPage({ profiles }: { profiles: Profile[] | null }) {
                   <PuzzleIcon />
                 </EmptyMedia>
                 <EmptyTitle>Nothing added yet</EmptyTitle>
-                <EmptyDescription>Find an MCP server in GitHub's registry, or add one by its address, and your bots get its tools.</EmptyDescription>
+                <EmptyDescription>Find a skill or an MCP server above, and your bots get its instructions or its tools.</EmptyDescription>
               </EmptyHeader>
-              <EmptyContent>
-                <Button onClick={() => setChosen("mcp")}>Browse MCP servers</Button>
+              <EmptyContent className="flex-row justify-center">
+                <Button onClick={() => setChosen("skills")}>Browse skills</Button>
+                <Button variant="outline" onClick={() => setChosen("mcp")}>
+                  Browse MCP servers
+                </Button>
               </EmptyContent>
             </Empty>
           )}
           {tab === "installed" && Boolean(addons?.length) && mine.length === 0 && (
             <p className="text-sm text-muted-foreground">
               None of yours match.{" "}
+              {skillsFound ? (
+                <button type="button" className="text-foreground underline underline-offset-4" onClick={() => setChosen("skills")}>
+                  {skillsFound >= 20 ? "20+" : skillsFound} in Skills
+                </button>
+              ) : null}
+              {skillsFound && found ? " · " : null}
               {found ? (
                 <button type="button" className="text-foreground underline underline-offset-4" onClick={() => setChosen("mcp")}>
                   {found >= 20 ? "20+" : found} in MCP
@@ -129,7 +146,7 @@ export function AddonsPage({ profiles }: { profiles: Profile[] | null }) {
                   <div className="min-w-0 flex-1">
                     <p className="flex min-w-0 items-baseline gap-2">
                       <span className="truncate font-medium">{addon.name}</span>
-                      {addon.mark && <span className={`shrink-0 text-xs ${addon.mark.kind === "update" ? "text-muted-foreground" : "text-destructive"}`}>{markText[addon.mark.kind]}</span>}
+                      {addon.mark && <span className={`shrink-0 text-xs ${addon.mark.kind === "update" ? "text-muted-foreground" : "text-destructive"}`}>{markText[addon.kind][addon.mark.kind]}</span>}
                     </p>
                     <p className="truncate text-sm text-muted-foreground">{summary(addon, profiles)}</p>
                   </div>
@@ -147,19 +164,28 @@ export function AddonsPage({ profiles }: { profiles: Profile[] | null }) {
             </p>
           )}
           {tab === "mcp" && <Results search={search} everything={everything} onEverything={setEverything} added={added} onOpen={setEntry} onAddress={() => setByAddress(true)} />}
-          {(tab === "skills" || tab === "plugins") && (
-            <p className="py-6 text-center text-sm text-muted-foreground">{tab === "skills" ? "Skills" : "Plugins"} aren't in fxbot yet. For now, add-ons are MCP servers.</p>
-          )}
+          {tab === "skills" && <SkillResults search={skillSearch} words={words} added={skillsAdded} onOpen={setSkill} />}
+          {tab === "plugins" && <p className="py-6 text-center text-sm text-muted-foreground">Plugins aren't in fxbot yet. For now, add-ons are skills and MCP servers.</p>}
         </div>
       </main>
       {entry && <EntryDialog card={entry} onAdded={onAdded} onClose={() => setEntry(null)} />}
+      {skill && <SkillDialog card={skill} onAdded={onAdded} onClose={() => setSkill(null)} />}
       {byAddress && <AddressDialog onAdded={onAdded} onClose={() => setByAddress(false)} />}
-      {open && (
+      {open?.kind === "mcp" && (
         <AddonSettings
           addon={open}
           profiles={profiles}
           onChange={replace}
           onSignIn={() => signIn(open)}
+          onRemoved={() => (setOpenId(null), setAddons((all) => all?.filter((a) => a.id !== open.id) ?? null))}
+          onClose={() => setOpenId(null)}
+        />
+      )}
+      {open?.kind === "skill" && (
+        <SkillSettings
+          addon={open}
+          bots={<BotsChoice addon={open} profiles={profiles} onChange={replace} />}
+          onChange={replace}
           onRemoved={() => (setOpenId(null), setAddons((all) => all?.filter((a) => a.id !== open.id) ?? null))}
           onClose={() => setOpenId(null)}
         />
@@ -170,12 +196,11 @@ export function AddonsPage({ profiles }: { profiles: Profile[] | null }) {
 }
 
 // One server: its sign-in or key, which bots have it, and which of its tools they get. Changes save as they are made.
-function AddonSettings({ addon, profiles, onChange, onSignIn, onRemoved, onClose }: { addon: Addon; profiles: Profile[] | null; onChange: (addon: Addon) => void; onSignIn: () => void; onRemoved: () => void; onClose: () => void }) {
+function AddonSettings({ addon, profiles, onChange, onSignIn, onRemoved, onClose }: { addon: McpAddon; profiles: Profile[] | null; onChange: (addon: Addon) => void; onSignIn: () => void; onRemoved: () => void; onClose: () => void }) {
   const [keys, setKeys] = useState<Record<string, string> | null>(null);
   const [error, setError] = useState("");
   const saved = (work: Promise<Addon>) => (setError(""), work.then(onChange, (e: Error) => setError(e.message)));
-  const change = (fields: Pick<Partial<Addon>, "bots" | "allowed">) => (onChange({ ...addon, ...fields }), saved(client.addons.change(addon.id, fields)));
-  const forBot = (id: string, on: boolean) => (onChange({ ...addon, on: on ? [...addon.on, id] : addon.on.filter((b) => b !== id) }), saved(client.addons.forBot(id, addon.id, on)));
+  const change = (fields: Pick<Partial<McpAddon>, "bots" | "allowed">) => (onChange({ ...addon, ...fields }), saved(client.addons.change(addon.id, fields)));
   const allow = (name: string, on: boolean) => change({ allowed: on ? [...addon.allowed, name] : addon.allowed.filter((n) => n !== name) });
   const allowed = addon.tools.filter((t) => addon.allowed.includes(t.name)).length;
   const saveKeys = (event: FormEvent) => (
@@ -225,25 +250,7 @@ function AddonSettings({ addon, profiles, onChange, onSignIn, onRemoved, onClose
 
           {addon.source && <FromRegistry addon={addon} onChange={onChange} />}
 
-          <section className="grid gap-2">
-            <div className="flex items-center justify-between gap-3">
-              <h3 className={heading}>Bots</h3>
-              <Tabs value={addon.bots} onValueChange={(bots) => change({ bots: bots as Addon["bots"] })}>
-                <TabsList>
-                  <TabsTrigger value="all">All bots</TabsTrigger>
-                  <TabsTrigger value="each">Choose</TabsTrigger>
-                </TabsList>
-              </Tabs>
-            </div>
-            {addon.bots === "each" &&
-              profiles?.map((p) => (
-                <label key={p.id} className="flex items-center gap-3 text-sm">
-                  <Blob shape={p.shape} color={p.color} size={24} />
-                  <span className="min-w-0 flex-1 truncate">{p.name}</span>
-                  <Switch checked={addon.on.includes(p.id)} onCheckedChange={(on) => forBot(p.id, on)} />
-                </label>
-              ))}
-          </section>
+          <BotsChoice addon={addon} profiles={profiles} onChange={onChange} />
 
           <section className="grid gap-2">
             <div className="flex items-center justify-between gap-3">
@@ -287,9 +294,39 @@ function AddonSettings({ addon, profiles, onChange, onSignIn, onRemoved, onClose
   );
 }
 
+// Which bots have an add-on: all of them, or those chosen here, each with a switch. Changes save as they are made.
+function BotsChoice({ addon, profiles, onChange }: { addon: Addon; profiles: Profile[] | null; onChange: (addon: Addon) => void }) {
+  const [error, setError] = useState("");
+  const saved = (work: Promise<Addon>) => (setError(""), work.then(onChange, (e: Error) => setError(e.message)));
+  const forBot = (id: string, on: boolean) => (onChange({ ...addon, on: on ? [...addon.on, id] : addon.on.filter((b) => b !== id) }), saved(client.addons.forBot(id, addon.id, on)));
+  const choose = (bots: Addon["bots"]) => (onChange({ ...addon, bots }), saved(client.addons.change(addon.id, { bots })));
+  return (
+    <section className="grid gap-2">
+      <div className="flex items-center justify-between gap-3">
+        <h3 className={heading}>Bots</h3>
+        <Tabs value={addon.bots} onValueChange={(bots) => choose(bots as Addon["bots"])}>
+          <TabsList>
+            <TabsTrigger value="all">All bots</TabsTrigger>
+            <TabsTrigger value="each">Choose</TabsTrigger>
+          </TabsList>
+        </Tabs>
+      </div>
+      {addon.bots === "each" &&
+        profiles?.map((p) => (
+          <label key={p.id} className="flex items-center gap-3 text-sm">
+            <Blob shape={p.shape} color={p.color} size={24} />
+            <span className="min-w-0 flex-1 truncate">{p.name}</span>
+            <Switch checked={addon.on.includes(p.id)} onCheckedChange={(on) => forBot(p.id, on)} />
+          </label>
+        ))}
+      {error && <p role="alert" className="text-sm text-destructive">{error}</p>}
+    </section>
+  );
+}
+
 // An add-on from a registry: what the registry says about it now, and when there is a newer version, the newer page
 // with what changed, which needs the owner's Update before anything moves.
-function FromRegistry({ addon, onChange }: { addon: Addon; onChange: (addon: Addon) => void }) {
+function FromRegistry({ addon, onChange }: { addon: McpAddon; onChange: (addon: Addon) => void }) {
   const [next, setNext] = useState<AddonPreview | null>(null);
   const [looking, setLooking] = useState(false);
   const [error, setError] = useState("");
@@ -356,7 +393,7 @@ function FromRegistry({ addon, onChange }: { addon: Addon; onChange: (addon: Add
 // Opens the server's sign-in page in a tab, then waits. A loopback redirect cannot load on a phone, so the person
 // pastes the address of the page that failed instead. When signing in cannot start, the person's own OAuth app can
 // stand in for one fxbot registers.
-function SignIn({ addon, onClose }: { addon: Addon; onClose: () => void }) {
+function SignIn({ addon, onClose }: { addon: McpAddon; onClose: () => void }) {
   const [attempt, setAttempt] = useState<OAuthAttempt | null>(null);
   const [status, setStatus] = useState<OAuthStatus>({ status: "waiting" });
   const [address, setAddress] = useState("");

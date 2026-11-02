@@ -1,5 +1,6 @@
 import type {
   Addon,
+  BotSkill,
   AddonPreview,
   AddonRef,
   AddonSearch,
@@ -21,6 +22,9 @@ import type {
   Settings,
   SignIn,
   SignInStatus,
+  SkillPreview,
+  SkillRef,
+  SkillSearch,
   StreamLine,
   Team,
   UpdateStatus,
@@ -119,6 +123,8 @@ export function createClient({ baseUrl = "", onVersion }: ClientOptions = {}) {
       remove: (id: string) => call<{ ok: true }>(`/profiles/${id}`, "DELETE"),
       // Finished turns from the bot's chats before its current one, oldest first.
       earlier: (id: string) => call<Turn[]>(`/profiles/${id}/earlier`),
+      // The bot's skills, for the $ and / picker.
+      skills: (id: string) => call<BotSkill[]>(`/profiles/${id}/skills`),
     },
     settings: {
       get: () => call<Settings>("/settings"),
@@ -148,15 +154,19 @@ export function createClient({ baseUrl = "", onVersion }: ClientOptions = {}) {
       get: (id: string) => call<LibraryItem>(`/library/${id}`),
       remove: (id: string) => call<{ ok: true }>(`/library/${id}`, "DELETE"),
     },
-    // Remote MCP servers. Preview a server, then add it with the preview's hash. Header values and an OAuth client go
-    // to the server once and never come back.
+    // Remote MCP servers and skills. Preview one, then add it with the preview's hash. Header values and an OAuth
+    // client go to the server once and never come back.
     addons: {
       list: () => call<Addon[]>("/addons"),
-      preview: (ref: AddonRef) => call<AddonPreview>("/addons/preview", "POST", { ref }),
+      preview: <R extends AddonRef>(ref: R) => call<R extends SkillRef ? SkillPreview : AddonPreview>("/addons/preview", "POST", { ref }),
       add: (ref: AddonRef, hash: string) => call<Addon>("/addons", "POST", { ref, hash }),
       // The registry's entries; `everything` also asks the official registry, unmoderated.
       search: (q: string, { kind, everything }: { kind?: string; everything?: boolean } = {}) =>
         call<AddonSearch>(`/addons/search?${new URLSearchParams({ q, ...(kind ? { kind } : {}), ...(everything ? { everything: "1" } : {}) })}`),
+      // fxbot's skills list, then skills.sh's results for 2 characters or more.
+      searchSkills: (q: string) => call<SkillSearch>(`/addons/search?${new URLSearchParams({ q, kind: "skill" })}`),
+      // One of an installed skill's files; SKILL.md by default.
+      readSkill: (id: string, file?: string) => call<{ text: string }>(`/addons/${id}/skills?${new URLSearchParams(file ? { file } : {})}`).then((r) => r.text),
       // Moves an add-on to the newer definition its page showed, with that page's hash.
       update: (id: string, hash: string) => call<Addon>(`/addons/${id}/update`, "POST", { hash }),
       change: (id: string, fields: { enabled?: boolean; bots?: "all" | "each"; allowed?: string[] }) => call<Addon>(`/addons/${id}`, "PATCH", fields),

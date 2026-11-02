@@ -24,7 +24,7 @@ import { lookup } from "node:dns/promises";
 import { BlockList, isIP } from "node:net";
 import { createSecrets } from "./secrets.ts";
 import { newId, type AddonRecord, type Store } from "./store.ts";
-import type { Addon, AddonFrom, AddonPreview, AddonRef, AddonSecrets, OAuthAttempt, OAuthStatus, Transport } from "./types.ts";
+import type { AddonFrom, AddonPreview, AddonRef, AddonSecrets, McpAddon as Addon, OAuthAttempt, OAuthStatus, SkillRef, Transport } from "./types.ts";
 
 const fail = (status: number, message: string): never => {
   throw Object.assign(new Error(message), { status });
@@ -32,6 +32,8 @@ const fail = (status: number, message: string): never => {
 
 // A server's record. `tools` is its last listing, so its tools stay with the bots while it is away, and `prefix`
 // starts each tool's name, unique among add-ons.
+// A server by its address, or a registry entry.
+type McpRef = Exclude<AddonRef, SkillRef>;
 type Config = { url: string; transport: Transport; headers: string[]; auth: Addon["auth"]; allowLocal: boolean; prefix: string; tools: Tool[] };
 type McpRecord = AddonRecord<Config>;
 // Sealed per add-on: header values, the person's own OAuth client, clients registered by issuer and redirect URI,
@@ -367,7 +369,7 @@ export async function createMcp({ store, secretKey, fetch, localUrl, clientMetad
 
   // What an add-on is, from the address the person typed or the registry entry they picked. The registry's address
   // is configured, not typed, so it is fetched as is.
-  async function define(ref: AddonRef) {
+  async function define(ref: McpRef) {
     if (!ref || typeof ref !== "object") return fail(400, "ref must be an object");
     if ("registry" in ref) {
       if (typeof ref.registry !== "string" || !ref.registry) fail(400, "registry must name a server");
@@ -434,7 +436,7 @@ export async function createMcp({ store, secretKey, fetch, localUrl, clientMetad
     }
   }
 
-  async function preview(ref: AddonRef) {
+  async function preview(ref: McpRef) {
     const definition = await define(ref);
     const info = "info" in definition ? { info: definition.info } : {};
     if ("local" in definition) {
@@ -578,9 +580,9 @@ export async function createMcp({ store, secretKey, fetch, localUrl, clientMetad
     connect: () => void Promise.all([...records.values()].map(start)),
 
     list: async () => Promise.all([...records.values()].map(view)),
-    preview: async (ref: AddonRef) => (await preview(ref)).page,
+    preview: async (ref: McpRef) => (await preview(ref)).page,
     // Adds what the page showed, if the server still matches its hash.
-    async add(ref: AddonRef, hash: unknown) {
+    async add(ref: McpRef, hash: unknown) {
       const { page, definition, found } = await preview(ref);
       if (page.local) fail(400, `${page.name} runs on this machine, which comes with plugins.`);
       if (hash !== page.hash) fail(409, "This server changed since its page was shown. Look at it again before adding it.");

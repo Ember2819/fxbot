@@ -1,5 +1,5 @@
 import { useState, type ComponentType } from "react";
-import { CircleAlertIcon, CircleCheckIcon, FileTextIcon, HistoryIcon, LibraryIcon, LoaderCircleIcon, SaveIcon, WrenchIcon } from "lucide-react";
+import { BookOpenIcon, CircleAlertIcon, CircleCheckIcon, FileTextIcon, HistoryIcon, LibraryIcon, LoaderCircleIcon, SaveIcon, WrenchIcon } from "lucide-react";
 import { Streamdown } from "streamdown";
 import { Trace, TraceCollapsible, TraceCollapsibleContent, TraceCollapsibleTrigger, TraceDescription, TraceIcon, TraceLine, TraceTitle } from "@/components/ui/trace";
 import type { Part, Turn } from "@fxbot/sdk/client";
@@ -79,6 +79,7 @@ const builtIn: Record<string, { icon: ComponentType; doing: string; done: string
   library_search: { icon: LibraryIcon, doing: "Searching the library", done: "Searched the library", failed: "Couldn't search the library", gist: (i) => i?.query },
   library_read: { icon: FileTextIcon, doing: "Reading from the library", done: "Read from the library", failed: "Couldn't read from the library", gist: (i) => i?.id },
   library_save: { icon: SaveIcon, doing: "Saving to the library", done: "Saved to the library", failed: "Couldn't save to the library", gist: (i) => i?.name },
+  skill: { icon: BookOpenIcon, doing: "Reading a skill", done: "Read a skill", failed: "Couldn't read a skill", gist: (i) => (i?.name ? [i.name, i.file].filter(Boolean).join(" / ") : i?.search) },
 };
 
 // A call failed when its tool said so, or when the turn ended before it did.

@@ -1,4 +1,5 @@
 import type { FxResumeTurn, FxSessionPromptInput, FxTurn } from "libfx";
+import { createArchives } from "./archive.ts";
 import { createHistory, summarize } from "./history.ts";
 import { createLibrary } from "./library.ts";
 import { createMcp } from "./mcp.ts";
@@ -6,8 +7,9 @@ import { createProviders } from "./providers.ts";
 import { createRegistry } from "./registry.ts";
 import { createReleases } from "./releases.ts";
 import { readKey } from "./secrets.ts";
+import { createSkills } from "./skills.ts";
 import { createStore, isId, type StoredProfile } from "./store.ts";
-import { colors, maxPinned, shapes, type AddonRef, type AddonSecrets, type Fields, type Kind, type LibraryQuery, type Message, type NewProvider, type Profile, type ProfileUpdate, type ProviderUpdate, type Settings, type StreamLine, type Upload } from "./types.ts";
+import { colors, maxPinned, shapes, type Addon, type AddonRef, type AddonSecrets, type Fields, type Kind, type LibraryQuery, type Message, type NewProvider, type Profile, type ProfileUpdate, type ProviderUpdate, type Settings, type StreamLine, type SkillRef, type Upload } from "./types.ts";
 
 export type * from "./types.ts";
 export { colors, itemKinds, kinds, maxPinned, shapes } from "./types.ts";
@@ -39,8 +41,8 @@ export type FxbotOptions = {
   registryUrl?: string;
   /** The official MCP registry, searched only when asked to search everything. Default `https://registry.modelcontextprotocol.io`. */
   everythingUrl?: string;
-  /** The published copy of fxbot's own MCP list, read hourly. Without it, the list this release shipped with. */
-  fxbotUrl?: string;
+  /** The site that publishes fxbot's own lists, `mcp-registry.json` and `skills-registry.json`, read hourly. Without it, the lists this release shipped with. */
+  listsUrl?: string;
   /** Mirror the registry at start and hourly. Default true; checks turn it off and sync by hand. */
   syncRegistry?: boolean;
 };
@@ -49,6 +51,8 @@ export type FxbotOptions = {
 const fail = (status: 400 | 404 | 502, message: string): never => {
   throw Object.assign(new Error(message), { status });
 };
+// A skill is named by its skills.sh id; a server by its address or its registry entry.
+const isSkill = (ref: AddonRef): ref is SkillRef => typeof (ref as SkillRef | undefined)?.skill === "string";
 
 // libfx's limits for one prompt's images.
 const maxImage = 3.75 * 2 ** 20;
@@ -81,10 +85,18 @@ export async function createFxbot(options: FxbotOptions) {
   const releases = createReleases({ version, url: options.releasesUrl, fetch });
   const history = createHistory(store.sql);
   const library = createLibrary(store.sql);
-  // MCP servers' tools join every agent. A change to them makes the agents again, one change at a time.
+  // MCP servers' tools join every agent, and the skill tool once there are skills. A change to them makes the agents
+  // again, one change at a time.
   const registryUrl = options.registryUrl ?? "https://api.mcp.github.com";
   const everythingUrl = options.everythingUrl ?? "https://registry.modelcontextprotocol.io";
-  const registry = createRegistry({ sql: store.sql, fetch, mirrorUrl: registryUrl, everythingUrl, fxbotUrl: options.fxbotUrl });
+  const lists = options.listsUrl?.replace(/\/+$/, "");
+  const registry = createRegistry({
+    sql: store.sql,
+    fetch,
+    mirrorUrl: registryUrl,
+    everythingUrl,
+    ...(lists ? { fxbotUrl: `${lists}/mcp-registry.json`, fxbotSkillsUrl: `${lists}/skills-registry.json` } : {}),
+  });
   if (options.syncRegistry !== false) void registry.sync();
   const mcp = await createMcp({
     store,
@@ -95,7 +107,13 @@ export async function createFxbot(options: FxbotOptions) {
     findEntry: registry.lookup,
     onChange: () => void retool(),
   });
-  const toolsNow = async () => [history.tool, ...library.tools, ...(await mcp.tools())];
+  const skills = await createSkills({
+    store,
+    archives: createArchives({ fetch }),
+    fromOf: (skill) => (registry.ourSkill(skill) ? "fxbot" : "skills.sh"),
+    onChange: () => void retool(),
+  });
+  const toolsNow = async () => [history.tool, ...library.tools, ...(skills.any() ? [skills.tool] : []), ...(await mcp.tools())];
   const providers = await createProviders({ store, secretKey: key, dataDir, vercelClientId, fetch, tools: await toolsNow() });
   let retooling = Promise.resolve();
   function retool() {
@@ -118,11 +136,15 @@ export async function createFxbot(options: FxbotOptions) {
     return profile.model || (await providers.get(profile.provider)).model;
   }
 
-  // libfx keeps no model or instructions for a session, so every open passes them, and the bot for chat_history.
+  // libfx keeps no model or instructions for a session, so every open passes them, and the bot for chat_history and
+  // skill. The bot's skills follow its instructions, in 1% of the model's context window, at 4 characters a token, or
+  // 8,000 characters when the window is unknown.
   async function open(profile: StoredProfile, sessionId: string) {
     const model = await modelFor(profile);
     const agent = await providers.agentFor(profile.provider, model);
-    return agent.session(sessionId, { model: model || undefined, instructions: instructionsFor(profile), context: { bot: profile.id } });
+    const window = skills.countFor(profile.id) ? await providers.contextWindow(profile.provider, model).catch(() => undefined) : undefined;
+    const catalog = skills.catalog(profile.id, window ? Math.floor(window * 0.01 * 4) : 8000);
+    return agent.session(sessionId, { model: model || undefined, instructions: [...instructionsFor(profile), catalog].filter(Boolean), context: { bot: profile.id } });
   }
 
   async function get(id: string) {
@@ -139,7 +161,9 @@ export async function createFxbot(options: FxbotOptions) {
   // text under its name, the way libfx hands the model a resource. libfx counts a prompt of resources alone as empty.
   // Every file is checked against libfx's limits before any is saved; then each goes into the library, tagged for the
   // bot and its chat. The record is saved before the prompt, so the stream finds it when the turn starts.
-  async function attach(profile: StoredProfile, text: string, messageId: string, files: Upload[]): Promise<FxSessionPromptInput> {
+  // A message with files or named skills is blocks: its text, each skill's instructions, then each file. What it sent
+  // is kept, since libfx's stream shows only a plain-text prompt.
+  async function attach(profile: StoredProfile, text: string, messageId: string, files: Upload[], skilled: ReturnType<typeof skills.invoked>): Promise<FxSessionPromptInput> {
     const checked = files.map(({ name, type, data }) => {
       if (typeof name !== "string" || typeof type !== "string" || typeof data !== "string") return fail(400, "each file needs a name, a type, and base64 data");
       const bytes = Buffer.from(data, "base64");
@@ -148,7 +172,7 @@ export async function createFxbot(options: FxbotOptions) {
     const images = checked.filter((file) => file.kind === "image");
     if (images.some((file) => file.bytes.length > maxImage)) fail(400, "An image can be at most 3.75 MiB.");
     if (images.reduce((sum, file) => sum + file.bytes.length, 0) > maxImages) fail(400, "A message's images can be at most 6 MiB together.");
-    const blocks: Exclude<FxSessionPromptInput, string>[number][] = text.trim() ? [{ type: "text", text }] : [];
+    const blocks: Exclude<FxSessionPromptInput, string>[number][] = [...(text.trim() ? [{ type: "text" as const, text }] : []), ...skilled];
     const sent: Upload[] = [];
     for (const { name, type, bytes, kind, text: content } of checked) {
       const item = await library.save({ profileId: profile.id, sessionId: profile.sessionId!, origin: "uploaded", name, type, bytes });
@@ -259,6 +283,8 @@ export async function createFxbot(options: FxbotOptions) {
         await get(id);
         await store.profiles.remove(id);
       },
+      // The bot's skills, for the $ and / picker in its chat.
+      skills: async (id: string) => (await get(id), skills.listFor(id)),
       // The bot's chats before its current one, which a provider switch leaves behind.
       async earlier(id: string) {
         const profile = await get(id);
@@ -301,7 +327,9 @@ export async function createFxbot(options: FxbotOptions) {
       // Saved before the prompt, so a restart still finds the session and every upload knows its chat. A concurrent
       // first send keeps the id already saved.
       if (!profile.sessionId) profile = (await store.profiles.claimSession(id, await (await providers.agentFor(profile.provider, "")).newSessionId())) ?? fail(404, "profile not found");
-      const input = files.length ? await attach(profile, text, messageId, files) : text;
+      // A skill named as $name, or /name at the start, goes with the message, so the bot has it without asking.
+      const skilled = skills.invoked(id, text);
+      const input = files.length || skilled.length ? await attach(profile, text, messageId, files, skilled) : text;
       try {
         // A messageId the session already accepted runs nothing new and resolves to the same ids.
         const turn = (await open(profile, profile.sessionId!)).prompt(input, { messageId });
@@ -335,38 +363,44 @@ export async function createFxbot(options: FxbotOptions) {
       remove: (id: string) => library.remove(id),
     },
 
-    // Remote MCP servers. Adding one takes the `hash` its preview showed, and fails if the server changed since.
+    // Remote MCP servers and skills. Adding one takes the `hash` its preview showed, and fails if it changed since.
     // Secrets are write-only; a listed add-on says only whether it holds them.
     addons: {
-      // With what the registry says about each now: its details, and a mark when it has a newer version, or is
-      // deprecated or gone.
-      list: async () => registry.decorate(await mcp.list()),
-      // fxbot's list and GitHub's registry, and with `everything`, the official one's own search too.
-      search: (q: unknown, options: { kind?: unknown; everything?: boolean }) => registry.search(q, options),
-      preview: (ref: AddonRef) => mcp.preview(ref),
-      add: (ref: AddonRef, hash: string) => mcp.add(ref, hash),
-      update: (id: string, hash: unknown) => mcp.update(id, hash),
-      change: (id: string, input: { enabled?: boolean; bots?: "all" | "each"; allowed?: string[] }) => mcp.change(id, input),
-      remove: (id: string) => mcp.remove(id),
+      // With what the registry says about each server now: its details, and a mark when it has a newer version, or is
+      // deprecated or gone. Skills carry their marks from the hourly check of their repositories.
+      list: async (): Promise<Addon[]> => [...(await registry.decorate(await mcp.list())), ...skills.list()],
+      // fxbot's list and GitHub's registry, and with `everything`, the official one's own search too. Skills: fxbot's
+      // skills list, then skills.sh's.
+      search: (q: unknown, options: { kind?: unknown; everything?: boolean }) => (options.kind === "skill" ? registry.searchSkills(q) : registry.search(q, options)),
+      preview: (ref: AddonRef) => (isSkill(ref) ? skills.preview(ref) : mcp.preview(ref)),
+      add: (ref: AddonRef, hash: string) => (isSkill(ref) ? skills.add(ref, hash) : mcp.add(ref, hash)),
+      update: (id: string, hash: unknown) => (skills.has(id) ? skills.update(id, hash) : mcp.update(id, hash)),
+      change: (id: string, input: { enabled?: boolean; bots?: "all" | "each"; allowed?: string[] }) => (skills.has(id) ? skills.change(id, input) : mcp.change(id, input)),
+      remove: (id: string) => (skills.has(id) ? skills.remove(id) : mcp.remove(id)),
       setSecrets: (id: string, input: AddonSecrets) => mcp.setSecrets(id, input),
       // A bot's switch, read when the add-on is chosen bot by bot.
       async forBot(profileId: string, addonId: string, enabled: boolean) {
         await get(profileId);
-        return mcp.forBot(profileId, addonId, enabled);
+        return skills.has(addonId) ? skills.forBot(profileId, addonId, enabled) : mcp.forBot(profileId, addonId, enabled);
       },
+      // One of an installed skill's files, to read on its page.
+      readSkill: (id: string, file: unknown) => skills.read(id, file),
+      // Checks the skills' repositories now, as the hourly check does, and marks what changed there.
+      check: () => skills.check(),
     },
 
     // OAuth sign-in to an MCP server: start with the page's origin, then poll. The browser comes back to that origin's
     // `/api/oauth/callback`, or the person pastes the address of the page a loopback redirect could not load.
     oauth: mcp.oauth,
 
-    // Waits for the turns this process started, then lets Postgres go.
     // The running version, and the newest stable release when it is newer.
     release: releases.get,
 
+    // Waits for the turns this process started, then lets Postgres go.
     async close() {
       releases.close();
       registry.close();
+      skills.close();
       await mcp.close();
       await providers.close();
       await store.close();
