@@ -20,12 +20,14 @@ for (const name of await readdir(join(server, "assets")).catch(() => [])) if (!n
 
 const template = await readFile(join(out, "index.html"), "utf8");
 if (!template.includes("<!--head-->") || !template.includes("<!--body-->")) throw new Error("index.html lost its <!--head--> and <!--body--> marks");
-const { pages } = (await import(pathToFileURL(join(server, "render.js")).href)) as typeof import("./src/render.tsx");
-for (const page of pages()) {
+const { pages, searchFiles } = (await import(pathToFileURL(join(server, "render.js")).href)) as typeof import("./src/render.tsx");
+const list = pages();
+for (const page of list) {
   const file = join(out, page.file);
   await mkdir(dirname(file), { recursive: true });
   await writeFile(file, template.replace("<!--head-->", () => page.head).replace("<!--body-->", () => page.body));
 }
+for (const [name, text] of Object.entries(searchFiles(list))) await writeFile(join(out, name), text);
 await rm(server, { recursive: true });
 // fxbot's own lists of MCP servers and skills, which each release also ships with, for installs that read the
 // published copies (FXBOT_LISTS_URL). The SDK's files are the only copies to edit.

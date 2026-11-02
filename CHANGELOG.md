@@ -2,6 +2,13 @@
 
 Each release of fxbot, newest first. A release that adds migrations, bumps libfx, or needs a step by hand opens with **Before upgrading**. Lines for the next release collect under Unreleased, and the release workflow publishes a version's section as its notes.
 
+## 0.2.1 (2026-11-02)
+
+A website release. The app is the same as 0.2.0.
+
+- A link to fxbot.sh shares as a preview card, with the bots, the heading, and the site's address.
+- Each page of the site names its canonical address and has Open Graph and Twitter tags. The site has a sitemap and a `robots.txt`, and its link check covers them.
+
 ## 0.2.0 (2026-11-02)
 
 **Before upgrading.** Migration `0002_model_lists` adds a table that keeps each provider's model list, `0003_registry_entries` adds two that keep a copy of GitHub's MCP registry, and `0004_skills` adds one for skills. Chats and add-ons carry on.
