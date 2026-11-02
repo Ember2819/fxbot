@@ -26,8 +26,31 @@ export type Profile = Fields & { id: string; sessionId: string | null; preview: 
 // An update takes any field, and `pinned`. The first bot starts pinned, and at most `maxPinned` are.
 export type ProfileUpdate = Partial<Fields> & { pinned?: boolean };
 export const maxPinned = 3;
-// New bots start on `defaultProvider`.
-export type Settings = { defaultProvider: string };
+// New bots start on `defaultProvider`. Memory search's vectors come from `embedder`: the machine's local embedder, a
+// provider's /embeddings (`embeddingProvider` and `embeddingModel`), or none. `messageVectors` is how many characters of
+// each message are embedded, and 0 embeds none.
+export type Embedder = "local" | "remote" | "off";
+export type Settings = { defaultProvider: string; embedder: Embedder; embeddingProvider: string; embeddingModel: string; messageVectors: number };
+// What the machine runs as its local embedder, in an install made by setup.sh.
+export type LocalEmbedder = "cpu" | "gpu" | "off";
+// How far memory search's vectors have got: the model in use, or null when it's off or not answering, the counts, and
+// the fill-in's last error. `local` and `switching` come from the machine: what it runs, and a change it is making or
+// why that failed. `canSwitch` is whether Settings can ask it for one.
+export type EmbeddingStatus = {
+  model: string | null;
+  error: string | null;
+  messages: number;
+  withVectors: number;
+  memories: number;
+  memoriesWithVectors: number;
+  local: LocalEmbedder | null;
+  switching: { to: LocalEmbedder; error?: string } | null;
+  canSwitch: boolean;
+};
+// The provider kinds that serve OpenAI's /embeddings.
+export const embeddingKinds = ["openai", "openrouter", "gateway", "vercel", "ollama", "lmstudio", "custom"] as const;
+// One fact a bot keeps: saved by the bot during a turn (with the message that started it), or added by the owner.
+export type Memory = { id: string; text: string; savedBy: "bot" | "owner"; messageId: string | null; createdAt: string; updatedAt: string };
 
 // A release of fxbot: its version, its notes, and its page.
 export type Release = { version: string; notes: string; url: string };

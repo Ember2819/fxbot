@@ -1,5 +1,6 @@
 import { createFxEngine, type FxAgentTool } from "libfx";
 import type { Turn } from "./client.ts";
+import { fuse, type Embeddings } from "./embeddings.ts";
 import type { Sql } from "./store.ts";
 import type { Upload } from "./types.ts";
 
@@ -33,8 +34,9 @@ const messageBytes = 4_000;
 type Row = { id: string; createdAt: Date; role: string; text: string };
 
 // Every message as plain text, so a bot can search its own chats after a provider switch, and a switch can be
-// summarized from them when the old provider cannot do it.
-export function createHistory(sql: Sql) {
+// summarized from them when the old provider cannot do it. With an embedder and message vectors on, a search also
+// finds messages by meaning.
+export function createHistory(sql: Sql, embeddings?: Embeddings) {
   // A message and its neighbours in the same chat, in full, oldest first. It reads 6 more on each side than it shows,
   // so the ids it names to page on give windows that meet this one end to end.
   async function around(bot: string, ref: string) {
@@ -68,7 +70,7 @@ export function createHistory(sql: Sql) {
     name: "chat_history",
     description:
       "Search this bot's messages across all of its chats, or read them in full. With query: a message matching any of the words counts, " +
-      "more matches rank higher, and a word also matches longer words it starts. Returns the best matches oldest first, each with its date, " +
+      "more matches rank higher, a word also matches longer words it starts, and, with meaning search on, messages close in meaning count too. Returns the best matches oldest first, each with its date, " +
       "msg:<id>, and whether it is from an earlier chat. With around: a msg:<id>, reads that message and the ones before and after it in " +
       "its chat, in full; call again with the first or last id to page.",
     inputSchema: {
@@ -88,13 +90,28 @@ export function createHistory(sql: Sql) {
       const words = anyWords(String(input.query ?? ""));
       if (!words) return "Give words to look for in query, or a msg:<id> in around.";
       const limit = Math.min(Math.max(Math.trunc(Number(input.limit) || 8), 1), 20);
-      // The message that started this turn is already saved, and is left out: it is the search itself.
-      const rows = await sql<(Row & { here: boolean })[]>`
-        select id, created_at, role, session_id = ${call.sessionId} as here, ts_headline('simple', text, q, 'MaxWords=40, MinWords=15') as text
-        from messages, to_tsquery('simple', ${words}) q
-        where profile_id = ${bot} and tsv @@ q
-          and id <> coalesce((select max(id) from messages where profile_id = ${bot} and session_id = ${call.sessionId} and role = 'user'), 0)
-        order by ts_rank_cd(tsv, q) desc, created_at desc limit ${limit}`;
+      // The message that started this turn is already saved, and is left out: it is the search itself. The word
+      // matches and the nearest vectors are fused, best first.
+      const [byWords, byMeaning] = await Promise.all([
+        sql<(Row & { here: boolean })[]>`
+          select id, created_at, role, session_id = ${call.sessionId} as here, ts_headline('simple', text, q, 'MaxWords=40, MinWords=15') as text
+          from messages, to_tsquery('simple', ${words}) q
+          where profile_id = ${bot} and tsv @@ q
+            and id <> coalesce((select max(id) from messages where profile_id = ${bot} and session_id = ${call.sessionId} and role = 'user'), 0)
+          order by ts_rank_cd(tsv, q) desc, created_at desc limit 40`,
+        (async () => {
+          const near = embeddings && (await embeddings.messagesOn()) ? await embeddings.query(String(input.query)) : null;
+          if (!near) return [] as (Row & { here: boolean })[];
+          return sql<(Row & { here: boolean })[]>`
+            select id, created_at, role, session_id = ${call.sessionId} as here,
+              ts_headline('simple', text, to_tsquery('simple', ${words}), 'MaxWords=40, MinWords=15') as text
+            from messages
+            where profile_id = ${bot} and embedded_with = ${near.model} and embedding is not null
+              and id <> coalesce((select max(id) from messages where profile_id = ${bot} and session_id = ${call.sessionId} and role = 'user'), 0)
+            order by embedding <=> ${near.vector}::vector limit 40`;
+        })(),
+      ]);
+      const rows = fuse([byWords, byMeaning]).slice(0, limit);
       if (!rows.length) return "No earlier messages match.";
       // The best matches, in the order they were written.
       return rows
@@ -106,9 +123,12 @@ export function createHistory(sql: Sql) {
 
   return {
     tool,
-    record: async (bot: string, sessionId: string, messageId: string, role: "user" | "assistant", text: string) =>
-      void (await sql`insert into messages (profile_id, session_id, message_id, role, text)
-        values (${bot}, ${sessionId}, ${messageId}, ${role}, ${text}) on conflict do nothing`),
+    // A new message also gets its vector, in the background.
+    async record(bot: string, sessionId: string, messageId: string, role: "user" | "assistant", text: string) {
+      await sql`insert into messages (profile_id, session_id, message_id, role, text)
+        values (${bot}, ${sessionId}, ${messageId}, ${role}, ${text}) on conflict do nothing`;
+      embeddings?.nudge();
+    },
     // The bot's chats before `sessionId`, as finished turns, oldest first: the newest `limit` messages of them. A provider
     // switch starts a new session, and the old one may not open again, so the chat shows these above the handoff.
     // A message that sent files gets its saved text and files back.

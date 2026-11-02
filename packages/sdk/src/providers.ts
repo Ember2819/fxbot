@@ -6,7 +6,8 @@ import { join } from "node:path";
 import { createModels, type Access } from "./models.ts";
 import { createSecrets, withoutSecrets } from "./secrets.ts";
 import { newId, type ProviderRecord, type Sql, type Store } from "./store.ts";
-import { kinds, type Kind, type NewProvider, type Provider, type ProviderUpdate, type SignIn, type SignInStatus } from "./types.ts";
+import type { EmbeddingsTarget } from "./embeddings.ts";
+import { embeddingKinds, kinds, type Kind, type NewProvider, type Provider, type ProviderUpdate, type SignIn, type SignInStatus } from "./types.ts";
 import * as vercel from "./vercel.ts";
 
 type Fetch = typeof fetch;
@@ -229,6 +230,14 @@ export async function createProviders({ store, secretKey, dataDir, vercelClientI
     },
     has: (id: string) => agents.has(id),
     get: record,
+    // Where a provider serves OpenAI's /embeddings, for memory search, with its key or its signed-in fetch.
+    async embeddingsTarget(id: string): Promise<EmbeddingsTarget> {
+      const current = await record(id);
+      if (current.kind === "gateway") return { url: "https://ai-gateway.vercel.sh/v1/embeddings", apiKey: await keyOf(current), fetch };
+      if (current.kind === "vercel") return { url: "https://ai-gateway.vercel.sh/v1/embeddings", fetch: vercelFetch(current) };
+      if (!(embeddingKinds as readonly string[]).includes(current.kind)) return fail(400, `A ${kinds[current.kind as Kind].label} serves no embeddings.`);
+      return { url: `${current.baseUrl}/embeddings`, apiKey: await keyOf(current), fetch };
+    },
     list,
     // libfx fixes an agent's tools when it is made, so a new tool list, as when an add-on comes or goes, makes every
     // agent again.

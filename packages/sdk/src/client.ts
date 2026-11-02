@@ -29,10 +29,13 @@ import type {
   Team,
   UpdateStatus,
   Upload,
+  EmbeddingStatus,
+  LocalEmbedder,
+  Memory,
 } from "./types.ts";
 
 export type * from "./types.ts";
-export { colors, itemKinds, kinds, maxPinned, shapes } from "./types.ts";
+export { colors, embeddingKinds, itemKinds, kinds, maxPinned, shapes } from "./types.ts";
 
 export const unreachable = "Cannot reach the server.";
 
@@ -125,10 +128,20 @@ export function createClient({ baseUrl = "", onVersion }: ClientOptions = {}) {
       earlier: (id: string) => call<Turn[]>(`/profiles/${id}/earlier`),
       // The bot's skills, for the $ and / picker.
       skills: (id: string) => call<BotSkill[]>(`/profiles/${id}/skills`),
+      // What the bot keeps: newest first, or the matches for a search.
+      memories: {
+        list: (id: string, query = "") => call<Memory[]>(`/profiles/${id}/memories${query.trim() ? `?query=${encodeURIComponent(query.trim())}` : ""}`),
+        add: (id: string, text: string) => call<Memory>(`/profiles/${id}/memories`, "POST", { text }),
+        update: (id: string, memoryId: string, text: string) => call<Memory>(`/profiles/${id}/memories/${memoryId}`, "PATCH", { text }),
+        remove: (id: string, memoryId: string) => call<{ ok: true }>(`/profiles/${id}/memories/${memoryId}`, "DELETE"),
+      },
     },
     settings: {
       get: () => call<Settings>("/settings"),
-      update: (settings: Settings) => call<Settings>("/settings", "PATCH", settings),
+      // Any of the fields. `local` asks the machine to run its local embedder on the CPU or a GPU.
+      update: (settings: Partial<Settings> & { local?: LocalEmbedder }) => call<Settings>("/settings", "PATCH", settings),
+      // How far memory search's vectors have got.
+      embedding: () => call<EmbeddingStatus>("/settings/embedding"),
     },
     // A key goes to the server once and never comes back: a listed provider says only whether it holds one.
     providers: {

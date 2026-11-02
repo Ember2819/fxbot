@@ -1,18 +1,20 @@
 import type { FxResumeTurn, FxSessionPromptInput, FxTurn } from "libfx";
 import { createArchives } from "./archive.ts";
+import { createEmbeddings, type EmbeddingSettings } from "./embeddings.ts";
 import { createHistory, summarize } from "./history.ts";
 import { createLibrary } from "./library.ts";
 import { createMcp } from "./mcp.ts";
+import { createMemories } from "./memories.ts";
 import { createProviders } from "./providers.ts";
 import { createRegistry } from "./registry.ts";
 import { createReleases } from "./releases.ts";
 import { readKey } from "./secrets.ts";
 import { createSkills } from "./skills.ts";
 import { createStore, isId, type StoredProfile } from "./store.ts";
-import { colors, maxPinned, shapes, type Addon, type AddonRef, type AddonSecrets, type Fields, type Kind, type LibraryQuery, type Message, type NewProvider, type Profile, type ProfileUpdate, type ProviderUpdate, type Settings, type StreamLine, type SkillRef, type Upload } from "./types.ts";
+import { colors, maxPinned, shapes, type Addon, type AddonRef, type AddonSecrets, type Fields, type Kind, type LibraryQuery, type Message, type NewProvider, type Profile, type ProfileUpdate, type ProviderUpdate, type Settings, type StreamLine, embeddingKinds, type SkillRef, type Upload } from "./types.ts";
 
 export type * from "./types.ts";
-export { colors, itemKinds, kinds, maxPinned, shapes } from "./types.ts";
+export { colors, embeddingKinds, itemKinds, kinds, maxPinned, shapes } from "./types.ts";
 export { readKey, rotateSecrets } from "./secrets.ts";
 export { compareVersions, isStable, isVersion, releasesUrlFor } from "./releases.ts";
 
@@ -45,6 +47,8 @@ export type FxbotOptions = {
   listsUrl?: string;
   /** Mirror the registry at start and hourly. Default true; checks turn it off and sync by hand. */
   syncRegistry?: boolean;
+  /** The machine's local embedder, an OpenAI-style API such as `http://embed:8080/v1`, for memory search. None: no local embedder. */
+  embedUrl?: string;
 };
 
 // Bad input fails with `status` 400 and a missing bot with 404, so a server can answer with the same status.
@@ -83,7 +87,10 @@ export async function createFxbot(options: FxbotOptions) {
   const key = typeof secretKey === "string" ? readKey(secretKey) : secretKey;
   const store = await createStore({ databaseUrl, dataDir, backupsDir });
   const releases = createReleases({ version, url: options.releasesUrl, fetch });
-  const history = createHistory(store.sql);
+  // Memory search's vectors: from the machine's local embedder, a provider's /embeddings, or none.
+  const embeddings = createEmbeddings({ sql: store.sql, fetch, localUrl: options.embedUrl?.replace(/\/+$/, ""), target: (id) => providers.embeddingsTarget(id) });
+  const history = createHistory(store.sql, embeddings);
+  const memories = createMemories(store.sql, embeddings);
   const library = createLibrary(store.sql);
   // MCP servers' tools join every agent, and the skill tool once there are skills. A change to them makes the agents
   // again, one change at a time.
@@ -114,8 +121,10 @@ export async function createFxbot(options: FxbotOptions) {
     fromOf: (skill) => (registry.ourSkill(skill) ? "fxbot" : "skills.sh"),
     onChange: () => void retool(),
   });
-  const toolsNow = async () => [history.tool, ...library.tools, ...(skills.any() ? [skills.tool] : []), ...(await mcp.tools())];
+  const toolsNow = async () => [history.tool, ...memories.tools, ...library.tools, ...(skills.any() ? [skills.tool] : []), ...(await mcp.tools())];
   const providers = await createProviders({ store, secretKey: key, dataDir, vercelClientId, fetch, tools: await toolsNow() });
+  // Vectors that rows lack, from where Settings says, in the background.
+  embeddings.nudge();
   let retooling = Promise.resolve();
   function retool() {
     retooling = retooling.then(async () => providers.retool(await toolsNow())).catch((error) => console.error("Could not give the agents their new tools:", error));
@@ -137,15 +146,19 @@ export async function createFxbot(options: FxbotOptions) {
     return profile.model || (await providers.get(profile.provider)).model;
   }
 
-  // libfx keeps no model or instructions for a session, so every open passes them, and the bot for chat_history and
-  // skill. The bot's skills follow its instructions, in 1% of the model's context window, at 4 characters a token, or
-  // 8,000 characters when the window is unknown.
+  // libfx keeps no model or instructions for a session, so every open passes them, and the bot for its tools. After the
+  // bot's own instructions come its memories, in 2% of the model's context window, and its skills, in 1%, at 4
+  // characters a token, or 8,000 characters each when the window is unknown. libfx takes at most 64 KiB in all, so the
+  // memories get no more than what the rest leaves. They change only when a memory does, so the prompt cache holds.
   async function open(profile: StoredProfile, sessionId: string) {
     const model = await modelFor(profile);
     const agent = await providers.agentFor(profile.provider, model);
-    const window = skills.countFor(profile.id) ? await providers.contextWindow(profile.provider, model).catch(() => undefined) : undefined;
-    const catalog = skills.catalog(profile.id, window ? Math.floor(window * 0.01 * 4) : 8000);
-    return agent.session(sessionId, { model: model || undefined, instructions: [...instructionsFor(profile), catalog].filter(Boolean), context: { bot: profile.id } });
+    const window = await providers.contextWindow(profile.provider, model).catch(() => undefined);
+    const share = (part: number) => (window ? Math.floor(window * part * 4) : 8000);
+    const catalog = skills.catalog(profile.id, share(0.01));
+    const room = 64 * 1024 - 1024 - Buffer.byteLength([...instructionsFor(profile), catalog].join("\n\n"));
+    const memory = await memories.section(profile.id, Math.min(share(0.02), room));
+    return agent.session(sessionId, { model: model || undefined, instructions: [...instructionsFor(profile), memory, catalog].filter(Boolean), context: { bot: profile.id } });
   }
 
   async function get(id: string) {
@@ -258,6 +271,13 @@ export async function createFxbot(options: FxbotOptions) {
 
   return {
     profiles: {
+      // A bot's memories: newest first, or matches for `query`, and the owner's own additions and changes.
+      memories: {
+        list: async (id: string, query?: { query?: string; limit?: number }) => (await get(id), memories.list(id, query)),
+        add: async (id: string, text: unknown) => (await get(id), memories.add(id, text)),
+        update: async (id: string, memoryId: string, text: unknown) => (await get(id), memories.update(id, memoryId, text)),
+        remove: async (id: string, memoryId: string) => (await get(id), memories.remove(id, memoryId)),
+      },
       list: async () => (await store.profiles.list()).map(withBusy),
       get: async (id: string) => withBusy(await get(id)),
       async create(input: Partial<Fields>) {
@@ -294,11 +314,39 @@ export async function createFxbot(options: FxbotOptions) {
     },
 
     settings: {
-      get: store.settings.get,
-      async update({ defaultProvider }: Settings) {
-        if (typeof defaultProvider !== "string") fail(400, "defaultProvider must be a string");
-        return store.settings.save({ defaultProvider: await provider(defaultProvider.trim()) });
+      get: async (): Promise<Settings> => ({ ...(await store.settings.get()), ...(await embeddings.settings()) }),
+      // Any of the fields. A new remote source embeds a test string first, and keeps the old one if that fails.
+      async update(input: Partial<Settings>) {
+        if (input.defaultProvider !== undefined) {
+          if (typeof input.defaultProvider !== "string") fail(400, "defaultProvider must be a string");
+          await store.settings.save({ defaultProvider: await provider(input.defaultProvider.trim()) });
+        }
+        const now = await embeddings.settings();
+        const next: EmbeddingSettings = { ...now };
+        if (input.embedder !== undefined) next.embedder = ["local", "remote", "off"].includes(input.embedder) ? input.embedder : fail(400, "embedder must be local, remote, or off");
+        if (input.messageVectors !== undefined)
+          next.messageVectors = Number.isInteger(input.messageVectors) && input.messageVectors >= 0 && input.messageVectors <= 100_000 ? input.messageVectors : fail(400, "messageVectors must be a whole number from 0 to 100,000");
+        if (input.embeddingModel !== undefined) {
+          if (typeof input.embeddingModel !== "string" || input.embeddingModel.trim().length > 200) fail(400, "embeddingModel must be at most 200 characters");
+          next.embeddingModel = input.embeddingModel.trim();
+        }
+        if (input.embeddingProvider !== undefined) {
+          if (typeof input.embeddingProvider !== "string") fail(400, "embeddingProvider must be a string");
+          next.embeddingProvider = input.embeddingProvider.trim();
+          if (next.embeddingProvider && !(embeddingKinds as readonly string[]).includes((await providers.get(next.embeddingProvider)).kind)) fail(400, "That provider serves no embeddings.");
+        }
+        if (next.embedder === "remote" && (!next.embeddingProvider || !next.embeddingModel)) fail(400, "Pick a provider and an embedding model for remote vectors.");
+        const changed = (Object.keys(next) as (keyof EmbeddingSettings)[]).some((field) => next[field] !== now[field]);
+        if (changed) {
+          const source = (["embedder", "embeddingProvider", "embeddingModel"] as const).some((field) => next[field] !== now[field]);
+          if (source && next.embedder === "remote")
+            await embeddings.test(next).catch((error: Error) => fail(400, `The embedding model didn't answer: ${error.message}`));
+          await embeddings.save(next);
+        }
+        return this.get();
       },
+      // How far memory search's vectors have got. The server adds what the machine runs.
+      embedding: embeddings.status,
     },
 
     providers: {
@@ -399,6 +447,7 @@ export async function createFxbot(options: FxbotOptions) {
 
     // Waits for the turns this process started, then lets Postgres go.
     async close() {
+      embeddings.close();
       releases.close();
       registry.close();
       skills.close();

@@ -1,11 +1,11 @@
-import { createFxbot, releasesUrlFor, type AddonRef, type ItemKind, type UpdateStatus } from "@fxbot/sdk";
+import { createFxbot, releasesUrlFor, type AddonRef, type ItemKind, type LocalEmbedder, type Settings, type UpdateStatus } from "@fxbot/sdk";
 import { readFileSync, statSync } from "node:fs";
 import { createServer, type IncomingMessage, type ServerResponse } from "node:http";
 import { extname, join, normalize } from "node:path";
 import { Readable } from "node:stream";
 import { pipeline } from "node:stream/promises";
 import type { ReadableStream } from "node:stream/web";
-import { canUpdate, lastUpdate, repository, requestUpdate, version, waiting } from "./control.ts";
+import { canUpdate, lastUpdate, localEmbedder, repository, requestEmbedder, requestUpdate, version, waiting } from "./control.ts";
 
 // Loopback by default. Other devices reach it through `tailscale serve`; the page never holds a secret. In its container
 // it listens on FXBOT_HOST, 0.0.0.0, and compose publishes the port on the machine's loopback only. FXBOT_PORT lets a
@@ -31,6 +31,7 @@ const fxbot = await createFxbot({
   registryUrl: process.env.FXBOT_MCP_REGISTRY || undefined,
   everythingUrl: process.env.FXBOT_MCP_EVERYTHING || undefined,
   listsUrl: process.env.FXBOT_LISTS_URL || undefined,
+  embedUrl: process.env.FXBOT_EMBED_URL || undefined,
 });
 
 // The ui package's build, served beside the API.
@@ -142,8 +143,21 @@ async function api(req: IncomingMessage, res: ServerResponse, url: URL) {
     return json(res, 200, await fxbot.addons.forBot(id, extra, (await body<{ enabled: boolean }>(req)).enabled));
   if (resource === "settings" && !id) {
     if (method === "GET") return json(res, 200, await fxbot.settings.get());
-    if (method === "PATCH") return json(res, 200, await fxbot.settings.update(await body(req)));
+    if (method === "PATCH") {
+      // `local` asks the machine to run its local embedder on the CPU or a GPU, or not at all (control.ts).
+      const { local, ...fields } = await body<Partial<Settings> & { local?: LocalEmbedder }>(req);
+      const settings = await fxbot.settings.update(fields);
+      if (local !== undefined) {
+        if (!canUpdate) fail(400, "Only an install made by setup.sh switches its local embedder.");
+        requestEmbedder(["cpu", "gpu", "off"].includes(local) ? local : fail(400, "local must be cpu, gpu, or off"));
+      }
+      return json(res, 200, settings);
+    }
     return fail(405, "method not allowed");
+  }
+  if (resource === "settings" && id === "embedding" && !action && method === "GET") {
+    const run = canUpdate ? localEmbedder() : null;
+    return json(res, 200, { ...(await fxbot.settings.embedding()), canSwitch: canUpdate, local: run?.embedder ?? null, switching: run?.switching ?? null });
   }
   if (resource === "providers" && extra === undefined) {
     if (!id && method === "GET") return json(res, 200, await fxbot.providers.list());
@@ -172,6 +186,11 @@ async function api(req: IncomingMessage, res: ServerResponse, url: URL) {
   }
   // An image's URL from before the library, kept in older chats.
   if (resource === "profiles" && action === "uploads" && method === "GET") return file(req, res, url, (etag) => fxbot.library.upload(id, extra ?? "", etag));
+  if (resource === "profiles" && action === "memories" && extra) {
+    if (method === "PATCH") return json(res, 200, await fxbot.profiles.memories.update(id, extra, (await body<{ text?: unknown }>(req)).text));
+    if (method === "DELETE") return json(res, 200, (await fxbot.profiles.memories.remove(id, extra), ok));
+    return fail(405, "method not allowed");
+  }
   if (resource !== "profiles" || extra !== undefined) return fail(404, "not found");
 
   if (!id) {
@@ -185,6 +204,9 @@ async function api(req: IncomingMessage, res: ServerResponse, url: URL) {
     if (method === "GET") return json(res, 200, profile);
     if (method === "PATCH") return json(res, 200, await fxbot.profiles.update(id, await body(req)));
     if (method === "DELETE") return json(res, 200, (await fxbot.profiles.remove(id), ok));
+  } else if (action === "memories") {
+    if (method === "GET") return json(res, 200, await fxbot.profiles.memories.list(id, { query: url.searchParams.get("query") ?? undefined, limit: Number(url.searchParams.get("limit")) || undefined }));
+    if (method === "POST") return json(res, 201, await fxbot.profiles.memories.add(id, (await body<{ text?: unknown }>(req)).text));
   } else if (action === "messages" && method === "POST") {
     // libfx takes at most 6 MiB of images in a message, so with base64 a message stays under 12 MiB.
     return json(res, 200, await fxbot.send(id, await body(req, 12 << 20)));

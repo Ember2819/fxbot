@@ -65,9 +65,10 @@ export async function createStore({ databaseUrl, dataDir, backupsDir }: MigrateO
       remove: async (id: string) => void (await sql`delete from profiles where id = ${id}`),
       usingProvider: async (provider: string) => Number((await sql`select count(*) from profiles where provider = ${provider}`)[0].count),
     },
+    // The default provider. Memory search's fields are embeddings.ts's.
     settings: {
-      get: async (): Promise<Settings> => ({ defaultProvider: one(await sql`select default_provider from settings`)?.defaultProvider ?? "" }),
-      save: async ({ defaultProvider }: Settings) => {
+      get: async (): Promise<Pick<Settings, "defaultProvider">> => ({ defaultProvider: one(await sql`select default_provider from settings`)?.defaultProvider ?? "" }),
+      save: async ({ defaultProvider }: Pick<Settings, "defaultProvider">) => {
         await sql`insert into settings (id, default_provider) values (1, ${defaultProvider || null})
           on conflict (id) do update set default_provider = excluded.default_provider`;
         return { defaultProvider };
