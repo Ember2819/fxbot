@@ -7,7 +7,8 @@
   "workspaces": [
     "packages/sdk",
     "packages/server",
-    "packages/ui"
+    "packages/ui",
+    "packages/website"
   ],
   "engines": {
     "node": ">=22.18.0"
@@ -17,6 +18,7 @@
     "server": "node --env-file-if-exists=.env packages/server/src/index.ts",
     "prod": "npm run build && npm run server",
     "build": "npm run build -w @fxbot/ui",
+    "build-site": "npm run build -w @fxbot/website",
     "typecheck": "npm run typecheck --workspaces",
     "rotate-key": "node --env-file-if-exists=.env packages/server/src/rotate-key.ts",
     "update": "node packages/server/src/update.ts"

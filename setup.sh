@@ -154,5 +154,5 @@ for _ in $(seq 60); do curl -fs http://127.0.0.1:8787/api/health >/dev/null && b
 curl -fs http://127.0.0.1:8787/api/health >/dev/null || die "fxbot did not start. See: journalctl -u fxbot"
 
 say "fxbot ${tag#v} runs on http://127.0.0.1:8787"
-echo "Reach it from your other devices over Tailscale:  tailscale serve --bg 8787"
+echo "Open it there. From your other devices, Tailscale is the simplest way in:  tailscale serve --bg 8787"
 echo "Settings shows each new release, with an Update button. Or: cd $install/current && sudo -u fxbot -H npm run update"

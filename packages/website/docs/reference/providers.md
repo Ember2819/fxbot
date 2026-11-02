@@ -1,0 +1,32 @@
+# Providers
+
+The kinds of provider in **Add provider…**, in Settings. Each bot runs on one provider.
+
+| Kind | Connects with | Base URL | Models from |
+| --- | --- | --- | --- |
+| ChatGPT plan | Device code | | The Codex model list |
+| Grok plan | Device code | | Grok's model list |
+| Vercel account | Device code, then a team. Needs `FXBOT_VERCEL_CLIENT_ID`. | | AI Gateway |
+| AI Gateway key | Key | | AI Gateway |
+| OpenAI key | Key | `https://api.openai.com/v1` | models.dev |
+| OpenCode Zen key | Key | `https://opencode.ai/inference/openai/v1` | models.dev, Chat Completions models only |
+| OpenCode Go key | Key | `https://opencode.ai/inference/go/openai/v1` | models.dev, Chat Completions models only |
+| OpenRouter key | Key | `https://openrouter.ai/api/v1` | models.dev |
+| Ollama | Base URL, and an optional context window | `http://localhost:11434/v1` by default | The server: `/api/tags`, and `/api/show` for each model |
+| LM Studio | Base URL, and an optional context window | `http://localhost:1234/v1` by default | The server: `/api/v1/models` |
+| Other server | Base URL, and an optional key and context window | | The server: `/models`, ids only |
+
+## Keys and sign-ins
+
+- A key is checked with the provider when it is added, at its model list. It is refused when the provider answers 401 or 403, and kept on a 404, which a server with no list at `/models` gives.
+- A key goes to the server once and is never sent back. A provider in the list says only whether it holds a key or a sign-in.
+- A device code sign-in runs on the server. The page gets the link, the code, and when it expires.
+- Keys and tokens are stored sealed. See the [security model](/docs/explanation/security/).
+
+## Model lists
+
+- fxbot keeps each provider's model list in Postgres and answers with it at once. A list older than 5 minutes is fetched again behind that answer, and a failed fetch keeps the old list.
+- A list is dropped when its source changes: a new key, address, team, or sign-in.
+- models.dev is read at most once a day.
+- The model picker takes a model id that the list lacks.
+- A provider's **Context window**, on Ollama, LM Studio, and Other server, overrides what the server reports, for every model it serves.

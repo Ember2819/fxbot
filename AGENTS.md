@@ -6,7 +6,7 @@ Read [CONVENTIONS.md](CONVENTIONS.md) before changing code. The built scope is [
 
 ## What this repo is
 
-fxbot is a TypeScript monorepo of three npm workspaces: `packages/sdk` (`@fxbot/sdk`, the agent system around [libfx](https://fx.sh/docs/lib), plus `@fxbot/sdk/client` for UIs), `packages/server` (the HTTP API over the SDK), and `packages/ui` (the PWA). v1 is built: bot profiles and the chat UI, and so are [provider logins](docs/_completed/phases/provider-logins.md), the [library](docs/_completed/phases/library.md), the [installable app](docs/_completed/phases/pwa.md), remote [MCP servers](docs/_completed/phases/mcp.md), and [releases](docs/_completed/phases/releases.md): tagged versions, `setup.sh`, updates from Settings, and numbered migrations. Records live in Postgres. There is no test suite or CI. The other phase stubs describe future work. Do not report them as running behavior.
+fxbot is a TypeScript monorepo of four npm workspaces: `packages/sdk` (`@fxbot/sdk`, the agent system around [libfx](https://fx.sh/docs/lib), plus `@fxbot/sdk/client` for UIs), `packages/server` (the HTTP API over the SDK), `packages/ui` (the PWA), and `packages/website` (the public site and its docs, static pages that import none of the other three). v1 is built: bot profiles and the chat UI, and so are [provider logins](docs/_completed/phases/provider-logins.md), the [library](docs/_completed/phases/library.md), the [installable app](docs/_completed/phases/pwa.md), remote [MCP servers](docs/_completed/phases/mcp.md), and [releases](docs/_completed/phases/releases.md): tagged versions, `setup.sh`, updates from Settings, and numbered migrations. Records live in Postgres. There is no test suite or CI. The other phase stubs describe future work. Do not report them as running behavior.
 
 Later ideas live as one-page stubs in [docs/phases/](docs/phases/). Build one only when asked.
 
@@ -28,6 +28,7 @@ Run these from the repository root after `npm install`, with Node 22.18 or newer
 
 - `npm run typecheck` runs `tsc --noEmit` in each package, with that package's own `tsconfig.json`.
 - `npm run build` builds the page and service worker into `packages/ui/dist/`. It does not typecheck.
+- `npm run build-site` builds the website into `out/` and checks its links. Its docs are Markdown in `packages/website/docs/`, one [Diátaxis](https://diataxis.fr) kind per page. The changelog page and the variables table come from `CHANGELOG.md` and the README.
 - Add shadcn components from `packages/ui`: `npx shadcn@latest add <name>`.
 - `git diff --check` checks whitespace on tracked changes. New files need a separate look; untracked files are outside that diff.
 

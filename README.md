@@ -8,15 +8,16 @@ Simplicity is the rule: a small core, few dependencies, and no abstraction until
 
 ## Stack
 
-A TypeScript monorepo with three npm workspaces under `packages/`, laid out after [eve](https://eve.dev): a core package with a client subpath, a thin server, and a UI on the client.
+A TypeScript monorepo with four npm workspaces under `packages/`, laid out after [eve](https://eve.dev): a core package with a client subpath, a thin server, a UI on the client, and the public site.
 
 | Package | What it is |
 | --- | --- |
 | [`@fxbot/sdk`](packages/sdk/README.md) | The agent system: providers and their sign-ins, one libfx agent per provider, bot profiles, settings, uploads, each bot's durable chat, and its searchable history. `@fxbot/sdk/client` is a typed client for the server's HTTP API, with the stream reader and the turn reducer a UI needs. |
 | `@fxbot/server` | The backend: `node:http` routes over the SDK, and the built UI. Keys and tokens stay here, sealed in Postgres. |
 | `@fxbot/ui` | The PWA: Vite, React, and shadcn/ui, with the chat built from shadcn's AI Elements patterns, on `@fxbot/sdk/client`. |
+| `@fxbot/website` | The public site and its docs, pre-rendered with Vite, React, and Tailwind into static pages in `out/` by `npm run build-site`. `FXBOT_SITE_BASE` sets the path it is served under. |
 
-Records live in Postgres; libfx keeps each chat's session in files. No Next.js, and no Vercel AI SDK. The packages run as TypeScript source on Node 22.18 or newer, with no build step but the UI's.
+Records live in Postgres; libfx keeps each chat's session in files. No Next.js, and no Vercel AI SDK. The packages run as TypeScript source on Node 22.18 or newer, with no build step but the UI's and the site's.
 
 ## Phases
 
@@ -71,9 +72,11 @@ It installs git and Postgres, and Node 22 from nodejs.org, checked against its c
 
 Running it again finishes an install that stopped, and leaves a working one alone. It stops, and says why, if another fxbot already holds its names: a database `fxbot`, a key in `/etc/fxbot`, or port 8787. A checkout's `npm run dev` stays clear of them ([Run from a checkout](#run-from-a-checkout)), so both can run on one machine.
 
-### On your tailnet
+### Reaching it
 
-fxbot listens on loopback only and has no login of its own, so reach it through Tailscale and nothing else. Give it the machine's own address:
+fxbot listens on 127.0.0.1:8787 and has no login of its own. On the machine itself, open `http://127.0.0.1:8787`: everything works there, installing the app included.
+
+From your other devices, [Tailscale](https://tailscale.com) is the recommended way. It adds HTTPS, which a phone needs to install the app, and only your own devices can reach fxbot. Give it the machine's own address:
 
 ```sh
 sudo tailscale serve --bg 8787       # https://<machine>.<tailnet>.ts.net
@@ -91,6 +94,14 @@ sudo tailscale serve --service=svc:bot --https=443 http://127.0.0.1:8787
 ```
 
 Check the address from a phone or laptop on the tailnet, not from the machine itself: a grant to people doesn't cover a tagged machine, so the name may not resolve there.
+
+Anything else in front of fxbot, such as a reverse proxy or another VPN, works if it:
+- **adds its own login or access control.** Whoever reaches fxbot can use all of it: every bot, chat, and provider.
+- **serves HTTPS,** which installing the app needs, and which lets an MCP server's sign-in come back to fxbot by itself.
+- **passes the `Host` header through unchanged.** fxbot refuses a write whose page origin doesn't match the host it was reached at.
+- **doesn't buffer responses,** since each chat streams its replies.
+
+Never open port 8787 to a network directly.
 
 Open the address on each device and install the app from it: Install in Settings on Chrome or Edge, or Share and then Add to Home Screen on an iPhone. The app opens offline, and offers Reload when an update lands.
 
