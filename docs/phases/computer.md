@@ -2,7 +2,7 @@
 
 Each bot gets a Linux computer of its own to use during its turns: a shell, files that last, and the programs other plugins install. The computer is a plugin. A bot with it on runs commands, reads and writes files, and shares what it makes to its library. Other plugins add programs to every computer through setup steps, the way the browser plugin in this phase adds a web browser. Computers start on a bot's first call and stop when they sit idle. They run in a rootless container engine that belongs to a user of their own on the machine, so they stay apart from fxbot's own files and from each other. From [issue #6](https://github.com/iammrduncan/fxbot/issues/6).
 
-Status: planned, not built. Research and plan only, written on 2026-11-02. It builds on the [plugin API](plugins.md), and on the [containers](containers.md) install for the app's side of the engine. A checkout runs it as well. The issue asked for computers before plugins. Since then the stub made the computer a plugin, so this phase comes after plugins.
+Status: planned, not built. Research and plan only, written on 2026-11-02. It builds on the [plugin API](plugins.md), and on the [containers](../_completed/phases/containers.md) install for the app's side of the engine. A checkout runs it as well. The issue asked for computers before plugins. Since then the stub made the computer a plugin, so this phase comes after plugins.
 
 ## 0. Core or add-on
 
@@ -131,7 +131,7 @@ fxbot has no login of its own, so a computer that reaches the tailnet address ca
 
 1. **One computer per bot.** It costs about 2 MB while running idle and nothing when stopped. It starts in about 0.1 s, and keeps bots apart without loosening the container. Grok bot and OpenBot share a computer per person and say plainly that it isn't a boundary between bots. fxbot's bots are of one owner too, but separate computers cost nothing more here.
 2. **No daemon in the computer.** The plugin uses the engine's own API for commands, files, and builds, so a computer is `sleep` under an init. That is what keeps it at 150 kB.
-3. **A rootless engine of its own.** A `fxbot-computer` user on the machine runs rootless podman, whose socket is mounted into the app with that user's group. A container escape lands in an unprivileged user that can't read fxbot's files. The app never holds a root socket, as [containers](containers.md) requires, and the plugin refuses an engine that isn't rootless.
+3. **A rootless engine of its own.** A `fxbot-computer` user on the machine runs rootless podman, whose socket is mounted into the app with that user's group. A container escape lands in an unprivileged user that can't read fxbot's files. The app never holds a root socket, as [containers](../_completed/phases/containers.md) requires, and the plugin refuses an engine that isn't rootless.
 4. **The engine user's own systemd,** with lingering and its D-Bus session, or limits are silently dropped.
 5. **The internet only, by uid.** An nftables table refuses the engine user's connections to the machine, its tailnet, the LAN, and the container networks, except DNS to the machine's resolvers. It is one rule set on the host, and it covers every computer whichever way a process connects.
 6. **Plugins install programs as image layers.** Each plugin that needs the computer names setup steps, as eve's extensions and Grok bot's setup scripts do. The computer builds one image from them, which every bot's computer shares, so Chromium is on disk once. A bot's own `apt-get` lasts until the image changes. Its home lasts until it is reset.
@@ -211,7 +211,7 @@ The owner runs it once, as root. The plugin's Settings section shows the exact c
    - It rejects 127.0.0.0/8, 10.0.0.0/8, 172.16.0.0/12, 192.168.0.0/16, 100.64.0.0/10, 169.254.0.0/16, and multicast, and `::1`, `fc00::/7`, `fe80::/10`, and `ff00::/8` for IPv6.
    - `fxbot-computer-firewall.service` (oneshot, `nft -f`) loads it at boot.
 6. **The app's access:**
-   - **A containers install:** the script writes `/opt/fxbot/compose.override.yaml`, which mounts `/var/lib/fxbot-computer/run` at `/run/fxbot-computer` with the user's gid in `group_add`, then runs `fxbot up`. Compose merges an override file beside its own when it runs without `-f`, so the [containers](containers.md) phase's `fxbot` command must call it that way, and its updates must leave the file alone.
+   - **A containers install:** the script writes `/opt/fxbot/compose.override.yaml`, which mounts `/var/lib/fxbot-computer/run` at `/run/fxbot-computer` with the user's gid in `group_add`, then runs `fxbot up`. Compose merges an override file beside its own when it runs without `-f`, so the [containers](../_completed/phases/containers.md) phase's `fxbot` command must call it that way, and its updates must leave the file alone.
    - **A checkout:** `--user <login>` adds that user to the `fxbot-computer` group. The plugin's `engine` setting is then `/var/lib/fxbot-computer/run/engine.sock`.
 7. **It prints** the socket path and what it changed.
 

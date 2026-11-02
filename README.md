@@ -25,7 +25,7 @@ Records live in Postgres; libfx keeps each chat's session in files. No Next.js, 
 
 ## Phases
 
-In order of execution priority. Checked phases are built. Each is marked **core** or **add-on** ([Core or add-on](CONVENTIONS.md#core-or-add-on)). A core seam is a part of the core that add-ons plug into. Containers, Memories, and Plugins have full plans, and the rest are one-page stubs until they are planned.
+In order of execution priority. Checked phases are built. Each is marked **core** or **add-on** ([Core or add-on](CONVENTIONS.md#core-or-add-on)). A core seam is a part of the core that add-ons plug into. Memories and Plugins have full plans, and the rest are one-page stubs until they are planned.
 
 - [x] [v1](docs/_completed/v1-plan.md) (core): bot profiles and a streaming chat
 - [x] [Provider logins](docs/_completed/phases/provider-logins.md) (core): ChatGPT, Grok, and Vercel accounts, API keys, and local model servers
@@ -35,7 +35,7 @@ In order of execution priority. Checked phases are built. Each is marked **core*
 - [x] [Releases](docs/_completed/phases/releases.md) (core): install a release, and update when the next one is ready
 - [x] [Add-ons](docs/_completed/phases/addons.md) (core seam): search GitHub's MCP registry, add a server from its page, and update installed ones
 - [x] [Skills](docs/_completed/phases/skills.md) (core seam): instructions bots read when a task needs them, from fxbot's list and skills.sh
-- [ ] [Containers](docs/phases/containers.md) (core): podman or docker, and one compose file for fxbot, its database with pgvector, and its local embedder
+- [x] [Containers](docs/_completed/phases/containers.md) (core): podman or docker, one compose file for fxbot and its database with pgvector, and updates through the machine's `fxbot` command
 - [ ] [Memories](docs/phases/memories.md) (core): each bot keeps what it has learned
 - [ ] [Plugins](docs/phases/plugins.md) (core: the plugin API): add-ons that change the app, with hooks, tools, data, and screens of their own; [chat rooms](docs/phases/chat-rooms.md) and herdr first
 - [ ] [Agent computer](docs/phases/computer.md) (add-on, a plugin others build on): a shell, files, and programs for bots, for the add-ons that need one
@@ -65,16 +65,26 @@ On Debian or Ubuntu, `setup.sh` installs the newest release, or the one you name
 
 ```sh
 curl -fsSL https://raw.githubusercontent.com/iammrduncan/fxbot/main/setup.sh | sudo bash
-curl -fsSL https://raw.githubusercontent.com/iammrduncan/fxbot/main/setup.sh | sudo bash -s -- v0.1.0
+curl -fsSL https://raw.githubusercontent.com/iammrduncan/fxbot/main/setup.sh | sudo bash -s -- v0.3.0
 ```
 
-It installs git and Postgres, and Node 22 from nodejs.org, checked against its checksum, unless the machine has Node 22.18 or newer. Then:
-- the `fxbot` user, its Postgres role and database (peer auth, no password), and a key in `/etc/fxbot/secret.key` that only `fxbot` reads
-- the release in `/opt/fxbot`: a clone in `repo/`, each installed release in `releases/<tag>/`, and `current` pointing at the running one
-- `/etc/fxbot/fxbot.env`, with chats in `/var/lib/fxbot/data` and backups in `/var/lib/fxbot/backups`
-- `fxbot.service`, started on 127.0.0.1:8787
+fxbot runs as containers: the app, and its database in pgvector's Postgres image, from one compose file. `setup.sh` uses podman, or docker when only docker is installed. When neither is, it installs podman and Compose v2, on Debian 13 or Ubuntu 24.04 and newer; on older releases, install Docker from Docker's repository first. Then:
+- the `fxbot` user, and a key in `/etc/fxbot/secret.key` that only `fxbot` reads
+- `/opt/fxbot`: the release's `compose.yaml`, an `.env` with its version and a random database password, and the `fxbot` command, also at `/usr/local/bin/fxbot`
+- `/etc/fxbot/fxbot.env` for the app's settings, with chats in `/var/lib/fxbot/data`, backups in `/var/lib/fxbot/backups`, and the app's update requests in `/var/lib/fxbot/control`
+- `fxbot.service`, which starts the containers at boot, on 127.0.0.1:8787, and `fxbot-control.path`, which hands Settings' updates to the `fxbot` command
 
-Running it again finishes an install that stopped, and leaves a working one alone. It stops, and says why, if another fxbot already holds its names: a database `fxbot`, a key in `/etc/fxbot`, or port 8787. A checkout's `npm run dev` stays clear of them ([Run from a checkout](#run-from-a-checkout)), so both can run on one machine.
+Running it again finishes an install that stopped, and leaves a working one alone. It stops, and says why, if another program holds port 8787. A checkout's `npm run dev` stays clear of it ([Run from a checkout](#run-from-a-checkout)), so both can run on one machine.
+
+| Command | What it does |
+| --- | --- |
+| `sudo fxbot status` | The version and the containers |
+| `sudo fxbot logs [fxbot \| db]` | Their logs |
+| `sudo fxbot update [version]` | Moves to the newest release, or the one named. See [Update](#update) |
+| `sudo fxbot up` and `down` | Starts and stops the containers, as `fxbot.service` does |
+| `sudo fxbot restore <folder>` | Puts a backup in place of the database and the chat files |
+
+**Moving from 0.2.** An install of 0.2 ran on the machine's own Postgres. Run `setup.sh` again: it stops 0.2, copies its database into the database container, and starts the containers on the same chats, key, and settings. The 0.2 files, settings, and database stay until you remove them, and `sudo fxbot status` says how to remove them or go back to 0.2. Settings' Update in 0.2 can't make this move.
 
 ### Reaching it
 
@@ -111,33 +121,27 @@ Open the address on each device and install the app from it: Install in Settings
 
 ## Update
 
-When a newer release is out, Settings shows its notes and an **Update** button. fxbot builds the new release beside the running one, switches `current` to it, lets running chats finish, and restarts. From a shell:
+When a newer release is out, Settings shows its notes and an **Update** button. The app asks the machine, and the `fxbot` command there downloads the release, starts it, and waits until it answers. Running chats finish first, and the database keeps running. From a shell:
 
 ```sh
-cd /opt/fxbot/current && sudo -u fxbot -H npm run update    # the newest release, or name one: -- v0.2.0
-sudo systemctl restart fxbot
+sudo fxbot update            # the newest release, or name one: sudo fxbot update 0.3.1
 ```
 
 - **Migrations.** Each release's database changes are numbered files in `packages/sdk/src/migrations/`. A starting server runs the ones the database hasn't, all or none. It first backs up the database and the chat files into `FXBOT_BACKUPS`, and keeps the last five.
-- **Prereleases,** such as `v0.2.0-rc.1`, install only by name.
-- **Going back.** With no migration in between, point `current` at the older release and restart:
+- **A release that doesn't start** is replaced by the one before, on the backup taken before its migrations if it ran any. Settings shows why.
+- **Prereleases,** such as `0.3.0-rc.1`, install only by name.
+- **Going back.** After a migration, the older release refuses the database. Restore the backup taken before it, then name the older version:
 
   ```sh
-  sudo ln -sfn releases/v0.1.0 /opt/fxbot/current && sudo systemctl restart fxbot
+  sudo fxbot restore /var/lib/fxbot/backups/<date>-before-<migration>
+  sudo sed -i 's/^FXBOT_VERSION=.*/FXBOT_VERSION=0.3.0/' /opt/fxbot/.env && sudo fxbot up
   ```
 
-  After a migration, the older release refuses the database. Restore the backup taken before it, then switch:
-
-  ```sh
-  sudo systemctl stop fxbot
-  sudo -u fxbot pg_restore --clean --if-exists -d fxbot /var/lib/fxbot/backups/<date>-before-<migration>/database.dump
-  sudo -u fxbot tar -xzf /var/lib/fxbot/backups/<date>-before-<migration>/data.tar.gz -C /var/lib/fxbot/data
-  sudo ln -sfn releases/v0.1.0 /opt/fxbot/current && sudo systemctl start fxbot
-  ```
+  With no migration in between, only the second line.
 
 ## Run from a checkout
 
-Node 22.18 or newer, and Postgres. From the repository root:
+Node 22.18 or newer, and podman or docker for the database. From the repository root:
 
 ```sh
 npm install
@@ -146,12 +150,13 @@ npm run prod     # build the page, then serve it and the API on 127.0.0.1, port 
 npm run server   # only the API and the last build, on the same port
 ```
 
-The server reads these from the environment, or from an uncommitted `.env` in the repository root; the environment wins. Only the server reads `.env`, and none of these is itself a secret.
+The server reads these from the environment, or from an uncommitted `.env` in the repository root; the environment wins. Only the server and the checkout's compose file read `.env`. `FXBOT_DATABASE_URL` holds the database's password, and the key that seals everything else stays in its own file.
 
 | Variable | What it is |
 | --- | --- |
-| `FXBOT_DATABASE_URL` | Required. fxbot's Postgres, such as `postgres:///fxbot_dev` with `PGHOST=/var/run/postgresql`: the local socket with peer auth, so no password |
-| `FXBOT_PORT` | The API's port on 127.0.0.1. Default 8787, a release install's; `npm run dev` uses 8788 unless this is set in the shell |
+| `FXBOT_DATABASE_URL` | Required. fxbot's Postgres, such as `postgres://fxbot:<password>@127.0.0.1:5433/fxbot_dev` from `deploy/compose.dev.yaml` |
+| `FXBOT_PORT` | The API's port. Default 8787, a release install's; `npm run dev` uses 8788 unless this is set in the shell |
+| `FXBOT_HOST` | The address the API listens on. Default 127.0.0.1. fxbot's image sets 0.0.0.0, and compose publishes the port on the machine's 127.0.0.1 |
 | `FXBOT_SECRET_KEY_FILE` | Required. A file outside the repo with 32 random bytes in base64. It seals every key and token fxbot stores |
 | `FXBOT_VERCEL_CLIENT_ID` | Optional. fxbot's own Vercel OAuth app, for signing in with a Vercel account |
 | `FXBOT_DATA` | Where libfx keeps each chat's session files. Default `./data` |
@@ -159,19 +164,28 @@ The server reads these from the environment, or from an uncommitted `.env` in th
 | `FXBOT_MCP_REGISTRY` | Optional. The MCP registry that fxbot mirrors hourly for search, and that registry entries come from. Default GitHub's, `https://api.mcp.github.com` |
 | `FXBOT_MCP_EVERYTHING` | Optional. The registry that Search everything asks, once per search. Default the official one, `https://registry.modelcontextprotocol.io` |
 | `FXBOT_LISTS_URL` | Optional. The site that publishes fxbot's own lists of MCP servers and skills. fxbot reads its `mcp-registry.json` and `skills-registry.json` hourly, and keeps the lists the release shipped with until a read succeeds. Default fxbot's site, `https://fxbot.sh` |
-| `FXBOT_BACKUPS` | Where the database and chat files are backed up before migrations run. Default `./backups` |
+| `FXBOT_BACKUPS` | Where the database and chat files are backed up before migrations run. Default `./backups`. The backup uses `pg_dump`, which must be Postgres 17's |
+| `FXBOT_CONTROL` | Set by a release install's compose file: the folder where the app asks the machine for updates. Without it, Settings doesn't update |
 | `FXBOT_UPDATE_CHECK` | `off` stops the daily check for a newer release, which asks GitHub about the repository in `package.json` |
 | `FXBOT_RELEASES_URL` | Optional. Where that check reads the newest release, in the shape of GitHub's `releases/latest`, for a fork or a mirror |
 
-One-time setup on Debian, for a checkout you run as yourself. Its names stay clear of a release install's (`fxbot`, `/etc/fxbot`, port 8787), so both can run on one machine. For everyday use, install a release instead: there the server runs as its own user.
+One-time setup, for a checkout you run as yourself. Its database runs in a container of its own on port 5433, and its names stay clear of a release install's (`fxbot`, `/etc/fxbot`, port 8787), so both can run on one machine. For everyday use, install a release instead.
 
 ```sh
-sudo apt install postgresql
-sudo -u postgres createuser "$USER"
-sudo -u postgres createdb -O "$USER" fxbot_dev        # peer auth: you connect as your own role
+sudo apt install podman docker-compose postgresql-client-17     # or Docker; the client is for backups
 sudo install -d -o "$USER" -m 700 /etc/fxbot-dev
 openssl rand -base64 32 > /etc/fxbot-dev/secret.key && chmod 400 /etc/fxbot-dev/secret.key
-printf '%s\n' FXBOT_DATABASE_URL=postgres:///fxbot_dev PGHOST=/var/run/postgresql FXBOT_SECRET_KEY_FILE=/etc/fxbot-dev/secret.key > .env
+pw=$(openssl rand -hex 16)
+printf '%s\n' "FXBOT_DB_PASSWORD=$pw" "FXBOT_DATABASE_URL=postgres://fxbot:$pw@127.0.0.1:5433/fxbot_dev" FXBOT_SECRET_KEY_FILE=/etc/fxbot-dev/secret.key > .env
+systemctl --user enable --now podman.socket                             # podman compose runs docker-compose through it
+podman compose -f deploy/compose.dev.yaml --env-file .env up -d        # or docker compose
+```
+
+A checkout set up on the machine's own Postgres, before 0.3, moves its database across with:
+
+```sh
+pg_dump --format=custom fxbot_dev > fxbot_dev.dump
+podman compose -f deploy/compose.dev.yaml --env-file .env exec -T db pg_restore -U fxbot -d fxbot_dev --no-owner < fxbot_dev.dump
 ```
 
 Then add providers in Settings: a ChatGPT, Grok, or Vercel account by device code, an API key, or a local server such as Ollama. The page sends a key once and never gets it back. To seal everything under a new key, stop the server and run `npm run rotate-key -- <new key file>`, then point `FXBOT_SECRET_KEY_FILE` at that file.
@@ -198,11 +212,11 @@ git switch main && git merge --ff-only release/0.2.0 && git push
 git switch -c release/0.3.0 && git push -u origin release/0.3.0
 ```
 
-The [release workflow](.github/workflows/release.yml) typechecks and builds the new version, checks that no shipped migration changed, then tags it and publishes a GitHub Release with its changelog section. It runs only on `main`: release branches are for work, and never publish. A prerelease, such as `0.3.0-rc.1`, is published only when you merge one into `main`. A fix to a release goes on `release/0.2.1` from `main`, and is merged into the open release branch after.
+The [release workflow](.github/workflows/release.yml) typechecks and builds the new version, checks that no shipped migration changed, builds fxbot's image for amd64 and arm64 and pushes it to ghcr.io, then tags it and publishes a GitHub Release with its changelog section. GitHub makes a new package private: after the first release with an image, make it public once, in the package's settings (**Change visibility**). It runs only on `main`: release branches are for work, and never publish. A prerelease, such as `0.3.0-rc.1`, is published only when you merge one into `main`. A fix to a release goes on `release/0.2.1` from `main`, and is merged into the open release branch after.
 
 ## Status
 
-v1 is built: bot profiles drawn as animated blobs, a streaming chat that survives reloads and server restarts, image and text file attachments, and an installable shell that opens offline. [Provider logins](docs/_completed/phases/provider-logins.md) is built too: device code sign-in, API keys and local servers, model discovery, sealed secrets in Postgres, and provider switches that carry a summary over. The [library](docs/_completed/phases/library.md) is built as well: one copy of every file the chats hold, images and text files sent and documents a bot saves, each tagged with the bots and chats it came from. The bento button beside Settings opens it across every bot, with search and filters, and a panel beside each chat shows that bot's own. Bots search, read, and save it through three tools. [MCP servers](docs/_completed/phases/mcp.md) are built: the puzzle button beside the library adds a remote server by its address, signs in with OAuth or takes a key, and gives the tools you allow (the read-only ones to start) to all bots or the bots you choose. [Add-ons](docs/_completed/phases/addons.md) put a search above that page's tabs: fxbot mirrors GitHub's MCP registry hourly, opens each entry's page before adding it, and marks an installed server that has a newer version, is deprecated, or was removed, and updates it only when asked. [Skills](docs/_completed/phases/skills.md) come from fxbot's own list and skills.sh, pinned to a commit of their GitHub repository: each bot sees a short list of its skills, and a `skill` tool reads one when a task needs it. In a chat, `$` or `/` picks one to send with a message. The [PWA phase](docs/_completed/phases/pwa.md) made fxbot an app to install from the tailnet address: Chrome's own Install button, the steps on an iPhone, and room for the notch, the home indicator, and the keyboard. The production build also opens offline, and its new builds wait for Reload. [Releases](docs/_completed/phases/releases.md) are built: `setup.sh` installs a tagged release, Settings updates to the next with one button, and the database moves forward through numbered migrations, backed up first. All of it was checked against mock servers, stubbed sign-in services, and Chromium on this machine, not with real accounts, models, or phones. The [v1 plan](docs/_completed/v1-plan.md) and the phase pages record what was checked.
+v1 is built: bot profiles drawn as animated blobs, a streaming chat that survives reloads and server restarts, image and text file attachments, and an installable shell that opens offline. [Provider logins](docs/_completed/phases/provider-logins.md) is built too: device code sign-in, API keys and local servers, model discovery, sealed secrets in Postgres, and provider switches that carry a summary over. The [library](docs/_completed/phases/library.md) is built as well: one copy of every file the chats hold, images and text files sent and documents a bot saves, each tagged with the bots and chats it came from. The bento button beside Settings opens it across every bot, with search and filters, and a panel beside each chat shows that bot's own. Bots search, read, and save it through three tools. [MCP servers](docs/_completed/phases/mcp.md) are built: the puzzle button beside the library adds a remote server by its address, signs in with OAuth or takes a key, and gives the tools you allow (the read-only ones to start) to all bots or the bots you choose. [Add-ons](docs/_completed/phases/addons.md) put a search above that page's tabs: fxbot mirrors GitHub's MCP registry hourly, opens each entry's page before adding it, and marks an installed server that has a newer version, is deprecated, or was removed, and updates it only when asked. [Skills](docs/_completed/phases/skills.md) come from fxbot's own list and skills.sh, pinned to a commit of their GitHub repository: each bot sees a short list of its skills, and a `skill` tool reads one when a task needs it. In a chat, `$` or `/` picks one to send with a message. The [PWA phase](docs/_completed/phases/pwa.md) made fxbot an app to install from the tailnet address: Chrome's own Install button, the steps on an iPhone, and room for the notch, the home indicator, and the keyboard. The production build also opens offline, and its new builds wait for Reload. [Releases](docs/_completed/phases/releases.md) are built: `setup.sh` installs a tagged release, Settings updates to the next with one button, and the database moves forward through numbered migrations, backed up first. [Containers](docs/_completed/phases/containers.md) replaced how it installs: `setup.sh` runs fxbot and pgvector's Postgres as containers, with podman or docker, and Settings' Update asks the machine's `fxbot` command, which goes back to the old release if the new one doesn't start. All of it was checked against mock servers, stubbed sign-in services, and Chromium on this machine, not with real accounts, models, or phones. The [v1 plan](docs/_completed/v1-plan.md) and the phase pages record what was checked.
 
 ## License
 

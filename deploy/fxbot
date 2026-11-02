@@ -11,6 +11,8 @@ set -euo pipefail
 
 [ "$(id -u)" -eq 0 ] || { echo "fxbot: run it as root, such as: sudo fxbot ${1:-status}" >&2; exit 1; }
 here=$(dirname "$(readlink -f "$0")")
+# A folder named on the command line is the caller's, from before the cd.
+from_here=$PWD
 cd "$here"
 [ -f .env ] || { echo "fxbot: $here has no .env. Run setup.sh." >&2; exit 1; }
 set -a
@@ -77,6 +79,7 @@ migrations() { compose exec -T db psql -U fxbot -d fxbot -Atc 'select count(*) f
 # `fxbot up` starts the app.
 restore() {
   local folder=${1:?name a backup folder, such as $var/backups/<date>-before-<migration>}
+  [[ $folder == /* ]] || folder=$from_here/$folder
   [ -f "$folder/database.dump" ] || die "$folder has no database.dump"
   compose stop fxbot >/dev/null 2>&1 || true
   compose up -d --wait db >/dev/null 2>&1 || die "the database didn't start. See: fxbot logs db"
@@ -172,8 +175,10 @@ case ${1:-} in
     if [ -L "$here/current" ]; then
       echo
       echo "The 0.2 install that moved into containers is still here. Once you're sure, remove it:"
-      echo "  rm -rf $here/repo $here/releases $here/current $here/fxbot-0.2.service"
+      echo "  rm -rf $here/repo $here/releases $here/current $here/fxbot-0.2.service $here/fxbot-0.2.env"
       echo "  sudo -u postgres dropdb fxbot"
+      echo "To go back to it instead: fxbot down, then put $here/fxbot-0.2.env back as /etc/fxbot/fxbot.env and"
+      echo "$here/fxbot-0.2.service as /etc/systemd/system/fxbot.service, and: systemctl daemon-reload && systemctl start fxbot"
     fi
     ;;
   logs) compose logs -f --tail 100 "${@:2}" ;;

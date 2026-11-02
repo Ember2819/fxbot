@@ -114,7 +114,8 @@ if [ "$moving" = yes ]; then
   chown fxbot:fxbot "$folder/database.dump"
   mv "$install/.env.new" "$install/.env"
   (cd "$install" && ./fxbot restore "$folder") || die "the 0.2 database didn't restore into the container. The 0.2 install is untouched: see $install/fxbot-0.2.service"
-  # The app's database, key, and folders now come from compose.
+  # The app's database, key, and folders now come from compose. 0.2's settings are kept, for going back.
+  cp -p "$etc/fxbot.env" "$install/fxbot-0.2.env"
   sed -i '/^FXBOT_DATABASE_URL=\|^PGHOST=\|^PGPORT=\|^FXBOT_SECRET_KEY_FILE=\|^FXBOT_DATA=\|^FXBOT_BACKUPS=/d' "$etc/fxbot.env"
 fi
 [ ! -f "$install/.env.new" ] || mv "$install/.env.new" "$install/.env"

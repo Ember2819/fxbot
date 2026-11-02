@@ -4,7 +4,7 @@ In this tutorial you install fxbot on a Debian or Ubuntu machine, open it on you
 
 You need:
 
-- a Debian or Ubuntu machine with systemd, where you can use `sudo`
+- a Debian 13 or Ubuntu 24.04 machine, or newer, with systemd, where you can use `sudo`. On Debian 12 or Ubuntu 22.04, first [install Docker](https://docs.docker.com/engine/install/) from Docker's repository.
 - [Tailscale](https://tailscale.com/download) on that machine and on your phone, in the same tailnet, with [HTTPS turned on](https://tailscale.com/kb/1153/enabling-https). This tutorial uses it to reach fxbot from your phone, the recommended way; fxbot itself doesn't need it.
 - a ChatGPT plan, or an API key from OpenAI or OpenRouter
 
@@ -16,10 +16,12 @@ On the machine, run:
 curl -fsSL https://raw.githubusercontent.com/iammrduncan/fxbot/main/setup.sh | sudo bash
 ```
 
-The script names each step in bold as it goes: packages, Node, Postgres, the fxbot user, the release, and the service. Building the release takes a few minutes. It ends with:
+The script names each step in bold as it goes: the container engine, the fxbot user and its key, the release, and the services. fxbot runs as two containers, the app and its database. The script uses podman, or docker when only docker is installed, and installs podman when neither is. Downloading the two images can take a few minutes. It ends with:
 
 ```
 fxbot <version> runs on http://127.0.0.1:8787
+Open it there. From your other devices, Tailscale is the simplest way in:  tailscale serve --bg 8787
+Settings shows each new release, with an Update button. Or: sudo fxbot update
 ```
 
 Ask it whether it is up:
@@ -28,7 +30,13 @@ Ask it whether it is up:
 curl http://127.0.0.1:8787/api/health
 ```
 
-It answers `{"ok":true,"version":"<version>"}`. fxbot is running, but only this machine can reach it.
+It answers `{"ok":true,"version":"<version>"}`. fxbot is running, but only this machine can reach it. To see its containers:
+
+```sh
+sudo fxbot status
+```
+
+It names the version and the engine, then lists two containers, `fxbot` and `db`.
 
 ## Reach it from your phone
 

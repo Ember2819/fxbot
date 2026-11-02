@@ -6,25 +6,35 @@ First, read the release's section of the [changelog](/docs/reference/changelog/)
 
 ## From Settings
 
-When a newer release is out, Settings shows its notes and an **Update** button. Choose it. fxbot builds the new release, switches to it, lets running chats finish, and restarts. The page then offers **Reload**.
+When a newer release is out, Settings shows its notes and an **Update** button. Choose it. The machine's `fxbot` command downloads the release, lets running chats finish, and starts it, while the database keeps running. Settings shows each step, and the page reloads onto the new version once it answers.
 
 ## From a shell
 
 ```sh
-cd /opt/fxbot/current && sudo -u fxbot -H npm run update
-sudo systemctl restart fxbot
+sudo fxbot update
 ```
 
 To install a particular release, such as a prerelease, name it:
 
 ```sh
-cd /opt/fxbot/current && sudo -u fxbot -H npm run update -- v0.2.0-rc.1
+sudo fxbot update 0.4.0-rc.1
 ```
+
+## From 0.2
+
+0.2 ran on the machine's own Node and Postgres, and its Settings can't move it into containers. Run `setup.sh` again:
+
+```sh
+curl -fsSL https://raw.githubusercontent.com/iammrduncan/fxbot/main/setup.sh | sudo bash
+```
+
+It stops 0.2, copies its database into `/var/lib/fxbot/backups/<date>-move-to-containers/`, restores that copy into the database container, and starts the containers on the same chats, key, and settings. The 0.2 files and database stay until you remove them. `sudo fxbot status` prints the commands.
 
 ## If it doesn't work
 
-- **The new release didn't build.** fxbot stays on the running one, and says why.
-- **Another update is running.** Wait for it to finish.
-- **fxbot doesn't start after the restart.** Read `journalctl -u fxbot`, then [go back](/docs/how-to/go-back/).
+- **The new release didn't download.** fxbot stays on the running one, and says why.
+- **Another update is running.** Settings says so. From a shell, the second update waits for the first.
+- **The new release doesn't start.** Within 5 minutes, fxbot goes back to the release it was on, and restores the backup the new release took before its migrations, if it ran any. Settings shows why. Read more with `sudo fxbot logs fxbot`.
+- **fxbot doesn't start after going back.** Read `sudo fxbot logs`, then [go back](/docs/how-to/go-back/) by hand.
 
 What an update does, step by step, is in [Releases and updates](/docs/explanation/releases/).

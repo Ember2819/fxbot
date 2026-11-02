@@ -1,13 +1,15 @@
 # Go back to an earlier release
 
-An update keeps the release it replaced in `/opt/fxbot/releases/`. Going back means pointing `current` at it. These steps use `v0.1.0`; use the tag you are going back to.
+Each release is an image, and `/opt/fxbot/.env` names the one that runs, in `FXBOT_VERSION`. Going back means naming the older version and starting it. These steps use `0.3.0`; use the version you are going back to.
+
+An update that doesn't start goes back by itself. These steps are for a release that started, which you want to leave.
 
 ## With no migration in between
 
 The changelog says whether a release added migrations, under **Before upgrading**. If none did:
 
 ```sh
-sudo ln -sfn releases/v0.1.0 /opt/fxbot/current && sudo systemctl restart fxbot
+sudo sed -i 's/^FXBOT_VERSION=.*/FXBOT_VERSION=0.3.0/' /opt/fxbot/.env && sudo fxbot up
 ```
 
 ## After a migration
@@ -20,14 +22,14 @@ The older release refuses a database that a newer one migrated. Restore the back
    sudo ls /var/lib/fxbot/backups
    ```
 
-2. Stop fxbot, restore the database and the chat files from that folder, and switch:
+2. Restore the database and the chat files from that folder, then name the older version and start it:
 
    ```sh
-   sudo systemctl stop fxbot
-   sudo -u fxbot pg_restore --clean --if-exists -d fxbot /var/lib/fxbot/backups/<date>-before-<migration>/database.dump
-   sudo -u fxbot tar -xzf /var/lib/fxbot/backups/<date>-before-<migration>/data.tar.gz -C /var/lib/fxbot/data
-   sudo ln -sfn releases/v0.1.0 /opt/fxbot/current && sudo systemctl start fxbot
+   sudo fxbot restore /var/lib/fxbot/backups/<date>-before-<migration>
+   sudo sed -i 's/^FXBOT_VERSION=.*/FXBOT_VERSION=0.3.0/' /opt/fxbot/.env && sudo fxbot up
    ```
+
+   `fxbot restore` stops the app first, and puts the backup in place of the database and the chat files.
 
 Anything said or saved after the backup is lost with the restore.
 

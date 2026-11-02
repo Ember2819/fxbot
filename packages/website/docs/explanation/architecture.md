@@ -4,7 +4,7 @@ fxbot is one Node server around [libfx](https://fx.sh/docs/lib), Postgres, and a
 
 ## One process
 
-A release runs one Node process. It serves the built page and its API on 127.0.0.1, runs every bot's agent, and holds every key. There is no second service, no queue, and no process manager beyond systemd. Records live in Postgres, and libfx keeps each chat's session in files.
+A release runs one Node process, in a container beside its database's. It serves the built page and its API on the machine's 127.0.0.1, runs every bot's agent, and holds every key. There is no second service and no queue. Podman or docker restarts a container that crashes, and systemd starts both at boot. Records live in Postgres, and libfx keeps each chat's session in files.
 
 ## The packages
 
@@ -14,7 +14,7 @@ The repository is a TypeScript monorepo, laid out after [eve](https://eve.dev): 
 | --- | --- |
 | `@fxbot/sdk` | The agent system: providers and their sign-ins, one libfx agent per provider, bots, settings, the library, MCP servers, each bot's durable chat, and its searchable history. It keeps the records in Postgres, seals the secrets, and runs the migrations. |
 | `@fxbot/sdk/client` | A typed client for the server's API, with the stream reader and the turn reducer a UI needs. It carries no credentials. |
-| `@fxbot/server` | HTTP and nothing more: `node:http` routes over the SDK, body limits, and status codes. It reads the settings, serves the page, and runs updates. |
+| `@fxbot/server` | HTTP and nothing more: `node:http` routes over the SDK, body limits, and status codes. It reads the settings, serves the page, and asks the machine for updates. |
 | `@fxbot/ui` | The app: Vite, React, and shadcn/ui, built on `@fxbot/sdk/client` alone. |
 | `@fxbot/website` | This site, built to static pages. |
 

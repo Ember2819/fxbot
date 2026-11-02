@@ -4,6 +4,12 @@ Each release of fxbot, newest first. A release that adds migrations, bumps libfx
 
 ## Unreleased
 
+**Before upgrading.** fxbot now runs as containers. To move a 0.2 install, run `setup.sh` again: it copies the database into the database container, and keeps the chats, key, and settings. Settings' Update in 0.2 can't make this move.
+
+- **Containers.** `setup.sh` installs fxbot as containers, with podman, or docker when only docker is installed: fxbot's image from ghcr.io, for amd64 and arm64, and pgvector's Postgres image. It no longer installs Node or the distro's Postgres. `sudo fxbot` runs them: `status`, `logs`, `update`, `up`, `down`, and `restore`.
+- Settings' Update asks the machine, which starts the new release and waits until it answers. If it doesn't, the old release comes back by itself, on the backup taken before the new one's migrations, and Settings shows why. The database keeps running, and running chats finish first.
+- A checkout's database runs from `deploy/compose.dev.yaml`. `npm run update` is gone: a checkout updates with git.
+- The server listens on `FXBOT_HOST`, 127.0.0.1 by default.
 - The website's top bar and the README link to the Hackers in the Loop community on [Discord](https://discord.gg/3Qs2uejUf9).
 - fxbot reads its own lists of MCP servers and skills from its site, https://fxbot.sh, every hour, so new picks show up between releases. Before, it read them only with `FXBOT_LISTS_URL` set, which now points it at another site.
 

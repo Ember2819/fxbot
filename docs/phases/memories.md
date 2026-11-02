@@ -2,7 +2,7 @@
 
 Each bot keeps what it learns: the owner's preferences, facts about them and their work, decisions, and corrections. It saves them during its own turns. The newest are in its instructions in every turn, and it searches for the rest. The owner sees, edits, adds, and deletes them in the bot's panel. Memory search and `chat_history` match by meaning as well as by words, with vectors from a local embedder on the machine or a provider's API.
 
-Status: planned, not built. Research and plan only, written on 2026-11-02 and updated the same day with the owner's answers. It runs on the [containers](containers.md) install, whose database image has pgvector. It builds on what [provider logins](../_completed/phases/provider-logins.md) decided: memories live in Postgres, search is hybrid (pgvector plus full-text, fused with reciprocal rank fusion), the embedding model is picked in Settings from any provider that serves `/embeddings`, and `chat_history` gains its vector half here.
+Status: planned, not built. Research and plan only, written on 2026-11-02 and updated the same day with the owner's answers. It runs on the [containers](../_completed/phases/containers.md) install, whose database image has pgvector. It builds on what [provider logins](../_completed/phases/provider-logins.md) decided: memories live in Postgres, search is hybrid (pgvector plus full-text, fused with reciprocal rank fusion), the embedding model is picked in Settings from any provider that serves `/embeddings`, and `chat_history` gains its vector half here.
 
 ## 0. Core or add-on
 
@@ -89,7 +89,7 @@ Checked on 2026-11-02 against each project's docs and source. Where a point is m
 
 Checked on 2026-11-02 against package indexes, pgvector's source, and a throwaway Postgres 17 cluster in the scratchpad.
 
-**The database image.** Distro packages vary: Debian 12 and Ubuntu 22.04 have no pgvector, and Ubuntu 24.04 has 0.6.0. The [containers](containers.md) install avoids them all. pgvector's own image, `pgvector/pgvector`, is Postgres with pgvector built in, for amd64 and arm64 (`0.8.7-pg17`, about 160 MB).
+**The database image.** Distro packages vary: Debian 12 and Ubuntu 22.04 have no pgvector, and Ubuntu 24.04 has 0.6.0. The [containers](../_completed/phases/containers.md) install avoids them all. pgvector's own image, `pgvector/pgvector`, is Postgres with pgvector built in, for amd64 and arm64 (`0.8.7-pg17`, about 160 MB).
 
 **Not a trusted extension.** `vector.control` has no `trusted` line, so only a superuser can run `CREATE EXTENSION vector`. In the image, the role that `POSTGRES_USER` names is a superuser, so fxbot's migration can create it.
 
@@ -166,7 +166,7 @@ EmbeddingGemma 2 scores 68.5 on the English MTEB v2 mean, and Qwen3-Embedding-0.
 
 **GPUs in containers.** Podman reaches an NVIDIA GPU with `--device nvidia.com/gpu=all`, from a CDI spec that `nvidia-ctk cdi generate` writes. Docker uses `--gpus all`, or `deploy.resources.reservations.devices` in compose. No one compose syntax works with every podman-compose and Docker Compose that the distros ship, so each needs a small GPU override file. A trial run such as `podman run --rm --device nvidia.com/gpu=all ubuntu nvidia-smi -L` shows whether the GPU path works.
 
-**Compose.** fxbot runs Compose v2 on podman and docker alike ([containers](containers.md)). The GPU device syntax differs between them (`devices: [nvidia.com/gpu=all]` for podman, `deploy.resources.reservations.devices` for docker), so the GPU variant is an override file per engine.
+**Compose.** fxbot runs Compose v2 on podman and docker alike ([containers](../_completed/phases/containers.md)). The GPU device syntax differs between them (`devices: [nvidia.com/gpu=all]` for podman, `deploy.resources.reservations.devices` for docker), so the GPU variant is an override file per engine.
 
 ### fxbot today
 
@@ -277,7 +277,7 @@ or secrets. Change one with replaces, remove a wrong one with memory_forget, and
   - Other kinds can't be picked.
 - **Off:** words only.
 
-**Which local embedder runs** is one `embed` service, on the CPU or the GPU, at `FXBOT_EMBED_URL` (default `http://embed:8080/v1`). Settings shows the one that answers, by its model. Picking the other writes an `embedder.json` request through the [containers](containers.md) phase's request channel: the host command checks for a working GPU with a trial run, switches the compose files, and recreates `embed`. Picking Off or Remote leaves `embed` out.
+**Which local embedder runs** is one `embed` service, on the CPU or the GPU, at `FXBOT_EMBED_URL` (default `http://embed:8080/v1`). Settings shows the one that answers, by its model. Picking the other writes an `embedder.json` request through the [containers](../_completed/phases/containers.md) phase's request channel: the host command checks for a working GPU with a trial run, switches the compose files, and recreates `embed`. Picking Off or Remote leaves `embed` out.
 
 **The call:** `POST <base>/embeddings` with `{ model, input: [texts] }`, from the server only.
 - **Prefixes:** fxbot adds each model's query and document prefixes from a small table in `embeddings.ts`, for EmbeddingGemma, Qwen3-Embedding, nomic, and bge. Other models get none.
@@ -318,7 +318,7 @@ A memory is `{ id, text, savedBy, createdAt, updatedAt, messageId }`. `@fxbot/sd
 
 ### Install and update
 
-- **The database** is the [containers](containers.md) install's, in pgvector's image (`pgvector/pgvector:0.8.7-pg17-trixie`). fxbot connects as the role `POSTGRES_USER` names, which is a superuser in the image, so `0005_memories` creates the extension itself.
+- **The database** is the [containers](../_completed/phases/containers.md) install's, in pgvector's image (`pgvector/pgvector:0.8.7-pg17-trixie`). fxbot connects as the role `POSTGRES_USER` names, which is a superuser in the image, so `0005_memories` creates the extension itself.
 - **The embedder** is the `embed` service in the same compose file, on the CPU, or on a GPU through an override file. Its model downloads into a `models` volume on first start. fxbot doesn't wait for it: until it answers, searches use words and the loop waits. See [Embeddings](#embeddings-packagessdksrcembeddingsts).
 - **Updating from 0.2** goes through the containers phase's move into the database container. `0005_memories` then runs like any migration, after a backup. The changelog's Before upgrading names it.
 - **A checkout** runs the database and the embedder from the compose file, and `npm run dev` on the machine.
@@ -345,7 +345,7 @@ A memory is `{ id, text, savedBy, createdAt, updatedAt, messageId }`. `@fxbot/sd
   - `steps.tsx`: three sentences
   - `memory-search.tsx`: the Settings section
 - **Elsewhere:**
-  - the compose file's `embed` service and its GPU override files, which the [containers](containers.md) phase's `setup.sh` chooses between
+  - the compose file's `embed` service and its GPU override files, which the [containers](../_completed/phases/containers.md) phase's `setup.sh` chooses between
   - the README's checkout setup and `CHANGELOG.md`
   - the site's docs: a Memories section in [bots and chats](../../packages/website/docs/explanation/bots-and-chats.md), and a how-to for choosing where vectors come from
 
@@ -368,7 +368,7 @@ A memory is `{ id, text, savedBy, createdAt, updatedAt, messageId }`. `@fxbot/sd
 
 ### Size
 
-About 950 lines: the SDK about 480 (memories 220, embeddings 190 with the prefix table, and the rest in `history.ts`, `index.ts`, and types), the server 50, the UI 320, and the migration 30. The compose service and its GPU override files are about 30 lines, in the [containers](containers.md) phase's files. Plus docs.
+About 950 lines: the SDK about 480 (memories 220, embeddings 190 with the prefix table, and the rest in `history.ts`, `index.ts`, and types), the server 50, the UI 320, and the migration 30. The compose service and its GPU override files are about 30 lines, in the [containers](../_completed/phases/containers.md) phase's files. Plus docs.
 
 ## 4. Checklist
 
@@ -434,8 +434,8 @@ Decided by the owner on 2026-11-02:
 | Background review | Not in core. Add-ons can add it, such as a nightly pass ("dreams"). |
 | The budget in the instructions | 2% of the context window, to start. |
 | Vectors for every message | Yes by default, from the first 8,000 characters. Settings can turn them off, or change the number of characters. |
-| pgvector on every distro | The database runs in pgvector's image ([containers](containers.md)). |
+| pgvector on every distro | The database runs in pgvector's image ([containers](../_completed/phases/containers.md)). |
 | Where vectors come from | A local embedder on the CPU by default. Settings can pick a local GPU embedder, or a provider's API. |
 | The CPU model | EmbeddingGemma 2. |
 
-The [containers](containers.md) plan answers the last open question: Settings switches the embedder through its request file and host command, with no socket in the app.
+The [containers](../_completed/phases/containers.md) plan answers the last open question: Settings switches the embedder through its request file and host command, with no socket in the app.

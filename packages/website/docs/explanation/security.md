@@ -4,15 +4,17 @@ fxbot is built for one person's machine. It keeps every secret on the server, se
 
 ## Loopback only, with no login
 
-fxbot listens on 127.0.0.1 and has no accounts, so what sits in front of it decides who gets in. On the machine itself, that is whoever uses that machine. Through Tailscale, the recommended way in, it is your tailnet's access rules: Tailscale already knows each device and each person, so a second login in fxbot would be one more password guarding the same door, and a weaker one.
+fxbot listens on the machine's 127.0.0.1 and has no accounts, so what sits in front of it decides who gets in. On the machine itself, that is whoever uses that machine. Through Tailscale, the recommended way in, it is your tailnet's access rules: Tailscale already knows each device and each person, so a second login in fxbot would be one more password guarding the same door, and a weaker one.
 
 The cost is that whoever reaches the address can use all of fxbot: every bot, every chat, every provider. So fxbot should never be open to a network directly, through port forwarding or [Tailscale Funnel](https://tailscale.com/kb/1223/funnel), and any other way in, such as a reverse proxy, needs a login of its own ([Reach it from other devices](/docs/how-to/reach-it/)).
+
+In a release install, fxbot runs in a container as the `fxbot` user, and compose publishes its port on the machine's 127.0.0.1. Its database has no port on the machine.
 
 ## Keys sealed in Postgres
 
 Every key and token fxbot stores is sealed in the SDK with AES-256-GCM before it reaches Postgres, with a fresh nonce each time, and bound to the record it belongs to. Postgres holds only ciphertext and never sees the key. fxbot doesn't use pgcrypto, whose key would travel inside SQL and could reach Postgres's logs.
 
-The key is a file, `/etc/fxbot/secret.key` in a release install, that only the server's user reads.
+The key is a file, `/etc/fxbot/secret.key` in a release install, that only the server's user reads. Compose mounts it into the app's container, read-only.
 
 `npm run rotate-key` seals everything again under a new key, for when the old one may have leaked. See [Commands](/docs/reference/commands/#npm-run-rotate-key).
 

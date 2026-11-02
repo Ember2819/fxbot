@@ -1,30 +1,29 @@
 # Configuration
 
-fxbot's server reads its settings from environment variables. None of them is a secret: the key that seals secrets is a file, named by `FXBOT_SECRET_KEY_FILE`.
+fxbot's server reads its settings from environment variables. The key that seals secrets is a file, named by `FXBOT_SECRET_KEY_FILE`.
 
 ## Where they are set
 
 | Install | Where | Read by |
 | --- | --- | --- |
-| A release, from `setup.sh` | `/etc/fxbot/fxbot.env`, owned by `fxbot`, mode 600 | `fxbot.service`, as its `EnvironmentFile`. A change takes effect at the next restart. |
+| A release, from `setup.sh` | `/etc/fxbot/fxbot.env`, for optional settings such as `FXBOT_LISTS_URL`. The release's compose file sets the rest. | The app's container, through compose's `env_file`. A change takes effect at the next `sudo systemctl restart fxbot`. |
 | A checkout | The environment, or `.env` in the repository root. The environment wins. | The server and its commands. Vite reads no `.env`. |
 
-The file `setup.sh` writes, with the Postgres cluster's own port:
+In a release, the compose file sets these for the app, with the database password from `/opt/fxbot/.env`:
 
 ```sh
-FXBOT_DATABASE_URL=postgres:///fxbot
-PGHOST=/var/run/postgresql
-PGPORT=5432
-FXBOT_SECRET_KEY_FILE=/etc/fxbot/secret.key
+FXBOT_DATABASE_URL=postgres://fxbot:<password>@db/fxbot
+FXBOT_SECRET_KEY_FILE=/run/secrets/fxbot_key
 FXBOT_DATA=/var/lib/fxbot/data
 FXBOT_BACKUPS=/var/lib/fxbot/backups
+FXBOT_CONTROL=/var/lib/fxbot/control
 ```
+
+These win over the same names in `fxbot.env`. The image sets `FXBOT_HOST=0.0.0.0` inside the container, and compose publishes its port on the machine's 127.0.0.1. `/opt/fxbot/.env` holds the install's own settings for compose, not the app's: see [What setup.sh creates](/docs/reference/install-layout/).
 
 ## Variables
 
 <!-- the variables table from README.md -->
-
-`PGHOST` and `PGPORT` are Postgres's own: the folder of its socket, and its port.
 
 ## The site
 

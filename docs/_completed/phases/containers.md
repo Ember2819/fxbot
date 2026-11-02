@@ -2,11 +2,11 @@
 
 fxbot runs as containers. `setup.sh` uses podman, or docker when only docker is installed, and one compose file runs fxbot and its database. Settings' Update asks the machine to move to the next release. A small host command does the work, and puts the old release back if the new one doesn't start.
 
-Status: planned, not built. Research and plan only, written on 2026-11-02. The owner decided the shape the same day: podman first, docker as the fallback, and one compose file for fxbot, its database (pgvector's image), and the local embedder that [memories](memories.md) adds. This phase builds fxbot and the database; memories adds the embedder.
+Status: built on 2026-11-02, on `release/0.3.0`. The human checks at the end of the checklist are still open. Planned the same day; the owner decided the shape the same day: podman first, docker as the fallback, and one compose file for fxbot, its database (pgvector's image), and the local embedder that [memories](../../phases/memories.md) adds. This phase builds fxbot and the database; memories adds the embedder.
 
 ## 0. Core or add-on
 
-**Core: what fxbot needs to run** ([Core or add-on](../../CONVENTIONS.md#core-or-add-on)). It replaces the install that [releases](../_completed/phases/releases.md) built, where `setup.sh` installed Node and the distro's Postgres on the machine, and an update built the next release in place. Distros ship different Postgres versions, and some have no pgvector, which memories needs. In containers, every machine runs the same Node, the same Postgres, and pgvector.
+**Core: what fxbot needs to run** ([Core or add-on](../../../CONVENTIONS.md#core-or-add-on)). It replaces the install that [releases](releases.md) built, where `setup.sh` installed Node and the distro's Postgres on the machine, and an update built the next release in place. Distros ship different Postgres versions, and some have no pgvector, which memories needs. In containers, every machine runs the same Node, the same Postgres, and pgvector.
 
 ## 1. Research
 
@@ -163,11 +163,11 @@ volumes: { pgdata: {} }
 - **`/etc/fxbot/fxbot.env`** keeps the owner's optional settings, such as `FXBOT_LISTS_URL` and `FXBOT_VERCEL_CLIENT_ID`, as today.
 - **The database** isn't published to the machine. Only the app container reaches it, by service name.
 - **The key** stays `/etc/fxbot/secret.key`, owned by `fxbot` and readable by it alone. Compose mounts it read-only.
-- [Memories](memories.md) adds the `embed` service to this file, and its GPU override files beside it.
+- [Memories](../../phases/memories.md) adds the `embed` service to this file, and its GPU override files beside it.
 
 ### The host command (`deploy/fxbot`, installed as `/opt/fxbot/fxbot` and `/usr/local/bin/fxbot`)
 
-A shell script of about 150 lines, run as root. It finds its engine in `.env`, and runs `podman compose` or `docker compose` in `/opt/fxbot`, without `-f`, so compose also merges a `compose.override.yaml` there. fxbot never writes that file, and updates leave it alone; the [agent computer](computer.md) uses it.
+A shell script of about 150 lines, run as root. It finds its engine in `.env`, and runs `podman compose` or `docker compose` in `/opt/fxbot`, without `-f`, so compose also merges a `compose.override.yaml` there. fxbot never writes that file, and updates leave it alone; the [agent computer](../../phases/computer.md) uses it.
 
 | Command | Does |
 | --- | --- |
@@ -233,7 +233,7 @@ Running it again leaves a working install alone and finishes one that stopped, a
 5. Start the stack. 0.3.0's migrations run with their usual backup.
 6. Leave the machine's Postgres, its `fxbot` database, and `/opt/fxbot/{repo,releases,current}` alone, and print how to remove them.
 
-Going back to 0.2 means stopping the containers and putting the kept unit back. The machine's database never changed.
+Going back to 0.2 means stopping the containers and putting the kept unit and settings back (`fxbot-0.2.service` and `fxbot-0.2.env`, which the move keeps in `/opt/fxbot`). The machine's database never changed.
 
 ### The app (`packages/server`, `packages/ui`)
 
@@ -298,9 +298,19 @@ metadata-action adds `latest` for a stable version only. A prerelease such as `0
 - **An update** downloads only the layers that changed, then the app is down for about 4 seconds, measured. The database keeps running.
 - **Health checks** open a port from bash every 3 seconds, with no Node start.
 
+### Changed while building
+
+- **Pulls:** `fxbot update` pulls with `--policy missing`. A release's tags never change, so an image already on the machine is the right one, and checks can use local images.
+- **Restoring:** `fxbot restore` drops the database and makes it again before `pg_restore`, instead of `--clean`, so tables that a newer release added go too, and the same migration can run again later. It starts the database container itself, so the move from 0.2 and going back use the same command.
+- **Stopping:** the app gets `stop_grace_period: 90s`, as systemd gave it, so running chats finish before an update replaces it.
+- **Two updates at once:** the second reads `.env` again once it holds the lock, since the first may have changed the version while it waited.
+- **Checks:** `FXBOT_ROOT` puts the compose file's machine folders under another root, beside `COMPOSE_PROJECT_NAME` and `FXBOT_PORT`, so a check runs beside a real install.
+- **MCP sign-ins** still redirect to `http://127.0.0.1:<port>`, not to `FXBOT_HOST`.
+- **Running `setup.sh` again** starts `fxbot.service` if it's stopped, and doesn't restart a running install.
+
 ### Not in this phase
 
-- The embedder and its GPU files: [memories](memories.md).
+- The embedder and its GPU files: [memories](../../phases/memories.md).
 - Updates on their own: Settings still shows the release, and the owner chooses.
 - Quadlets, `podman auto-update`, and rootless podman.
 - Distros without Compose v2 packages, other than through Docker's repository.
@@ -316,31 +326,31 @@ About 650 lines added and 200 removed:
 Checks run on this machine, which has podman 5.4.2 and Docker Compose, beside the owner's 0.2 install, with other names and ports, and are removed after. Writing systemd units or packages to this machine needs the owner's go-ahead. The rest is checked here, and the full `setup.sh` on a fresh machine is a human check.
 
 **M1. The image**
-- [ ] `podman build .` makes an image for this machine's CPU, and `--platform linux/arm64` installs libfx's arm64 addon in the build stage (checked by listing `node_modules/@libfx`).
-- [ ] In it: `node`, `pg_dump` 17, and `fxbot-health` run, libfx reports its native backend, and the server listens on `FXBOT_HOST`.
-- [ ] Its size, unpacked and compressed (`podman save | gzip | wc -c`), is noted.
+- [x] `podman build .` makes an image for this machine's CPU, in 23 s with a warm cache, and `--platform linux/arm64 --target build` installs only `libfx-linux-arm64-gnu`.
+- [x] In it: Node 22.23.4, `pg_dump` 17.11, and `fxbot-health`. libfx reports `"backend":"native"`, the workspace links survive, and the server listens on `FXBOT_HOST` (0.0.0.0) as user `node` by default.
+- [x] 340 MB unpacked, 109 MB compressed.
 
 **M2. The stack**
-- [ ] `deploy/compose.yaml`, with a scratch `.env`, a scratch key and folders, and another project name and port, comes up with `up -d --wait`. The app migrates a fresh database, and answers on 127.0.0.1 only.
-- [ ] The database has no port on the machine. The app runs as the given ids, and its files in the data and backups folders are owned by them.
-- [ ] A missing `FXBOT_DB_PASSWORD` or `FXBOT_VERSION` stops compose with its name.
-- [ ] `kill -9` of the app restarts it. `compose down` and `up` keep the database's records.
+- [x] `deploy/compose.yaml`, with a scratch `.env`, a scratch key and folders, and another project name and port, came up with `up -d --wait` in 11 s. The app migrated a fresh database, and answered on 127.0.0.1 only.
+- [x] The database has no port on the machine. The app runs as uid 995 (the machine's `fxbot`), and its files and backups are owned by 995:987.
+- [x] A missing `FXBOT_DB_PASSWORD` stops compose with "required variable FXBOT_DB_PASSWORD is missing a value". `FXBOT_VERSION` uses the same `:?` form.
+- [x] `kill -9` of the app restarted it. `compose down` and `up` kept a bot made before.
 
 **M3. Updates**
-- [ ] Two local tags of the image stand in for two releases, with `FXBOT_IMAGE` and `FXBOT_FILES` pointed at them. `fxbot update` moves from one to the other: the steps reach `status.json`, the database keeps running, and the app is back healthy.
-- [ ] A version that isn't newer, isn't `x.y.z`, or doesn't exist is refused, and nothing changes.
-- [ ] A new image that never gets healthy goes back to the old one. A new image that adds a migration and then fails goes back to the old one with the backup restored, and the old app starts on it.
-- [ ] Settings' Update writes the request. With `fxbot apply` run by hand, the page shows the steps and reloads onto the new version.
-- [ ] Two requests at once: the second waits for the first.
+- [x] Local tags stood in for releases, with `FXBOT_IMAGE` and `FXBOT_FILES` pointed at them. `fxbot update 0.3.1` took 4.6 s: the steps reached `status.json`, the database kept running, and the app answered as 0.3.1.
+- [x] The same version, an older one, `abc;rm`, and 9.9.9 (no files) were each refused with the reason, and `.env` kept 0.3.1.
+- [x] An image that never got healthy went back to the old one in 14 s. An image that added migration `0099` and then failed went back in 13 s: its backup was restored, `0099` and its table were gone, the bot was there, and the old app started on it.
+- [x] In Chromium, Settings' Update wrote the request ("Asking the machine to update"), and with `fxbot apply` run by hand the page showed "Getting" and "Starting" and reloaded as 0.3.5. For a release that didn't start, it showed the steps and "0.3.6 didn't start, so fxbot went back to 0.3.5." A second Update while one waits answers 409.
+- [x] Two updates at once: the second waited for the first's lock, read the version again, and then ran.
 
 **M4. Moving a 0.2 install**
-- [ ] A scratch database on the machine's Postgres, made by 0.2.1 with bots, chats, files, providers, and sealed keys, moves into a scratch stack. Every record, sealed key, and chat file works in 0.3.0 after its migrations.
-- [ ] The old database is unchanged afterwards.
+- [x] A scratch database on the machine's Postgres, made by the 0.2.1 server with a bot, a provider with a sealed key (checked against a mock server), messages, and a library file, moved with `pg_dump` and `fxbot restore` into a scratch stack. Every count matched, the key unsealed in the container, the library file was served, and a chat file stayed in place. This phase adds no migration.
+- [x] The old database was unchanged afterwards.
 
 **M5. A checkout, the workflow, and docs**
-- [ ] `deploy/compose.dev.yaml` runs beside the M2 stack, and `npm run dev` uses its database.
-- [ ] The workflow's new job is written and pinned. Its first real run is the owner's release.
-- [ ] The docs are written, `npm run build-site` passes, and `npm run typecheck`, `npm run build`, and `git diff --check` pass.
+- [x] `deploy/compose.dev.yaml` ran on another port beside the M3 stack, and the server that `npm run dev` starts migrated and answered on it.
+- [x] The workflow's `image` job is written, `publish` waits for it, and each action's SHA matches its tag on GitHub. Its first real run is the owner's release.
+- [x] The docs are written: the README, AGENTS.md, the changelog, the home page, and 12 site pages. `npm run build-site` (1,760 links in 24 pages), `npm run typecheck`, `npm run build`, `git diff --check`, and `bash -n` on both scripts pass.
 
 **Human checks**
 - [ ] `setup.sh` on a fresh Debian 13 or Ubuntu 24.04 machine with nothing installed: podman, Compose, the stack, and both units. fxbot answers after a reboot.

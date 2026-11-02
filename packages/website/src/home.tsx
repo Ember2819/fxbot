@@ -67,14 +67,14 @@ const features: { shape: Shape; color: Color; title: string; link: string; body:
     link: "/docs/explanation/releases/",
     body: (
       <>
-        <code>setup.sh</code> installs a tagged release. When the next one is out, Settings shows its notes and an Update button. The database moves forward, with a backup first.
+        <code>setup.sh</code> installs a tagged release as containers. When the next one is out, Settings shows its notes and an Update button. The database moves forward, with a backup first, and a release that doesn't start gives way to the one before.
       </>
     ),
   },
 ];
 
 const steps: { title: string; command?: string; body: ReactNode }[] = [
-  { title: "Install it", command: installCommand, body: <>On Debian or Ubuntu. It installs Postgres, Node if the machine needs it, and fxbot as a service on 127.0.0.1:8787.</> },
+  { title: "Install it", command: installCommand, body: <>On Debian or Ubuntu. It runs fxbot and its database as containers, with podman or docker, as a service on 127.0.0.1:8787.</> },
   {
     title: "Open it",
     command: "sudo tailscale serve --bg 8787",
@@ -168,8 +168,8 @@ export function Home() {
           <dl className="grid content-start gap-px overflow-hidden rounded-xl border bg-border text-sm">
             {[
               ["Machine", "Debian or Ubuntu, with systemd"],
-              ["Runtime", "Node 22.18 or newer, which setup.sh installs when it is missing"],
-              ["Records", "Postgres, with every key and token sealed"],
+              ["Runtime", "podman or docker, which setup.sh installs (podman) when neither is there"],
+              ["Records", "Postgres with pgvector, in a container, with every key and token sealed"],
               ["Agents", "libfx, one agent per provider"],
               ["Network", "127.0.0.1:8787; from other devices, Tailscale (recommended) or a proxy of your own"],
             ].map(([term, detail]) => (
