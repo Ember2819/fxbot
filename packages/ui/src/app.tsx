@@ -1,6 +1,5 @@
 import { useEffect, useLayoutEffect, useRef, useState, type FormEvent, type MouseEvent, type ReactNode } from "react";
-import { ArrowUpIcon, CheckIcon, ChevronRightIcon, CircleCheckIcon, CopyIcon, FileTextIcon, LayoutDashboardIcon, LoaderCircleIcon, MessageCircleDashedIcon, PanelRightIcon, PaperclipIcon, PinIcon, PinOffIcon, PlusIcon, PuzzleIcon, SettingsIcon, XIcon } from "lucide-react";
-import { Streamdown } from "streamdown";
+import { ArrowUpIcon, CheckIcon, ChevronRightIcon, CopyIcon, FileTextIcon, LayoutDashboardIcon, MessageCircleDashedIcon, PanelRightIcon, PaperclipIcon, PinIcon, PinOffIcon, PlusIcon, PuzzleIcon, SettingsIcon, XIcon } from "lucide-react";
 import { Attachment, AttachmentAction, AttachmentActions, AttachmentContent, AttachmentGroup, AttachmentMedia, AttachmentTitle, AttachmentTrigger } from "@/components/ui/attachment";
 import { Bubble, BubbleContent } from "@/components/ui/bubble";
 import { Button, buttonVariants } from "@/components/ui/button";
@@ -36,7 +35,6 @@ import {
 } from "@/components/ui/sidebar";
 import { Textarea } from "@/components/ui/textarea";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
-import { Trace, TraceCollapsible, TraceCollapsibleContent, TraceCollapsibleTrigger, TraceIcon, TraceLine, TraceTitle } from "@/components/ui/trace";
 import { colors, maxPinned, unreachable, type Color, type Fields, type Profile, type Provider, type Settings, type Shape, type Turn, type Upload } from "@fxbot/sdk/client";
 import { client } from "./client.ts";
 import { maxFiles, readFile } from "./attachments.ts";
@@ -45,6 +43,7 @@ import { BotPanel, usePanel } from "./bot-panel.tsx";
 import { AddonsPage, BotAddons } from "./addons.tsx";
 import { LibraryPage } from "./library.tsx";
 import { Version } from "./release.tsx";
+import { Reply } from "./steps.tsx";
 import { follow, go } from "./nav.ts";
 import { ModelField, Providers } from "./providers.tsx";
 import { install, keepDraft, reload, takeDraft, useInstall, useNewVersion } from "./pwa.ts";
@@ -744,8 +743,7 @@ function TurnView({ turn, color, retry }: { turn: Turn; color?: Color; retry?: (
       <MessageScrollerItem messageId={`${turn.messageId}-reply`}>
         <Message>
           <MessageContent>
-            {turn.reasoning && <Reasoning text={turn.reasoning} running={!turn.done && !turn.reply} />}
-            {turn.reply ? <Streamdown>{turn.reply}</Streamdown> : !turn.done && !turn.reasoning && <p className="animate-pulse text-muted-foreground">Thinking…</p>}
+            <Reply turn={turn} />
             {turn.note && (
               <p className="text-sm text-destructive">
                 {turn.note}{" "}
@@ -826,23 +824,6 @@ function Handoff({ text }: { text: string }) {
   );
 }
 
-// shadcn's Reasoning pattern: open while the model thinks, folded once the reply starts.
-function Reasoning({ text, running }: { text: string; running: boolean }) {
-  const [open, setOpen] = useState<boolean>();
-  return (
-    <Trace>
-      <TraceCollapsible open={open ?? running} onOpenChange={setOpen}>
-        <TraceCollapsibleTrigger>
-          <TraceLine status={running ? "running" : undefined}>
-            <TraceIcon>{running ? <LoaderCircleIcon className="animate-spin" /> : <CircleCheckIcon />}</TraceIcon>
-            <TraceTitle>{running ? "Thinking" : "Thought"}</TraceTitle>
-          </TraceLine>
-        </TraceCollapsibleTrigger>
-        <TraceCollapsibleContent className="whitespace-pre-wrap">{text}</TraceCollapsibleContent>
-      </TraceCollapsible>
-    </Trace>
-  );
-}
 
 function CopyButton({ text }: { text: string }) {
   const [copied, setCopied] = useState(false);

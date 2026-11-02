@@ -5,9 +5,9 @@ A plugin bundles [MCP servers](../_completed/phases/mcp.md) and [skills](skills.
 - install the tooling they need, such as [herdr](https://herdr.dev)
 - hook into a bot's turns
 
-Plugins are found and added through [add-ons](addons.md), whose page lists every part before anything is saved. A plugin made only of remote servers and skills runs nothing on this machine. One with local servers, setup, or hooks does, and the first plugin, herdr, has all three, so most of this page is about doing that safely.
+Plugins are found and added through [add-ons](../_completed/phases/addons.md), whose page lists every part before anything is saved. A plugin made only of remote servers and skills runs nothing on this machine. One with local servers, setup, or hooks does, and the first plugin, herdr, has all three, so most of this page is about doing that safely.
 
-Status: planned, not built. Research and plan only. It builds on [add-ons](addons.md), [MCP servers](../_completed/phases/mcp.md), and [skills](skills.md), and shares one hook seam with [permissions](permissions.md). Its first plugin is herdr ([fxbot's extension](#fxbots-extension)).
+Status: planned, not built. Research and plan only. It builds on [add-ons](../_completed/phases/addons.md), [MCP servers](../_completed/phases/mcp.md), and [skills](skills.md), and shares one hook seam with [permissions](permissions.md). Its first plugin is herdr ([fxbot's extension](#fxbots-extension)).
 
 ## 1. Research
 
@@ -26,9 +26,9 @@ These are read from specs, source, docs, and the installed libfx, as of November
   - **Secrets and sign-in.** Plugins "MUST NOT embed credentials or other secrets" in `env` or headers. The spec "defines no OAuth configuration": sign-in is the client's job.
 - **Who reads what.**
   - Codex: the root `plugin.json` is "the portable entry point", `.codex-plugin/plugin.json` is "a compatibility fallback", and Claude-compatible manifests and `.claude-plugin/marketplace.json` are read too ([Codex](https://developers.openai.com/plugins/build/plugins)).
-  - Cursor: a root `plugin.json` or `.cursor-plugin/plugin.json` ([Cursor](https://cursor.com/docs/plugins)). Grok Bot's apps come from Cursor's catalog ([add-ons](addons.md#1-research)).
+  - Cursor: a root `plugin.json` or `.cursor-plugin/plugin.json` ([Cursor](https://cursor.com/docs/plugins)). Grok Bot's apps come from Cursor's catalog ([add-ons](../_completed/phases/addons.md#1-research)).
   - Grok Build looks for `plugin.json`, `.grok-plugin/plugin.json`, and `.claude-plugin/plugin.json` (`xai-org/grok-build`, `crates/codegen/xai-grok-agent/src/plugins/manifest.rs`).
-  - Claude Code keeps `.claude-plugin/plugin.json`, and so does Anthropic's marketplace. 192 of its 315 plugins hold only MCP servers and skills ([add-ons](addons.md#1-research)).
+  - Claude Code keeps `.claude-plugin/plugin.json`, and so does Anthropic's marketplace. 192 of its 315 plugins hold only MCP servers and skills ([add-ons](../_completed/phases/addons.md#1-research)).
 - **Twilio's plugin** (`twilio/ai`, at the marketplace's pin `8aba46f`).
   - Its `.claude-plugin/plugin.json` lists `"skills": ["./skills/twilio", "./skills/sendgrid"]`, and an inline server, `{ "type": "http", "url": "https://mcp.twilio.com/docs" }`, which needs no sign-in (`mcp/README.md`).
   - Its 57 skills sit two levels down, so Agent Plugins' strict discovery would miss them. Later commits add Codex and Cursor manifests.
@@ -131,7 +131,7 @@ These are read from specs, source, docs, and the installed libfx, as of November
 
 ### fxbot's extension
 
-The herdr plugin, fxbot's first plugin, published in the project's marketplace ([add-ons, question 2](addons.md#5-open-questions)):
+The herdr plugin, fxbot's first plugin, published in the project's marketplace ([add-ons, question 2](../_completed/phases/addons.md#5-open-questions)):
 
 ```text
 herdr/
@@ -191,7 +191,7 @@ herdr-mcp talks to whatever session the `herdr` CLI finds. By default that is th
 
 ### Installing
 
-1. **A source.** Sources are listed in [add-ons](addons.md#sources-packagessdksrcregistryts):
+1. **A source.** Sources are listed in [add-ons](../_completed/phases/addons.md#sources-packagessdksrcregistryts):
    - a marketplace entry, pinned by `sha`, or by the marketplace's own commit
    - a registry `packages` entry
    - a git URL pinned to a commit
@@ -204,7 +204,7 @@ herdr-mcp talks to whatever session the `herdr` CLI finds. By default that is th
    - Commands are argv tokens, with no shell strings outside an explicit `sh -c`.
    - Paths stay inside the plugin.
    - Each bad server or skill is skipped and reported, as Agent Plugins requires.
-4. **The add-on page** lists every part ([add-ons](addons.md#the-add-on-page)):
+4. **The add-on page** lists every part ([add-ons](../_completed/phases/addons.md#the-add-on-page)):
    - every command and argument, untruncated
    - environment variable names
    - URLs
@@ -216,7 +216,7 @@ herdr-mcp talks to whatever session the `herdr` CLI finds. By default that is th
 6. **Checks.** Each `requires.check` runs. A missing binary shows its `install` step behind a **Run setup** button.
    - The output streams to the page, and the step runs as the plugin user.
    - If the step needs root, fxbot shows the command for the owner to run instead.
-7. **Enable.** Local servers start, remote ones connect, skills join the catalogs, and tools join the agents ([add-ons: bots](addons.md#bots-and-add-ons)).
+7. **Enable.** Local servers start, remote ones connect, skills join the catalogs, and tools join the agents ([add-ons: bots](../_completed/phases/addons.md#bots-and-add-ons)).
 
 ### Running (`packages/sdk/src/plugins.ts`)
 
@@ -239,7 +239,7 @@ herdr-mcp talks to whatever session the `herdr` CLI finds. By default that is th
 
 ### API, SDK, and client
 
-Adding a plugin goes through the [add-ons](addons.md#api-sdk-and-client) preview and Add. These routes are the plugin's own:
+Adding a plugin goes through the [add-ons](../_completed/phases/addons.md#api-sdk-and-client) preview and Add. These routes are the plugin's own:
 
 | Route | SDK call |
 | --- | --- |
@@ -249,9 +249,9 @@ Adding a plugin goes through the [add-ons](addons.md#api-sdk-and-client) preview
 
 ### Where the code goes
 
-- **`packages/sdk`:** `plugins.ts` (reading the format, the extension, processes, and hooks). It uses `archive.ts` and `skills.ts` from [skills](skills.md), and `mcp.ts`. `registry.ts` gains the marketplace sync described in [add-ons](addons.md#sources-packagessdksrcregistryts).
+- **`packages/sdk`:** `plugins.ts` (reading the format, the extension, processes, and hooks). It uses `archive.ts` and `skills.ts` from [skills](skills.md), and `mcp.ts`. `registry.ts` gains the marketplace sync described in [add-ons](../_completed/phases/addons.md#sources-packagessdksrcregistryts).
 - **`packages/server`:** the routes above.
-- **`packages/ui`:** the settings form, setup output, and process status and logs. The add-on page is in [add-ons](addons.md#ui).
+- **`packages/ui`:** the settings form, setup output, and process status and logs. The add-on page is in [add-ons](../_completed/phases/addons.md#ui).
 
 ### Security
 

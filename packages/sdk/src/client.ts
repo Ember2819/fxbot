@@ -2,6 +2,7 @@ import type {
   Addon,
   AddonPreview,
   AddonRef,
+  AddonSearch,
   AddonSecrets,
   Fields,
   Kind,
@@ -153,6 +154,11 @@ export function createClient({ baseUrl = "", onVersion }: ClientOptions = {}) {
       list: () => call<Addon[]>("/addons"),
       preview: (ref: AddonRef) => call<AddonPreview>("/addons/preview", "POST", { ref }),
       add: (ref: AddonRef, hash: string) => call<Addon>("/addons", "POST", { ref, hash }),
+      // The registry's entries; `everything` also asks the official registry, unmoderated.
+      search: (q: string, { kind, everything }: { kind?: string; everything?: boolean } = {}) =>
+        call<AddonSearch>(`/addons/search?${new URLSearchParams({ q, ...(kind ? { kind } : {}), ...(everything ? { everything: "1" } : {}) })}`),
+      // Moves an add-on to the newer definition its page showed, with that page's hash.
+      update: (id: string, hash: string) => call<Addon>(`/addons/${id}/update`, "POST", { hash }),
       change: (id: string, fields: { enabled?: boolean; bots?: "all" | "each"; allowed?: string[] }) => call<Addon>(`/addons/${id}`, "PATCH", fields),
       remove: (id: string) => call<{ ok: true }>(`/addons/${id}`, "DELETE"),
       setSecrets: (id: string, secrets: AddonSecrets) => call<Addon>(`/addons/${id}/secrets`, "PUT", secrets),
@@ -172,10 +178,18 @@ export function createClient({ baseUrl = "", onVersion }: ClientOptions = {}) {
 
 export type Client = ReturnType<typeof createClient>;
 
-// One message and its reply. `unsent` marks a message the server never took, which can be sent again.
-export type Turn = { messageId: string; text: string; files?: Upload[]; reply: string; reasoning?: string; done: boolean; note?: string; unsent?: boolean };
+// A step of a reply, in the order it happened: thinking, text, or a tool call. A tool call has its input when it
+// starts, or a preview of an input over 64 KiB, and its result when it ends.
+export type Part =
+  | { type: "reasoning"; text: string }
+  | { type: "text"; text: string }
+  | { type: "tool"; id: string; name: string; input?: unknown; inputPreview?: string; output?: string; error?: boolean; done: boolean };
 
-// Folds one stream line into a thread. Lines without a messageId, such as `idle`, and tool lines change nothing.
+// One message and its reply. `parts` is the reply step by step; `reply` is its text alone, the parts' text joined, and
+// all a turn from an earlier chat has. `unsent` marks a message the server never took, which can be sent again.
+export type Turn = { messageId: string; text: string; files?: Upload[]; reply: string; parts?: Part[]; done: boolean; note?: string; unsent?: boolean };
+
+// Folds one stream line into a thread. Lines without a messageId, such as `idle`, change nothing.
 export function applyLine(turns: Turn[], line: StreamLine): Turn[] {
   const { messageId } = line;
   if (!messageId) return turns;
@@ -184,17 +198,31 @@ export function applyLine(turns: Turn[], line: StreamLine): Turn[] {
   if (line.type === "turn_start" || line.type === "turn_resume") {
     // Turns show in the order they start, so a message sent during the replay lands after it.
     // A turn that runs again after a crash sends its reply again from the start.
-    const started = { ...turn, text: line.input ?? turn.text, files: line.files ?? turn.files, reply: "", reasoning: undefined, done: false, note: undefined, unsent: undefined };
+    const started = { ...turn, text: typeof line.input === "string" ? line.input : turn.text, files: line.files ?? turn.files, reply: "", parts: [], done: false, note: undefined, unsent: undefined };
     return [...(i < 0 ? turns : turns.toSpliced(i, 1)), started];
   }
+  const parts = turn.parts ?? [];
+  const last = parts.at(-1);
+  // Deltas of one kind in a row make one part; a tool call or the other kind starts the next.
+  const add = (type: "text" | "reasoning", delta: string): Part[] =>
+    last?.type === type ? parts.with(-1, { type, text: last.text + delta }) : [...parts, { type, text: delta }];
   let next: Turn;
-  if (line.type === "text_delta") {
-    next = { ...turn, reply: turn.reply + line.delta };
-  } else if (line.type === "reasoning_delta") {
-    next = { ...turn, reasoning: (turn.reasoning ?? "") + line.delta };
+  if (line.type === "text_delta" && line.delta) {
+    next = { ...turn, reply: turn.reply + (last?.type === "text" || !turn.reply ? "" : "\n\n") + line.delta, parts: add("text", line.delta) };
+  } else if (line.type === "reasoning_delta" && line.delta) {
+    next = { ...turn, parts: add("reasoning", line.delta) };
+  } else if (line.type === "tool_start" && line.id) {
+    const call: Part = { type: "tool", id: line.id, name: line.name ?? "tool", input: line.input, inputPreview: line.inputPreview, done: false };
+    next = { ...turn, parts: [...parts.filter((p) => !(p.type === "tool" && p.id === line.id)), call] };
+  } else if (line.type === "tool_end" && line.id) {
+    // A call that started before the replay's cursor ends without its start, so it is added here.
+    const at = parts.findIndex((p) => p.type === "tool" && p.id === line.id);
+    const ended = { output: line.content, error: line.isError === true, done: true };
+    next = { ...turn, parts: at < 0 ? [...parts, { type: "tool", id: line.id, name: line.name ?? "tool", ...ended }] : parts.with(at, { ...(parts[at] as Part & { type: "tool" }), ...ended }) };
   } else if (line.type === "turn_end") {
     const note = line.error ? `Error: ${line.error.message}` : line.stopReason === "end_turn" ? undefined : `Stopped: ${line.stopReason}`;
-    next = { ...turn, done: true, note };
+    // A turn that ends with a tool still running, as on an error, leaves the tool ended too.
+    next = { ...turn, done: true, note, parts: parts.map((p) => (p.type === "tool" && !p.done ? { ...p, done: true } : p)) };
   } else return turns;
   return i < 0 ? [...turns, next] : turns.with(i, next);
 }

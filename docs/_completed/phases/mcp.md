@@ -1,10 +1,10 @@
 # MCP servers
 
-Add any remote MCP server to fxbot, by its URL or from [add-ons](../../phases/addons.md). fxbot connects from the server, signs in with OAuth when the server asks, and gives the server's tools to the bots that use it. A server can also serve [skills](../../phases/skills.md). Local MCP servers, which run code on this machine, come in [plugins](../../phases/plugins.md), and plugins can bundle remote servers too.
+Add any remote MCP server to fxbot, by its URL or from [add-ons](addons.md). fxbot connects from the server, signs in with OAuth when the server asks, and gives the server's tools to the bots that use it. A server can also serve [skills](../../phases/skills.md). Local MCP servers, which run code on this machine, come in [plugins](../../phases/plugins.md), and plugins can bundle remote servers too.
 
 The hard part is signing in. fxbot runs on a tailnet or on localhost, with no public address, and the project should not have to register its own OAuth client with every MCP provider. This page answers that: [section 2](#2-key-takeaways) in short, [OAuth sign-in](#oauth-sign-in) in full.
 
-Status: built on 2026-11-01, and checked against mock MCP servers built on `@modelcontextprotocol/server`, a mock authorization server, a mock model, and disposable databases: 67 checks, all passing (section 4), after the follow-up below. No real account was used; those sign-ins are the owner's. Where the build differs from the plan, section 3 says so under **Built**. It is the first add-on phase, so it created the add-on tables ([add-ons: Postgres](../../phases/addons.md#postgres)) and a first Add-ons page, with Add by URL and the installed list, which [add-ons](../../phases/addons.md) extends with search. Its read-only trust stands in for [permissions](../../phases/permissions.md) until that phase ships.
+Status: built on 2026-11-01, and checked against mock MCP servers built on `@modelcontextprotocol/server`, a mock authorization server, a mock model, and disposable databases: 67 checks, all passing (section 4), after the follow-up below. No real account was used; those sign-ins are the owner's. Where the build differs from the plan, section 3 says so under **Built**. It is the first add-on phase, so it created the add-on tables ([add-ons: Postgres](addons.md#postgres)) and a first Add-ons page, with Add by URL and the installed list, which [add-ons](addons.md) extends with search. Its read-only trust stands in for [permissions](../../phases/permissions.md) until that phase ships.
 
 ## 1. Research
 
@@ -36,7 +36,7 @@ These are read from specs, source, docs, and read-only requests, as of November 
 - **Restrictions.**
   - Figma admits only clients in its catalog, and Vercel only "reviewed and approved" clients.
   - Atlassian accepts redirect origins from an allowlist that defaults to localhost, and serves no RFC 9728 metadata.
-- **Static tokens.** GitHub takes a personal access token, Stripe an agent key, Linear "API keys directly in the `Authorization: Bearer`" header, and Supabase a personal token. Registry entries mark secret headers with `isSecret` ([add-ons](../../phases/addons.md)).
+- **Static tokens.** GitHub takes a personal access token, Stripe an agent key, Linear "API keys directly in the `Authorization: Bearer`" header, and Supabase a personal token. Registry entries mark secret headers with `isSecret` ([add-ons](addons.md)).
 
 **libfx 0.0.16** (`libfx/mcp`, installed)
 - `createMcpAdapter(client, { prefix, serverName, resources, prompts })` resolves to `{ tools, instructions, close }`, built from "a host-owned MCP client". Transport, authentication, elicitation, and cleanup stay with the host.
@@ -87,7 +87,7 @@ These are read from specs, source, docs, and read-only requests, as of November 
    - This puts DCR ahead of the spec's SHOULD order, because CIMD cannot name a per-install callback. CIMD carries on when DCR goes away (the SDK's notes give 2027-07-28 as the earliest).
 4. **Sign-in runs on the server** as an attempt the page polls, as in provider logins. The verifier and tokens never reach the page, and tokens are sealed.
 5. **libfx only adapts a client.** fxbot owns the transport, sign-in, reconnects, and shutdown, through `@modelcontextprotocol/client`, whose `auth()` does discovery, PKCE, DCR, and CIMD.
-6. **Tools are fixed per agent** (libfx). Adding, removing, or changing a server's allowed tools rebuilds the provider agents. Whether a bot uses a server is decided inside each tool's `execute()` ([add-ons: bots](../../phases/addons.md#bots-and-add-ons)).
+6. **Tools are fixed per agent** (libfx). Adding, removing, or changing a server's allowed tools rebuilds the provider agents. Whether a bot uses a server is decided inside each tool's `execute()` ([add-ons: bots](addons.md#bots-and-add-ons)).
 7. **MCP tools are untrusted** and not safe to run twice. Until [permissions](../../phases/permissions.md) ships, bots get only a server's read-only tools until the owner allows others by name.
 8. **Adding a URL makes the server fetch it.** fxbot takes HTTPS only, and refuses private and tailnet addresses unless the user allows one.
 
@@ -95,13 +95,13 @@ These are read from specs, source, docs, and read-only requests, as of November 
 
 ### Adding a server
 
-- From [add-ons](../../phases/addons.md): a registry entry's `remotes` (`streamable-http` or `sse`, a URL, `headers` marked `isSecret`). Or "Add by URL".
+- From [add-ons](addons.md): a registry entry's `remotes` (`streamable-http` or `sse`, a URL, `headers` marked `isSecret`). Or "Add by URL".
 - The SDK checks the URL, HTTPS and not private (see Security). Then it probes the server without credentials, with `server/discover`, or `initialize` for older servers. The add-on page shows what the probe finds, including whether the server serves skills:
   - **It answers:** no auth.
   - **401 with `resource_metadata`:** OAuth.
   - **Secret headers in the registry entry:** the page asks for their values in password fields, and they are sealed.
   - **Otherwise:** the user can add a header by hand, such as `Authorization: Bearer <token>`.
-- The record is an add-on of kind `mcp` ([add-ons: Postgres](../../phases/addons.md#postgres)) holding:
+- The record is an add-on of kind `mcp` ([add-ons: Postgres](addons.md#postgres)) holding:
   - `url` and `transport`
   - header names only
   - `auth` (`none`, `headers`, or `oauth`)
@@ -172,13 +172,13 @@ The fixed-port URI is for servers that match ports exactly. Until the document e
 | `POST /api/oauth/attempts/:id/paste` | `oauth.paste(id, address)` |
 | `GET /api/oauth/callback` | `oauth.callback(query)`: the redirect target, answered with a small HTML page |
 
-Adding, listing, enabling, allowing tools, choosing bots, and removing are the [add-ons](../../phases/addons.md#api-sdk-and-client) routes. The callback is the one route that a browser reaches from another site, so it does nothing without a matching, unexpired `state`.
+Adding, listing, enabling, allowing tools, choosing bots, and removing are the [add-ons](addons.md#api-sdk-and-client) routes. The callback is the one route that a browser reaches from another site, so it does nothing without a matching, unexpired `state`.
 
 ### Where the code goes
 
 - **`packages/sdk`**
   - `mcp.ts`: clients, the provider adapter for OAuth, attempts, and tool wrapping.
-  - The add-on records it needs (see [add-ons](../../phases/addons.md)).
+  - The add-on records it needs (see [add-ons](addons.md)).
   - `index.ts` passes MCP tools into provider agents.
 - **`packages/server`:** the routes above. A sign-in takes the request's `Origin`, after the server's check that a write's origin matches the address it came in on.
 - **`packages/ui`:** a list of servers with an edit button and an on switch, an add dialog, each server's settings (sign-in or key, bots, tools), and the sign-in dialog (open a tab, or paste).
@@ -286,6 +286,6 @@ Each has a default, and the build took every one. Until the owner publishes the 
 1. **Callback origin.** Is it set by hand, or read from `tailscale status`? *Answered:* neither. It is the page's own origin, checked by the server.
 2. **The CIMD document.** Where does the public document live? *Default:* the project's GitHub Pages site, whose domain also gives fxbot's plugin namespace ([plugins](../../phases/plugins.md#5-open-questions)). The owner publishes it.
 3. **Trust before permissions.** *Answered:* read-only tools only, until the owner allows others by name.
-4. **Per-bot default.** *Default:* a new server is on for every bot. See [add-ons](../../phases/addons.md#bots-and-add-ons) for why every bot still sees its tool list.
+4. **Per-bot default.** *Default:* a new server is on for every bot. See [add-ons](addons.md#bots-and-add-ons) for why every bot still sees its tool list.
 5. **Private addresses.** *Default:* refused, with an "allow local address" switch per add-on.
 6. **Elicitation, sampling, resources, and prompts.** *Default:* none in this phase, apart from the skill files that the skills extension serves through `resources/read`. libfx can turn resources and prompts into instructions later.

@@ -19,11 +19,12 @@ import {
 import type { FxAgentHostTool } from "libfx";
 import { createMcpAdapter } from "libfx/mcp";
 import { createHash, randomBytes } from "node:crypto";
+import { infoOf, type Entry } from "./registry.ts";
 import { lookup } from "node:dns/promises";
 import { BlockList, isIP } from "node:net";
 import { createSecrets } from "./secrets.ts";
 import { newId, type AddonRecord, type Store } from "./store.ts";
-import type { Addon, AddonPreview, AddonRef, AddonSecrets, OAuthAttempt, OAuthStatus, Transport } from "./types.ts";
+import type { Addon, AddonFrom, AddonPreview, AddonRef, AddonSecrets, OAuthAttempt, OAuthStatus, Transport } from "./types.ts";
 
 const fail = (status: number, message: string): never => {
   throw Object.assign(new Error(message), { status });
@@ -65,8 +66,8 @@ export type McpOptions = {
   localUrl: string;
   /** The project's client ID metadata document, once it is published. */
   clientMetadataUrl?: string;
-  /** An MCP registry's base URL, for adding its entries. */
-  registryUrl: string;
+  /** A registry entry by name, from where it came, or null when there is none. */
+  findEntry: (name: string, from: AddonFrom, version: string) => Promise<Entry | null>;
   /** The tools bots can use have changed. */
   onChange: () => void;
 };
@@ -146,10 +147,13 @@ function slug(name: string) {
   const word = labels.length > 1 ? (labels.slice(0, -1).find((l) => !["mcp", "api", "www"].includes(l)) ?? labels[0]) : host;
   return word.match(/[a-z0-9]+/g)?.join("_").slice(0, 24) || "mcp";
 }
+// An add-on's source names a registry entry, for the marks and Update, or else the address it was added by.
+const registered = (source: unknown): source is NonNullable<Addon["source"]> =>
+  typeof source === "object" && source !== null && typeof (source as { registry?: unknown }).registry === "string";
 const headerName = (name: unknown) => (typeof name === "string" && /^[A-Za-z0-9!#$%&'*+.^_`|~-]{1,100}$/.test(name) ? name : fail(400, "Each header needs a name of letters, digits, and dashes."));
 
 // Remote MCP servers as add-ons: their records, connections, sign-ins, and the tools bots get from them.
-export async function createMcp({ store, secretKey, fetch, localUrl, clientMetadataUrl, registryUrl, onChange }: McpOptions) {
+export async function createMcp({ store, secretKey, fetch, localUrl, clientMetadataUrl, findEntry, onChange }: McpOptions) {
   const secrets = createSecrets(store.sql, secretKey, "addon_secrets");
   const records = new Map((await store.addons.list()).filter((r) => r.kind === "mcp").map((r) => [r.id, r as McpRecord] as [string, McpRecord]));
   const on = new Map<string, Set<string>>();
@@ -158,7 +162,7 @@ export async function createMcp({ store, secretKey, fetch, localUrl, clientMetad
   const allowedOf = (record: McpRecord) => record.allowed ?? record.config.tools.filter((t) => t.annotations?.readOnlyHint === true).map((t) => t.name);
 
   const get = (id: string) => records.get(id) ?? fail(404, "add-on not found");
-  async function save(id: string, fields: Partial<Pick<McpRecord, "config" | "enabled" | "bots" | "allowed" | "status">>) {
+  async function save(id: string, fields: Partial<Pick<McpRecord, "config" | "enabled" | "bots" | "allowed" | "status" | "source" | "approvedHash">>) {
     const record = records.get(id);
     if (!record) return;
     records.set(id, { ...record, ...fields });
@@ -243,6 +247,7 @@ export async function createMcp({ store, secretKey, fetch, localUrl, clientMetad
   // One client per enabled server. A dropped one retries after 1, 2, 4… up to 60 seconds, unless it needs a sign-in
   // or header values first.
   const live = new Map<string, { client?: Client; error?: string; timer?: NodeJS.Timeout; delay: number }>();
+  let closed = false;
   const entryOf = (id: string) => live.get(id) ?? live.set(id, { delay: 1000 }).get(id)!;
   async function disconnect(id: string) {
     const entry = entryOf(id);
@@ -266,7 +271,7 @@ export async function createMcp({ store, secretKey, fetch, localUrl, clientMetad
     try {
       await client.connect(transportFor(record.config.url, record.config.transport, authed(record)));
       const tools = await listTools(client);
-      if (records.get(id)?.enabled !== true || entry.client) return void (await client.close());
+      if (closed || records.get(id)?.enabled !== true || entry.client) return void (await client.close());
       Object.assign(entry, { client, error: undefined, delay: 1000 });
       client.onclose = () => void (entry.client === client && drop(id, "The connection closed."));
       const changed = JSON.stringify(tools) !== JSON.stringify(records.get(id)!.config.tools);
@@ -279,7 +284,7 @@ export async function createMcp({ store, secretKey, fetch, localUrl, clientMetad
   }
   async function drop(id: string, reason: string) {
     const record = records.get(id);
-    if (!record) return;
+    if (!record || closed) return;
     const entry = entryOf(id);
     const client = entry.client;
     entry.client = undefined;
@@ -356,6 +361,7 @@ export async function createMcp({ store, secretKey, fetch, localUrl, clientMetad
       tools: tools.map(toolView),
       signedIn: auth === "headers" ? headers.every((name) => secret.headers?.[name]) : Boolean(secret.tokens),
       ownClient: Boolean(secret.own),
+      ...(registered(record.source) ? { source: record.source } : {}),
     };
   }
 
@@ -366,17 +372,25 @@ export async function createMcp({ store, secretKey, fetch, localUrl, clientMetad
     if ("registry" in ref) {
       if (typeof ref.registry !== "string" || !ref.registry) fail(400, "registry must name a server");
       const version = typeof ref.version === "string" && ref.version ? ref.version : "latest";
-      const res = await fetch(`${registryUrl}/v0.1/servers/${encodeURIComponent(ref.registry)}/versions/${encodeURIComponent(version)}`).catch(() => null);
-      if (!res?.ok) return fail(res?.status === 404 ? 404 : 502, `The registry has no ${ref.registry} ${version}.`);
-      const { server } = (await res.json()) as { server: { name: string; title?: string; version: string; remotes?: { type: string; url: string; headers?: { name: string; description?: string; isSecret?: boolean }[] }[] } };
-      const remote = server.remotes?.find((r) => r.type === "streamable-http" || r.type === "sse") ?? fail(400, `${ref.registry} has no remote server to add.`);
+      const from: AddonFrom = ref.from === "fxbot" || ref.from === "official" ? ref.from : "github";
+      const entry = (await findEntry(ref.registry, from, version).catch(() => fail(502, `The registry didn't answer for ${ref.registry}.`))) ?? fail(404, `The registry has no ${ref.registry} ${version}.`);
+      const { server } = entry;
+      const info = infoOf(entry, from);
+      const source = { registry: server.name, version: server.version, from };
+      const remote = server.remotes?.find((r) => r.type === "streamable-http" || r.type === "sse");
+      // An entry that runs only as a package is a process on this machine, which comes with plugins.
+      if (!remote) {
+        if (!server.packages?.length) fail(400, `${ref.registry} has no remote server to add.`);
+        return { name: info.title, url: "", transport: "streamable-http" as Transport, allowLocal: false, headers: [], source, info, local: true };
+      }
       return {
-        name: server.title || server.name,
+        name: info.title,
         url: remote.url,
         transport: remote.type as Transport,
         allowLocal: ref.allowLocal === true,
         headers: (remote.headers ?? []).map((h) => ({ name: headerName(h.name), secret: h.isSecret === true, ...(h.description ? { description: h.description } : {}) })),
-        source: { registry: server.name, version: server.version },
+        source,
+        info,
       };
     }
     if (typeof ref.url !== "string" || !ref.url.trim()) fail(400, "url is required");
@@ -422,10 +436,15 @@ export async function createMcp({ store, secretKey, fetch, localUrl, clientMetad
 
   async function preview(ref: AddonRef) {
     const definition = await define(ref);
+    const info = "info" in definition ? { info: definition.info } : {};
+    if ("local" in definition) {
+      const page: AddonPreview = { hash: "", name: definition.name, url: "", transport: definition.transport, auth: "none", headers: [], allowLocal: false, tools: null, local: true, ...info };
+      return { page, definition, found: { name: definition.name, auth: "none" as Addon["auth"], tools: null } };
+    }
     const found = await probe(definition);
     const { url, transport, allowLocal, headers } = definition;
     const hash = createHash("sha256").update(JSON.stringify([url, transport, allowLocal, headers, found.auth])).digest("hex");
-    const page: AddonPreview = { hash, name: found.name, url, transport, auth: found.auth, headers, allowLocal, tools: found.tools?.map(toolView) ?? null };
+    const page: AddonPreview = { hash, name: found.name, url, transport, auth: found.auth, headers, allowLocal, tools: found.tools?.map(toolView) ?? null, ...info };
     return { page, definition, found };
   }
 
@@ -563,6 +582,7 @@ export async function createMcp({ store, secretKey, fetch, localUrl, clientMetad
     // Adds what the page showed, if the server still matches its hash.
     async add(ref: AddonRef, hash: unknown) {
       const { page, definition, found } = await preview(ref);
+      if (page.local) fail(400, `${page.name} runs on this machine, which comes with plugins.`);
       if (hash !== page.hash) fail(409, "This server changed since its page was shown. Look at it again before adding it.");
       const record: McpRecord = {
         id: newId(),
@@ -597,6 +617,20 @@ export async function createMcp({ store, secretKey, fetch, localUrl, clientMetad
       });
       if (switched) await start(records.get(id)!);
       if (switched || allowed !== undefined) onChange();
+      return view(records.get(id)!);
+    },
+    // Moves an add-on from a registry to the definition its newer page showed, once the owner adds it again. Its
+    // values stay; a header it didn't have before waits for its value.
+    async update(id: string, hash: unknown) {
+      const record = get(id);
+      const source = registered(record.source) ? record.source : fail(400, `${record.name} isn't from a registry.`);
+      const { page, definition, found } = await preview({ registry: source.registry, allowLocal: record.config.allowLocal, from: source.from });
+      if (page.local) fail(400, `${page.name} now runs only on this machine, which comes with plugins.`);
+      if (hash !== page.hash) fail(409, "This server changed since its page was shown. Look at it again before updating.");
+      const config = { ...record.config, url: page.url, transport: page.transport, headers: page.headers.map((h) => h.name), auth: found.auth, tools: found.tools ?? record.config.tools };
+      await save(id, { config, source: definition.source, approvedHash: page.hash });
+      await start(records.get(id)!);
+      onChange();
       return view(records.get(id)!);
     },
     async remove(id: string) {
@@ -661,7 +695,9 @@ export async function createMcp({ store, secretKey, fetch, localUrl, clientMetad
       callback: async (query: URLSearchParams) => finish(pendingFor(query.get("state")), query),
     },
 
+    // A connection still opening closes itself when it gets there.
     async close() {
+      closed = true;
       await Promise.all([...live.keys()].map(disconnect));
     },
   };

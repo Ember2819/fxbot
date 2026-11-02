@@ -1,0 +1,31 @@
+{
+  "servers": [
+    {
+      "server": {
+        "name": "org.alphaxiv/alphaxiv",
+        "title": "alphaXiv",
+        "description": "Search and read arXiv papers, explore their code, find researchers, and keep a library on alphaXiv.",
+        "version": "1.0.0",
+        "websiteUrl": "https://www.alphaxiv.org/docs/mcp",
+        "remotes": [{ "type": "streamable-http", "url": "https://api.alphaxiv.org/mcp/v1" }]
+      }
+    },
+    {
+      "server": {
+        "name": "cloud.keirolabs/keiro",
+        "title": "Keiro",
+        "description": "Web search, research, and page extraction for AI agents, from Keiro Labs.",
+        "version": "1.0.0",
+        "websiteUrl": "https://keirolabs.cloud",
+        "repository": { "url": "https://github.com/Keirolabs-API/keiro-mcp", "source": "github" },
+        "remotes": [
+          {
+            "type": "streamable-http",
+            "url": "https://api.keirolabs.cloud/mcp/api",
+            "headers": [{ "name": "Authorization", "description": "Your Keiro API key, from keirolabs.cloud", "isRequired": true, "isSecret": true }]
+          }
+        ]
+      }
+    }
+  ]
+}

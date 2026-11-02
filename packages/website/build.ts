@@ -27,4 +27,7 @@ for (const page of pages()) {
   await writeFile(file, template.replace("<!--head-->", () => page.head).replace("<!--body-->", () => page.body));
 }
 await rm(server, { recursive: true });
+// fxbot's own MCP list, which each release also ships with, for installs that read the published copy
+// (FXBOT_MCP_FXBOT). The SDK's file is the only copy to edit.
+await cp(join(root, "../sdk/src/mcp-registry.json"), join(out, "mcp-registry.json"));
 console.log(`The site is in ${out}`);

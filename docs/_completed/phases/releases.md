@@ -268,7 +268,7 @@ Checks run against a disposable "origin": a bare git repository in the scratchpa
 The owner answered these on 2026-11-02:
 
 1. **The first version.** 0.1.0.
-2. **Where it goes in the order.** Next, before [add-ons](../../phases/addons.md).
+2. **Where it goes in the order.** Next, before [add-ons](addons.md).
 3. **An Update button in Settings.** Yes. It needs no extra rights, because the new release is built beside the running one ([Updating](#updating-packagesserversrcupdatets)).
 4. **Prereleases.** Only when the owner asks for one. Work happens on a release branch until it is ready to merge into `main` and be tagged. After the build, the owner narrowed it: the workflow runs only on `main`, and release branches never publish.
 5. **An install script.** Yes: `setup.sh`, installing a release tag from GitHub. The owner has a domain for it, not ready yet, so the first address is the repository's raw file.

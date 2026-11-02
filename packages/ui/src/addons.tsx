@@ -1,5 +1,5 @@
 import { useEffect, useState, type FormEvent } from "react";
-import { ExternalLinkIcon, LoaderCircleIcon, PencilIcon, PlusIcon, PuzzleIcon } from "lucide-react";
+import { ExternalLinkIcon, LoaderCircleIcon, PencilIcon, PuzzleIcon, SearchIcon } from "lucide-react";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -8,21 +8,14 @@ import { Input } from "@/components/ui/input";
 import { SidebarTrigger } from "@/components/ui/sidebar";
 import { Switch } from "@/components/ui/switch";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import type { Addon, AddonPreview, OAuthAttempt, OAuthStatus, Profile } from "@fxbot/sdk/client";
+import type { Addon, AddonCard, AddonMark, AddonPreview, OAuthAttempt, OAuthStatus, Profile } from "@fxbot/sdk/client";
+import { AddressDialog, bearer, EntryDialog, heading, hint, hostOf, Information, label, Results, signsIn, useSearch } from "./addon-add.tsx";
 import { Blob } from "./blob.tsx";
 import { client } from "./client.ts";
 
-const label = "grid gap-1.5 text-sm font-medium";
-const hint = "font-normal text-muted-foreground";
-const heading = "text-sm font-medium";
-const hostOf = (url: string) => new URL(url).host;
-// A key without a scheme is a bearer token. "Bearer …" and "Token …" go as written.
-const bearer = (key: string) => (/\s/.test(key.trim()) ? key.trim() : `Bearer ${key.trim()}`);
-// A key goes in Authorization, unless it is written as a header of its own, such as "X-Api-Key: …".
-function keyHeader(key: string): [string, string] {
-  const named = /^([A-Za-z][A-Za-z0-9-]*):\s+(\S.*)$/.exec(key.trim());
-  return named ? [named[1], named[2]] : ["Authorization", bearer(key)];
-}
+// Past this many, the page says how many tools reach the bots: each one's schema rides along with every message.
+const toolBudget = 40;
+const markText: Record<AddonMark["kind"], string> = { update: "Update available", deprecated: "Deprecated", removed: "Removed from the registry" };
 
 // Under a server's name: how it is, how many of its tools bots get, and which bots.
 function summary(addon: Addon, profiles: Profile[] | null) {
@@ -38,13 +31,22 @@ function summary(addon: Addon, profiles: Profile[] | null) {
     .join(" · ");
 }
 
-// Remote MCP servers, one row each with a switch, and an edit button that opens the server's settings.
+type Tab = "installed" | "skills" | "mcp" | "plugins";
+
+// One search over every kind of add-on, with a tab for what is installed and one per kind. Installed lists the
+// servers, one row each with a switch and an edit button that opens the server's settings. The MCP tab searches the
+// registry; skills and plugins aren't built yet.
 export function AddonsPage({ profiles }: { profiles: Profile[] | null }) {
   const [addons, setAddons] = useState<Addon[] | null>(null);
   const [error, setError] = useState("");
-  const [adding, setAdding] = useState(false);
+  const [query, setQuery] = useState("");
+  const [everything, setEverything] = useState(false);
+  const [chosen, setChosen] = useState<Tab | null>(null);
+  const [entry, setEntry] = useState<AddonCard | null>(null);
+  const [byAddress, setByAddress] = useState(false);
   const [openId, setOpenId] = useState<string | null>(null);
   const [signingIn, setSigningIn] = useState<Addon | null>(null);
+  const search = useSearch(query, everything);
   const load = () => client.addons.list().then((list) => (setAddons(list), setError("")), (e: Error) => setError(e.message));
   useEffect(() => void load(), []);
   // A server's status changes by itself while it connects.
@@ -55,53 +57,103 @@ export function AddonsPage({ profiles }: { profiles: Profile[] | null }) {
   }, [addons]);
   const replace = (next: Addon) => setAddons((all) => all?.map((a) => (a.id === next.id ? next : a)) ?? null);
   const open = addons?.find((a) => a.id === openId);
+  const reaching = (addons ?? []).filter((a) => a.enabled).reduce((n, a) => n + a.tools.filter((t) => a.allowed.includes(t.name)).length, 0);
   const signIn = (addon: Addon) => (setOpenId(null), setSigningIn(addon));
+  // Installed first when there is anything installed, else the registry.
+  const tab = chosen ?? (addons?.length ? "installed" : "mcp");
+  const words = query.trim().toLowerCase();
+  const mine = (addons ?? []).filter((a) => !words || [a.name, a.source?.registry ?? "", hostOf(a.url)].some((text) => text.toLowerCase().includes(words)));
+  const found = words && search.result ? search.result.cards.length : undefined;
+  // The mirror gives 20 at most.
+  const count = (n: number) => <span className="text-muted-foreground tabular-nums">{n >= 20 ? "20+" : n}</span>;
+  const added = new Set((addons ?? []).flatMap((a) => [a.url, ...(a.source ? [a.source.registry] : [])]));
+  const onAdded = (addon: Addon) => {
+    setEntry(null);
+    setByAddress(false);
+    setAddons((all) => [...(all ?? []), addon]);
+    setQuery("");
+    setChosen("installed");
+    if (addon.auth === "oauth") signIn(addon);
+  };
 
   return (
     <>
       <header className="box-content flex h-14 shrink-0 items-center gap-2 px-3 pt-[env(safe-area-inset-top)]">
         <SidebarTrigger />
         <h1 className="flex-1 font-medium">Add-ons</h1>
-        {Boolean(addons?.length) && (
-          <Button variant="outline" size="sm" onClick={() => setAdding(true)}>
-            <PlusIcon /> Add
-          </Button>
-        )}
       </header>
       <main className="flex flex-1 flex-col overflow-y-auto px-4 pb-6">
-        {error && <p role="alert" className="mx-auto w-full max-w-xl text-sm text-destructive">{error}</p>}
-        {addons?.length === 0 && (
-          <Empty className="flex-1">
-            <EmptyHeader>
-              <EmptyMedia variant="icon">
-                <PuzzleIcon />
-              </EmptyMedia>
-              <EmptyTitle>No MCP servers yet</EmptyTitle>
-              <EmptyDescription>Add one by its address, and your bots get its tools.</EmptyDescription>
-            </EmptyHeader>
-            <EmptyContent>
-              <Button onClick={() => setAdding(true)}>Add a server</Button>
-            </EmptyContent>
-          </Empty>
-        )}
-        {Boolean(addons?.length) && (
-          <ul className="mx-auto w-full max-w-xl divide-y rounded-xl border">
-            {addons!.map((addon) => (
-              <li key={addon.id} className="flex items-center gap-2 py-2.5 pr-3 pl-3">
-                <div className="min-w-0 flex-1">
-                  <p className="truncate font-medium">{addon.name}</p>
-                  <p className="truncate text-sm text-muted-foreground">{summary(addon, profiles)}</p>
-                </div>
-                <Button variant="ghost" size="icon-sm" aria-label={`Edit ${addon.name}`} onClick={() => setOpenId(addon.id)}>
-                  <PencilIcon />
-                </Button>
-                <Switch aria-label={`Use ${addon.name}`} checked={addon.enabled} onCheckedChange={(enabled) => client.addons.change(addon.id, { enabled }).then(replace, (e: Error) => setError(e.message))} />
-              </li>
-            ))}
-          </ul>
-        )}
+        <div className="mx-auto grid w-full max-w-xl gap-3">
+          <div className="relative">
+            <SearchIcon className="absolute top-2.5 left-2.5 size-4 text-muted-foreground" />
+            <Input enterKeyHint="search" aria-label="Search add-ons" placeholder="Search add-ons" className="pl-8" value={query} onChange={(e) => setQuery(e.target.value)} />
+            {search.busy && words && <LoaderCircleIcon className="absolute top-2.5 right-3 size-4 animate-spin text-muted-foreground" />}
+          </div>
+          <Tabs value={tab} onValueChange={(next) => setChosen(next as Tab)}>
+            <TabsList className="w-full">
+              <TabsTrigger value="installed">Installed{words && addons?.length ? count(mine.length) : null}</TabsTrigger>
+              <TabsTrigger value="skills">Skills</TabsTrigger>
+              <TabsTrigger value="mcp">MCP{found !== undefined ? count(found) : null}</TabsTrigger>
+              <TabsTrigger value="plugins">Plugins</TabsTrigger>
+            </TabsList>
+          </Tabs>
+          {error && <p role="alert" className="text-sm text-destructive">{error}</p>}
+          {tab === "installed" && addons?.length === 0 && (
+            <Empty>
+              <EmptyHeader>
+                <EmptyMedia variant="icon">
+                  <PuzzleIcon />
+                </EmptyMedia>
+                <EmptyTitle>Nothing added yet</EmptyTitle>
+                <EmptyDescription>Find an MCP server in GitHub's registry, or add one by its address, and your bots get its tools.</EmptyDescription>
+              </EmptyHeader>
+              <EmptyContent>
+                <Button onClick={() => setChosen("mcp")}>Browse MCP servers</Button>
+              </EmptyContent>
+            </Empty>
+          )}
+          {tab === "installed" && Boolean(addons?.length) && mine.length === 0 && (
+            <p className="text-sm text-muted-foreground">
+              None of yours match.{" "}
+              {found ? (
+                <button type="button" className="text-foreground underline underline-offset-4" onClick={() => setChosen("mcp")}>
+                  {found >= 20 ? "20+" : found} in MCP
+                </button>
+              ) : null}
+            </p>
+          )}
+          {tab === "installed" && mine.length > 0 && (
+            <ul className="divide-y rounded-xl border">
+              {mine.map((addon) => (
+                <li key={addon.id} className="flex items-center gap-2 py-2.5 pr-3 pl-3">
+                  <div className="min-w-0 flex-1">
+                    <p className="flex min-w-0 items-baseline gap-2">
+                      <span className="truncate font-medium">{addon.name}</span>
+                      {addon.mark && <span className={`shrink-0 text-xs ${addon.mark.kind === "update" ? "text-muted-foreground" : "text-destructive"}`}>{markText[addon.mark.kind]}</span>}
+                    </p>
+                    <p className="truncate text-sm text-muted-foreground">{summary(addon, profiles)}</p>
+                  </div>
+                  <Button variant="ghost" size="icon-sm" aria-label={`Edit ${addon.name}`} onClick={() => setOpenId(addon.id)}>
+                    <PencilIcon />
+                  </Button>
+                  <Switch aria-label={`Use ${addon.name}`} checked={addon.enabled} onCheckedChange={(enabled) => client.addons.change(addon.id, { enabled }).then(replace, (e: Error) => setError(e.message))} />
+                </li>
+              ))}
+            </ul>
+          )}
+          {tab === "installed" && reaching > toolBudget && (
+            <p className="text-sm text-muted-foreground">
+              {reaching} tools reach your bots. Past {toolBudget}, every message carries more, since each tool's description goes with it. Allow fewer in each server's settings.
+            </p>
+          )}
+          {tab === "mcp" && <Results search={search} everything={everything} onEverything={setEverything} added={added} onOpen={setEntry} onAddress={() => setByAddress(true)} />}
+          {(tab === "skills" || tab === "plugins") && (
+            <p className="py-6 text-center text-sm text-muted-foreground">{tab === "skills" ? "Skills" : "Plugins"} aren't in fxbot yet. For now, add-ons are MCP servers.</p>
+          )}
+        </div>
       </main>
-      {adding && <AddServer onClose={() => setAdding(false)} onAdded={(addon) => (setAdding(false), setAddons((all) => [...(all ?? []), addon]), addon.auth === "oauth" && signIn(addon))} />}
+      {entry && <EntryDialog card={entry} onAdded={onAdded} onClose={() => setEntry(null)} />}
+      {byAddress && <AddressDialog onAdded={onAdded} onClose={() => setByAddress(false)} />}
       {open && (
         <AddonSettings
           addon={open}
@@ -114,94 +166,6 @@ export function AddonsPage({ profiles }: { profiles: Profile[] | null }) {
       )}
       {signingIn && <SignIn addon={signingIn} onClose={() => (setSigningIn(null), void load())} />}
     </>
-  );
-}
-
-// The address, then what is there: the server's name and how it signs in. A server that takes a key gets one field,
-// and one that signs in with OAuth can take a key instead. A key names a header, which the add approves.
-function AddServer({ onAdded, onClose }: { onAdded: (addon: Addon) => void; onClose: () => void }) {
-  const [url, setUrl] = useState("");
-  const [allowLocal, setAllowLocal] = useState(false);
-  const [page, setPage] = useState<AddonPreview | null>(null);
-  const [useKey, setUseKey] = useState(false);
-  const [key, setKey] = useState("");
-  const [busy, setBusy] = useState(false);
-  const [error, setError] = useState("");
-  const keyed = page?.auth === "headers" || useKey;
-  const local = allowLocal || error.includes("is a local address");
-
-  async function run(work: () => Promise<void>) {
-    setBusy(true);
-    setError("");
-    await work().catch((e: Error) => setError(e.message));
-    setBusy(false);
-  }
-  const look = (event: FormEvent) => (
-    event.preventDefault(), run(async () => (setPage(null), setPage(await client.addons.preview({ url, allowLocal })), setUseKey(false), setKey("")))
-  );
-  const add = () =>
-    run(async () => {
-      if (!keyed) return onAdded(await client.addons.add({ url, allowLocal }, page!.hash));
-      const [name, value] = keyHeader(key);
-      const ref = { url, allowLocal, headers: [name] };
-      const addon = await client.addons.add(ref, (await client.addons.preview(ref)).hash);
-      onAdded(await client.addons.setSecrets(addon.id, { headers: { [name]: value } }));
-    });
-
-  return (
-    <Dialog open onOpenChange={(open) => !open && onClose()}>
-      <DialogContent>
-        <DialogHeader>
-          <DialogTitle>Add an MCP server</DialogTitle>
-          <DialogDescription>Paste the server's address. Its docs give it, often ending in /mcp.</DialogDescription>
-        </DialogHeader>
-        <form onSubmit={look} className="grid gap-3">
-          <div className="flex gap-2">
-            <Input type="url" required autoFocus aria-label="Address" placeholder="https://mcp.example.com/mcp" value={url} onChange={(e) => (setUrl(e.target.value), setPage(null), setError(""))} />
-            <Button type="submit" variant="outline" disabled={busy}>
-              {busy && !page ? <LoaderCircleIcon className="animate-spin" /> : "Look"}
-            </Button>
-          </div>
-          {local && (
-            <label className="flex items-start gap-2 text-sm">
-              <Checkbox className="mt-0.5" checked={allowLocal} onCheckedChange={(checked) => (setAllowLocal(checked === true), setPage(null))} />
-              <span>
-                Allow a local address <span className={hint}>Only for a server you run: it can then reach this machine and your private network.</span>
-              </span>
-            </label>
-          )}
-        </form>
-        {error && <p role="alert" className="text-sm text-destructive">{error}</p>}
-        {page && (
-          <div className="grid gap-3 border-t pt-3">
-            <div>
-              <p className="font-medium">{page.name}</p>
-              <p className="text-sm text-muted-foreground">
-                {hostOf(page.url)} · {page.tools ? `${page.tools.length} tools` : keyed ? "Takes a key" : "Signs in with OAuth"}
-              </p>
-            </div>
-            {keyed && (
-              <label className={label}>
-                API key
-                <Input type="password" autoComplete="off" value={key} onChange={(e) => setKey(e.target.value)} />
-                <span className={`text-xs ${hint}`}>Sent as Authorization: Bearer. For another header, write it as Name: value.</span>
-              </label>
-            )}
-            {page.auth === "oauth" && !useKey && (
-              <p className="text-sm text-muted-foreground">
-                You sign in after adding it.{" "}
-                <button type="button" className="text-foreground underline underline-offset-4" onClick={() => setUseKey(true)}>
-                  Use a key instead
-                </button>
-              </p>
-            )}
-            <Button onClick={add} disabled={busy || (keyed && !key.trim())} className="justify-self-start">
-              Add {page.name}
-            </Button>
-          </div>
-        )}
-      </DialogContent>
-    </Dialog>
   );
 }
 
@@ -258,6 +222,8 @@ function AddonSettings({ addon, profiles, onChange, onSignIn, onRemoved, onClose
               </div>
             </form>
           )}
+
+          {addon.source && <FromRegistry addon={addon} onChange={onChange} />}
 
           <section className="grid gap-2">
             <div className="flex items-center justify-between gap-3">
@@ -318,6 +284,72 @@ function AddonSettings({ addon, profiles, onChange, onSignIn, onRemoved, onClose
         </Button>
       </DialogContent>
     </Dialog>
+  );
+}
+
+// An add-on from a registry: what the registry says about it now, and when there is a newer version, the newer page
+// with what changed, which needs the owner's Update before anything moves.
+function FromRegistry({ addon, onChange }: { addon: Addon; onChange: (addon: Addon) => void }) {
+  const [next, setNext] = useState<AddonPreview | null>(null);
+  const [looking, setLooking] = useState(false);
+  const [error, setError] = useState("");
+  const source = addon.source!;
+  const look = () => (
+    setLooking(true),
+    setError(""),
+    client.addons.preview({ registry: source.registry, allowLocal: addon.allowLocal, from: source.from }).then(setNext, (e: Error) => setError(e.message)).finally(() => setLooking(false))
+  );
+  const update = () => client.addons.update(addon.id, next!.hash).then((moved) => (setNext(null), onChange(moved)), (e: Error) => setError(e.message));
+  const changes = next
+    ? [
+        next.info && next.info.version !== source.version && `Version ${source.version} → ${next.info.version}`,
+        next.url !== addon.url && `Address ${hostOf(addon.url)} → ${hostOf(next.url)}`,
+        next.auth !== addon.auth && `Sign-in: ${signsIn[addon.auth]} → ${signsIn[next.auth]}`,
+        next.headers.map((h) => h.name).join() !== addon.headers.join() && `Headers: ${addon.headers.join(", ") || "none"} → ${next.headers.map((h) => h.name).join(", ") || "none"}`,
+      ].filter(Boolean)
+    : [];
+  return (
+    <section className="grid gap-2">
+      <h3 className={heading}>From the registry</h3>
+      {addon.mark?.kind === "deprecated" && <p className="text-sm text-destructive">The registry marks it deprecated. It still works, but may stop.</p>}
+      {addon.mark?.kind === "removed" && <p className="text-sm text-destructive">The registry no longer lists it. It still works as added.</p>}
+      {addon.info ? <Information info={{ ...addon.info, version: source.version }} /> : <p className="text-sm text-muted-foreground">Added as {source.registry} {source.version}.</p>}
+      {addon.mark?.kind === "update" && !next && (
+        <Button size="sm" variant="outline" className="justify-self-start" disabled={looking} onClick={look}>
+          {looking && <LoaderCircleIcon className="animate-spin" />}
+          Update to {addon.mark.version}
+        </Button>
+      )}
+      {next && (
+        <div className="grid gap-2 rounded-lg border p-3 text-sm">
+          {next.local ? (
+            <p>Its newer version runs only on this machine, which comes with plugins.</p>
+          ) : (
+            <>
+              <p className="font-medium">What changes</p>
+              {changes.length ? (
+                <ul className="grid gap-1 text-muted-foreground">
+                  {changes.map((change) => (
+                    <li key={String(change)}>{change}</li>
+                  ))}
+                </ul>
+              ) : (
+                <p className="text-muted-foreground">Only its version.</p>
+              )}
+              <div className="flex gap-2">
+                <Button size="sm" onClick={update}>
+                  Update
+                </Button>
+                <Button size="sm" variant="ghost" onClick={() => setNext(null)}>
+                  Cancel
+                </Button>
+              </div>
+            </>
+          )}
+        </div>
+      )}
+      {error && <p role="alert" className="text-sm text-destructive">{error}</p>}
+    </section>
   );
 }
 

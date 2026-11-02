@@ -58,7 +58,7 @@ const features: { shape: Shape; color: Color; title: string; link: string; body:
     color: "purple",
     title: "MCP servers",
     link: "/docs/how-to/add-an-mcp-server/",
-    body: <>Add a remote MCP server by its address. fxbot signs in with OAuth or a key, and gives the tools you allow to all bots or the ones you choose. Read-only tools come first.</>,
+    body: <>Find a remote MCP server in GitHub's registry, or add one by its address. fxbot signs in with OAuth or a key, and gives the tools you allow to all bots or the ones you choose. Read-only tools come first.</>,
   },
   {
     shape: "hexagon",

@@ -134,15 +134,52 @@ export type Addon = {
   tools: AddonTool[];
   signedIn: boolean;
   ownClient: boolean;
+  /** The registry entry it was added from, its version then, and where it came from. */
+  source?: { registry: string; version: string; from: AddonFrom };
+  /** What its source says about it now. */
+  info?: AddonInfo;
+  mark?: AddonMark;
 };
-// What the page asks to add: a server by its URL, with the names of any headers it needs, or a registry entry.
-export type AddonRef = { url: string; transport?: Transport; headers?: string[]; allowLocal?: boolean } | { registry: string; version?: string; allowLocal?: boolean };
-// The add-on page: what probing the server found. Add sends `hash` back, and fails if the server changed since.
-export type AddonPreview = Omit<Addon, "id" | "kind" | "headers" | "enabled" | "bots" | "on" | "allowed" | "status" | "tools" | "signedIn" | "ownClient"> & {
+// Where a registry entry comes from: fxbot's own list, GitHub's registry, or the official one, unmoderated.
+export type AddonFrom = "fxbot" | "github" | "official";
+// What the page asks to add: a server by its URL, with the names of any headers it needs, or a registry entry, from
+// GitHub's registry unless `from` says otherwise.
+export type AddonRef =
+  | { url: string; transport?: Transport; headers?: string[]; allowLocal?: boolean }
+  | { registry: string; version?: string; allowLocal?: boolean; from?: AddonFrom };
+// The add-on page: what probing the server found, and for a registry entry, what the registry says about it. Add sends
+// `hash` back, and fails if the server changed since. `local` is an entry that runs only on this machine, which can't
+// be added before plugins.
+export type AddonPreview = Omit<Addon, "id" | "kind" | "headers" | "enabled" | "bots" | "on" | "allowed" | "status" | "tools" | "signedIn" | "ownClient" | "source" | "mark"> & {
   hash: string;
   headers: { name: string; secret: boolean; description?: string }[];
   tools: AddonTool[] | null;
+  local?: boolean;
 };
+// A registry entry as the registry describes it. `namespace` is its publisher, verified by the registry; `domain` is
+// the domain a reverse-DNS namespace names, which a remote's host should be on.
+export type AddonInfo = {
+  name: string;
+  namespace: string;
+  domain?: string;
+  title: string;
+  description: string;
+  version: string;
+  repository?: string;
+  website?: string;
+  license?: string;
+  stars?: number;
+  status: "active" | "deprecated" | "deleted";
+  from: AddonFrom;
+};
+// A search result. `url` and `host` are its remote's, and `hostMatches` whether it is on the namespace's domain, when
+// the namespace names one. `needs` is "key" when the entry asks for a secret header; a sign-in is learned on its page.
+// `local` runs only on this machine.
+export type AddonCard = AddonInfo & { kind: "mcp"; url?: string; host?: string; hostMatches?: boolean; needs?: "key"; local?: boolean };
+// What the hourly check found about an installed add-on. It changes nothing by itself.
+export type AddonMark = { kind: "update"; version: string } | { kind: "deprecated" } | { kind: "removed" };
+// A search's cards, and the mirror's state: when it last synced, and why the last try failed.
+export type AddonSearch = { cards: AddonCard[]; syncedAt: string | null; error?: string; everythingError?: string };
 // Write-only: header values, or the person's own OAuth client for a server that registers none itself.
 export type AddonSecrets = { headers?: Record<string, string>; clientId?: string; clientSecret?: string };
 // An OAuth sign-in as the page sees it. "redirect" comes back on its own; "paste" needs the address of the page that
@@ -154,9 +191,16 @@ export type OAuthStatus = { status: "waiting" | "done" | "failed"; error?: strin
 export type StreamLine = {
   type: string;
   messageId?: string;
-  input?: string;
+  /** A turn's message on `turn_start`, or a tool's arguments on `tool_start`. */
+  input?: unknown;
   files?: Upload[];
   delta?: string;
+  /** A tool call: `id` pairs `tool_start` with `tool_end`. A large input comes as a preview instead. */
+  id?: string;
+  name?: string;
+  inputPreview?: string;
+  content?: string;
+  isError?: boolean;
   stopReason?: string;
   error?: { message: string };
   cursor?: number;

@@ -1,10 +1,10 @@
 # Skills
 
-Bots use skills: [Agent Skills](https://agentskills.io/specification), folders with a `SKILL.md`. Skills come from [add-ons](addons.md): a skill found on skills.sh, the skills inside a [plugin](plugins.md), or the skills an [MCP server](../_completed/phases/mcp.md) serves. Each bot sees a short list of its skills, and reads one only when a task needs it.
+Bots use skills: [Agent Skills](https://agentskills.io/specification), folders with a `SKILL.md`. Skills come from [add-ons](../_completed/phases/addons.md): a skill found on skills.sh, the skills inside a [plugin](plugins.md), or the skills an [MCP server](../_completed/phases/mcp.md) serves. Each bot sees a short list of its skills, and reads one only when a task needs it.
 
 This page's first idea was that profiles grow skills from use, kept small enough to read and audit. That comes later and builds on the same records and tool ([Later](#later-skills-bots-write)).
 
-Status: planned, not built. Research and plan only. It lands after [add-ons](addons.md), whose records and search it uses, and skills served by MCP servers need [MCP servers](../_completed/phases/mcp.md) too. It lands before [plugins](plugins.md), whose skills it loads.
+Status: planned, not built. Research and plan only. It lands after [add-ons](../_completed/phases/addons.md), whose records and search it uses, and skills served by MCP servers need [MCP servers](../_completed/phases/mcp.md) too. It lands before [plugins](plugins.md), whose skills it loads.
 
 ## 1. Research
 
@@ -65,7 +65,7 @@ These are read from specs, source, docs, and read-only requests, as of November 
 3. **Each bot's catalog has a budget.**
    - It joins the bot's instructions per session, which libfx allows.
    - Every name is listed. Descriptions fill up to 1% of the model's context window, or 8,000 characters when the window is unknown. The tool's search finds the rest.
-4. **One library, switched per bot,** as in Grok Bot. An add-on's skills follow the add-on's per-bot switch ([add-ons](addons.md#bots-and-add-ons)).
+4. **One library, switched per bot,** as in Grok Bot. An add-on's skills follow the add-on's per-bot switch ([add-ons](../_completed/phases/addons.md#bots-and-add-ons)).
 5. **Skills are text in Postgres.** fxbot keeps `SKILL.md` and the other text files in the skill's folder. Bots have no shell, so a bot can read `scripts/` but they never run.
 6. **Skills from an MCP server stay with that server.** fxbot lists them with the server, reads them through it, and labels them with its name, as the extension requires.
 7. **A skill is someone else's instructions.** It is pinned, shown in full before it's added, capped in size, and confirmed again when it changes.
@@ -126,13 +126,13 @@ When a task matches a skill's description, call the skill tool with the skill's 
 
 ### Adding skills
 
-- **From skills.sh** ([add-ons](addons.md#sources-packagessdksrcregistryts)). A result names `owner/repo` and a skill.
+- **From skills.sh** ([add-ons](../_completed/phases/addons.md#sources-packagessdksrcregistryts)). A result names `owner/repo` and a skill.
   - `archive.ts` pins the repository's current commit (GitHub's commits API) and downloads its archive from `codeload.github.com`.
   - It reads the archive in memory: regular files only, no links, and every path kept inside the skill's folder. Nothing is written to disk.
   - It finds the skill the way `npx skills` does, by its frontmatter name.
 - **From a plugin:** its skills are read from the same archive ([plugins](plugins.md#the-format)).
 - **From an MCP server** that declares the extension: `skills/list` after connecting, refreshed whenever its tools are.
-- **The add-on page** lists each skill's name and description, and opens its full text ([add-ons](addons.md#the-add-on-page)).
+- **The add-on page** lists each skill's name and description, and opens its full text ([add-ons](../_completed/phases/addons.md#the-add-on-page)).
 - **Updates.** A newer commit shows Update, which asks again. Nothing changes on its own.
 
 ### API, SDK, and client
@@ -142,7 +142,7 @@ When a task matches a skill's description, call the skill tool with the skill's 
 | `GET /api/addons/:id/skills` | `skills.list(addon)`: names, descriptions, and sizes |
 | `GET /api/addons/:id/skills/:name?file=` | `skills.read(addon, name, file?)`: the text, to read in the page |
 
-Adding, per-bot switches, and removal are the [add-ons](addons.md#api-sdk-and-client) routes.
+Adding, per-bot switches, and removal are the [add-ons](../_completed/phases/addons.md#api-sdk-and-client) routes.
 
 ### UI
 

@@ -38,6 +38,8 @@ A remote MCP server's tools are code fxbot doesn't control, and a call may not b
 
 Adding a server makes fxbot's server fetch its address. So fxbot takes HTTPS only, and refuses local and private addresses, the tailnet's included, unless you allow one for a server you run. A server's key, headers, and OAuth client are sealed like a provider's.
 
+A registry entry says who published it, checked by the registry, but not that its server is safe or theirs. Its page shows the server's host, in red when it isn't on the publisher's domain, and nothing is saved before **Add**. If the entry changes between the page and **Add**, fxbot refuses and shows the page again. fxbot fetches GitHub's MCP registry every hour, its own list of servers when an address for it is set, and the official registry only when you tick **Search everything**, which sends it your search words. It loads no icons from them.
+
 ## What it doesn't cover
 
 - Each message goes to the provider its bot uses, which sees the chat. Only a local model server keeps it on your network.

@@ -89,9 +89,14 @@ export async function createStore({ databaseUrl, dataDir, backupsDir }: MigrateO
       create: async (r: AddonRecord) =>
         void (await sql`insert into addons (id, kind, name, source, config, approved_hash, enabled, bots, allowed, status)
           values (${r.id}, ${r.kind}, ${r.name}, ${sql.json(r.source as postgres.JSONValue)}, ${sql.json(r.config as postgres.JSONValue)}, ${r.approvedHash}, ${r.enabled}, ${r.bots}, ${r.allowed && sql.json(r.allowed)}, ${r.status})`),
-      update: async (id: string, fields: Partial<Pick<AddonRecord, "config" | "enabled" | "bots" | "allowed" | "status">>) => {
-        const { config, allowed, ...rest } = fields;
-        const values = { ...rest, ...(config === undefined ? {} : { config: sql.json(config as postgres.JSONValue) }), ...(allowed ? { allowed: sql.json(allowed) } : {}) };
+      update: async (id: string, fields: Partial<Pick<AddonRecord, "config" | "enabled" | "bots" | "allowed" | "status" | "source" | "approvedHash">>) => {
+        const { config, allowed, source, ...rest } = fields;
+        const values = {
+          ...rest,
+          ...(config === undefined ? {} : { config: sql.json(config as postgres.JSONValue) }),
+          ...(allowed ? { allowed: sql.json(allowed) } : {}),
+          ...(source === undefined ? {} : { source: sql.json(source as postgres.JSONValue) }),
+        };
         if (Object.keys(values).length) await sql`update addons set ${sql(values)} where id = ${id}`;
       },
       remove: async (id: string) => void (await sql`delete from addons where id = ${id}`),

@@ -3,6 +3,7 @@ import { createHistory, summarize } from "./history.ts";
 import { createLibrary } from "./library.ts";
 import { createMcp } from "./mcp.ts";
 import { createProviders } from "./providers.ts";
+import { createRegistry } from "./registry.ts";
 import { createReleases } from "./releases.ts";
 import { readKey } from "./secrets.ts";
 import { createStore, isId, type StoredProfile } from "./store.ts";
@@ -34,8 +35,14 @@ export type FxbotOptions = {
   localUrl?: string;
   /** The project's published client ID metadata document, for MCP sign-ins that use one. */
   clientMetadataUrl?: string;
-  /** The MCP registry that registry entries come from. Default GitHub's, `https://api.mcp.github.com`. */
+  /** The MCP registry that registry entries come from, mirrored hourly for search. Default GitHub's, `https://api.mcp.github.com`. */
   registryUrl?: string;
+  /** The official MCP registry, searched only when asked to search everything. Default `https://registry.modelcontextprotocol.io`. */
+  everythingUrl?: string;
+  /** The published copy of fxbot's own MCP list, read hourly. Without it, the list this release shipped with. */
+  fxbotUrl?: string;
+  /** Mirror the registry at start and hourly. Default true; checks turn it off and sync by hand. */
+  syncRegistry?: boolean;
 };
 
 // Bad input fails with `status` 400 and a missing bot with 404, so a server can answer with the same status.
@@ -75,13 +82,17 @@ export async function createFxbot(options: FxbotOptions) {
   const history = createHistory(store.sql);
   const library = createLibrary(store.sql);
   // MCP servers' tools join every agent. A change to them makes the agents again, one change at a time.
+  const registryUrl = options.registryUrl ?? "https://api.mcp.github.com";
+  const everythingUrl = options.everythingUrl ?? "https://registry.modelcontextprotocol.io";
+  const registry = createRegistry({ sql: store.sql, fetch, mirrorUrl: registryUrl, everythingUrl, fxbotUrl: options.fxbotUrl });
+  if (options.syncRegistry !== false) void registry.sync();
   const mcp = await createMcp({
     store,
     secretKey: key,
     fetch,
     localUrl: options.localUrl ?? "http://127.0.0.1:8787",
     clientMetadataUrl: options.clientMetadataUrl,
-    registryUrl: options.registryUrl ?? "https://api.mcp.github.com",
+    findEntry: registry.lookup,
     onChange: () => void retool(),
   });
   const toolsNow = async () => [history.tool, ...library.tools, ...(await mcp.tools())];
@@ -327,9 +338,14 @@ export async function createFxbot(options: FxbotOptions) {
     // Remote MCP servers. Adding one takes the `hash` its preview showed, and fails if the server changed since.
     // Secrets are write-only; a listed add-on says only whether it holds them.
     addons: {
-      list: () => mcp.list(),
+      // With what the registry says about each now: its details, and a mark when it has a newer version, or is
+      // deprecated or gone.
+      list: async () => registry.decorate(await mcp.list()),
+      // fxbot's list and GitHub's registry, and with `everything`, the official one's own search too.
+      search: (q: unknown, options: { kind?: unknown; everything?: boolean }) => registry.search(q, options),
       preview: (ref: AddonRef) => mcp.preview(ref),
       add: (ref: AddonRef, hash: string) => mcp.add(ref, hash),
+      update: (id: string, hash: unknown) => mcp.update(id, hash),
       change: (id: string, input: { enabled?: boolean; bots?: "all" | "each"; allowed?: string[] }) => mcp.change(id, input),
       remove: (id: string) => mcp.remove(id),
       setSecrets: (id: string, input: AddonSecrets) => mcp.setSecrets(id, input),
@@ -350,6 +366,7 @@ export async function createFxbot(options: FxbotOptions) {
 
     async close() {
       releases.close();
+      registry.close();
       await mcp.close();
       await providers.close();
       await store.close();

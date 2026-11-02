@@ -27,6 +27,8 @@ const fxbot = await createFxbot({
   localUrl: `http://${host}:${port}`,
   clientMetadataUrl: process.env.FXBOT_CLIENT_METADATA_URL || undefined,
   registryUrl: process.env.FXBOT_MCP_REGISTRY || undefined,
+  everythingUrl: process.env.FXBOT_MCP_EVERYTHING || undefined,
+  fxbotUrl: process.env.FXBOT_MCP_FXBOT || undefined,
 });
 
 // The ui package's build, served beside the API.
@@ -112,6 +114,9 @@ async function api(req: IncomingMessage, res: ServerResponse, url: URL) {
   }
   if (resource === "addons" && extra === undefined) {
     if (id === "preview" && !action && method === "POST") return json(res, 200, await fxbot.addons.preview((await body<{ ref: AddonRef }>(req)).ref));
+    if (id === "search" && !action && method === "GET")
+      return json(res, 200, await fxbot.addons.search(url.searchParams.get("q") ?? "", { kind: url.searchParams.get("kind") ?? undefined, everything: url.searchParams.get("everything") === "1" }));
+    if (id && action === "update" && method === "POST") return json(res, 200, await fxbot.addons.update(id, (await body<{ hash?: unknown }>(req)).hash));
     if (!id && method === "GET") return json(res, 200, await fxbot.addons.list());
     if (!id && method === "POST") {
       const { ref, hash } = await body<{ ref: AddonRef; hash: string }>(req);
