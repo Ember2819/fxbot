@@ -2,6 +2,8 @@
 
 fxbot is a small installable web app for long-running chats with bot profiles. The browser is the UI on desktop and mobile. One Node server runs [libfx](https://fx.sh/docs/lib) and sends each conversation to the provider its bot uses: a ChatGPT, Grok, or Vercel account signed in with a device code, an API key, or a local model server.
 
+![fxbot in a desktop browser: Bob's chat open, with Fernando and Securely in the sidebar](docs/screenshot.png)
+
 Simplicity is the rule: a small core, few dependencies, and no abstraction until a second real use. See [CONVENTIONS.md](CONVENTIONS.md).
 
 ## Stack
@@ -67,7 +69,30 @@ It installs git and Postgres, and Node 22 from nodejs.org, checked against its c
 - `/etc/fxbot/fxbot.env`, with chats in `/var/lib/fxbot/data` and backups in `/var/lib/fxbot/backups`
 - `fxbot.service`, started on 127.0.0.1:8787
 
-Running it again finishes an install that stopped, and leaves a working one alone. Reach fxbot from your other devices with `tailscale serve --bg 8787`, then install the app from that address.
+Running it again finishes an install that stopped, and leaves a working one alone. It stops, and says why, if another fxbot already holds its names: a database `fxbot`, a key in `/etc/fxbot`, or port 8787. A checkout's `npm run dev` stays clear of them ([Run from a checkout](#run-from-a-checkout)), so both can run on one machine.
+
+### On your tailnet
+
+fxbot listens on loopback only and has no login of its own, so reach it through Tailscale and nothing else. Give it the machine's own address:
+
+```sh
+sudo tailscale serve --bg 8787       # https://<machine>.<tailnet>.ts.net
+```
+
+Or a name of its own, `bot.<tailnet>.ts.net`, as a [Tailscale Service](https://tailscale.com/kb/1552/tailscale-services). The machine must be tagged, and a tailnet admin does three things once:
+1. **Define the service** on the admin console's Services page: **Define a Service**, named `bot`, with the port `tcp:443`.
+2. **Approve this machine** as its host on that service's page, or with an `autoApprovers` rule for the machine's tag.
+3. **Grant access** in the policy file, such as `{ "src": ["autogroup:member"], "dst": ["svc:bot"], "ip": ["443"] }`.
+
+Then, on the machine:
+
+```sh
+sudo tailscale serve --service=svc:bot --https=443 http://127.0.0.1:8787
+```
+
+Check the address from a phone or laptop on the tailnet, not from the machine itself: a grant to people doesn't cover a tagged machine, so the name may not resolve there.
+
+Open the address on each device and install the app from it: Install in Settings on Chrome or Edge, or Share and then Add to Home Screen on an iPhone. The app opens offline, and offers Reload when an update lands.
 
 ## Update
 
@@ -101,16 +126,17 @@ Node 22.18 or newer, and Postgres. From the repository root:
 
 ```sh
 npm install
-npm run dev      # the page on 127.0.0.1:5173 and the API on 8787, reloading on any change
-npm run prod     # build the page, then serve it and the API on 127.0.0.1:8787
-npm run server   # only the API and the last build, on 127.0.0.1:8787
+npm run dev      # the page on 127.0.0.1:5173 and the API on 8788, reloading on any change
+npm run prod     # build the page, then serve it and the API on 127.0.0.1, port FXBOT_PORT
+npm run server   # only the API and the last build, on the same port
 ```
 
 The server reads these from the environment, or from an uncommitted `.env` in the repository root; the environment wins. Only the server reads `.env`, and none of these is itself a secret.
 
 | Variable | What it is |
 | --- | --- |
-| `FXBOT_DATABASE_URL` | Required. fxbot's Postgres, such as `postgres:///fxbot` with `PGHOST=/var/run/postgresql`: the local socket with peer auth, so no password |
+| `FXBOT_DATABASE_URL` | Required. fxbot's Postgres, such as `postgres:///fxbot_dev` with `PGHOST=/var/run/postgresql`: the local socket with peer auth, so no password |
+| `FXBOT_PORT` | The API's port on 127.0.0.1. Default 8787, a release install's; `npm run dev` uses 8788 unless this is set in the shell |
 | `FXBOT_SECRET_KEY_FILE` | Required. A file outside the repo with 32 random bytes in base64. It seals every key and token fxbot stores |
 | `FXBOT_VERCEL_CLIENT_ID` | Optional. fxbot's own Vercel OAuth app, for signing in with a Vercel account |
 | `FXBOT_DATA` | Where libfx keeps each chat's session files. Default `./data` |
@@ -120,30 +146,28 @@ The server reads these from the environment, or from an uncommitted `.env` in th
 | `FXBOT_UPDATE_CHECK` | `off` stops the daily check for a newer release, which asks GitHub about the repository in `package.json` |
 | `FXBOT_RELEASES_URL` | Optional. Where that check reads the newest release, in the shape of GitHub's `releases/latest`, for a fork or a mirror |
 
-One-time setup on Debian. The server gets its own OS user, which alone can read the key and reach the database; run agents as another, non-root user:
+One-time setup on Debian, for a checkout you run as yourself. Its names stay clear of a release install's (`fxbot`, `/etc/fxbot`, port 8787), so both can run on one machine. For everyday use, install a release instead: there the server runs as its own user, which alone reads the key and reaches the database.
 
 ```sh
 sudo apt install postgresql
-sudo useradd --system --create-home fxbot
-sudo -u postgres createuser fxbot
-sudo -u postgres createdb -O fxbot fxbot           # peer auth: only OS user fxbot connects as role fxbot
-sudo install -d -o fxbot -m 700 /etc/fxbot
-openssl rand -base64 32 | sudo -u fxbot tee /etc/fxbot/secret.key >/dev/null
-sudo chmod 400 /etc/fxbot/secret.key
+sudo -u postgres createuser "$USER"
+sudo -u postgres createdb -O "$USER" fxbot_dev        # peer auth: you connect as your own role
+sudo install -d -o "$USER" -m 700 /etc/fxbot-dev
+openssl rand -base64 32 > /etc/fxbot-dev/secret.key && chmod 400 /etc/fxbot-dev/secret.key
+printf '%s\n' FXBOT_DATABASE_URL=postgres:///fxbot_dev PGHOST=/var/run/postgresql FXBOT_SECRET_KEY_FILE=/etc/fxbot-dev/secret.key > .env
 ```
 
 Then add providers in Settings: a ChatGPT, Grok, or Vercel account by device code, an API key, or a local server such as Ollama. The page sends a key once and never gets it back. To seal everything under a new key, stop the server and run `npm run rotate-key -- <new key file>`, then point `FXBOT_SECRET_KEY_FILE` at that file.
 
-`npm run prod` is the production build on its own: it builds the page into `packages/ui/dist/`, then serves it and `/api` on port 8787. The API that `npm run dev` starts serves the last build there too.
+`npm run prod` is the production build on its own: it builds the page into `packages/ui/dist/`, then serves it and `/api`. The API that `npm run dev` starts serves the last build there too. On a machine with a release install, give either another port than 8787 with `FXBOT_PORT`.
 
-Both servers listen on loopback only. To reach fxbot from your other devices, serve it on your tailnet once, with HTTPS:
+To reach the development page from your other devices, serve it on your tailnet, with HTTPS:
 
 ```sh
 tailscale serve --bg 5173                 # npm run dev, at https://<machine>.<tailnet>.ts.net
-tailscale serve --bg --https=8443 8787    # optional: npm run prod, at https://<machine>.<tailnet>.ts.net:8443
 ```
 
-Install fxbot from the first address: Install in Settings on Chrome or Edge, or Share and then Add to Home Screen on an iPhone. That app is the development page, so every change shows up as it lands, but it cannot open while the server is down. The production build at the second address opens offline, and when a new build is served it waits for you to tap Reload in the sidebar. Keep it off the first address, where its offline copy would stand in for the development page. fxbot has no login of its own, so do not expose either port any other way.
+An app installed from that address is the development page, so every change shows up as it lands, but it cannot open while `npm run dev` is down. fxbot has no login of its own, so do not expose its ports any other way.
 
 ## Releasing
 

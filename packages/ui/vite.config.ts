@@ -8,7 +8,8 @@ import { VitePWA, type ManifestOptions } from "vite-plugin-pwa";
 
 const repo = fileURLToPath(new URL("../..", import.meta.url));
 const { version } = JSON.parse(readFileSync(`${repo}package.json`, "utf8")) as { version: string };
-const apiPort = process.env.FXBOT_PORT ?? "8787";
+// The development API's port. A release that setup.sh installs takes 8787, so both can run on one machine.
+const apiPort = process.env.FXBOT_PORT ?? "8788";
 
 // `npm run dev` runs the API beside Vite, and restarts it when the server or the SDK changes. Vite on its own watches
 // only this package, so it is told to watch those two as well. Its watcher drives the restarts too: Node's
@@ -36,7 +37,8 @@ function runApi() {
   let child: ChildProcess | undefined;
   let restarting = false;
   const start = () => {
-    child = spawn(process.execPath, ["--env-file-if-exists=.env", "packages/server/src/index.ts"], { cwd: repo, stdio: ["ignore", "inherit", "inherit"] });
+    // The port is given, so .env cannot point the API away from the proxy below.
+    child = spawn(process.execPath, ["--env-file-if-exists=.env", "packages/server/src/index.ts"], { cwd: repo, env: { ...process.env, FXBOT_PORT: apiPort }, stdio: ["ignore", "inherit", "inherit"] });
     child.once("exit", () => {
       child = undefined;
       if (restarting) (restarting = false), start();

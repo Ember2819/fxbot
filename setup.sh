@@ -71,6 +71,15 @@ if ! runuser -u postgres -- pg_isready -q; then
 fi
 
 say "The fxbot user, its database, and its key"
+# Names another fxbot may hold already, such as a checkout run by hand: they are not taken over.
+owner=$(runuser -u postgres -- psql -tAc "select pg_get_userbyid(datdba) from pg_database where datname = 'fxbot'")
+[ -z "$owner" ] || [ "$owner" = fxbot ] || die "a database named fxbot exists, owned by $owner. If another fxbot uses it, rename it (alter database fxbot rename to fxbot_dev) and point that fxbot at the new name, then run this again."
+if [ -e "$etc/secret.key" ] && [ "$(stat -c %U "$etc/secret.key")" != fxbot ]; then
+  die "$etc/secret.key exists, owned by $(stat -c %U "$etc/secret.key"). If another fxbot uses it, move it (such as to /etc/fxbot-dev/) and point that fxbot at it, then run this again."
+fi
+if [ -d /run/systemd/system ] && ! systemctl is-active --quiet fxbot && (exec 3<>/dev/tcp/127.0.0.1/8787) 2>/dev/null; then
+  die "another program listens on port 8787, which fxbot.service needs. A checkout's npm run dev uses 8788; move the other program, then run this again."
+fi
 id fxbot >/dev/null 2>&1 || useradd --system --home-dir "$var" --create-home --shell /usr/sbin/nologin fxbot
 install -d -o fxbot -g fxbot -m 700 "$var" "$var/data" "$var/backups" "$etc"
 # Peer auth: only the OS user fxbot connects, as the role fxbot, with no password.
@@ -96,7 +105,7 @@ else
   if [ -e "$folder" ]; then as_fxbot git -C "$install/repo" worktree remove --force "$folder" 2>/dev/null || rm -rf "$folder"; fi
   as_fxbot git -C "$install/repo" worktree prune
   as_fxbot git -C "$install/repo" worktree add --quiet --detach "$folder" "$tag"
-  (cd "$folder" && as_fxbot npm ci --no-audit --no-fund --loglevel=error && as_fxbot npm run build --silent) || die "$tag did not build"
+  (cd "$folder" && as_fxbot npm ci --no-audit --no-fund --loglevel=error && as_fxbot npm run build --silent >/dev/null) || die "$tag did not build"
   as_fxbot ln -sfn "releases/$tag" "$install/current"
 fi
 
