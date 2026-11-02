@@ -433,7 +433,7 @@ Checks use a disposable database in the pgvector image, the mock model (which ca
 - [x] `npm run typecheck`, `npm run build`, `git diff --check`, and `bash -n` on both scripts pass.
 
 **Human checks**
-- [ ] With the local embedder on the CPU, a bot saves a fact on its own, a new chat uses it, and a search finds it by meaning. How long the owner's machine takes to fill its existing messages is noted.
+- [ ] With the local embedder on the CPU, a bot saves a fact on its own, a new chat uses it, and a search finds it by meaning. How long the owner's machine takes to fill its existing messages is noted. So far, on the owner's 0.3.0 install: bots saved 10 memories on their own with a real model, and every memory and message got a vector.
 - [ ] On a machine with an NVIDIA GPU, `setup.sh` picks the GPU embedder, and Settings shows Qwen3-Embedding.
 - [ ] A remote provider (an OpenAI key, or Ollama) works the same way.
 - [ ] On a phone, the Memories tab and the Settings section work.

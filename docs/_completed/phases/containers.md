@@ -357,8 +357,8 @@ Checks run on this machine, which has podman 5.4.2 and Docker Compose, beside th
 **Human checks**
 - [ ] `setup.sh` on a fresh Debian 13 or Ubuntu 24.04 machine with nothing installed: podman, Compose, the stack, and both units. fxbot answers after a reboot.
 - [ ] On a machine with only docker, `setup.sh` uses it.
-- [ ] The owner's own 0.2 install moves with `setup.sh`, and its chats, providers, MCP servers, and skills are all there.
-- [ ] After the first release with this phase: the ghcr.io package is made public once, then `podman pull ghcr.io/iammrduncan/fxbot:<version>` works with no login, on amd64 and arm64.
+- [x] The owner's own install, at 0.1.0, moved with `setup.sh` from local files before the release, and its chats, providers, MCP servers, and skills were all there. It then updated to the released 0.3.0 with `fxbot update`, with the database and embedder running throughout.
+- [x] After v0.3.0, ghcr.io served the image with no login, with no step needed to make it public: `0.3.0`, `0.3`, and `latest`, each an index of amd64 and arm64. The owner's machine pulled 0.3.0 (amd64).
 - [ ] Settings' Update, through the path unit, moves to the next release.
 
 ## 5. Open questions
