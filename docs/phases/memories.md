@@ -420,7 +420,7 @@ Decided by the owner on 2026-11-02:
 | Vectors for every message | Yes by default, from the first 8,000 characters. Settings can turn them off, or change the number of characters. |
 | pgvector on every distro | The database runs in pgvector's image ([containers](containers.md)). |
 | Where vectors come from | A local embedder on the CPU by default. Settings can pick a local GPU embedder, or a provider's API. |
+| The CPU model | EmbeddingGemma 2. |
 
 Still open, with the default the build follows:
-1. **The CPU model.** *Default:* EmbeddingGemma 2. It was released in October 2026 and is untested here. If it fails the human check, bge-small-en-v1.5 (37 MB, English only) is the light fallback.
-2. **Switching between the CPU and the GPU from Settings.** *Default:* Settings shows the command, and `setup.sh` makes the switch. Starting containers from the page waits for the [containers](containers.md) phase to decide whether fxbot may use the podman or docker socket.
+1. **Switching between the CPU and the GPU from Settings.** *Default:* Settings shows the command, and `setup.sh` makes the switch. Starting containers from the page waits for the [containers](containers.md) phase to decide whether fxbot may use the podman or docker socket.
