@@ -7,6 +7,7 @@
 #   fxbot update [version]     to the newest release, or the one named
 #   fxbot apply                the app's requests
 #   fxbot restore <folder>     a backup: its database.dump, and its data.tar.gz when there is one
+#   fxbot rotate-key           every stored secret sealed again under a new key
 set -euo pipefail
 
 [ "$(id -u)" -eq 0 ] || { echo "fxbot: run it as root, such as: sudo fxbot ${1:-status}" >&2; exit 1; }
@@ -89,6 +90,24 @@ restore() {
     tar -xzf "$folder/data.tar.gz" -C "$var/data"
     chown -R "$FXBOT_UID:$FXBOT_GID" "$var/data"
   fi
+}
+
+# Every stored key and token sealed again under a new key, in one transaction, with the app stopped. The new key
+# replaces /etc/fxbot/secret.key, and the old one stays beside it as secret.key.old until you remove it.
+rotate_key() {
+  local key=${FXBOT_ROOT:-}/etc/fxbot/secret.key
+  local new=$key.new
+  (umask 377 && head -c 32 /dev/urandom | base64 >"$new")
+  chown "$FXBOT_UID:$FXBOT_GID" "$new"
+  compose stop fxbot >/dev/null 2>&1 || true
+  if ! compose run --rm --no-deps -v "$new:/run/fxbot/new.key:ro" fxbot node packages/server/src/rotate-key.ts /run/fxbot/new.key >/dev/null; then
+    rm -f "$new"
+    compose up -d --wait fxbot >/dev/null 2>&1 || true
+    die "nothing was sealed again, and the old key still works"
+  fi
+  cp -p "$key" "$key.old" && mv "$new" "$key"
+  compose up -d --wait fxbot >/dev/null 2>&1
+  echo "fxbot runs on the new key. The old one is $key.old: remove it once you're sure."
 }
 
 # To a newer release: its compose file, this command, and its images, then a start that waits for health. If the new
@@ -185,8 +204,9 @@ case ${1:-} in
   update) update "${2:-}" ;;
   apply) apply ;;
   restore) restore "${2:-}" ;;
+  rotate-key) rotate_key ;;
   *)
-    sed -n '6,9p' "$0" | sed 's/^# //'
+    sed -n '6,10p' "$0" | sed 's/^# //'
     exit 1
     ;;
 esac

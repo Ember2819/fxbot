@@ -36,6 +36,7 @@ The command for an install made by `setup.sh`: `/opt/fxbot/fxbot`, linked as `/u
 | `sudo fxbot down` | Stops and removes the containers. The database's volume stays. |
 | `sudo fxbot apply` | Carries out the app's requests in `/var/lib/fxbot/control/requests`. `fxbot-control.service` runs it. |
 | `sudo fxbot restore <folder>` | Puts a backup in place of the database and the chat files. See below. |
+| `sudo fxbot rotate-key` | Seals every stored secret again under a new key. See below. |
 
 ### fxbot update
 
@@ -61,7 +62,11 @@ If the new app isn't healthy in time, it goes back to the old compose file, comm
 sudo fxbot restore /var/lib/fxbot/backups/<date>-before-<migration>
 ```
 
-Stops the app, starts the database if it isn't running, drops the database, and makes it again from the folder's `database.dump`. When the folder has a `data.tar.gz`, it unpacks it into `/var/lib/fxbot/data`. `sudo fxbot up` then starts the app. Name the folder by its full path.
+Stops the app, starts the database if it isn't running, drops the database, and makes it again from the folder's `database.dump`. When the folder has a `data.tar.gz`, it unpacks it into `/var/lib/fxbot/data`. `sudo fxbot up` then starts the app. A relative folder is taken from where you run the command.
+
+### fxbot rotate-key
+
+Seals every stored key and token again, providers' and MCP servers' alike, under a new key, for when the old one may have leaked. It stops the app, makes a new `/etc/fxbot/secret.key`, seals everything again in one transaction, and starts the app. The old key stays beside it as `/etc/fxbot/secret.key.old`: remove it once fxbot works. If sealing fails, nothing changes, and the old key still works.
 
 ## npm scripts
 
@@ -81,4 +86,4 @@ The API that `npm run dev`, `npm run server`, and `npm run prod` start, and `npm
 
 ### npm run rotate-key
 
-Seals every stored key and token again, providers' and MCP servers' alike, under the key in `<new key file>`: 32 random bytes in base64, such as `openssl rand -base64 32` makes. It reads `FXBOT_DATABASE_URL`, and `FXBOT_SECRET_KEY_FILE` for the old key. Stop the server first, and afterwards point `FXBOT_SECRET_KEY_FILE` at the new file.
+For a checkout; a release install uses [`fxbot rotate-key`](#fxbot-rotate-key). Seals every stored key and token again, providers' and MCP servers' alike, under the key in `<new key file>`: 32 random bytes in base64, such as `openssl rand -base64 32` makes. It reads `FXBOT_DATABASE_URL`, and `FXBOT_SECRET_KEY_FILE` for the old key. Stop the server first, and afterwards point `FXBOT_SECRET_KEY_FILE` at the new file.

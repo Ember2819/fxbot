@@ -16,7 +16,7 @@ Every key and token fxbot stores is sealed in the SDK with AES-256-GCM before it
 
 The key is a file, `/etc/fxbot/secret.key` in a release install, that only the server's user reads. Compose mounts it into the app's container, read-only.
 
-`npm run rotate-key` seals everything again under a new key, for when the old one may have leaked. See [Commands](/docs/reference/commands/#npm-run-rotate-key).
+`sudo fxbot rotate-key` seals everything again under a new key, for when the old one may have leaked; a checkout uses `npm run rotate-key`. See [Commands](/docs/reference/commands/#fxbot-rotate-key).
 
 ## Nothing secret on the page
 

@@ -83,6 +83,7 @@ Running it again finishes an install that stopped, and leaves a working one alon
 | `sudo fxbot update [version]` | Moves to the newest release, or the one named. See [Update](#update) |
 | `sudo fxbot up` and `down` | Starts and stops the containers, as `fxbot.service` does |
 | `sudo fxbot restore <folder>` | Puts a backup in place of the database and the chat files |
+| `sudo fxbot rotate-key` | Seals every stored key and token again under a new key, and keeps the old key as `secret.key.old` |
 
 **Moving from 0.2.** An install of 0.2 ran on the machine's own Postgres. Run `setup.sh` again: it stops 0.2, copies its database into the database container, and starts the containers on the same chats, key, and settings. The 0.2 files, settings, and database stay until you remove them, and `sudo fxbot status` says how to remove them or go back to 0.2. Settings' Update in 0.2 can't make this move.
 
