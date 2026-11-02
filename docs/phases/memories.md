@@ -124,7 +124,7 @@ No host says how many dimensions a model returns, so an app learns it by embeddi
 
 ### Local embedders
 
-Checked on 2026-11-02 from each project's source, registry manifests, and model cards. Sizes are compressed downloads. Nothing was run here, because this machine has no podman or docker, so memory use and CPU speed are unmeasured.
+Checked on 2026-11-02 from each project's source, registry manifests, and model cards. Sizes are compressed downloads. llama.cpp and EmbeddingGemma 2 were then run here, under the measurements below.
 
 | | llama.cpp server (b12033) | Hugging Face TEI (1.9.4) | Ollama (0.40.13) |
 | --- | --- | --- | --- |
@@ -147,6 +147,22 @@ Models it can serve, from their cards:
 | bge-small-en-v1.5 | 37 MB | 384 | 512 | English | MIT | a query prefix only |
 
 EmbeddingGemma 2 scores 68.5 on the English MTEB v2 mean, and Qwen3-Embedding-0.6B 61.8 on its retrieval tasks. Neither OpenAI-style route adds the prefixes, so the app does. EmbeddingGemma 2's GGUF claims a 262K context, so the server is started with `-c 8192`.
+
+**Measured here** on 2026-11-02, with podman 5.4.2 on a 6-core VM, running `server-b12033` with `ggml-org/embeddinggemma-2-GGUF:Q8_0` on the CPU:
+- The image is 862 MB unpacked. The model downloaded and the server answered `/health` within 15 seconds.
+- `/v1/models` names the model `ggml-org/embeddinggemma-2-GGUF:Q8_0`, and vectors have 768 dimensions.
+- With the card's prefixes, three test questions each ranked the right note first among four. For example, "What vehicle does the owner have?" found "The owner drives an electric car." (0.83 against 0.77 for the next).
+- Speed is about 600 tokens a second, the same with a 2,048-token or an 8,192-token batch:
+
+  | 32 inputs of | Time | Per second |
+  | --- | --- | --- |
+  | 500 characters | 5.6 s | 5.7 |
+  | 2,000 characters | 22 s | 1.4 |
+  | 8,000 characters | 100–110 s | 0.3 |
+
+- Memory is 378 MB with `-b 2048 -ub 2048`, and 1.25 GB with 8,192.
+- A 40,000-character input fails with 500 and "input (9443 tokens) is too large to process".
+- In `pgvector/pgvector:0.8.7-pg17`, the role that `POSTGRES_USER` names is a superuser, `0005_memories` applies after 0001–0004 and creates the extension (0.8.7), and the fused query from [Search](#search) ranks a word-and-meaning match first, finds a match by meaning alone, and leaves out another bot's rows and another model's vectors. Exact search over one bot's 100,000 random 768-dimension vectors took about 230 ms, and over 10,000 about 37 ms. Each vector row took about 4 KB on disk.
 
 **GPUs in containers.** Podman reaches an NVIDIA GPU with `--device nvidia.com/gpu=all`, from a CDI spec that `nvidia-ctk cdi generate` writes. Docker uses `--gpus all`, or `deploy.resources.reservations.devices` in compose. No one compose syntax works with every podman-compose and Docker Compose that the distros ship, so each needs a small GPU override file. A trial run such as `podman run --rm --device nvidia.com/gpu=all ubuntu nvidia-smi -L` shows whether the GPU path works.
 
@@ -171,7 +187,7 @@ EmbeddingGemma 2 scores 68.5 on the English MTEB v2 mean, and Qwen3-Embedding-0.
 7. **Memories are notes, not instructions.** Their section says so, as OpenBot, eve, and OpenDots label theirs.
 8. **Hybrid search, in one query.** A word list and a vector list are fused with reciprocal rank fusion, as in pgvector's example. When the embedder is off or fails, search uses words alone and still answers.
 9. **pgvector comes with the database.** The database runs in pgvector's own image, so every install has it, and the migration creates the extension. Vectors are a `vector` column with no fixed size, so any model fits.
-10. **Exact search, no index.** A bot's memories number in the hundreds or thousands, and even 100,000 messages scan in about 300 ms. An index needs a fixed size per model, so it waits until a real bot needs it.
+10. **Exact search, no index.** A bot's memories number in the hundreds or thousands, and even 100,000 messages scan in about 230 ms at 768 dimensions, measured here. An index needs a fixed size per model, so it waits until a real bot needs it.
 11. **A local embedder by default.** Every message gets a vector by default, so the machine runs its own small embedder, with no key or cost per call. Settings picks it on the CPU, on a GPU, or a provider's API instead.
 
 ## 3. Implementation
@@ -253,7 +269,7 @@ or secrets. Change one with replaces, remove a wrong one with memory_forget, and
 ### Embeddings (`packages/sdk/src/embeddings.ts`)
 
 **Where vectors come from**, picked in Settings:
-- **Local, on the CPU** (the default): the compose file's `embed` service, llama.cpp's `server-b12033` image with `ggml-org/embeddinggemma-2-GGUF:Q8_0`. It downloads 310 MB into a `models` volume on first start.
+- **Local, on the CPU** (the default): the compose file's `embed` service, llama.cpp's `server-b12033` image with `ggml-org/embeddinggemma-2-GGUF:Q8_0`, started with `--embeddings --no-mmproj -c 8192 -b 2048 -ub 2048`. It downloads 310 MB into a `models` volume on first start, and holds about 380 MB. It runs at a low CPU weight (`cpu_shares`), so a fill-in yields to everything else on the machine.
 - **Local, on a GPU:** the same service from `server-cuda-b12033` with `Qwen/Qwen3-Embedding-0.6B-GGUF:Q8_0`, through a GPU override file. `setup.sh` uses it when a trial run reaches the GPU.
 - **Remote:** a provider in Settings that serves `/embeddings`, with an embedding model typed in.
   - `openai`, `openrouter`, `ollama`, `lmstudio`, and `custom` use their `baseUrl`.
@@ -265,7 +281,7 @@ or secrets. Change one with replaces, remove a wrong one with memory_forget, and
 
 **The call:** `POST <base>/embeddings` with `{ model, input: [texts] }`, from the server only.
 - **Prefixes:** fxbot adds each model's query and document prefixes from a small table in `embeddings.ts`, for EmbeddingGemma, Qwen3-Embedding, nomic, and bge. Other models get none.
-- **Long input:** each message is cut to `message_vectors` characters (8,000 by default), which fits the 8,192-token context. If llama.cpp still answers "too large", that input is retried at half the length.
+- **Long input:** each message is cut to `message_vectors` characters (8,000 by default), about 1,900 tokens of English. Text with more tokens per character, such as code or Chinese, can pass the 2,048-token batch, and llama.cpp answers "too large". That input is retried at half the length, until it fits.
 - **The test:** picking a source embeds a test string first. That gives the model's dimensions, and a failure keeps the old setting and shows the error.
 
 **Filling in vectors:** one loop in the server process. It takes up to 32 rows at a time that lack a vector from the current model: memories first, then messages, newest first. Each batch is one request.
@@ -338,9 +354,9 @@ A memory is `{ id, text, savedBy, createdAt, updatedAt, messageId }`. `@fxbot/sd
 - **Loading the page:** the tab and the Settings section, about 300 lines of UI, in the app's bundle.
 - **Sending a message:** one indexed query when the session opens, and a longer system prompt, at most the budget. That prompt is cached between memory changes. With embeddings on, recording a message nudges the loop, off the send path.
 - **Streaming:** unchanged.
-- **In the background:** the loop runs only while vectors are missing, at one request per 32 rows. Filling in an existing install's messages on the CPU takes a while once, and the chat doesn't wait for it.
+- **In the background:** the loop runs only while vectors are missing, at one request per 32 rows. On the CPU it embeds about 600 tokens a second on 6 cores. A 2,000-character reply takes under a second. Filling in 1,000 existing messages of about 1,000 characters takes about 7 minutes, and a 2-core machine about three times as long. The chat doesn't wait for it.
 - **A search** with meaning adds one embedding request for the query, plus the scan.
-- **The machine:** the local embedder holds its model in memory, about its 310 MB download plus the server's own, measured in the human check. Off or Remote leaves the `embed` service out of compose, and it costs nothing.
+- **The machine:** the local embedder holds about 380 MB, measured here. Each message's vector adds about 4 KB to the database. Off or Remote leaves the `embed` service out of compose, and it costs nothing.
 
 ### Not in this phase
 
@@ -356,7 +372,7 @@ About 950 lines: the SDK about 480 (memories 220, embeddings 190 with the prefix
 
 ## 4. Checklist
 
-Checks use a disposable database in the pgvector image, the mock model (which can call tools), a mock embeddings server whose vectors put chosen words close together, and Playwright. The [containers](containers.md) phase comes first, so the check machine has podman or docker. The real local embedder runs there too, when it can, and otherwise in the human check.
+Checks use a disposable database in the pgvector image, the mock model (which can call tools), a mock embeddings server whose vectors put chosen words close together, the real CPU embedder, and Playwright. This machine has podman 5.4.2 and both images.
 
 **M1. Memories and tools**
 - [ ] `0005_memories` applies to a database from 0.2.1 in the pgvector image, after a backup, and creates the extension.
@@ -388,7 +404,7 @@ Checks use a disposable database in the pgvector image, the mock model (which ca
 - [ ] Remote: a mock provider with a key works the same way. The key never appears in a response.
 - [ ] A change from local to remote fills new vectors, and searches still answer while it runs. Removing the remote provider turns meaning search off.
 - [ ] With the local embedder still loading, searches use words and the loop waits.
-- [ ] The real `embed` service, on the CPU, answers fxbot's call with 768 dimensions, if containers can run on the check machine.
+- [ ] The real `embed` service, on the CPU, answers fxbot's call with 768 dimensions, and a fill-in at low CPU weight leaves the chat responsive.
 
 **M4. Hybrid search**
 - [ ] With the mock vectors, `memory_search` finds a memory that shares no word with the query, and a row in both lists ranks first.
@@ -402,7 +418,7 @@ Checks use a disposable database in the pgvector image, the mock model (which ca
 - [ ] `npm run typecheck`, `npm run build`, and `git diff --check` pass.
 
 **Human checks**
-- [ ] With the local embedder on the CPU, a bot saves a fact on its own, a new chat uses it, and a search finds it by meaning. The `embed` container's memory use, and how long it takes to fill 1,000 messages, are noted.
+- [ ] With the local embedder on the CPU, a bot saves a fact on its own, a new chat uses it, and a search finds it by meaning. How long the owner's machine takes to fill its existing messages is noted.
 - [ ] On a machine with an NVIDIA GPU, `setup.sh` picks the GPU embedder, and Settings shows Qwen3-Embedding.
 - [ ] A remote provider (an OpenAI key, or Ollama) works the same way.
 - [ ] On a phone, the Memories tab and the Settings section work.
