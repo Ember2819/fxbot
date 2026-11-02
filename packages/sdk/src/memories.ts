@@ -1,5 +1,5 @@
 import type { FxAgentTool } from "libfx";
-import { fuse, type Embeddings } from "./embeddings.ts";
+import { fuse, near, type Embeddings } from "./embeddings.ts";
 import { anyWords } from "./history.ts";
 import type { Sql } from "./store.ts";
 import type { Memory } from "./types.ts";
@@ -69,7 +69,7 @@ export function createMemories(sql: Sql, embeddings: Embeddings) {
     if (!gone.count) fail(404, "This bot has no such memory.");
   }
 
-  // Best first: the word matches and, with an embedder, the nearest vectors, fused.
+  // Best first: the word matches and, with an embedder, the vectors nearest the query's, fused.
   async function search(bot: string, query: string, limit: number) {
     const words = anyWords(query);
     const [byWords, byMeaning] = await Promise.all([
@@ -77,10 +77,11 @@ export function createMemories(sql: Sql, embeddings: Embeddings) {
         ? sql<Row[]>`select ${fields(sql)} from memories, to_tsquery('simple', ${words}) q where profile_id = ${bot} and tsv @@ q
             order by ts_rank_cd(tsv, q) desc, updated_at desc limit 40`
         : Promise.resolve([] as Row[]),
-      embeddings.query(query).then((near) =>
-        near
-          ? sql<Row[]>`select ${fields(sql)} from memories where profile_id = ${bot} and embedded_with = ${near.model} and embedding is not null
-              order by embedding <=> ${near.vector}::vector limit 40`
+      embeddings.query(query).then((close) =>
+        close
+          ? sql<Row[]>`with nearest as (select ${fields(sql)}, embedding <=> ${close.vector}::vector as distance from memories
+                where profile_id = ${bot} and embedded_with = ${close.model} and embedding is not null order by distance limit 40)
+              select * from nearest where distance <= (select min(distance) from nearest) + ${near} order by distance`
           : ([] as Row[]),
       ),
     ]);

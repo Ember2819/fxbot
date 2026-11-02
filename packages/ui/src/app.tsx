@@ -42,6 +42,7 @@ import { Blob, LookPicker } from "./blob.tsx";
 import { BotPanel, usePanel } from "./bot-panel.tsx";
 import { AddonsPage, BotAddons } from "./addons.tsx";
 import { LibraryPage } from "./library.tsx";
+import { MemorySearch } from "./memory-search.tsx";
 import { Version } from "./release.tsx";
 import { Reply } from "./steps.tsx";
 import { follow, go } from "./nav.ts";
@@ -481,6 +482,7 @@ function SettingsForm() {
           {installing === "steps" && <p className="rounded-xl border p-3 text-sm">To install fxbot, tap Share, then Add to Home Screen, and leave Open as Web App on.</p>}
           {settings && <Providers defaultProvider={settings.defaultProvider} onDefault={makeDefault} />}
           <p className="text-sm text-muted-foreground">New bots start on the default provider, with its default model.</p>
+          <MemorySearch />
           <Version />
         </div>
       </main>

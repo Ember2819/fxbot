@@ -27,6 +27,11 @@ const prefixFor = (model: string, kind: "query" | "document") => {
   return found ? found[kind === "query" ? 1 : 2] : "";
 };
 
+// How far past the nearest vector a meaning match may be, in cosine distance. Distances aren't comparable across
+// queries, so a fixed cutoff lets everything in or nothing: with EmbeddingGemma 2, the nearest note to a query sat 0.20
+// to 0.30 away and unrelated ones 0.29 to 0.41, and keeping those within 0.05 of the nearest kept the matches.
+export const near = 0.05;
+
 // pgvector's text form.
 export const asVector = (values: number[]) => `[${values.join(",")}]`;
 

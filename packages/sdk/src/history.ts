@@ -1,6 +1,6 @@
 import { createFxEngine, type FxAgentTool } from "libfx";
 import type { Turn } from "./client.ts";
-import { fuse, type Embeddings } from "./embeddings.ts";
+import { fuse, near, type Embeddings } from "./embeddings.ts";
 import type { Sql } from "./store.ts";
 import type { Upload } from "./types.ts";
 
@@ -100,15 +100,17 @@ export function createHistory(sql: Sql, embeddings?: Embeddings) {
             and id <> coalesce((select max(id) from messages where profile_id = ${bot} and session_id = ${call.sessionId} and role = 'user'), 0)
           order by ts_rank_cd(tsv, q) desc, created_at desc limit 40`,
         (async () => {
-          const near = embeddings && (await embeddings.messagesOn()) ? await embeddings.query(String(input.query)) : null;
-          if (!near) return [] as (Row & { here: boolean })[];
+          const close = embeddings && (await embeddings.messagesOn()) ? await embeddings.query(String(input.query)) : null;
+          if (!close) return [] as (Row & { here: boolean })[];
           return sql<(Row & { here: boolean })[]>`
-            select id, created_at, role, session_id = ${call.sessionId} as here,
-              ts_headline('simple', text, to_tsquery('simple', ${words}), 'MaxWords=40, MinWords=15') as text
-            from messages
-            where profile_id = ${bot} and embedded_with = ${near.model} and embedding is not null
-              and id <> coalesce((select max(id) from messages where profile_id = ${bot} and session_id = ${call.sessionId} and role = 'user'), 0)
-            order by embedding <=> ${near.vector}::vector limit 40`;
+            with nearest as (
+              select id, created_at, role, session_id = ${call.sessionId} as here, text, embedding <=> ${close.vector}::vector as distance
+              from messages
+              where profile_id = ${bot} and embedded_with = ${close.model} and embedding is not null
+                and id <> coalesce((select max(id) from messages where profile_id = ${bot} and session_id = ${call.sessionId} and role = 'user'), 0)
+              order by distance limit 40)
+            select id, created_at, role, here, ts_headline('simple', text, to_tsquery('simple', ${words}), 'MaxWords=40, MinWords=15') as text
+            from nearest where distance <= (select min(distance) from nearest) + ${near} order by distance`;
         })(),
       ]);
       const rows = fuse([byWords, byMeaning]).slice(0, limit);

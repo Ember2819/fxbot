@@ -1,5 +1,5 @@
 import { useState, type ComponentType } from "react";
-import { BookOpenIcon, CircleAlertIcon, CircleCheckIcon, FileTextIcon, HistoryIcon, LibraryIcon, LoaderCircleIcon, SaveIcon, WrenchIcon } from "lucide-react";
+import { BookOpenIcon, BrainIcon, CircleAlertIcon, CircleCheckIcon, EraserIcon, FileTextIcon, HistoryIcon, LibraryIcon, LoaderCircleIcon, SaveIcon, SearchIcon, WrenchIcon } from "lucide-react";
 import { Streamdown } from "streamdown";
 import { Trace, TraceCollapsible, TraceCollapsibleContent, TraceCollapsibleTrigger, TraceDescription, TraceIcon, TraceLine, TraceTitle } from "@/components/ui/trace";
 import type { Part, Turn } from "@fxbot/sdk/client";
@@ -79,6 +79,9 @@ const builtIn: Record<string, { icon: ComponentType; doing: string; done: string
   library_search: { icon: LibraryIcon, doing: "Searching the library", done: "Searched the library", failed: "Couldn't search the library", gist: (i) => i?.query },
   library_read: { icon: FileTextIcon, doing: "Reading from the library", done: "Read from the library", failed: "Couldn't read from the library", gist: (i) => i?.id },
   library_save: { icon: SaveIcon, doing: "Saving to the library", done: "Saved to the library", failed: "Couldn't save to the library", gist: (i) => i?.name },
+  memory_save: { icon: BrainIcon, doing: "Saving a memory", done: "Saved a memory", failed: "Couldn't save a memory", gist: (i) => i?.text },
+  memory_search: { icon: SearchIcon, doing: "Searching memories", done: "Searched memories", failed: "Couldn't search memories", gist: (i) => i?.query },
+  memory_forget: { icon: EraserIcon, doing: "Forgetting a memory", done: "Forgot a memory", failed: "Couldn't forget a memory", gist: (i) => i?.id },
   skill: { icon: BookOpenIcon, doing: "Reading a skill", done: "Read a skill", failed: "Couldn't read a skill", gist: (i) => (i?.name ? [i.name, i.file].filter(Boolean).join(" / ") : i?.search) },
 };
 
