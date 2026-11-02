@@ -107,7 +107,7 @@ These are read from source and docs, as of November 2026. Each path is relative 
    - Agents may run here. A plain 0600 file, as fx and opencode keep, is readable by any agent running as the same user.
    - The SDK seals with AES-256-GCM. The key sits in a file outside the repo, readable only by the server's OS user, and Postgres is reached over a socket with peer auth.
    - Postgres was coming for memories anyway.
-5. **Let the SDK find the models,** with one source per kind (section 3), and cache each list for 5 minutes. A failed list reports its reason, never an empty list.
+5. **Let the SDK find the models,** with one source per kind (section 3), and cache each list for 5 minutes. A failed list reports its reason, never an empty list. (Since 0.2.0 each list is also kept in Postgres, answered at once after a restart, and refreshed behind the answer: [issue 5](https://github.com/iammrduncan/fxbot/issues/5).)
 6. **Run one libfx agent per provider.** A session cannot change agents.
 7. **Compact on a provider switch,** as fx does: one tool-free summary request, carried forward each time. The messages stay searchable through `chat_history`. libfx has no compaction API, so fxbot does this itself.
 8. **Add credentials to requests in one place.**

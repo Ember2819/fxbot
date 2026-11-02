@@ -1,4 +1,5 @@
 import { listModels } from "libfx";
+import type postgres from "postgres";
 import type { ProviderRecord, Sql } from "./store.ts";
 import type { Model } from "./types.ts";
 
@@ -51,9 +52,15 @@ const fromModelsDev = (m: any): Model => ({
 // What a provider needs to be asked for its models: its key, a plan's tokens, or a fetch that adds a Vercel login.
 export type Access = { apiKey?: string; accessToken?: string; accountId?: string; fetch?: Fetch };
 
-// One source per kind of provider, each list kept for 5 minutes.
+type Kept = { at: number; models: Model[] };
+
+// One source per kind of provider. Each list is kept in memory and in Postgres, so a restart still has it; one older
+// than 5 minutes is fetched again behind the answer.
 export function createModels(sql: Sql, fetch: Fetch) {
-  const cache = new Map<string, { at: number; models: Model[] }>();
+  const cache = new Map<string, Kept>();
+  const pending = new Map<string, Promise<Kept>>();
+  // A list fetched for an old key or address is dropped rather than kept.
+  const generation = new Map<string, number>();
   let codex: { at: number; version: string } | undefined;
 
   // Codex may hide newer models from an older client, so fx asks with the current Codex CLI version.
@@ -148,18 +155,51 @@ export function createModels(sql: Sql, fetch: Fetch) {
     }
   }
 
+  async function kept(id: string): Promise<Kept | undefined> {
+    const hit = cache.get(id);
+    if (hit) return hit;
+    const row = (await sql<{ models: Model[]; fetchedAt: Date }[]>`select models, fetched_at from model_lists where provider_id = ${id}`)[0];
+    if (!row) return undefined;
+    const found = { at: new Date(row.fetchedAt).getTime(), models: row.models };
+    cache.set(id, found);
+    return found;
+  }
+
+  // Fetches a provider's list and keeps it. Asks while one runs share it.
+  function refresh(record: ProviderRecord, access: Access) {
+    const running = pending.get(record.id);
+    if (running) return running;
+    const started = generation.get(record.id) ?? 0;
+    const next = (async () => {
+      const models = (await fetchList(record, access)).sort((a, b) => a.id.localeCompare(b.id));
+      const found = { at: Date.now(), models };
+      if ((generation.get(record.id) ?? 0) !== started) return found;
+      cache.set(record.id, found);
+      await sql`insert into model_lists (provider_id, models, fetched_at) values (${record.id}, ${sql.json(models as unknown as postgres.JSONValue)}, now())
+        on conflict (provider_id) do update set models = excluded.models, fetched_at = excluded.fetched_at`;
+      return found;
+    })().finally(() => pending.delete(record.id));
+    pending.set(record.id, next);
+    return next;
+  }
+
   return {
+    // What the provider listed last answers at once, and a list older than 5 minutes is fetched again behind it, for
+    // the next look. A failed refresh keeps the old list. Only a provider never listed waits for its first fetch.
     // The provider's own context field wins over what its server reports.
     async list(record: ProviderRecord, access: Access) {
-      const hit = cache.get(record.id);
-      if (hit && Date.now() - hit.at < cacheMs) return hit.models;
-      const models = (await fetchList(record, access))
-        .map((m) => (record.contextWindow ? { ...m, contextWindow: record.contextWindow } : m))
-        .sort((a, b) => a.id.localeCompare(b.id));
-      cache.set(record.id, { at: Date.now(), models });
-      return models;
+      let found = await kept(record.id);
+      if (!found) found = await refresh(record, access);
+      else if (Date.now() - found.at > cacheMs) refresh(record, access).catch(() => {});
+      const window = record.contextWindow;
+      return window ? found.models.map((m) => ({ ...m, contextWindow: window })) : found.models;
     },
-    forget: (id: string) => cache.delete(id),
+    // A new key, address, team, or sign-in may list other models.
+    async forget(id: string) {
+      generation.set(id, (generation.get(id) ?? 0) + 1);
+      cache.delete(id);
+      await sql`delete from model_lists where provider_id = ${id}`;
+    },
     // A key is checked by listing with it: Gateway and local servers by their own list, OpenCode at its own, and
     // others at `/models`, where a 404 passes, since some servers serve no list there.
     async check(record: ProviderRecord, access: Access) {

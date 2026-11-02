@@ -190,7 +190,7 @@ export async function createProviders({ store, secretKey, dataDir, vercelClientI
     if (provider) {
       const existing = await record(provider);
       await secrets.put(provider, credentials);
-      models.forget(provider);
+      await models.forget(provider);
       await restart(existing);
       return provider;
     }
@@ -285,7 +285,7 @@ export async function createProviders({ store, secretKey, dataDir, vercelClientI
         await store.providers.save(next, tx as unknown as Sql);
         if (apiKey) await secrets.put(id, { apiKey }, tx as unknown as Sql);
       });
-      models.forget(id);
+      if (apiKey !== undefined || next.baseUrl !== current.baseUrl || next.teamId !== current.teamId) await models.forget(id);
       if (apiKey !== undefined || next.baseUrl !== current.baseUrl || next.teamId !== current.teamId || next.contextWindow !== current.contextWindow) await restart(next);
       return listed(id);
     },
@@ -297,7 +297,7 @@ export async function createProviders({ store, secretKey, dataDir, vercelClientI
       await stop(id);
       await store.providers.remove(id);
       secrets.forget(id);
-      models.forget(id);
+      await models.forget(id);
       if ((await store.settings.get()).defaultProvider === id) await store.settings.save({ defaultProvider: "" });
     },
 
