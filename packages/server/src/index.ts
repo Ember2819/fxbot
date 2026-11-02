@@ -7,10 +7,11 @@ import { pipeline } from "node:stream/promises";
 import type { ReadableStream } from "node:stream/web";
 import { installed, repository, update, version } from "./update.ts";
 
-// Loopback only. Other devices reach it through `tailscale serve`; the page never holds a secret.
-// FXBOT_PORT lets a check run beside a running server.
+// Loopback by default. Other devices reach it through `tailscale serve`; the page never holds a secret. In its container
+// it listens on FXBOT_HOST, 0.0.0.0, and compose publishes the port on the machine's loopback only. FXBOT_PORT lets a
+// check run beside a running server.
 const port = Number(process.env.FXBOT_PORT ?? 8787);
-const host = "127.0.0.1";
+const host = process.env.FXBOT_HOST || "127.0.0.1";
 const { FXBOT_DATABASE_URL: databaseUrl, FXBOT_SECRET_KEY_FILE: keyFile } = process.env;
 if (!databaseUrl) throw new Error("FXBOT_DATABASE_URL is required: fxbot keeps its records in Postgres (see the README)");
 if (!keyFile) throw new Error("FXBOT_SECRET_KEY_FILE is required: a file outside the repo with 32 random bytes in base64 (see the README)");
@@ -24,7 +25,8 @@ const fxbot = await createFxbot({
   version,
   // GitHub's newest release for the repository in package.json, unless turned off.
   releasesUrl: process.env.FXBOT_UPDATE_CHECK === "off" ? undefined : process.env.FXBOT_RELEASES_URL || releasesUrlFor(repository),
-  localUrl: `http://${host}:${port}`,
+  // MCP sign-ins redirect to the browser's loopback, which reaches the published port.
+  localUrl: `http://127.0.0.1:${port}`,
   clientMetadataUrl: process.env.FXBOT_CLIENT_METADATA_URL || undefined,
   registryUrl: process.env.FXBOT_MCP_REGISTRY || undefined,
   everythingUrl: process.env.FXBOT_MCP_EVERYTHING || undefined,
