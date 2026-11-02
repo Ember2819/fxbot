@@ -1,6 +1,8 @@
-# fxbot's release install: the app and its database. setup.sh puts this file in /opt/fxbot beside an .env that sets
-# FXBOT_VERSION, FXBOT_UID and FXBOT_GID (the fxbot user's), FXBOT_DB_PASSWORD, and FXBOT_ENGINE. The fxbot command
-# there runs it. FXBOT_ROOT puts the machine's folders under another root, for checks.
+# fxbot's release install: the app, its database, and the local embedder for memory search. setup.sh puts this file in
+# /opt/fxbot beside an .env that sets FXBOT_VERSION, FXBOT_UID and FXBOT_GID (the fxbot user's), FXBOT_DB_PASSWORD,
+# FXBOT_ENGINE, and FXBOT_EMBEDDER. The fxbot command there runs it, with the embedder's profile on unless
+# FXBOT_EMBEDDER is off, and a GPU file (compose.gpu.<engine>.yaml) when it's gpu. FXBOT_ROOT puts the machine's
+# folders under another root, for checks.
 name: fxbot
 services:
   fxbot:
@@ -13,6 +15,7 @@ services:
       FXBOT_DATA: /var/lib/fxbot/data
       FXBOT_BACKUPS: /var/lib/fxbot/backups
       FXBOT_CONTROL: /var/lib/fxbot/control
+      FXBOT_EMBED_URL: http://embed:8080/v1
     secrets: [fxbot_key]
     volumes:
       - ${FXBOT_ROOT:-}/var/lib/fxbot/data:/var/lib/fxbot/data
@@ -38,7 +41,20 @@ services:
     healthcheck: { test: [ CMD, pg_isready, -h, 127.0.0.1, -U, fxbot, -d, fxbot ], interval: 3s }
     stop_grace_period: 1m
     restart: unless-stopped
+  # Vectors for memory search: llama.cpp's server with EmbeddingGemma 2 on the CPU, which it downloads into `models` on
+  # its first start. It yields the CPU to everything else, and the app doesn't wait for it.
+  embed:
+    profiles: [ embed ]
+    image: ghcr.io/ggml-org/llama.cpp:server-b12033
+    command: [ --embeddings, -hf, "ggml-org/embeddinggemma-2-GGUF:Q8_0", --no-mmproj, -c, "8192", -b, "2048", -ub, "2048", --no-webui, --host, 0.0.0.0, --port, "8080" ]
+    environment:
+      LLAMA_CACHE: /models
+    volumes: [ models:/models ]
+    cpu_shares: 256
+    healthcheck: { test: [ CMD, curl, -fs, "http://localhost:8080/health" ], interval: 10s, start_period: 10m }
+    restart: unless-stopped
 secrets:
   fxbot_key: { file: "${FXBOT_ROOT:-}/etc/fxbot/secret.key" }
 volumes:
   pgdata: {}
+  models: {}

@@ -211,6 +211,8 @@ export function createEmbeddings({ sql, fetch, localUrl, target }: { sql: Sql; f
     async status() {
       const from = await source().catch((error: Error) => (lastError ??= error.message, null));
       const model = from?.model ?? null;
+      // The embedder answers again: try now rather than at the next minute, which clears the error when it works.
+      if (from && lastError && !running) void fill();
       const [counts] = await sql<{ messages: number; withVectors: number; memories: number; memoriesWithVectors: number }[]>`
         select (select count(*)::int from messages) as messages,
           (select count(*)::int from messages where embedded_with = ${model ?? ""}) as with_vectors,

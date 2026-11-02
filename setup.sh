@@ -77,15 +77,18 @@ fi
 moving=no
 if [ -L "$install/current" ] && [ ! -f "$install/.env" ]; then moving=yes; fi
 
+fresh=no
 if [ -f "$install/.env" ]; then
   tag=v$(sed -n 's/^FXBOT_VERSION=//p' "$install/.env")
   say "fxbot ${tag#v} is installed already"
 else
+  fresh=yes
   tag=${want:-v$(curl -fsSL "$releases" | sed -n 's/.*"tag_name": *"v\{0,1\}\([^"]*\)".*/\1/p' | head -n 1)}
   [ "$tag" != v ] || die "couldn't find the newest release at $releases"
   say "fxbot ${tag#v}"
   curl -fsSL "$files/$tag/deploy/compose.yaml" -o "$install/compose.yaml" || die "couldn't download $tag's compose.yaml from $files"
   curl -fsSL "$files/$tag/deploy/fxbot" -o "$install/fxbot" || die "couldn't download $tag's fxbot command from $files"
+  curl -fsSL "$files/$tag/deploy/compose.gpu.$engine.yaml" -o "$install/compose.gpu.$engine.yaml" || die "couldn't download $tag's GPU file from $files"
   chmod 755 "$install/fxbot"
   (
     umask 077
@@ -95,6 +98,7 @@ FXBOT_VERSION=${tag#v}
 FXBOT_UID=$(id -u fxbot)
 FXBOT_GID=$(id -g fxbot)
 FXBOT_ENGINE=$engine
+FXBOT_EMBEDDER=cpu
 FXBOT_DB_PASSWORD=$(head -c 24 /dev/urandom | base64 | tr -d '/+=')
 EOF
     for name in FXBOT_IMAGE FXBOT_FILES FXBOT_RELEASES_URL; do [ -z "${!name:-}" ] || echo "$name=${!name}" >>"$install/.env.new"; done
@@ -170,6 +174,12 @@ systemctl enable --now fxbot-control.path >/dev/null 2>&1
 systemctl enable fxbot >/dev/null 2>&1
 systemctl start fxbot || die "fxbot did not start. See: sudo fxbot logs"
 curl -fs http://127.0.0.1:8787/api/health >/dev/null || die "fxbot did not answer. See: sudo fxbot logs"
+
+# A machine with an NVIDIA GPU runs the local embedder there, if a trial run reaches it.
+if [ "$fresh" = yes ] && command -v nvidia-smi >/dev/null && nvidia-smi -L >/dev/null 2>&1; then
+  say "The local embedder, on the GPU"
+  fxbot embedder gpu || echo "No GPU answered a trial run, so the local embedder stays on the CPU."
+fi
 
 say "fxbot ${tag#v} runs on http://127.0.0.1:8787"
 echo "Open it there. From your other devices, Tailscale is the simplest way in:  tailscale serve --bg 8787"

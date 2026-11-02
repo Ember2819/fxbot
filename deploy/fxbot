@@ -8,6 +8,7 @@
 #   fxbot apply                the app's requests
 #   fxbot restore <folder>     a backup: its database.dump, and its data.tar.gz when there is one
 #   fxbot rotate-key           every stored secret sealed again under a new key
+#   fxbot embedder cpu|gpu|off  the local embedder for memory search, on the CPU, on a GPU, or not at all
 set -euo pipefail
 
 [ "$(id -u)" -eq 0 ] || { echo "fxbot: run it as root, such as: sudo fxbot ${1:-status}" >&2; exit 1; }
@@ -25,9 +26,22 @@ files=${FXBOT_FILES:-https://raw.githubusercontent.com/iammrduncan/fxbot}
 releases=${FXBOT_RELEASES_URL:-https://api.github.com/repos/iammrduncan/fxbot/releases/latest}
 wait=${FXBOT_UPDATE_TIMEOUT:-300}
 
+# The compose files and profile: the embedder's profile unless FXBOT_EMBEDDER is off, the GPU file for this engine when
+# it's gpu, and compose.override.yaml when an add-on wrote one.
 compose() {
-  if [ "${FXBOT_ENGINE:-podman}" = docker ]; then docker compose --project-directory "$here" "$@"; else PODMAN_COMPOSE_WARNING_LOGS=false podman compose --project-directory "$here" "$@"; fi
+  local files=compose.yaml
+  [ "${FXBOT_EMBEDDER:-cpu}" != gpu ] || files+=":compose.gpu.${FXBOT_ENGINE:-podman}.yaml"
+  [ ! -f compose.override.yaml ] || files+=":compose.override.yaml"
+  local profiles=embed
+  [ "${FXBOT_EMBEDDER:-cpu}" != off ] || profiles=""
+  if [ "${FXBOT_ENGINE:-podman}" = docker ]; then
+    COMPOSE_FILE=$files COMPOSE_PROFILES=$profiles docker compose --project-directory "$here" "$@"
+  else
+    COMPOSE_FILE=$files COMPOSE_PROFILES=$profiles PODMAN_COMPOSE_WARNING_LOGS=false podman compose --project-directory "$here" "$@"
+  fi
 }
+# Every container started, then a wait for the app alone: the embedder may still be downloading its model.
+start() { compose up -d --remove-orphans >/dev/null 2>&1 && compose up -d --wait --wait-timeout "$wait" fxbot; }
 die() {
   echo "fxbot: $*" >&2
   exit 1
@@ -129,21 +143,23 @@ update() {
 
   step "Getting $to"
   rm -rf "$next" && mkdir -p "$next"
-  curl -fsSL "$files/v$to/deploy/compose.yaml" -o "$next/compose.yaml" && curl -fsSL "$files/v$to/deploy/fxbot" -o "$next/fxbot" ||
+  curl -fsSL "$files/v$to/deploy/compose.yaml" -o "$next/compose.yaml" && curl -fsSL "$files/v$to/deploy/fxbot" -o "$next/fxbot" &&
+    curl -fsSL "$files/v$to/deploy/compose.gpu.${FXBOT_ENGINE:-podman}.yaml" -o "$next/compose.gpu.yaml" ||
     fail "Couldn't download $to's files from $files."
   # A release's tags never change, so an image that is here already is the right one.
   FXBOT_VERSION=$to compose -f "$next/compose.yaml" pull --policy missing -q >/dev/null 2>&1 || fail "Couldn't download $to's images."
 
   before=$(migrations)
   cp -p .env .env.back && cp -p compose.yaml compose.yaml.back && cp -p fxbot fxbot.back
+  cp -p "compose.gpu.${FXBOT_ENGINE:-podman}.yaml" compose.gpu.back 2>/dev/null || true
   sed -i "s/^FXBOT_VERSION=.*/FXBOT_VERSION=$to/" .env
   chmod 755 "$next/fxbot"
   # Renamed into place: this run keeps reading its own copy of the script.
-  mv "$next/compose.yaml" compose.yaml && mv "$next/fxbot" fxbot && rm -rf "$next"
+  mv "$next/compose.yaml" compose.yaml && mv "$next/compose.gpu.yaml" "compose.gpu.${FXBOT_ENGINE:-podman}.yaml" && mv "$next/fxbot" fxbot && rm -rf "$next"
   touch .update-started
   step "Starting $to"
-  if FXBOT_VERSION=$to compose up -d --wait --wait-timeout "$wait" --remove-orphans >/dev/null 2>&1; then
-    rm -f .env.back compose.yaml.back fxbot.back
+  if FXBOT_VERSION=$to start >/dev/null 2>&1; then
+    rm -f .env.back compose.yaml.back fxbot.back compose.gpu.back
     step "Running $to"
     status done
     return
@@ -158,10 +174,48 @@ update() {
     restore "$backup" || fail "$to didn't start, and $backup didn't restore. fxbot is stopped. See: fxbot logs"
   fi
   mv .env.back .env && mv compose.yaml.back compose.yaml && mv fxbot.back fxbot
-  FXBOT_VERSION=$from compose up -d --wait --wait-timeout "$wait" --remove-orphans >/dev/null 2>&1 ||
+  [ ! -f compose.gpu.back ] || mv compose.gpu.back "compose.gpu.${FXBOT_ENGINE:-podman}.yaml"
+  FXBOT_VERSION=$from start >/dev/null 2>&1 ||
     fail "$to didn't start, and neither did $from after going back. See: fxbot logs"
   status back "$to didn't start, so fxbot went back to $from.${why:+$'\n\n'$why}"
   die "$to didn't start, so fxbot went back to $from. See: fxbot logs fxbot"
+}
+
+# What the machine runs as its local embedder, in embedder-status.json for Settings: the state, the embedder now, and
+# the one asked for and why it failed, when there's one.
+embedder_status() {
+  printf '{"state":%s,"embedder":%s%s%s}\n' "$(quote "$1")" "$(quote "$2")" "${3:+,\"to\":$(quote "$3")}" "${4:+,\"error\":$(quote "$4")}" >"$control/.embedder-status.json"
+  mv "$control/.embedder-status.json" "$control/embedder-status.json"
+}
+gpu_works() {
+  local image=ghcr.io/ggml-org/llama.cpp:server-cuda-b12033
+  if [ "${FXBOT_ENGINE:-podman}" = docker ]; then
+    docker run --rm --gpus all --entrypoint nvidia-smi "$image" -L
+  else
+    podman run --rm --device nvidia.com/gpu=all --security-opt=label=disable --entrypoint nvidia-smi "$image" -L
+  fi >/dev/null 2>&1
+}
+
+# The local embedder on the CPU, on a GPU after a trial run reaches one, or not at all. Changing it changes the model,
+# so the app fills in new vectors for everything.
+embedder() {
+  local to=${1:-} from=${FXBOT_EMBEDDER:-cpu}
+  case $to in cpu | gpu | off) ;; *) die "name cpu, gpu, or off" ;; esac
+  embedder_status working "$from" "$to"
+  if [ "$to" = gpu ] && ! gpu_works; then
+    embedder_status failed "$from" "$to" "No GPU answered a trial run. A GPU needs NVIDIA's driver and container toolkit on the machine."
+    die "no GPU answered a trial run"
+  fi
+  if grep -q '^FXBOT_EMBEDDER=' .env; then sed -i "s/^FXBOT_EMBEDDER=.*/FXBOT_EMBEDDER=$to/" .env; else echo "FXBOT_EMBEDDER=$to" >>.env; fi
+  FXBOT_EMBEDDER=$to
+  if [ "$to" = off ]; then
+    compose rm -sf embed >/dev/null 2>&1 || true
+  elif ! compose up -d embed >/dev/null 2>&1; then
+    embedder_status failed "$from" "$to" "The embedder didn't start. See: fxbot logs embed"
+    die "the embedder didn't start. See: fxbot logs embed"
+  fi
+  embedder_status done "$to"
+  echo "The local embedder is $to."
 }
 
 # The app's requests, each moved out of the watched folder first, or systemd would start this again.
@@ -177,6 +231,11 @@ apply() {
         rm -f "$control/.$name"
         if [ -n "$version" ]; then (update "$version") || true; else echo "fxbot: update.json named no version" >&2; fi
         ;;
+      embedder.json)
+        version=$(sed -n 's/.*"to" *: *"\([a-z]*\)".*/\1/p' "$control/.$name" | head -n 1)
+        rm -f "$control/.$name"
+        (embedder "$version") || true
+        ;;
       *)
         rm -f "$control/.$name"
         echo "fxbot: no such request: $name" >&2
@@ -186,10 +245,10 @@ apply() {
 }
 
 case ${1:-} in
-  up) compose up -d --wait --wait-timeout "$wait" --remove-orphans ;;
+  up) start ;;
   down) compose down ;;
   status)
-    echo "fxbot $FXBOT_VERSION, on $FXBOT_ENGINE"
+    echo "fxbot $FXBOT_VERSION, on $FXBOT_ENGINE, with the local embedder ${FXBOT_EMBEDDER:-cpu}"
     compose ps
     if [ -L "$here/current" ]; then
       echo
@@ -205,8 +264,9 @@ case ${1:-} in
   apply) apply ;;
   restore) restore "${2:-}" ;;
   rotate-key) rotate_key ;;
+  embedder) embedder "${2:-}" ;;
   *)
-    sed -n '6,10p' "$0" | sed 's/^# //'
+    sed -n '6,11p' "$0" | sed 's/^# //'
     exit 1
     ;;
 esac

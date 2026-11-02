@@ -1,0 +1,8 @@
+# The local embedder on an NVIDIA GPU, under podman: llama.cpp's CUDA image with Qwen3-Embedding-0.6B. The GPU comes
+# through CDI (nvidia-ctk cdi generate). The fxbot command adds this file when FXBOT_EMBEDDER is gpu.
+services:
+  embed:
+    image: ghcr.io/ggml-org/llama.cpp:server-cuda-b12033
+    command: [ --embeddings, -hf, "Qwen/Qwen3-Embedding-0.6B-GGUF:Q8_0", -c, "8192", -b, "2048", -ub, "2048", --no-webui, --host, 0.0.0.0, --port, "8080" ]
+    devices: [ nvidia.com/gpu=all ]
+    security_opt: [ label=disable ]

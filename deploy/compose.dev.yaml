@@ -1,6 +1,7 @@
-# A checkout's database, for npm run dev and npm run server, on the machine's loopback beside a release install.
-# The checkout's .env sets FXBOT_DB_PASSWORD, and FXBOT_DATABASE_URL to
-# postgres://fxbot:<that password>@127.0.0.1:5433/fxbot_dev. From the checkout's folder:
+# A checkout's database and local embedder, for npm run dev and npm run server, on the machine's loopback beside a
+# release install. The checkout's .env sets FXBOT_DB_PASSWORD, FXBOT_DATABASE_URL to
+# postgres://fxbot:<that password>@127.0.0.1:5433/fxbot_dev, and FXBOT_EMBED_URL to http://127.0.0.1:8081/v1. From the
+# checkout's folder:
 #
 #   podman compose -f deploy/compose.dev.yaml --env-file .env up -d        (or docker compose)
 name: fxbot-dev
@@ -15,5 +16,16 @@ services:
     volumes: [ pgdata:/var/lib/postgresql/data ]
     healthcheck: { test: [ CMD, pg_isready, -h, 127.0.0.1, -U, fxbot, -d, fxbot_dev ], interval: 3s }
     restart: unless-stopped
+  # EmbeddingGemma 2 on the CPU, as a release install's; it downloads its model on its first start.
+  embed:
+    image: ghcr.io/ggml-org/llama.cpp:server-b12033
+    command: [ --embeddings, -hf, "ggml-org/embeddinggemma-2-GGUF:Q8_0", --no-mmproj, -c, "8192", -b, "2048", -ub, "2048", --no-webui, --host, 0.0.0.0, --port, "8080" ]
+    environment:
+      LLAMA_CACHE: /models
+    ports: [ "127.0.0.1:${FXBOT_EMBED_PORT:-8081}:8080" ]
+    volumes: [ models:/models ]
+    cpu_shares: 256
+    restart: unless-stopped
 volumes:
   pgdata: {}
+  models: {}
