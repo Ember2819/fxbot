@@ -126,7 +126,8 @@ export function createMemories(sql: Sql, embeddings: Embeddings) {
       name: "memory_search",
       description:
         "Search this bot's memories, by words and by meaning. Returns the best matches first, each as mem:<id>, the day it was saved or last changed, " +
-        "and its text. The newest memories are in your instructions already.",
+        "the msg:<id> of the turn it was saved in when there is one (read it with chat_history around), and its text. The newest memories are in " +
+        "your instructions already.",
       inputSchema: {
         type: "object",
         properties: { query: { type: "string", description: "What to look for" }, limit: { type: "integer", minimum: 1, maximum: 20 } },
@@ -139,7 +140,9 @@ export function createMemories(sql: Sql, embeddings: Embeddings) {
         const query = String(input.query ?? "").trim();
         if (!query) return "Give something to look for in query.";
         const rows = await search(who, query, Math.min(Math.max(Math.trunc(Number(input.limit) || 8), 1), 20));
-        return rows.length ? rows.map((r) => `mem:${r.id} (${day(r.updatedAt)}): ${r.text.replace(/\s+/g, " ")}`).join("\n") : "No memories match.";
+        return rows.length
+          ? rows.map((r) => `mem:${r.id} (${day(r.updatedAt)}${r.messageId ? `, from msg:${r.messageId}` : ""}): ${r.text.replace(/\s+/g, " ")}`).join("\n")
+          : "No memories match.";
       },
     },
     {

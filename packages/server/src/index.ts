@@ -157,7 +157,16 @@ async function api(req: IncomingMessage, res: ServerResponse, url: URL) {
   }
   if (resource === "settings" && id === "embedding" && !action && method === "GET") {
     const run = canUpdate ? localEmbedder() : null;
-    return json(res, 200, { ...(await fxbot.settings.embedding()), canSwitch: canUpdate, local: run?.embedder ?? null, switching: run?.switching ?? null });
+    // The machine turned its embedder off, as with `fxbot embedder off`, while Settings still asks for it.
+    const none = run?.embedder === "off" && !run.switching && (await fxbot.settings.get()).embedder === "local";
+    const status = await fxbot.settings.embedding();
+    return json(res, 200, {
+      ...status,
+      ...(none ? { error: "The machine runs no local embedder. Pick Local again to start it, or Off." } : {}),
+      canSwitch: canUpdate,
+      local: run?.embedder ?? null,
+      switching: run?.switching ?? null,
+    });
   }
   if (resource === "providers" && extra === undefined) {
     if (!id && method === "GET") return json(res, 200, await fxbot.providers.list());
