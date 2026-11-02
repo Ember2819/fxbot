@@ -167,7 +167,7 @@ volumes: { pgdata: {} }
 
 ### The host command (`deploy/fxbot`, installed as `/opt/fxbot/fxbot` and `/usr/local/bin/fxbot`)
 
-A shell script of about 150 lines, run as root. It finds its engine in `.env`, and runs `podman compose` or `docker compose` in `/opt/fxbot`.
+A shell script of about 150 lines, run as root. It finds its engine in `.env`, and runs `podman compose` or `docker compose` in `/opt/fxbot`, without `-f`, so compose also merges a `compose.override.yaml` there. fxbot never writes that file, and updates leave it alone; the [agent computer](computer.md) uses it.
 
 | Command | Does |
 | --- | --- |
