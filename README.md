@@ -25,7 +25,7 @@ Records live in Postgres; libfx keeps each chat's session in files. No Next.js, 
 
 ## Phases
 
-In order of execution priority. Checked phases are built. Each is marked **core** or **add-on** ([Core or add-on](CONVENTIONS.md#core-or-add-on)). A core seam is a part of the core that add-ons plug into. Plugins has a full plan, and the rest are one-page stubs until they are planned.
+In order of execution priority. Checked phases are built. Each is marked **core** or **add-on** ([Core or add-on](CONVENTIONS.md#core-or-add-on)). A core seam is a part of the core that add-ons plug into. Memories and Plugins have full plans, and the rest are one-page stubs until they are planned.
 
 - [x] [v1](docs/_completed/v1-plan.md) (core): bot profiles and a streaming chat
 - [x] [Provider logins](docs/_completed/phases/provider-logins.md) (core): ChatGPT, Grok, and Vercel accounts, API keys, and local model servers

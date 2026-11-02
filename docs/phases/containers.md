@@ -7,7 +7,7 @@ fxbot runs as containers. `setup.sh` finds podman, or docker when only docker is
 Decided by the owner on 2026-11-02:
 - Podman by default, and docker when it's the only one installed.
 - One compose file starts the fxbot container and the database container. The database is pgvector's image, `pgvector/pgvector`.
-- The local embedder for [memories](memories.md) is a service in the same compose file, on the CPU or a GPU.
+- The local embedder for [memories](memories.md) is a service in the same compose file, on the CPU or a GPU. [Memories' research](memories.md#local-embedders) picked llama.cpp's server: its CPU image by default, and its CUDA image through an override file when a trial run reaches an NVIDIA GPU.
 
 To plan:
 - **Images:** the release workflow builds fxbot's image for each tag, for amd64 and arm64, and publishes it.
@@ -16,6 +16,7 @@ To plan:
 - **Data:** volumes for the database and chat files, and backups before migrations, taken from the database container.
 - **Moving a 0.2 install** from the machine's own Postgres into the database container.
 - **A checkout:** the database and embedder from the same compose file, with `npm run dev` on the machine.
+- **Compose versions:** podman-compose 1.0.x (Debian 12, Ubuntu 24.04) ignores `profiles` and only orders `depends_on`, so the design uses override files passed with `-f`, and services that retry. Debian 12 and Ubuntu 22.04 have no `podman compose`.
 - **Reaching it** stays the same. The fxbot container listens on 127.0.0.1:8787, and Tailscale or a proxy serves it.
 
 Not planned yet.

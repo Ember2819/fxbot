@@ -196,7 +196,7 @@ export default async function setup(fx: PluginApi) {
 - **Schemas and migrations.** Adding a plugin makes the schema `plugin_<name>`, then runs the plugin's `migrations/*.sql` in name order, each in a transaction, with `search_path` set to that schema. The names applied are kept in its `_migrations` table.
 - **Updates** run only the new files. A plugin never changes a file that has shipped, as fxbot's own migrations don't.
 - **Removing a plugin** drops its schema (`drop schema … cascade`).
-- **Core table changes** (core migration `0005_plugins`):
+- **Core table changes** (core migration `0006_plugins`):
   - add-ons take `kind` `plugin`, with the plugin's files and parts in `config`
   - `sent` gains `from`
   - Plugin secrets use `addon_secrets`, as MCP servers' do
@@ -293,7 +293,7 @@ A plugin runs with everything fxbot can reach, as Pi, opencode, and eve plugins 
 - **`packages/sdk`:**
   - `plugins.ts`: loading, the server API, hooks, schemas and migrations, settings, and install, update, and remove
   - `plugin-api.ts`: its types
-  - In `index.ts`: the hook sites, `from`, sessions for plugins, and tools through the wrapper. Also `registry.ts` (the plugins list), `archive.ts` (per-caller limits), and `0005_plugins.sql`.
+  - In `index.ts`: the hook sites, `from`, sessions for plugins, and tools through the wrapper. Also `registry.ts` (the plugins list), `archive.ts` (per-caller limits), and `0006_plugins.sql`.
 - **`packages/server`:** the routes above, and `FXBOT_PLUGIN_DIRS`.
 - **`packages/ui`:**
   - `plugins.tsx`: the loader, `@fxbot/app`, and the error boundaries
@@ -400,7 +400,7 @@ Checks use a sample plugin in the scratchpad that uses every hook and place, dis
   - The site gains a how-to, "Add a plugin", and a reference page, "Plugin API", for authors.
   - The Core and add-ons page names plugins.
   - The README's variables table lists `FXBOT_PLUGIN_DIRS`.
-  - The CHANGELOG notes `0005_plugins`.
+  - The CHANGELOG notes `0006_plugins`.
 - [ ] `npm run typecheck`, `npm run build`, `npm run build-site`, and `git diff --check` pass.
 
 **The human runs these:**
