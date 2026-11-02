@@ -73,11 +73,13 @@ newer() {
 migrations() { compose exec -T db psql -U fxbot -d fxbot -Atc 'select count(*) from fxbot_migrations' 2>/dev/null || echo 0; }
 
 # A backup in place of the database, which is dropped and made again, so tables a newer release added go too. Then
-# the chat files from its tarball, when it has one. The app is stopped first; `fxbot up` starts it.
+# the chat files from its tarball, when it has one. The app is stopped first, and the database started if it wasn't;
+# `fxbot up` starts the app.
 restore() {
   local folder=${1:?name a backup folder, such as $var/backups/<date>-before-<migration>}
   [ -f "$folder/database.dump" ] || die "$folder has no database.dump"
   compose stop fxbot >/dev/null 2>&1 || true
+  compose up -d --wait db >/dev/null 2>&1 || die "the database didn't start. See: fxbot logs db"
   compose exec -T db psql -U fxbot -d postgres -q -c 'drop database if exists fxbot with (force)' -c 'create database fxbot'
   compose exec -T db pg_restore -U fxbot -d fxbot --no-owner --exit-on-error <"$folder/database.dump"
   if [ -f "$folder/data.tar.gz" ]; then
