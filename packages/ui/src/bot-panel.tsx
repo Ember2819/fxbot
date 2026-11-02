@@ -43,7 +43,7 @@ export function BotPanel({ profile, profiles, panel, version }: { profile: Profi
   const mobile = useIsMobile();
   // The bot is the one picked in the sidebar, so the panel goes straight to its tabs.
   const body = (
-    <Tabs value={panel.tab} onValueChange={(tab) => panel.setTab(tab as Tab)} className="min-h-0 flex-1 px-4 pt-3">
+    <Tabs value={panel.tab} onValueChange={(tab) => panel.setTab(tab as Tab)} className="min-h-0 flex-1 px-4 pt-[calc(0.75rem+env(safe-area-inset-top))]">
       <div className="flex items-center gap-2">
         <TabsList className="flex-1">
           <TabsTrigger value="details">Details</TabsTrigger>

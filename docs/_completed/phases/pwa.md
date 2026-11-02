@@ -6,7 +6,7 @@ v1 meant fxbot to install as a PWA, and on a phone it doesn't. The parts exist: 
 - it takes updates without running stale code
 - it looks native, with theme colors, safe areas, and the keyboard handled
 
-Status: planned, not built. Research and plan only. It changes the UI (the Vite config, `index.html`, some CSS, and a small `pwa.ts`), one server line, the root `package.json`, and the README, with nothing in `@fxbot/sdk`. Updating fxbot itself stays with [app updates](app-updates.md); this page covers the page noticing a new build.
+Status: built on 2026-11-01, and checked in Chromium on this machine against disposable databases and ports: 44 checks, all passing (section 4). Phones are still to be tried by hand. After the build, the owner chose to install the development page: `npm run dev` keeps the plain tailnet address, and `npm run prod` is the production build on its own port. Where the build differs from the plan, section 3 says so under **Built**. It changed the UI (the Vite config, `index.html`, a small `pwa.ts`, and class names in three components), one server line, the root `package.json`, the README, and `AGENTS.md`, with nothing in `@fxbot/sdk`. Updating fxbot itself is the [releases](releases.md) phase; this page covers the page noticing a new build.
 
 ## 1. Research
 
@@ -67,11 +67,11 @@ These are read from the repository at `41a9e66`, specs, docs, and source, as of 
 
 ## 2. Key takeaways
 
-1. **The installed app is the built app, at its own address.**
+1. **The installed app is the built app, at its own address.** *Reversed after the build: the owner installs the development page (see **Built**).*
    - The plain tailnet address (443) goes to 8787, the API serving `packages/ui/dist`.
    - Development moves to 8443, which goes to Vite on 5173.
    - The two origins never share a service worker, so the dev server can't disturb the installed app, and Vite needs no development worker.
-2. **One command runs the app.** `npm start` builds, then serves. `npm run dev` starts the same API, which serves the last build, so the phone app keeps working during development.
+2. **One command runs the app.** `npm start` builds, then serves. `npm run dev` starts the same API, which serves the last build, so the phone app keeps working during development. *Built as `npm run prod`.*
 3. **Updates are offered, never forced.**
    - An open app stays on its whole build until the owner taps Reload.
    - It checks for a new build hourly, and whenever it comes to the front.
@@ -90,12 +90,14 @@ These are read from the repository at `41a9e66`, specs, docs, and source, as of 
 
 ### Two addresses
 
+As built, the development page keeps the plain address and is the app to install. The plan had them the other way round (see **Built**).
+
 | Address | Serves | One-time command |
 | --- | --- | --- |
-| `https://<machine>.<tailnet>.ts.net` | The installed app: the API and the built page, on 8787 | `tailscale serve --bg 8787` |
-| `https://<machine>.<tailnet>.ts.net:8443` | Development: Vite on 5173, never installed | `tailscale serve --bg --https=8443 5173` |
+| `https://<machine>.<tailnet>.ts.net` | `npm run dev`: Vite on 5173, the app to install | `tailscale serve --bg 5173` |
+| `https://<machine>.<tailnet>.ts.net:8443` | Optional. `npm run prod`: the API and the built page, on 8787 | `tailscale serve --bg --https=8443 8787` |
 
-- The root `package.json` gets `npm start`: `npm run build && npm run server`.
+- The root `package.json` gets `npm run prod`: `npm run build && npm run server`.
 - The README's run section describes both addresses, and says to install from the first.
 - Vite's `allowedHosts` already admits `.ts.net`, and its hot reload follows the page's port.
 
@@ -133,7 +135,7 @@ manifest: {
   - `onNeedRefresh` sets a flag. The sidebar footer then shows "New version" with a Reload button, built from the existing Button, with no new component.
   - `onRegisteredSW` calls `registration.update()` every hour, and when `visibilitychange` brings the app back to the front.
 - **Reload** saves the open chat's draft text to `sessionStorage`, then calls `updateSW()`. The chat puts the draft back after the reload. A streaming reply survives a reload already (v1).
-- **Old pages and a new server.** A page left on an old build can meet a newer API. That stays with [app updates](app-updates.md). This phase only offers the newer page.
+- **Old pages and a new server.** A page left on an old build can meet a newer API. This phase only offers the newer page; [releases](releases.md) closed the gap, since the page now hears the server's version on each answer and looks for its build at once.
 
 ### Looking native (`index.css`, `app.tsx`)
 
@@ -149,65 +151,91 @@ manifest: {
 ### Where the code goes
 
 - **`packages/ui`:**
-  - `vite.config.ts`: the manifest and prompt mode
+  - `vite.config.ts`: the manifest, prompt mode, and the manifest served in development
   - `index.html`: theme colors and viewport
   - `index.css` and `app.tsx`: safe areas and the Reload row
   - `pwa.ts`: registration, update checks, the draft handoff, and the install row
 - **`packages/server`:** the `.woff2` type.
-- **The root `package.json` and README:** `npm start`, and the two addresses.
+- **The root `package.json` and README:** `npm run prod`, and the two addresses.
+
+### Built
+
+What the build found or changed, checked against vite-plugin-pwa 2.0.0 and Playwright's Chromium:
+
+- **The owner installs the development page.** The planned addresses meant a rebuild and a Reload after every change, while the owner runs `npm run dev` over Tailscale as agents build. So they swapped:
+  - `npm run dev` keeps the plain tailnet address, and its page is the app to install. A small Vite plugin serves the same manifest in development and links it.
+  - That page registers no service worker, so every change shows up as it lands. Chrome needs no worker to install, and Chromium reports no installability errors for the page.
+  - `npm start` became `npm run prod`: the production build on 8787, which can take :8443. It keeps the offline shell and the Reload prompt.
+  - The installed development page can't open while the server is down.
+  - The production build stays off the plain address, where its service worker would answer for the development page.
+- **Registration lives in `pwa.ts`, which `app.tsx` imports,** not in `main.tsx`. It registers as the module loads, so its `beforeinstallprompt` listener is in place before Chrome fires one. It needs no production check: under `npm run dev` the plugin's `virtual:pwa-register` is a stub that registers nothing.
+- **The rows' markup is in `app.tsx`.** `pwa.ts` has no JSX. It holds the state (`useNewVersion`, `useInstall`) and the actions (`reload`, `install`, and the draft's `keepDraft` and `takeDraft`).
+- **Prompt mode needs no Workbox options.** The plugin turns on `skipWaiting` and `clientsClaim` only for `autoUpdate`. The generated worker calls `skipWaiting()` only when the page sends `SKIP_WAITING`, which `updateSW()` does.
+- **Safe areas reach a few more places than planned:**
+  - the library page's header and the bot panel's tabs pad the top inset, like the chat's header
+  - the sidebar footer pads the bottom inset, and the sidebar paints its own color under the left one
+  - the page drops its left inset while the sidebar sits beside it
+- **Headless Chromium offered to install by itself** on `127.0.0.1`. It fired a real `beforeinstallprompt`, and Settings showed Install before the check dispatched its own.
+- **On a phone the sidebar is a sheet,** so "New version" shows once the sheet is opened, as planned.
 
 ### Size
 
-About 130 lines:
+Built: about 130 lines, against the estimate of 130. It adds no dependency and no process.
 
-| Part | Lines |
-| --- | --- |
-| `pwa.ts` | about 60 |
-| UI: the Reload row, the install row, and safe areas | about 45 |
-| Config, HTML, and CSS | about 25 |
-| Server and scripts | about 3 |
+| Part | Estimate | Built |
+| --- | --- | --- |
+| `pwa.ts` | 60 | 72 |
+| UI: the Reload row, the install row, the draft, and safe areas | 45 | +30 in `app.tsx`, and one class each in `library.tsx` and `bot-panel.tsx` |
+| Config, HTML, and CSS | 25 | +27 in `vite.config.ts`, with the manifest served in development, and +1 in `index.html`. `index.css` needed nothing |
+| Server and scripts | 3 | +1 and +1 |
 
 Plus the README.
 
 ## 4. Checklist
 
-Checks run the production build on a disposable port and database, with Playwright's Chromium on this machine. Phones are the human's.
+Checks run the production build on a disposable port and database, with Playwright's Chromium on this machine. Phones are the human's. The update checks build A and B in a copy of the repository, so the real build only ever holds the current code.
 
 **M1. Installs**
-- [ ] `npm start` builds and serves the app. The API that `npm run dev` starts serves the same build.
-- [ ] The manifest comes as `application/manifest+json` with `id`, `scope`, `description`, and both icons as `any` and `maskable`. Chromium reports no installability errors (`Page.getInstallabilityErrors`).
-- [ ] The font comes as `font/woff2`.
-- [ ] In dark mode, the dark theme color applies.
+- [x] `npm run prod` (planned as `npm start`) builds and serves the app. The API that `npm run dev` starts serves the same build.
+- [x] The development page links the same manifest and registers no worker. Chromium reports no installability errors for it either.
+- [x] The manifest comes as `application/manifest+json` with `id`, `scope`, `description`, and both icons as `any` and `maskable`. Chromium reports no installability errors (`Page.getInstallabilityErrors`).
+- [x] The font comes as `font/woff2`.
+- [x] In dark mode, the dark theme color applies. It matches the page's dark background, read back as `#0a0a0a`.
 
 **M2. Offline and updates**
-- [ ] With the server stopped, the cached shell opens and says it can't reach the server, as in v1.
-- [ ] Build A and open it, then build B. A visibility change brings up "New version".
-  - The page keeps running A, and no request mixes A's page with B's files.
+- [x] With the server stopped, the cached shell opens and says it can't reach the server, as in v1.
+- [x] Build A and open it, then build B. A visibility change brings up "New version".
+  - The page keeps running A, and no request mixes A's page with B's files. A plain reload still opens A while B waits.
   - Reload runs B.
-- [ ] A draft typed before Reload is still there after it.
-- [ ] A development page on another port leaves the app's worker alone.
+- [x] A draft typed before Reload is still there after it. A later visit to that chat starts empty.
+- [x] A development page on another port leaves the production worker alone.
 
 **M3. Install row and looks**
-- [ ] A dispatched `beforeinstallprompt` shows Install, and clicking it calls `prompt()`.
-- [ ] An iOS user agent shows the steps. Standalone display shows no row.
-- [ ] `npm run typecheck`, `npm run build`, and `git diff --check` pass.
+- [x] A dispatched `beforeinstallprompt` shows Install, and clicking it calls `prompt()`.
+- [x] An iOS user agent shows the steps. Standalone display shows no row. Chromium would not emulate `display-mode`, so this check answers `matchMedia` for it.
+- [x] `npm run typecheck`, `npm run build`, and `git diff --check` pass.
+
+**Also checked,** with Chromium's safe-area emulation:
+- Upright, with a 59-pixel status bar and a 34-pixel home indicator: the chat's header, the sidebar's top and bottom rows, and the bot panel's tabs clear both, and the composer pads 34 pixels.
+- Turned, with 59-pixel insets at both sides: the sidebar takes the left inset and the page the right one. With the sidebar closed, the page takes both.
+- No page errors in any view.
 
 **The human runs these:**
-- Point `tailscale serve` 443 at 8787, and add 8443 for development.
+- Keep `tailscale serve` 443 on 5173. For the production build, add 8443 for 8787.
 - **Android Chrome:** install from the tailnet address, and check:
   - the icon's shape, and the colors in light and dark
   - the composer stays above the keyboard
-  - "New version" appears after a rebuild
-  - the app opens in airplane mode
-- **iPhone on iOS 26:** Add to Home Screen with "Open as Web App" on. The status bar and the home indicator don't cover the header or the composer. Repeat the update and offline checks.
+  - a change to the code shows up in the app
+  - at :8443, "New version" appears after a rebuild, and the app opens in airplane mode
+- **iPhone on iOS 26:** Add to Home Screen with "Open as Web App" on. The status bar and the home indicator don't cover the header or the composer. Repeat the update and offline checks at :8443.
 - **Desktop Chrome:** install from the address bar.
 
 ## 5. Open questions
 
-Each has a default.
+Each has a default. The build took every one, and then the owner answered the first the other way.
 
-1. **Which address gets the app.** *Default:* the plain tailnet address for the app, and :8443 for development. The other way round works too, with the app on :8443.
+1. **Which address gets the app.** *Default:* the plain tailnet address for the app, and :8443 for development. The other way round works too, with the app on :8443. *Answered:* the plain address stays on development, which is the app to install, and the production build takes :8443.
 2. **Push notifications and badges.** "Bob replied", and a count of unread chats on the icon. *Default:* a later phase of its own, with VAPID keys sealed on the server like every other secret.
 3. **Screenshots for Android's install sheet.** *Default:* none for now. Two can be added later, with `form_factor` set.
-4. **A worker in development.** *Default:* none. A development worker would cache only the entry page, and the dev address is never installed.
-5. **Keeping the server running.** *Default:* no service, as now. When the server is down, the installed app opens its shell and says so.
+4. **A worker in development.** *Default:* none. A development worker would cache only the entry page. It stayed none after the development page became the one to install, since Chrome installs it without one.
+5. **Keeping the server running.** *Default:* no service, as now. With the server down, the installed development page can't open, while the production build opens its shell and says so.

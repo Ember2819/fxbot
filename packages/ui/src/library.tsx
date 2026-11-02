@@ -88,7 +88,7 @@ export function LibraryPage({ profiles }: { profiles: Profile[] | null }) {
 
   return (
     <>
-      <header className="flex h-14 shrink-0 items-center gap-2 px-3">
+      <header className="box-content flex h-14 shrink-0 items-center gap-2 px-3 pt-[env(safe-area-inset-top)]">
         <SidebarTrigger />
         <h1 className="font-medium">Library</h1>
       </header>

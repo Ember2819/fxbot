@@ -1,11 +1,13 @@
 import tailwindcss from "@tailwindcss/vite";
 import react from "@vitejs/plugin-react";
 import { spawn, type ChildProcess } from "node:child_process";
+import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { defineConfig, type Plugin } from "vite";
-import { VitePWA } from "vite-plugin-pwa";
+import { VitePWA, type ManifestOptions } from "vite-plugin-pwa";
 
 const repo = fileURLToPath(new URL("../..", import.meta.url));
+const { version } = JSON.parse(readFileSync(`${repo}package.json`, "utf8")) as { version: string };
 const apiPort = process.env.FXBOT_PORT ?? "8787";
 
 // `npm run dev` runs the API beside Vite, and restarts it when the server or the SDK changes. Vite on its own watches
@@ -52,27 +54,56 @@ function runApi() {
   };
 }
 
+const manifest: Partial<ManifestOptions> = {
+  id: "/",
+  name: "fxbot",
+  short_name: "fxbot",
+  description: "Long-running chats with your bots",
+  start_url: "/",
+  scope: "/",
+  display: "standalone",
+  background_color: "#ffffff",
+  theme_color: "#ffffff",
+  // The icons are opaque, and the bubble stays inside the circle that maskable icons keep, so each serves as both.
+  icons: [
+    { src: "/icon-192.png", sizes: "192x192", type: "image/png", purpose: "any" },
+    { src: "/icon-512.png", sizes: "512x512", type: "image/png", purpose: "any" },
+    { src: "/icon-192.png", sizes: "192x192", type: "image/png", purpose: "maskable" },
+    { src: "/icon-512.png", sizes: "512x512", type: "image/png", purpose: "maskable" },
+  ],
+};
+
+// The page that `npm run dev` serves is the app the owner installs, so it links the same manifest. It registers no
+// service worker, so every change shows up as it lands. The offline copy is the production build's (`npm run prod`).
+function devManifest(): Plugin {
+  return {
+    name: "fxbot-dev-manifest",
+    apply: "serve",
+    configureServer(server) {
+      server.middlewares.use("/manifest.webmanifest", (_req, res) => {
+        res.setHeader("content-type", "application/manifest+json");
+        res.end(JSON.stringify(manifest));
+      });
+    },
+    transformIndexHtml: () => [{ tag: "link", attrs: { rel: "manifest", href: "/manifest.webmanifest" }, injectTo: "head" }],
+  };
+}
+
 export default defineConfig({
+  // The page knows the version it was built from, to notice a server that runs another.
+  define: { __FXBOT_VERSION__: JSON.stringify(version) },
   plugins: [
     api(),
+    devManifest(),
     react(),
     tailwindcss(),
     VitePWA({
-      registerType: "autoUpdate",
-      manifest: {
-        name: "fxbot",
-        short_name: "fxbot",
-        display: "standalone",
-        start_url: "/",
-        background_color: "#ffffff",
-        theme_color: "#ffffff",
-        icons: [
-          { src: "/icon-192.png", sizes: "192x192", type: "image/png" },
-          { src: "/icon-512.png", sizes: "512x512", type: "image/png" },
-        ],
-      },
-      // The shell is precached. /api is never cached and never answered by the worker.
-      workbox: { globPatterns: ["**/*.{js,css,html,woff2}"], navigateFallbackDenylist: [/^\/api\//] },
+      // A new build's worker waits for src/pwa.ts to ask it to take over, so an open page never mixes two builds.
+      registerType: "prompt",
+      injectRegister: false,
+      manifest,
+      // The shell is precached. /api, and /callback where a sign-in on this machine lands, are never answered by the worker.
+      workbox: { globPatterns: ["**/*.{js,css,html,woff2}"], navigateFallbackDenylist: [/^\/api\//, /^\/callback(\?|$)/] },
     }),
   ],
   resolve: { alias: { "@": fileURLToPath(new URL("./src", import.meta.url)) } },

@@ -1,13 +1,13 @@
 # Plugins
 
-A plugin bundles [MCP servers](mcp.md) and [skills](skills.md) in the format that Cursor, Codex, Grok, and Claude Code share. In fxbot, a plugin can also:
+A plugin bundles [MCP servers](../_completed/phases/mcp.md) and [skills](skills.md) in the format that Cursor, Codex, Grok, and Claude Code share. In fxbot, a plugin can also:
 - launch local MCP servers
 - install the tooling they need, such as [herdr](https://herdr.dev)
 - hook into a bot's turns
 
-Plugins are found and added through [add-ons](addons.md), whose page lists every part before anything is saved. A plugin made only of remote servers and skills, such as Twilio's, runs nothing on this machine. One with local servers, setup, or hooks does, so most of this page is about doing that safely.
+Plugins are found and added through [add-ons](addons.md), whose page lists every part before anything is saved. A plugin made only of remote servers and skills runs nothing on this machine. One with local servers, setup, or hooks does, and the first plugin, herdr, has all three, so most of this page is about doing that safely.
 
-Status: planned, not built. Research and plan only. It builds on [add-ons](addons.md), [MCP servers](mcp.md), and [skills](skills.md), and shares one hook seam with [permissions](permissions.md).
+Status: planned, not built. Research and plan only. It builds on [add-ons](addons.md), [MCP servers](../_completed/phases/mcp.md), and [skills](skills.md), and shares one hook seam with [permissions](permissions.md). Its first plugin is herdr ([fxbot's extension](#fxbots-extension)).
 
 ## 1. Research
 
@@ -58,7 +58,7 @@ These are read from specs, source, docs, and the installed libfx, as of November
 **libfx 0.0.16 and the fx CLI** (installed package; `vercel-labs/fx`)
 - **Tools.** A host tool is `{ name, description, inputSchema, idempotent, execute(input, { signal, sessionId, context }) }`. Authorization happens "inside `execute`".
   - The tool list is fixed when an agent is made.
-- **MCP.** `libfx/mcp` adapts a client that fxbot owns ([mcp.md](mcp.md#1-research)). fxbot starts and stops local server processes itself.
+- **MCP.** `libfx/mcp` adapts a client that fxbot owns ([mcp.md](../_completed/phases/mcp.md#1-research)). fxbot starts and stops local server processes itself.
 - **Hooks.** `hooks.onEvent` reports turn, step, model, tool, permission, and MCP events. "libfx doesn't await their promises", so hooks there can only observe.
 - **The fx CLI.**
   - `fx mcp add NAME -- CMD` adds a stdio server, and a project's servers wait for `fx mcp approve` (`src/core/mcp_host/verbs.zig`).
@@ -95,7 +95,7 @@ These are read from specs, source, docs, and the installed libfx, as of November
    - settings for secrets
    - read-only hints
    - hooks
-3. **Code runs here only for local parts.** A plugin of remote servers and skills, like Twilio's, needs none of the rules below. Local servers, setup steps, and hooks do.
+3. **Code runs here only for local parts.** A plugin of remote servers and skills needs none of the rules below. Local servers, setup steps, and hooks do.
 4. **Local code runs as the agents' OS user, never as fxbot's own.** fxbot's user can read the secret key and reach Postgres. The plugin is pinned, and everything it runs is shown before it runs.
 5. **Keep plugins out of fxbot's process.** Hooks are commands that read and write JSON, not JavaScript loaded into the server. opencode and eve load plugin code in-process, but fxbot's process holds the keys to everything.
 6. **Hooks go only where real seams exist:**
@@ -109,7 +109,7 @@ These are read from specs, source, docs, and the installed libfx, as of November
    - their own process group
    - restarts with capped backoff
    - recent stderr shown in the UI
-9. **The first local plugin is herdr.** It checks for the binary, installs it on request, and runs a pinned herdr-mcp.
+9. **The first plugin is herdr,** which the owner already uses. It checks for the binary, installs it on request, and runs a pinned herdr-mcp.
 
 ## 3. Implementation
 
@@ -120,7 +120,7 @@ These are read from specs, source, docs, and the installed libfx, as of November
 - **MCP servers.**
   - Agent Plugins: `mcp.json`.
   - Claude: the manifest's `mcpServers` (inline, or a path), otherwise `.mcp.json`. Claude's `"type": "http"` means `streamable-http`, and an entry with a `command` is stdio.
-  - Remote servers go through the [MCP flow](mcp.md#adding-a-server), sign-in included. Local ones run as described under Running.
+  - Remote servers go through the [MCP flow](../_completed/phases/mcp.md#adding-a-server), sign-in included. Local ones run as described under Running.
 - **Skills.** `skills/<name>/SKILL.md`, plus each folder that the manifest or the marketplace entry lists in `skills`. A listed folder is a skill, or holds skills one level down, like Twilio's `./skills/twilio`. They load as [skills](skills.md#adding-skills) do.
 - **Placeholders.** `${PLUGIN_ROOT}` and `${PLUGIN_DATA}`, and Claude's `${CLAUDE_PLUGIN_ROOT}` and `${CLAUDE_PLUGIN_DATA}`, are expanded in `args`, `env`, and `cwd`. Nothing else is.
 - **Not used by fxbot.** Commands, agents, LSP servers, monitors, `bin/`, and other clients' hooks are counted on the add-on page.
@@ -131,7 +131,7 @@ These are read from specs, source, docs, and the installed libfx, as of November
 
 ### fxbot's extension
 
-The herdr plugin, as fxbot's first local plugin:
+The herdr plugin, fxbot's first plugin, published in the project's marketplace ([add-ons, question 2](addons.md#5-open-questions)):
 
 ```text
 herdr/
@@ -183,7 +183,7 @@ herdr-mcp talks to whatever session the `herdr` CLI finds. By default that is th
 - **`environmentVariables`.** Per server, in server.json's shape: `name`, `description`, `isRequired`, `isSecret`, and `default`.
   - Agent Plugins allows no secrets in `env` and no other placeholders, so settings live here.
   - The add-on asks for them, seals the secret ones, and passes them only to that server.
-- **`readOnly`.** Per server, the tools that count as read-only for [trust](mcp.md#tools-for-bots), when the server doesn't mark them itself.
+- **`readOnly`.** Per server, the tools that count as read-only, and so are allowed until the owner picks ([mcp.md](../_completed/phases/mcp.md#built)), when the server doesn't mark them itself.
 - **`hooks`.** The events are `tool.before`, `tool.after`, `turn.start`, and `turn.end`.
   - Each event takes commands as argv arrays, with an optional tool-name `match`.
   - Hook scripts live in the namespace's folder.
@@ -249,7 +249,7 @@ Adding a plugin goes through the [add-ons](addons.md#api-sdk-and-client) preview
 
 ### Where the code goes
 
-- **`packages/sdk`:** `plugins.ts` (reading the format, the extension, processes, and hooks). It uses `archive.ts` and `skills.ts` from [skills](skills.md), and `mcp.ts`.
+- **`packages/sdk`:** `plugins.ts` (reading the format, the extension, processes, and hooks). It uses `archive.ts` and `skills.ts` from [skills](skills.md), and `mcp.ts`. `registry.ts` gains the marketplace sync described in [add-ons](addons.md#sources-packagessdksrcregistryts).
 - **`packages/server`:** the routes above.
 - **`packages/ui`:** the settings form, setup output, and process status and logs. The add-on page is in [add-ons](addons.md#ui).
 
@@ -263,7 +263,7 @@ Adding a plugin goes through the [add-ons](addons.md#api-sdk-and-client) preview
   - Plugin code runs as the plugin user.
 - **The approved files are the files that run.** fxbot pins and verifies the fetch, runs no install scripts, asks again on any change, and never updates on its own.
 - **Secrets are sealed,** and reach only the server that declared them, through its environment.
-- **A plugin's tools are untrusted** like any MCP tool. They start read-only ([mcp.md](mcp.md#tools-for-bots)), and the [permissions](permissions.md) phase adds asking.
+- **A plugin's tools are untrusted** like any MCP tool. Only their read-only ones are allowed until the owner picks ([mcp.md](../_completed/phases/mcp.md#tools-for-bots)), and the [permissions](permissions.md) phase adds asking.
 - **herdr in particular.** Its socket has no auth, so a bot with herdr tools can type into any herdr pane. The herdr plugin starts read-only, with only `list_agents` and `read_pane`.
 
 ### Size
@@ -284,8 +284,9 @@ The process and hook code is where most of the risk is, and should not be trimme
 Checks use plugin repos and a marketplace in the scratchpad, a tiny stdio MCP server, disposable Postgres, and a plugin OS user created for the checks. Nothing installs real tooling except the human's herdr check.
 
 **M1. Format and install**
-- [ ] An Agent Plugins plugin with a stdio server, a remote server, and two skills: every part shows on the add-on page.
-- [ ] A Claude-format plugin like Twilio's (listed skill folders, an inline `http` server) installs with all its skills. It needs no plugin user, and nothing is unpacked to disk.
+- [ ] The herdr plugin, with a stub `herdr` and a tiny stdio server in place of herdr-mcp: its server, skill, setup steps, and hook all show on the add-on page, with `curl … | sh` flagged.
+- [ ] The mock marketplace syncs at its commit, and its plugins join the add-on search. An entry without a pin shows, but can't be added.
+- [ ] A Claude-format plugin (listed skill folders, an inline `http` server) installs with all its skills. It needs no plugin user, and nothing is unpacked to disk.
 - [ ] Commands, agents, and an LSP server are counted as not used. A bad server or skill is skipped and reported.
 - [ ] A changed commit, integrity, or sha256 is refused. No package script runs (checked with a package whose `postinstall` writes a marker file).
 - [ ] Changing the plugin asks again, and nothing updates on its own.
@@ -311,8 +312,8 @@ Checks use plugin repos and a marketplace in the scratchpad, a tiny stdio MCP se
 
 **The human runs these:**
 - Create the plugin user and its sudoers rule. Keep `FXBOT_DATA` outside any private home directory, so that user can reach `plugins/`.
-- Add Twilio's plugin from Anthropic's marketplace, and ask a bot a Twilio question.
-- Install the herdr plugin on the real machine, run its setup, and list agents from a bot.
+- Publish the project's marketplace with the herdr plugin.
+- Add the herdr plugin on the real machine, run its setup if herdr is missing, and list agents from a bot.
 - Decide whether to allow herdr's write tools.
 
 ## 5. Open questions
@@ -325,5 +326,5 @@ Each has a default.
 4. **The hook set.** *Default:* `tool.before`, `tool.after`, `turn.start`, and `turn.end`. Context and model transforms wait for a libfx seam.
 5. **Claude Code's hooks.** *Default:* not run. They expect Claude Code's tools and events, so they're counted as not used.
 6. **Which herdr.** The herdr TUI, or the newer app with `hc`? *Default:* the TUI and its socket, with the third-party herdr-mcp pinned to a commit. The owner confirms.
-7. **fxbot's namespace.** *Default:* a reverse-domain name on the project's public site, chosen with the [CIMD document's](mcp.md#5-open-questions) home.
+7. **fxbot's namespace.** *Default:* a reverse-domain name on the project's public site, chosen with the [CIMD document's](../_completed/phases/mcp.md#5-open-questions) home.
 8. **Updates.** *Default:* none on their own. A newer pin shows Update, which goes through the add-on page again.

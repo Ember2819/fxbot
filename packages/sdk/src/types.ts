@@ -29,6 +29,17 @@ export const maxPinned = 3;
 // New bots start on `defaultProvider`.
 export type Settings = { defaultProvider: string };
 
+// A release of fxbot: its version, its notes, and its page.
+export type Release = { version: string; notes: string; url: string };
+// The running version, the newest release when it is newer, and whether Settings can update to it: only in an install
+// made by setup.sh, under systemd. `updating` is an update's steps so far, its error, or its restart.
+export type UpdateStatus = {
+  version: string;
+  latest: Release | null;
+  canUpdate: boolean;
+  updating: { to: string; steps: string[]; error?: string; restarting?: boolean } | null;
+};
+
 // A file sent with a message: `data` is base64 on the way in, and `url` is its library file once fxbot keeps it.
 export type Upload = { name: string; type: string; url?: string; data?: string };
 // What a message sends. The same `messageId` again reaches the same turn and runs nothing new.
@@ -99,6 +110,45 @@ export type Team = { id: string; name: string };
 // A device code sign-in as the page sees it: where to go and the code to enter, never what claims the tokens.
 export type SignIn = { id: string; verificationUrl: string; userCode: string; expiresAt: number };
 export type SignInStatus = { status: "waiting" | "done" | "failed"; provider?: string; error?: string };
+
+// An add-on gives bots more to use. So far the one kind is a remote MCP server. `auth` is how it signs in: not at
+// all, with headers whose values fxbot keeps sealed, or with OAuth. `signedIn` says it has its token or header values.
+// Bots get only the tools in `allowed`, which are the read-only ones until the person picks. `bots` is "all", or "each"
+// for only the bots in `on`. `status` says "Connected", or what it waits for.
+export type AddonTool = { name: string; description: string; readOnly: boolean };
+export type Transport = "streamable-http" | "sse";
+export type Addon = {
+  id: string;
+  kind: "mcp";
+  name: string;
+  url: string;
+  transport: Transport;
+  auth: "none" | "headers" | "oauth";
+  headers: string[];
+  allowLocal: boolean;
+  enabled: boolean;
+  bots: "all" | "each";
+  on: string[];
+  allowed: string[];
+  status: string;
+  tools: AddonTool[];
+  signedIn: boolean;
+  ownClient: boolean;
+};
+// What the page asks to add: a server by its URL, with the names of any headers it needs, or a registry entry.
+export type AddonRef = { url: string; transport?: Transport; headers?: string[]; allowLocal?: boolean } | { registry: string; version?: string; allowLocal?: boolean };
+// The add-on page: what probing the server found. Add sends `hash` back, and fails if the server changed since.
+export type AddonPreview = Omit<Addon, "id" | "kind" | "headers" | "enabled" | "bots" | "on" | "allowed" | "status" | "tools" | "signedIn" | "ownClient"> & {
+  hash: string;
+  headers: { name: string; secret: boolean; description?: string }[];
+  tools: AddonTool[] | null;
+};
+// Write-only: header values, or the person's own OAuth client for a server that registers none itself.
+export type AddonSecrets = { headers?: Record<string, string>; clientId?: string; clientSecret?: string };
+// An OAuth sign-in as the page sees it. "redirect" comes back on its own; "paste" needs the address of the page that
+// failed to load.
+export type OAuthAttempt = { id: string; url: string; mode: "redirect" | "paste"; expiresAt: number };
+export type OAuthStatus = { status: "waiting" | "done" | "failed"; error?: string };
 
 // One line of a bot's NDJSON stream, as far as fxbot reads it. libfx writes more types and fields.
 export type StreamLine = {

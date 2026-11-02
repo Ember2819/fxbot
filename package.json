@@ -1,7 +1,9 @@
 {
   "name": "fxbot",
+  "version": "0.1.0",
   "private": true,
   "type": "module",
+  "repository": "https://github.com/iammrduncan/fxbot",
   "workspaces": [
     "packages/sdk",
     "packages/server",
@@ -13,9 +15,11 @@
   "scripts": {
     "dev": "npm run dev -w @fxbot/ui",
     "server": "node --env-file-if-exists=.env packages/server/src/index.ts",
+    "prod": "npm run build && npm run server",
     "build": "npm run build -w @fxbot/ui",
     "typecheck": "npm run typecheck --workspaces",
-    "rotate-key": "node --env-file-if-exists=.env packages/server/src/rotate-key.ts"
+    "rotate-key": "node --env-file-if-exists=.env packages/server/src/rotate-key.ts",
+    "update": "node packages/server/src/update.ts"
   },
   "devDependencies": {
     "@types/node": "^22.20.5",

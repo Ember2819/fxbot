@@ -1,14 +1,17 @@
 import type { FxResumeTurn, FxSessionPromptInput, FxTurn } from "libfx";
 import { createHistory, summarize } from "./history.ts";
 import { createLibrary } from "./library.ts";
+import { createMcp } from "./mcp.ts";
 import { createProviders } from "./providers.ts";
+import { createReleases } from "./releases.ts";
 import { readKey } from "./secrets.ts";
 import { createStore, isId, type StoredProfile } from "./store.ts";
-import { colors, maxPinned, shapes, type Fields, type Kind, type LibraryQuery, type Message, type NewProvider, type Profile, type ProfileUpdate, type ProviderUpdate, type Settings, type StreamLine, type Upload } from "./types.ts";
+import { colors, maxPinned, shapes, type AddonRef, type AddonSecrets, type Fields, type Kind, type LibraryQuery, type Message, type NewProvider, type Profile, type ProfileUpdate, type ProviderUpdate, type Settings, type StreamLine, type Upload } from "./types.ts";
 
 export type * from "./types.ts";
 export { colors, itemKinds, kinds, maxPinned, shapes } from "./types.ts";
 export { readKey, rotateSecrets } from "./secrets.ts";
+export { compareVersions, isStable, isVersion, releasesUrlFor } from "./releases.ts";
 
 export type FxbotOptions = {
   /** fxbot's Postgres. Every record lives there, and keys and tokens only sealed. */
@@ -19,8 +22,20 @@ export type FxbotOptions = {
   vercelClientId?: string;
   /** libfx's sessions. Default `data`. */
   dataDir?: string;
-  /** For sign-ins, model lists, and key checks; replaced in checks. */
+  /** Where a backup goes before migrations run: the database and `dataDir`. Default `backups`. */
+  backupsDir?: string;
+  /** The running version, from the root package.json. */
+  version?: string;
+  /** Where the newest stable release is read, in the shape of GitHub's `releases/latest`. None: no check. */
+  releasesUrl?: string;
+  /** For sign-ins, model lists, key checks, and MCP servers; replaced in checks. */
   fetch?: typeof fetch;
+  /** The server's own origin on this machine, for MCP sign-ins with a loopback redirect. Default `http://127.0.0.1:8787`. */
+  localUrl?: string;
+  /** The project's published client ID metadata document, for MCP sign-ins that use one. */
+  clientMetadataUrl?: string;
+  /** The MCP registry that registry entries come from. Default GitHub's, `https://api.mcp.github.com`. */
+  registryUrl?: string;
 };
 
 // Bad input fails with `status` 400 and a missing bot with 404, so a server can answer with the same status.
@@ -52,12 +67,31 @@ function fields(input: Partial<Fields>, create: boolean): Partial<Fields> {
 
 // Postgres for the records, one libfx agent per provider over a shared sessions directory, and a durable chat with
 // each bot. Turns a stopped process left open run again at once.
-export async function createFxbot({ databaseUrl, secretKey, vercelClientId, dataDir = "data", fetch = globalThis.fetch }: FxbotOptions) {
+export async function createFxbot(options: FxbotOptions) {
+  const { databaseUrl, secretKey, vercelClientId, dataDir = "data", backupsDir = "backups", version = "0.0.0", fetch = globalThis.fetch } = options;
   const key = typeof secretKey === "string" ? readKey(secretKey) : secretKey;
-  const store = await createStore(databaseUrl);
+  const store = await createStore({ databaseUrl, dataDir, backupsDir });
+  const releases = createReleases({ version, url: options.releasesUrl, fetch });
   const history = createHistory(store.sql);
   const library = createLibrary(store.sql);
-  const providers = await createProviders({ store, secretKey: key, dataDir, vercelClientId, fetch, tools: [history.tool, ...library.tools] });
+  // MCP servers' tools join every agent. A change to them makes the agents again, one change at a time.
+  const mcp = await createMcp({
+    store,
+    secretKey: key,
+    fetch,
+    localUrl: options.localUrl ?? "http://127.0.0.1:8787",
+    clientMetadataUrl: options.clientMetadataUrl,
+    registryUrl: options.registryUrl ?? "https://api.mcp.github.com",
+    onChange: () => void retool(),
+  });
+  const toolsNow = async () => [history.tool, ...library.tools, ...(await mcp.tools())];
+  const providers = await createProviders({ store, secretKey: key, dataDir, vercelClientId, fetch, tools: await toolsNow() });
+  let retooling = Promise.resolve();
+  function retool() {
+    retooling = retooling.then(async () => providers.retool(await toolsNow())).catch((error) => console.error("Could not give the agents their new tools:", error));
+    return retooling;
+  }
+  mcp.connect();
 
   // How many turns each bot has running in this process, for `busy`.
   const running = new Map<string, number>();
@@ -290,8 +324,33 @@ export async function createFxbot({ databaseUrl, secretKey, vercelClientId, data
       remove: (id: string) => library.remove(id),
     },
 
+    // Remote MCP servers. Adding one takes the `hash` its preview showed, and fails if the server changed since.
+    // Secrets are write-only; a listed add-on says only whether it holds them.
+    addons: {
+      list: () => mcp.list(),
+      preview: (ref: AddonRef) => mcp.preview(ref),
+      add: (ref: AddonRef, hash: string) => mcp.add(ref, hash),
+      change: (id: string, input: { enabled?: boolean; bots?: "all" | "each"; allowed?: string[] }) => mcp.change(id, input),
+      remove: (id: string) => mcp.remove(id),
+      setSecrets: (id: string, input: AddonSecrets) => mcp.setSecrets(id, input),
+      // A bot's switch, read when the add-on is chosen bot by bot.
+      async forBot(profileId: string, addonId: string, enabled: boolean) {
+        await get(profileId);
+        return mcp.forBot(profileId, addonId, enabled);
+      },
+    },
+
+    // OAuth sign-in to an MCP server: start with the page's origin, then poll. The browser comes back to that origin's
+    // `/api/oauth/callback`, or the person pastes the address of the page a loopback redirect could not load.
+    oauth: mcp.oauth,
+
     // Waits for the turns this process started, then lets Postgres go.
+    // The running version, and the newest stable release when it is newer.
+    release: releases.get,
+
     async close() {
+      releases.close();
+      await mcp.close();
       await providers.close();
       await store.close();
     },

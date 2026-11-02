@@ -1,10 +1,10 @@
 # Skills
 
-Bots use skills: [Agent Skills](https://agentskills.io/specification), folders with a `SKILL.md`. Skills come from [add-ons](addons.md): a skill found on skills.sh, the skills inside a [plugin](plugins.md), or the skills an [MCP server](mcp.md) serves. Each bot sees a short list of its skills, and reads one only when a task needs it.
+Bots use skills: [Agent Skills](https://agentskills.io/specification), folders with a `SKILL.md`. Skills come from [add-ons](addons.md): a skill found on skills.sh, the skills inside a [plugin](plugins.md), or the skills an [MCP server](../_completed/phases/mcp.md) serves. Each bot sees a short list of its skills, and reads one only when a task needs it.
 
 This page's first idea was that profiles grow skills from use, kept small enough to read and audit. That comes later and builds on the same records and tool ([Later](#later-skills-bots-write)).
 
-Status: planned, not built. Research and plan only. It needs the [add-ons](addons.md) records, and skills served by MCP servers need [MCP servers](mcp.md) too. It lands before [plugins](plugins.md), whose skills it loads.
+Status: planned, not built. Research and plan only. It lands after [add-ons](addons.md), whose records and search it uses, and skills served by MCP servers need [MCP servers](../_completed/phases/mcp.md) too. It lands before [plugins](plugins.md), whose skills it loads.
 
 ## 1. Research
 
@@ -182,7 +182,7 @@ Plus the `yaml` dependency.
 Checks use the mock model, disposable Postgres, and three mocks in the scratchpad:
 - a GitHub archive holding skills
 - a skills.sh search
-- the [MCP checks'](mcp.md#4-checklist) mock server, serving skills through the extension
+- the [MCP checks'](../_completed/phases/mcp.md#4-checklist) mock server, serving skills through the extension
 
 **M1. Records**
 - [ ] An archive with three skills: all three load. A skill with a bad name, or a name that doesn't match its folder, is skipped and reported.
@@ -198,6 +198,7 @@ Checks use the mock model, disposable Postgres, and three mocks in the scratchpa
 - [ ] A scripted mock model calls `skill`, and its next request carries the skill's text.
 
 **M3. Sources**
+- [ ] A skills search asks skills.sh once after typing stops, caches for 5 minutes, and asks nothing when turned off. Its results join the add-on search after local entries.
 - [ ] A skills.sh result adds its skill from the pinned commit. A newer commit shows Update.
 - [ ] An MCP server that declares the extension: its skills are listed after connecting, read through `resources/read`, and labelled with the server.
 
@@ -205,7 +206,7 @@ Checks use the mock model, disposable Postgres, and three mocks in the scratchpa
 - [ ] Playwright: search for a skill, open its page, read its text, add it, and turn it off for one bot.
 - [ ] `npm run typecheck`, `npm run build`, and `git diff --check` pass.
 
-**The human runs this:** add Twilio's plugin, then ask a bot how to record a call. It should read `twilio:twilio-call-recordings` first.
+**The human runs this:** find a skill through the add-on search, add it, and ask a bot something it covers. The bot should read the skill before it answers.
 
 ## 5. Open questions
 

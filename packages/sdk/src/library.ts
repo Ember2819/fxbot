@@ -1,5 +1,6 @@
 import { createHash } from "node:crypto";
 import type { FxAgentTool, FxToolContext, FxToolResult } from "libfx";
+import { anyWords, cutBytes } from "./history.ts";
 import { isId, newId, type Sql } from "./store.ts";
 import { itemKinds, type ItemKind, type LibraryItem, type LibraryPage, type LibraryQuery } from "./types.ts";
 
@@ -36,7 +37,7 @@ export function check({ name, type, bytes }: Pick<NewItem, "name" | "type" | "by
   return { kind: "document" as const, type: /^(?!image\/)[\w.+-]{1,60}\/[\w.+-]{1,60}$/.test(type) ? type : "text/plain", text };
 }
 
-// Search words: runs of letters and digits, at most 8, each matching as a prefix. They need no escaping.
+// The library page's search words: as a bot's (`anyWords`), but all of them must match, since a search box narrows.
 const tsquery = (q: string) =>
   (q.match(/[\p{L}\p{N}]+/gu) ?? [])
     .slice(0, 8)
@@ -45,8 +46,7 @@ const tsquery = (q: string) =>
 const clamp = (value: unknown, fallback: number, max: number) => Math.min(Math.max(Math.trunc(Number(value) || fallback), 1), max);
 const botOf = (call: FxToolContext) => (call.context as { bot?: string } | undefined)?.bot;
 const unavailable = "The library is unavailable in this chat.";
-// libfx refuses a host tool's result over 64 KiB of UTF-8 (libfx 0.0.16, checked by hand), so a document is read up to
-// this many bytes, leaving room for its name and the cut note.
+// A document is read up to this many bytes, under libfx's 64 KiB for a tool result, with room for its name and the note.
 const readBytes = 60_000;
 
 type Row = Omit<LibraryItem, "url">;
@@ -113,7 +113,8 @@ export function createLibrary(sql: Sql) {
       name: "library_search",
       description:
         "Search this bot's library: the files people sent it and the documents it saved, across all of its chats. " +
-        "Matches words in names and in document text, or lists the newest items for an empty query. Each match is named library:<id>; open one with library_read.",
+        "An item matching any of the words, in its name or a document's text, counts; more matches rank higher, and a word also matches " +
+        "longer words it starts. An empty query lists the newest items. Each match is named library:<id>; open one with library_read.",
       inputSchema: {
         type: "object",
         properties: {
@@ -127,7 +128,7 @@ export function createLibrary(sql: Sql) {
       async execute(input: { query?: unknown; kind?: unknown; limit?: unknown }, call) {
         const bot = botOf(call);
         if (!bot) return unavailable;
-        const words = tsquery(String(input.query ?? ""));
+        const words = anyWords(String(input.query ?? ""));
         const kind = itemKinds.find((k) => k === input.kind);
         const match = sql`to_tsquery('simple', ${words})`;
         const rows = await sql<{ id: string; kind: string; name: string; savedAt: Date; snippet: string }[]>`
@@ -158,11 +159,7 @@ export function createLibrary(sql: Sql) {
           : [];
         if (!row) return `This bot's library has no item library:${id}.`;
         if (row.data) return { type: "libfx.tool-result", text: row.name, images: [{ type: "image", mimeType: row.type, data: row.data.toString("base64"), sourceRef: `library:${id}` }] } satisfies FxToolResult;
-        // Cut at a whole character: a UTF-8 continuation byte starts with the bits 10.
-        const bytes = Buffer.from(row.text);
-        let end = Math.min(bytes.length, readBytes);
-        while (end < bytes.length && (bytes[end] & 0xc0) === 0x80) end--;
-        const text = bytes.subarray(0, end).toString();
+        const text = cutBytes(row.text, readBytes);
         const kept = [...text].length;
         const cut = kept < row.chars ? `\n\n[cut at ${kept.toLocaleString("en-US")} of ${row.chars.toLocaleString("en-US")} characters]` : "";
         return `${row.name}\n\n${text}${cut}`;

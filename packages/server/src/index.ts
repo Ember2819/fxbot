@@ -1,10 +1,11 @@
-import { createFxbot, type ItemKind } from "@fxbot/sdk";
+import { createFxbot, releasesUrlFor, type AddonRef, type ItemKind, type UpdateStatus } from "@fxbot/sdk";
 import { readFileSync, statSync } from "node:fs";
 import { createServer, type IncomingMessage, type ServerResponse } from "node:http";
 import { extname, join, normalize } from "node:path";
 import { Readable } from "node:stream";
 import { pipeline } from "node:stream/promises";
 import type { ReadableStream } from "node:stream/web";
+import { installed, repository, update, version } from "./update.ts";
 
 // Loopback only. Other devices reach it through `tailscale serve`; the page never holds a secret.
 // FXBOT_PORT lets a check run beside a running server.
@@ -19,6 +20,13 @@ const fxbot = await createFxbot({
   secretKey: readFileSync(keyFile, "utf8"),
   vercelClientId: process.env.FXBOT_VERCEL_CLIENT_ID || undefined,
   dataDir: process.env.FXBOT_DATA,
+  backupsDir: process.env.FXBOT_BACKUPS,
+  version,
+  // GitHub's newest release for the repository in package.json, unless turned off.
+  releasesUrl: process.env.FXBOT_UPDATE_CHECK === "off" ? undefined : process.env.FXBOT_RELEASES_URL || releasesUrlFor(repository),
+  localUrl: `http://${host}:${port}`,
+  clientMetadataUrl: process.env.FXBOT_CLIENT_METADATA_URL || undefined,
+  registryUrl: process.env.FXBOT_MCP_REGISTRY || undefined,
 });
 
 // The ui package's build, served beside the API.
@@ -30,6 +38,7 @@ const types: Record<string, string> = {
   ".webmanifest": "application/manifest+json",
   ".png": "image/png",
   ".svg": "image/svg+xml",
+  ".woff2": "font/woff2",
 };
 
 const fail = (status: number, message: string): never => {
@@ -74,11 +83,55 @@ async function body<T>(req: IncomingMessage, limit = 1 << 20): Promise<T> {
   return fail(400, "body must be a JSON object");
 }
 
+// Where a browser lands after signing in to an MCP server. The message can carry the server's own words, so it is
+// escaped, and the page runs nothing.
+async function signedIn(res: ServerResponse, query: URLSearchParams) {
+  let message: string;
+  try {
+    const { status, error } = await fxbot.oauth.callback(query);
+    message = status === "done" ? "Connected. You can close this tab." : `Sign-in failed: ${error}`;
+  } catch (error) {
+    message = `Sign-in failed: ${(error as Error).message}`;
+  }
+  const text = message.replace(/[&<>"']/g, (c) => `&#${c.charCodeAt(0)};`);
+  res
+    .writeHead(message.startsWith("Connected") ? 200 : 400, { "content-type": "text/html; charset=utf-8", "content-security-policy": "default-src 'none'; style-src 'unsafe-inline'", "cache-control": "no-store" })
+    .end(`<!doctype html><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>fxbot</title><p style="font:16px system-ui;margin:2rem">${text}</p>`);
+}
+
 async function api(req: IncomingMessage, res: ServerResponse, url: URL) {
   const [, , resource, id, action, extra] = url.pathname.split("/");
   const method = req.method;
   const ok = { ok: true };
-  if (resource === "health" && !id && method === "GET") return json(res, 200, ok);
+  if (resource === "health" && !id && method === "GET") return json(res, 200, { ok: true, version });
+  if (resource === "update" && !id) {
+    if (method === "GET") return json(res, 200, updateStatus());
+    // To the newest release the check found, never one the page names.
+    if (method === "POST") return json(res, 202, startUpdate());
+    return fail(404, "not found");
+  }
+  if (resource === "addons" && extra === undefined) {
+    if (id === "preview" && !action && method === "POST") return json(res, 200, await fxbot.addons.preview((await body<{ ref: AddonRef }>(req)).ref));
+    if (!id && method === "GET") return json(res, 200, await fxbot.addons.list());
+    if (!id && method === "POST") {
+      const { ref, hash } = await body<{ ref: AddonRef; hash: string }>(req);
+      return json(res, 201, await fxbot.addons.add(ref, hash));
+    }
+    if (id && !action && method === "PATCH") return json(res, 200, await fxbot.addons.change(id, await body(req)));
+    if (id && !action && method === "DELETE") return json(res, 200, (await fxbot.addons.remove(id), ok));
+    if (id && action === "secrets" && method === "PUT") return json(res, 200, await fxbot.addons.setSecrets(id, await body(req)));
+    // The checked origin is where the sign-in comes back to.
+    if (id && action === "sign-in" && method === "POST") return json(res, 201, await fxbot.oauth.start(id, req.headers.origin));
+    return fail(404, "not found");
+  }
+  if (resource === "oauth") {
+    if (id === "callback" && !action && method === "GET") return signedIn(res, url.searchParams);
+    if (id === "attempts" && action && !extra && method === "GET") return json(res, 200, fxbot.oauth.get(action));
+    if (id === "attempts" && action && extra === "paste" && method === "POST") return json(res, 200, await fxbot.oauth.paste(action, (await body<{ address: string }>(req)).address));
+    return fail(404, "not found");
+  }
+  if (resource === "profiles" && action === "addons" && extra && method === "PUT")
+    return json(res, 200, await fxbot.addons.forBot(id, extra, (await body<{ enabled: boolean }>(req)).enabled));
   if (resource === "settings" && !id) {
     if (method === "GET") return json(res, 200, await fxbot.settings.get());
     if (method === "PATCH") return json(res, 200, await fxbot.settings.update(await body(req)));
@@ -154,7 +207,15 @@ function page(res: ServerResponse, pathname: string) {
 const server = createServer(async (req, res) => {
   try {
     const url = new URL(req.url ?? "/", "http://localhost");
+    res.setHeader("x-fxbot-version", version);
+    // A browser names the page's origin on every write. A write from another site's page is refused, so a site open in
+    // the same browser cannot change fxbot. Tools without a browser send no origin.
+    const origin = req.headers.origin;
+    if (req.method !== "GET" && req.method !== "HEAD" && origin !== undefined && (!URL.canParse(origin) || new URL(origin).host !== req.headers.host))
+      return json(res, 403, { error: "This request came from another site." });
     if (url.pathname === "/api" || url.pathname.startsWith("/api/")) await api(req, res, url);
+    // A loopback redirect from an MCP sign-in, when the browser runs on this machine.
+    else if (url.pathname === "/callback" && req.method === "GET") await signedIn(res, url.searchParams);
     else page(res, url.pathname);
   } catch (error) {
     const status = (error as { status?: number }).status ?? 500;
@@ -166,12 +227,35 @@ const server = createServer(async (req, res) => {
 
 server.listen(port, host, () => console.log(`fxbot server on http://${host}:${port}`));
 
-// Stop taking requests, then let libfx finish the turns this process started.
-async function shutdown() {
+// Stop taking requests, then let libfx finish the turns this process started. 75 asks systemd for a restart.
+async function shutdown(code = 0) {
   server.close();
   server.closeAllConnections();
   await fxbot.close();
-  process.exit(0);
+  process.exit(code);
 }
-process.once("SIGINT", shutdown);
-process.once("SIGTERM", shutdown);
+
+// Settings updates only an install made by setup.sh, under systemd (which sets INVOCATION_ID), since systemd starts the
+// new release once this one exits. Elsewhere Settings shows the commands.
+const canUpdate = Boolean(process.env.INVOCATION_ID && installed());
+let updating: UpdateStatus["updating"] = null;
+const updateStatus = (): UpdateStatus => ({ ...fxbot.release(), canUpdate, updating });
+function startUpdate() {
+  const { latest } = fxbot.release();
+  if (!canUpdate) fail(400, "Settings can update an install made by setup.sh. Here, use npm run update or git.");
+  if (!latest) fail(400, `fxbot ${version} is the newest release.`);
+  if (updating && !updating.error) fail(409, "An update is running.");
+  const now: NonNullable<UpdateStatus["updating"]> = { to: latest!.version, steps: [] };
+  updating = now;
+  update({ to: latest!.version, log: (step) => now.steps.push(step) }).then(
+    () => {
+      now.restarting = true;
+      // Long enough for the page's next poll to see it.
+      setTimeout(() => void shutdown(75), 1500);
+    },
+    (error: Error) => (now.error = error.message),
+  );
+  return updateStatus();
+}
+process.once("SIGINT", () => void shutdown());
+process.once("SIGTERM", () => void shutdown());

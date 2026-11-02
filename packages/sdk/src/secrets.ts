@@ -34,15 +34,18 @@ export async function withoutSecrets(response: Response, secrets: (string | unde
   return new Response(body, { status: response.status, statusText: response.statusText, headers: { "content-type": response.headers.get("content-type") ?? "text/plain" } });
 }
 
-const unopenable = "Cannot open this provider's secret. Sign in again, or check FXBOT_SECRET_KEY_FILE.";
+// Each sealed table and the column its rows are keyed by: a provider's keys and tokens, and an add-on's.
+const tables = { secrets: "provider_id", addon_secrets: "addon_id" } as const;
 
 // Opened secrets stay in memory, so libfx's credentials() calls cost no query. Every write goes through here.
-export function createSecrets(sql: Sql, key: Buffer) {
+export function createSecrets(sql: Sql, key: Buffer, table: keyof typeof tables = "secrets") {
+  const column = tables[table];
+  const unopenable = `Cannot open this ${table === "secrets" ? "provider" : "add-on"}'s secret. Sign in again, or check FXBOT_SECRET_KEY_FILE.`;
   const cache = new Map<string, unknown>();
   return {
     async get<T>(id: string): Promise<T | undefined> {
       if (cache.has(id)) return cache.get(id) as T;
-      const row = (await sql<{ sealed: Buffer }[]>`select sealed from secrets where provider_id = ${id}`)[0];
+      const row = (await sql<{ sealed: Buffer }[]>`select sealed from ${sql(table)} where ${sql(column)} = ${id}`)[0];
       if (!row) return undefined;
       let value: unknown;
       try {
@@ -54,13 +57,13 @@ export function createSecrets(sql: Sql, key: Buffer) {
       return value as T;
     },
     async put(id: string, value: unknown, tx: Sql = sql) {
-      await tx`insert into secrets (provider_id, sealed) values (${id}, ${seal(key, id, value)})
-        on conflict (provider_id) do update set sealed = excluded.sealed, updated_at = now()`;
+      await tx`insert into ${sql(table)} (${sql(column)}, sealed) values (${id}, ${seal(key, id, value)})
+        on conflict (${sql(column)}) do update set sealed = excluded.sealed, updated_at = now()`;
       cache.set(id, value);
     },
-    // Rows go with their provider, by cascade.
+    // Rows go with their provider or add-on, by cascade.
     forget: (id: string) => cache.delete(id),
-    has: async () => new Set((await sql<{ providerId: string }[]>`select provider_id from secrets`).map((row) => row.providerId)),
+    has: async () => new Set((await sql<{ id: string }[]>`select ${sql(column)} as id from ${sql(table)}`).map((row) => row.id)),
   };
 }
 
@@ -69,10 +72,16 @@ export async function rotateSecrets({ databaseUrl, from, to }: { databaseUrl: st
   const sql = postgres(databaseUrl, { max: 1, onnotice: () => {} });
   try {
     return await sql.begin(async (tx) => {
-      const rows = await tx<{ provider_id: string; sealed: Buffer }[]>`select provider_id, sealed from secrets for update`;
-      for (const { provider_id: id, sealed } of rows)
-        await tx`update secrets set sealed = ${seal(to, id, unseal(from, id, sealed))}, updated_at = now() where provider_id = ${id}`;
-      return rows.length;
+      let count = 0;
+      for (const [table, column] of Object.entries(tables)) {
+        // A database from before add-ons has no addon_secrets yet.
+        if (!(await tx`select to_regclass(${table}) as found`)[0].found) continue;
+        const rows = await tx<{ id: string; sealed: Buffer }[]>`select ${tx(column)} as id, sealed from ${tx(table)} for update`;
+        for (const { id, sealed } of rows)
+          await tx`update ${tx(table)} set sealed = ${seal(to, id, unseal(from, id, sealed))}, updated_at = now() where ${tx(column)} = ${id}`;
+        count += rows.length;
+      }
+      return count;
     });
   } finally {
     await sql.end({ timeout: 5 });

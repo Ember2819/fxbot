@@ -425,7 +425,7 @@ What the build found or changed, checked against libfx 0.0.16, Postgres 17, and 
 - **Postgres.js:**
   - It sends a `timestamptz` parameter through a JS `Date`, which keeps only milliseconds, so items saved in the same millisecond were skipped between pages. The cursor is cast `::text::timestamptz`, and paging was checked with 16 items sharing one time.
   - It reads a null inside a `text[]` back as the string `"NULL"`, so a listing's bots come from `jsonb_agg`.
-- **Search.** Matches use the same prefix query in the list and in `library_search`. A query with no letters or digits filters nothing. `library_search` with an empty query lists the bot's newest items.
+- **Search.** The page's search needs every word, as planned. `library_search` takes any of them, ranked, as `chat_history` does after the same change (see provider logins), because a bot guesses at words. A query with no letters or digits filters nothing. `library_search` with an empty query lists the bot's newest items.
 - **Documents** keep their type when it looks like a MIME type and is not an image type, and `text/plain` otherwise. An SVG, which is text, is kept as a `text/plain` document, so only checked images claim an image type, which the chat draws as an image. HTML is kept as a document too. All documents go out as `text/plain`.
 - **`file`** returns the item's name, kind, type, and hash with the bytes, not a whole listed item.
 - **The move** adds `on conflict do nothing` to its tag insert, so a bot can never get two tags for one item and chat from it.

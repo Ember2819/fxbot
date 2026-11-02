@@ -1,0 +1,99 @@
+name: release
+
+# A release is a version in package.json that has no tag yet, on main. It is tagged and published only after it
+# typechecks and builds, with its section of CHANGELOG.md as the notes; a version such as 0.3.0-rc.1 is published as a
+# prerelease. Every other push to main does nothing, and release branches, where work happens, never run it.
+on:
+  push:
+    branches: [main]
+
+permissions: {}
+
+concurrency:
+  group: release
+  cancel-in-progress: false
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    outputs:
+      release: ${{ steps.version.outputs.release }}
+      tag: ${{ steps.version.outputs.tag }}
+      prerelease: ${{ steps.version.outputs.prerelease }}
+      notes: ${{ steps.notes.outputs.notes }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Find the version
+        id: version
+        run: |
+          version=$(node -p 'require("./package.json").version')
+          tag="v$version"
+          case "$version" in *-*) prerelease=true ;; *) prerelease=false ;; esac
+          release=true
+          if git rev-parse -q --verify "refs/tags/$tag" >/dev/null; then
+            echo "$tag is released already."
+            release=false
+          fi
+          { echo "release=$release"; echo "tag=$tag"; echo "prerelease=$prerelease"; } >> "$GITHUB_OUTPUT"
+
+      - if: steps.version.outputs.release == 'true'
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 22
+
+      - name: Typecheck and build
+        if: steps.version.outputs.release == 'true'
+        run: |
+          npm ci --no-audit --no-fund
+          npm run typecheck
+          npm run build
+
+      - name: Shipped migrations never change
+        if: steps.version.outputs.release == 'true'
+        run: |
+          previous=$(git describe --tags --abbrev=0 --match 'v*' HEAD 2>/dev/null || true)
+          [ -n "$previous" ] || exit 0
+          changed=$(git diff --name-status "$previous" HEAD -- packages/sdk/src/migrations/ | grep -v '^A' || true)
+          if [ -n "$changed" ]; then
+            echo "These migrations shipped in $previous, and must not change. Add a new one instead:"
+            echo "$changed"
+            exit 1
+          fi
+
+      - name: Cut the notes
+        id: notes
+        if: steps.version.outputs.release == 'true'
+        env:
+          TAG: ${{ steps.version.outputs.tag }}
+        run: |
+          version="${TAG#v}"
+          notes=$(awk -v head="## $version" 'index($0, head " ") == 1 || $0 == head { found = 1; next } /^## / { found = 0 } found' CHANGELOG.md | sed '/./,$!d')
+          if [ -z "$(printf '%s' "$notes" | tr -d '[:space:]')" ]; then
+            echo "CHANGELOG.md has no section for $version."
+            exit 1
+          fi
+          { echo "notes<<FXBOT_NOTES"; printf '%s\n' "$notes"; echo "FXBOT_NOTES"; } >> "$GITHUB_OUTPUT"
+
+  publish:
+    needs: check
+    if: needs.check.outputs.release == 'true'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Tag and publish
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ needs.check.outputs.tag }}
+          PRERELEASE: ${{ needs.check.outputs.prerelease }}
+          NOTES: ${{ needs.check.outputs.notes }}
+        run: |
+          flags=()
+          [ "$PRERELEASE" = true ] && flags+=(--prerelease)
+          gh release create "$TAG" --repo "$GITHUB_REPOSITORY" --target "$GITHUB_SHA" --title "$TAG" --notes "$NOTES" "${flags[@]}"

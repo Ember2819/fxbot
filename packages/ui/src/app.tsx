@@ -1,5 +1,5 @@
 import { useEffect, useLayoutEffect, useRef, useState, type FormEvent, type MouseEvent, type ReactNode } from "react";
-import { ArrowUpIcon, CheckIcon, ChevronRightIcon, CircleCheckIcon, CopyIcon, FileTextIcon, LayoutDashboardIcon, LoaderCircleIcon, MessageCircleDashedIcon, PanelRightIcon, PaperclipIcon, PinIcon, PinOffIcon, PlusIcon, SettingsIcon, XIcon } from "lucide-react";
+import { ArrowUpIcon, CheckIcon, ChevronRightIcon, CircleCheckIcon, CopyIcon, FileTextIcon, LayoutDashboardIcon, LoaderCircleIcon, MessageCircleDashedIcon, PanelRightIcon, PaperclipIcon, PinIcon, PinOffIcon, PlusIcon, PuzzleIcon, SettingsIcon, XIcon } from "lucide-react";
 import { Streamdown } from "streamdown";
 import { Attachment, AttachmentAction, AttachmentActions, AttachmentContent, AttachmentGroup, AttachmentMedia, AttachmentTitle, AttachmentTrigger } from "@/components/ui/attachment";
 import { Bubble, BubbleContent } from "@/components/ui/bubble";
@@ -42,9 +42,12 @@ import { client } from "./client.ts";
 import { maxFiles, readFile } from "./attachments.ts";
 import { Blob, LookPicker } from "./blob.tsx";
 import { BotPanel, usePanel } from "./bot-panel.tsx";
+import { AddonsPage, BotAddons } from "./addons.tsx";
 import { LibraryPage } from "./library.tsx";
+import { Version } from "./release.tsx";
 import { follow, go } from "./nav.ts";
 import { ModelField, Providers } from "./providers.tsx";
+import { install, keepDraft, reload, takeDraft, useInstall, useNewVersion } from "./pwa.ts";
 import { useTurnStream } from "./use-turn-stream.ts";
 
 export function App() {
@@ -99,6 +102,7 @@ export function App() {
   if (path === "/") screen = <Home profiles={profiles} offline={offline} onNew={() => setCreating(true)} />;
   else if (path === "/settings") screen = <SettingsForm />;
   else if (path === "/library") screen = <LibraryPage profiles={profiles} />;
+  else if (path === "/addons") screen = <AddonsPage profiles={profiles} />;
   else if (top === "profiles" && id && sub === "edit") screen = <ProfileForm key={id} id={id} onSaved={refresh} />;
   else if (top === "profiles" && id && sub === undefined) screen = <Chat key={id} id={id} profiles={profiles} onChange={refresh} />;
   else screen = <Header title="Not found" />;
@@ -107,7 +111,11 @@ export function App() {
     <TooltipProvider>
       <SidebarProvider>
         <BotSidebar profiles={profiles} offline={offline} active={id} onNew={() => setCreating(true)} onChange={refresh} />
-        <SidebarInset className="h-dvh overflow-hidden">{screen}</SidebarInset>
+        {/* An installed app draws under the notch and the home indicator (viewport-fit=cover), so each edge pads by its
+            inset. The left one belongs to the sidebar while it is open beside the page. */}
+        <SidebarInset className="h-dvh overflow-hidden pr-[env(safe-area-inset-right)] pl-[env(safe-area-inset-left)] md:peer-data-[state=expanded]:pl-0">
+          {screen}
+        </SidebarInset>
         <NewBot open={creating} onOpenChange={setCreating} onCreated={created} />
       </SidebarProvider>
     </TooltipProvider>
@@ -178,9 +186,10 @@ function BotSidebar({ profiles, offline, active, onNew, onChange }: { profiles: 
   // Pinned bots sit on top, large and centered; the rest are the list.
   const pinned = profiles?.filter((p) => p.pinned) ?? [];
   const full = pinned.length >= maxPinned;
+  const newVersion = useNewVersion();
   return (
-    <Sidebar>
-      <SidebarHeader className="flex-row items-center justify-end">
+    <Sidebar className="bg-sidebar pl-[env(safe-area-inset-left)]">
+      <SidebarHeader className="flex-row items-center justify-end pt-[calc(0.5rem+env(safe-area-inset-top))]">
         <Tooltip>
           <TooltipTrigger asChild>
             <Button variant="outline" size="icon" aria-label="New bot" className="size-10 rounded-full bg-background shadow-sm" onClick={() => (onNew(), setOpenMobile(false))}>
@@ -246,32 +255,57 @@ function BotSidebar({ profiles, offline, active, onNew, onChange }: { profiles: 
           </SidebarMenu>
         </SidebarGroup>
       </SidebarContent>
-      {/* One row: Settings, then the full library behind a bento button. */}
-      <SidebarFooter className="flex-row items-center gap-1">
-        <SidebarMenu className="flex-1">
-          <SidebarMenuItem>
-            <SidebarMenuButton asChild isActive={location.pathname === "/settings"}>
-              <a href="/settings" onClick={open}>
-                <SettingsIcon />
-                Settings
+      <SidebarFooter className="pb-[calc(0.5rem+env(safe-area-inset-bottom))]">
+        {/* A new build is waiting (pwa.ts). The page stays on its own build until this reloads it. */}
+        {newVersion && (
+          <div className="flex items-center gap-2 rounded-md bg-sidebar-accent py-1 pr-1 pl-3 text-sm">
+            <span className="flex-1">New version</span>
+            <Button size="sm" onClick={reload}>
+              Reload
+            </Button>
+          </div>
+        )}
+        {/* One row: Settings, then the full library behind a bento button, then add-ons. */}
+        <div className="flex items-center gap-1">
+          <SidebarMenu className="flex-1">
+            <SidebarMenuItem>
+              <SidebarMenuButton asChild isActive={location.pathname === "/settings"}>
+                <a href="/settings" onClick={open}>
+                  <SettingsIcon />
+                  Settings
+                </a>
+              </SidebarMenuButton>
+            </SidebarMenuItem>
+          </SidebarMenu>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <a
+                href="/library"
+                onClick={open}
+                aria-label="Library"
+                aria-current={location.pathname === "/library" ? "page" : undefined}
+                className={buttonVariants({ variant: "ghost", size: "icon", className: "shrink-0 aria-[current=page]:bg-sidebar-accent" })}
+              >
+                <LayoutDashboardIcon />
               </a>
-            </SidebarMenuButton>
-          </SidebarMenuItem>
-        </SidebarMenu>
-        <Tooltip>
-          <TooltipTrigger asChild>
-            <a
-              href="/library"
-              onClick={open}
-              aria-label="Library"
-              aria-current={location.pathname === "/library" ? "page" : undefined}
-              className={buttonVariants({ variant: "ghost", size: "icon", className: "shrink-0 aria-[current=page]:bg-sidebar-accent" })}
-            >
-              <LayoutDashboardIcon />
-            </a>
-          </TooltipTrigger>
-          <TooltipContent>Library</TooltipContent>
-        </Tooltip>
+            </TooltipTrigger>
+            <TooltipContent>Library</TooltipContent>
+          </Tooltip>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <a
+                href="/addons"
+                onClick={open}
+                aria-label="Add-ons"
+                aria-current={location.pathname === "/addons" ? "page" : undefined}
+                className={buttonVariants({ variant: "ghost", size: "icon", className: "shrink-0 aria-[current=page]:bg-sidebar-accent" })}
+              >
+                <PuzzleIcon />
+              </a>
+            </TooltipTrigger>
+            <TooltipContent>Add-ons</TooltipContent>
+          </Tooltip>
+        </div>
       </SidebarFooter>
     </Sidebar>
   );
@@ -279,7 +313,7 @@ function BotSidebar({ profiles, offline, active, onNew, onChange }: { profiles: 
 
 function Header({ title, lead, children }: { title: ReactNode; lead?: ReactNode; children?: ReactNode }) {
   return (
-    <header className="flex h-14 shrink-0 items-center gap-2 px-3">
+    <header className="box-content flex h-14 shrink-0 items-center gap-2 px-3 pt-[env(safe-area-inset-top)]">
       <SidebarTrigger />
       {lead}
       <h1 className="min-w-0 flex-1 truncate font-medium">{title}</h1>
@@ -407,6 +441,7 @@ function ProfileForm({ id, onSaved }: { id: string; onSaved: () => void }) {
             Instructions
             <Textarea rows={8} className="max-h-[50dvh]" value={fields.instructions} onChange={set("instructions")} disabled={!loaded} />
           </label>
+          <BotAddons profileId={id} />
           {error && <Problem>{error}</Problem>}
           <div className="flex gap-2">
             <Button type="submit" disabled={busy || !loaded}>
@@ -429,6 +464,7 @@ function SettingsForm() {
     client.settings.get().then(setSettings, (e: Error) => setError(e.message));
   }, []);
   const makeDefault = (defaultProvider: string) => client.settings.update({ defaultProvider }).then(setSettings, (e: Error) => setError(e.message));
+  const installing = useInstall();
 
   return (
     <>
@@ -436,8 +472,16 @@ function SettingsForm() {
       <main className="flex-1 overflow-y-auto px-4 py-6">
         <div className="mx-auto grid max-w-xl gap-5">
           {error && <Problem>{error}</Problem>}
+          {installing === "prompt" && (
+            <div className="flex items-center gap-3 rounded-xl border p-3 text-sm">
+              <p className="flex-1">Install fxbot as an app on this device.</p>
+              <Button onClick={install}>Install</Button>
+            </div>
+          )}
+          {installing === "steps" && <p className="rounded-xl border p-3 text-sm">To install fxbot, tap Share, then Add to Home Screen, and leave Open as Web App on.</p>}
           {settings && <Providers defaultProvider={settings.defaultProvider} onDefault={makeDefault} />}
           <p className="text-sm text-muted-foreground">New bots start on the default provider, with its default model.</p>
+          <Version />
         </div>
       </main>
     </>
@@ -449,7 +493,12 @@ const newMessageId = () => Date.now().toString(36) + Math.random().toString(36).
 function Chat({ id, profiles, onChange }: { id: string; profiles: Profile[] | null; onChange: () => void }) {
   const [profile, setProfile] = useState<Profile | null>(null);
   const [error, setError] = useState("");
-  const [draft, setDraft] = useState("");
+  // A draft left before a new build's reload comes back (pwa.ts).
+  const [draft, setDraft] = useState(() => takeDraft(id));
+  useEffect(() => {
+    keepDraft(id, draft);
+    return () => keepDraft(id, "");
+  }, [id, draft]);
   const [attached, setAttached] = useState<Upload[]>([]);
   const [notice, setNotice] = useState("");
   const box = useRef<HTMLTextAreaElement>(null);

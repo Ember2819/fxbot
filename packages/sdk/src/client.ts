@@ -1,4 +1,30 @@
-import type { Fields, Kind, LibraryItem, LibraryPage, LibraryQuery, Message, Model, NewProvider, Profile, ProfileUpdate, Provider, ProviderUpdate, Settings, SignIn, SignInStatus, StreamLine, Team, Upload } from "./types.ts";
+import type {
+  Addon,
+  AddonPreview,
+  AddonRef,
+  AddonSecrets,
+  Fields,
+  Kind,
+  LibraryItem,
+  LibraryPage,
+  LibraryQuery,
+  Message,
+  Model,
+  NewProvider,
+  OAuthAttempt,
+  OAuthStatus,
+  Profile,
+  ProfileUpdate,
+  Provider,
+  ProviderUpdate,
+  Settings,
+  SignIn,
+  SignInStatus,
+  StreamLine,
+  Team,
+  UpdateStatus,
+  Upload,
+} from "./types.ts";
 
 export type * from "./types.ts";
 export { colors, itemKinds, kinds, maxPinned, shapes } from "./types.ts";
@@ -8,6 +34,8 @@ export const unreachable = "Cannot reach the server.";
 export type ClientOptions = {
   /** The server's origin. Default: the page's own. */
   baseUrl?: string;
+  /** Hears the version the server names on each answer, so a page can notice a new one. */
+  onVersion?: (version: string) => void;
 };
 
 export type StreamOptions = {
@@ -21,7 +49,7 @@ export type StreamOptions = {
 
 // A typed client for an fxbot server's /api routes, for a page or a script. It carries no credentials: secrets stay
 // with the server, which calls the SDK. Each call throws an Error with the server's message, or `unreachable`.
-export function createClient({ baseUrl = "" }: ClientOptions = {}) {
+export function createClient({ baseUrl = "", onVersion }: ClientOptions = {}) {
   async function call<T>(path: string, method = "GET", body?: unknown): Promise<T> {
     let res: Response;
     try {
@@ -33,6 +61,8 @@ export function createClient({ baseUrl = "" }: ClientOptions = {}) {
     } catch {
       throw new Error(unreachable);
     }
+    const version = res.headers.get("x-fxbot-version");
+    if (version) onVersion?.(version);
     // A body that is not JSON comes from a proxy in front of a stopped server.
     const data = await res.json().catch(() => null);
     if (!res.ok || data === null) throw new Error(data?.error ?? unreachable);
@@ -47,6 +77,8 @@ export function createClient({ baseUrl = "" }: ClientOptions = {}) {
       try {
         const res = await fetch(`${baseUrl}/api/profiles/${id}/stream?cursor=${cursor}`, { signal });
         if (!res.ok || !res.body) throw new Error(`HTTP ${res.status}`);
+        const version = res.headers.get("x-fxbot-version");
+        if (version) onVersion?.(version);
         onConnection?.(true);
         const reader = res.body.pipeThrough(new TextDecoderStream()).getReader();
         let rest = "";
@@ -72,7 +104,12 @@ export function createClient({ baseUrl = "" }: ClientOptions = {}) {
   }
 
   return {
-    health: () => call<{ ok: true }>("/health"),
+    health: () => call<{ ok: true; version: string }>("/health"),
+    // The running version and the newest release. `start` updates to that release, where Settings can.
+    update: {
+      get: () => call<UpdateStatus>("/update"),
+      start: () => call<UpdateStatus>("/update", "POST"),
+    },
     profiles: {
       list: () => call<Profile[]>("/profiles"),
       get: (id: string) => call<Profile>(`/profiles/${id}`),
@@ -109,6 +146,23 @@ export function createClient({ baseUrl = "" }: ClientOptions = {}) {
       },
       get: (id: string) => call<LibraryItem>(`/library/${id}`),
       remove: (id: string) => call<{ ok: true }>(`/library/${id}`, "DELETE"),
+    },
+    // Remote MCP servers. Preview a server, then add it with the preview's hash. Header values and an OAuth client go
+    // to the server once and never come back.
+    addons: {
+      list: () => call<Addon[]>("/addons"),
+      preview: (ref: AddonRef) => call<AddonPreview>("/addons/preview", "POST", { ref }),
+      add: (ref: AddonRef, hash: string) => call<Addon>("/addons", "POST", { ref, hash }),
+      change: (id: string, fields: { enabled?: boolean; bots?: "all" | "each"; allowed?: string[] }) => call<Addon>(`/addons/${id}`, "PATCH", fields),
+      remove: (id: string) => call<{ ok: true }>(`/addons/${id}`, "DELETE"),
+      setSecrets: (id: string, secrets: AddonSecrets) => call<Addon>(`/addons/${id}/secrets`, "PUT", secrets),
+      forBot: (profileId: string, addonId: string, enabled: boolean) => call<Addon>(`/profiles/${profileId}/addons/${addonId}`, "PUT", { enabled }),
+      // Open `url`, then poll `oauth.get` until the status is done or failed.
+      signIn: (id: string) => call<OAuthAttempt>(`/addons/${id}/sign-in`, "POST"),
+    },
+    oauth: {
+      get: (id: string) => call<OAuthStatus>(`/oauth/attempts/${id}`),
+      paste: (id: string, address: string) => call<OAuthStatus>(`/oauth/attempts/${id}/paste`, "POST", { address }),
     },
     // Resolves once the server has stored the message; the reply arrives on the stream.
     send: (id: string, message: Message) => call<{ messageId: string; sessionId: string }>(`/profiles/${id}/messages`, "POST", message),

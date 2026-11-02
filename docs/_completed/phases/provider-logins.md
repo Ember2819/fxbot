@@ -323,6 +323,10 @@ What the build found or changed, checked against libfx 0.0.16 and the mocks:
 - **Images and `supportsVision`.** libfx refuses an image for a model marked `supportsVision: false` when the turn opens, not at send. The turn ends with "Image prompts are unavailable for the selected model", and nothing reaches the server.
 - **The Vercel model list** goes through libfx's `listModels` with the account's `fetch`, instead of a direct call with `?teamId=`. Until a team is picked, it says so.
 - **`chat_history`** leaves out the message that started the turn: that message is the search itself.
+- **`chat_history`, after a bot used it.** Its feedback: a query needed every word in one message, it saw only snippets, and matches came best first, so it sorted dates itself. Changed after the build:
+  - A message matching any word counts, more matches rank higher, and words match as prefixes.
+  - The best matches come oldest first, each with its `msg:<id>` and "(earlier chat)" when it is from another session. The search still covers every chat of the bot, as designed.
+  - `around: "msg:<id>"` reads that message and up to 6 on each side in its chat, in full, each cut at 4,000 bytes to stay under libfx's 64 KiB for a tool result, with the ids to page on.
 - **Earlier chats stay readable.** After a switch the stream holds only the new session, and the old one may not open again: its provider can be gone. Fixed after the build: `profiles.earlier(id)` (`GET /api/profiles/:id/earlier`) reads the bot's other sessions from `messages`, with the files their messages sent, and the chat shows them above the handoff. The bot still sees only the summary and `chat_history`.
 - **Engine turns** report only a stop reason; a failed request rejects instead.
 - **`FXBOT_PORT`** lets a check run a server beside a running one.

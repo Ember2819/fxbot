@@ -1,7 +1,7 @@
 # Add-ons
 
 One place to find and add the things that work with fxbot. A search box over live registries lists MCP servers, skills, and plugins, and one Add puts them into fxbot.
-- An [MCP server](mcp.md) gives bots tools from a remote service.
+- An [MCP server](../_completed/phases/mcp.md) gives bots tools from a remote service.
 - A [skill](skills.md) is instructions that a bot reads when a task needs them.
 - A [plugin](plugins.md) bundles MCP servers and skills. It can also run code on this machine: local MCP servers, tooling such as herdr, and hooks.
 
@@ -13,7 +13,7 @@ This page owns what they share:
 - the add-on records
 - how bots get add-ons
 
-Status: planned, not built. Research and plan only. [mcp.md](mcp.md), [skills.md](skills.md), and [plugins.md](plugins.md) build on it.
+Status: planned, not built. Research and plan only. It lands after [MCP servers](../_completed/phases/mcp.md), which creates the add-on tables and the first Add-ons page, and adds search and the add-on page for MCP servers. [Skills](skills.md) and [plugins](plugins.md) then add their own sources and sections.
 
 ## 1. Research
 
@@ -85,7 +85,7 @@ These are read from docs, source, and read-only requests to public APIs, as of N
    - skills.sh has no listing to mirror, so skills are searched there, once per search.
    - Searching the whole official registry is an opt-in, "everything, unmoderated" mode.
 2. **Install from what entries already say.**
-   - A registry entry's `remotes` become an [MCP server](mcp.md).
+   - A registry entry's `remotes` become an [MCP server](../_completed/phases/mcp.md).
    - Its `packages` mean a process on this machine, so they install as a [plugin](plugins.md).
    - A marketplace entry is a plugin, and a skills.sh result is a [skill](skills.md).
 3. **Plugins come from marketplaces in Claude's format,** which Codex and Grok Build read too. The defaults:
@@ -132,29 +132,34 @@ These are read from docs, source, and read-only requests to public APIs, as of N
 
 ### The add-on page
 
-Opening a card fetches the add-on's definition and shows its page. The definition is a registry entry, a plugin at its pin, or a skill at its commit. Nothing is saved yet.
+Opening a card fetches the add-on's definition and shows its page. The definition is a registry entry, a plugin at its pin, or a skill at its commit. Nothing is saved yet. The page for herdr, the first plugin ([plugins](plugins.md#fxbots-extension)):
 
 ```text
-twilio-developer-kit                                          [Add]
-Twilio Skills provide procedural knowledge for AI coding agents…
+herdr                                                         [Add]
+Drive herdr agents and panes from a bot
 
 MCP servers  1
-  twilio-docs              mcp.twilio.com · no sign-in
-Skills  57
-  twilio-account-setup     Create and configure a Twilio account from scratch…
-  twilio-agent-connect     …
-  …                                                           52 more
+  herdr                    runs on this machine · starts read-only
+Skills  1
+  herdr                    When and how to work with herdr's agents and panes
+Runs on this machine
+  uvx --from git+https://github.com/aelaguiz/herdr-mcp@<commit> herdr-mcp
+Setup
+  herdr                    found by: herdr --version
+                           else: sh -c "curl -fsSL https://herdr.dev/install.sh | sh"   flagged: curl | sh
+  uvx                      found by: uvx --version
+Hooks
+  turn.end                 node ./<namespace>/hooks/report.js
 
 Information
-  Includes      1 MCP server, 57 skills
-  Publisher     Twilio
-  Category      development
-  Website       twilio.com
-  Source        github.com/twilio/ai at 8aba46f, from Anthropic's marketplace
+  Includes      1 MCP server, 1 skill, 1 hook
+  Publisher     fxbot
+  Website       herdr.dev
+  Source        the project's marketplace, at <commit>
 ```
 
 - **Sections,** each shown only when the add-on has one:
-  - **MCP servers:** each server's name, host, and sign-in (none, keys, or OAuth, found by probing it). See [mcp.md](mcp.md#adding-a-server).
+  - **MCP servers:** each server's name, host, and sign-in (none, keys, or OAuth, found by probing it). See [mcp.md](../_completed/phases/mcp.md#adding-a-server).
   - **Skills:** each skill's name and description, five at a time, each opening its text. See [skills.md](skills.md#adding-skills).
   - **Runs on this machine, Hooks, and Setup:** every command with its arguments, untruncated. `sh -c`, `curl | sh`, and `sudo` are flagged. See [plugins.md](plugins.md#installing).
   - **Not used by fxbot:** a count of each part that fxbot doesn't run, such as commands, agents, LSP servers, and other clients' hooks.
@@ -169,13 +174,13 @@ Information
 
 ### Bots and add-ons
 
-- A new add-on is on for every bot ([question 4](#5-open-questions)). Each bot's settings list add-ons with a switch.
-- **Turning one off for a bot.** The bot comes from the session's `context`, never from the model. For that bot:
+- A new add-on is for all bots ([question 4](#5-open-questions)). Its settings can switch it to chosen bots, and then each bot's settings, and the add-on's own, show a switch per bot. This is built for MCP servers ([mcp.md](../_completed/phases/mcp.md#built)).
+- **A bot not chosen.** The bot comes from the session's `context`, never from the model. For that bot:
   - its tools refuse ("This tool is off for this bot")
   - its skills leave the bot's catalog
   - its hooks don't run
   - its instructions are left out of that bot's chats
-- **Agents.** Every agent's tool list holds every enabled add-on's tools. Adding, removing, or enabling an add-on rebuilds the provider agents, after their running turns.
+- **Agents.** Every agent's tool list holds every enabled add-on's allowed tools. Adding, removing, enabling an add-on, or changing its allowed tools rebuilds the provider agents, after their running turns.
 - **Token cost.** Every bot still sees every tool's schema, because libfx has no per-session tools.
   - fx loads MCP tools on demand (`capability_search`, `mcp_select_tool`), but libfx has no equivalent.
   - Many add-ons therefore cost tokens on every turn, and the Add-ons page shows a running count of tools.
@@ -188,10 +193,11 @@ addons          (id text primary key, kind text not null,          -- 'mcp' | 's
                  name text not null, source jsonb not null,         -- registry entry, marketplace entry, skills.sh result, or url, with its pin
                  config jsonb not null,                             -- url, transport, header names, or the plugin's parts
                  approved_hash text not null, enabled boolean not null default true,
-                 trust text not null default 'read-only', status text, created_at timestamptz default now())
+                 bots text not null default 'all',                  -- 'all' | 'each'
+                 allowed jsonb, status text, created_at timestamptz default now())   -- allowed tool names; null means the read-only ones
 addon_secrets   (addon_id text primary key references addons on delete cascade, sealed bytea not null)
 profile_addons  (profile_id text references profiles on delete cascade, addon_id text references addons on delete cascade,
-                 enabled boolean not null, primary key (profile_id, addon_id))   -- only when a bot differs from the default
+                 enabled boolean not null, primary key (profile_id, addon_id))   -- read when bots is 'each'
 registry_entries(source text, name text, version text, entry jsonb not null, updated_at timestamptz,
                  primary key (source, name))                        -- MCP registries and plugin marketplaces
 ```
@@ -208,20 +214,20 @@ registry_entries(source text, name text, version text, entry jsonb not null, upd
 | `POST /api/addons` with `{ ref, hash }` | `addons.add(ref, hash)`: fetches again, checks the hash, and saves |
 | `GET /api/addons` | `addons.list()`: installed add-ons, with status, tool counts, and skill counts |
 | `POST /api/addons/:id/update` with `{ hash }` | `addons.update(id, hash)`: moves to the newer definition the page showed |
-| `PATCH /api/addons/:id` | `addons.change(id, { enabled?, trust? })` |
+| `PATCH /api/addons/:id` | `addons.change(id, { enabled?, bots?, allowed? })` |
 | `PUT /api/profiles/:id/addons/:addon` | `addons.forBot(profile, addon, enabled)` |
 | `DELETE /api/addons/:id` | `addons.remove(id)`: stops processes, deletes secrets and skills |
 
-The routes that sign in, set secrets, read skills, and run setup are in [mcp.md](mcp.md#api-sdk-and-client), [skills.md](skills.md#api-sdk-and-client), and [plugins.md](plugins.md#api-sdk-and-client).
+The routes that sign in, set secrets, read skills, and run setup are in [mcp.md](../_completed/phases/mcp.md#api-sdk-and-client), [skills.md](skills.md#api-sdk-and-client), and [plugins.md](plugins.md#api-sdk-and-client).
 
 ### UI
 
 - An **Add-ons** page next to Settings has three parts:
   - a search field with kind filters (MCP servers, Skills, Plugins), and an "everything (unmoderated)" switch
   - result cards
-  - an Installed list showing status, tool and skill counts, trust, and Remove
+  - an Installed list: one row per add-on with its status, allowed tools, and bots, an edit button for its settings, and an on switch
 - A card opens the add-on page. Add saves it, then runs the add-on's own flow: secrets, sign-in, settings, or setup.
-- Bot settings list add-ons with switches.
+- Bot settings show a switch for each add-on given to chosen bots, and "All bots" for the rest.
 - Components come from shadcn only.
 
 ### Where the code goes
@@ -253,49 +259,45 @@ About 560 lines:
 | Client | about 25 |
 | UI, mostly the add-on page | about 220 |
 
-Plus [mcp.md](mcp.md#size), [skills.md](skills.md#size), and [plugins.md](plugins.md#size).
+Plus [mcp.md](../_completed/phases/mcp.md#size), [skills.md](skills.md#size), and [plugins.md](plugins.md#size).
 
 ## 4. Checklist
 
-Checks use disposable Postgres and mocks served from the scratchpad: a registry page, a marketplace repository, and a skills.sh search. Nothing reaches the live sources except the human's checks.
+Checks use disposable Postgres, the [MCP checks'](../_completed/phases/mcp.md#4-checklist) mock server, and a mock registry served from the scratchpad. Nothing reaches the live sources except the human's checks. [Skills](skills.md#4-checklist) and [plugins](plugins.md#4-checklist) check their own sources when they join the search.
 
 **M1. Sources**
 - [ ] A sync reads every page of the mock registry, then only `updated_since` changes.
   - A failed sync keeps the old copy.
   - A 429 or a rate-limit header backs off.
 - [ ] Everything mode asks once per search (3 characters or more) and caches for 5 minutes.
-- [ ] The mock marketplace syncs at its commit. An entry without a pin shows, but can't be added.
-- [ ] A skills search asks skills.sh once after typing stops, caches for 5 minutes, and asks nothing when turned off.
 
 **M2. Search and the add-on page**
-- [ ] Search mixes MCP servers, skills, and plugins, ranks name over title over description, and filters by kind.
+- [ ] Search ranks name over title over description, and filters by kind.
 - [ ] A card shows the namespace, the host, the domain match, the secret headers, and a deprecated status.
-- [ ] A mock plugin with a remote server, 57 skills, and a command shows "MCP servers 1", "Skills 57" (five, then "52 more"), and "Not used by fxbot: 1 command".
+- [ ] An MCP server's page shows its host, the sign-in its probe found, and the secret headers it asks for.
 - [ ] Add saves only with the hash the page showed. A definition that changed in between is refused, and shown again.
 
 **M3. Bots**
-- [ ] A new add-on is on for every bot. Turning it off for one bot makes its tools refuse and its skills leave the catalog, for that bot only.
+- [ ] A new add-on is for all bots. Switched to chosen bots, its tools refuse for a bot not chosen.
 - [ ] Adding or removing an add-on rebuilds the agents after running turns.
 
 **M4. UI and docs**
-- [ ] Playwright: search, open a card, see the add-on page, add, find it in Installed, and turn it off for one bot.
+- [ ] Playwright: search, open a card, see the add-on page, add, find it in Installed, and give it to one bot.
 - [ ] `npm run typecheck`, `npm run build`, and `git diff --check` pass.
 
 **The human runs these:**
-- one live sync of GitHub's registry and Anthropic's marketplace
-- one skills.sh search and one everything-mode search
-- open Twilio's page and compare it with Grok Bot's
-- publish the project's marketplace
+- one live sync of GitHub's registry, and one everything-mode search
+- add a server found through search, and use it from a chat
 
 ## 5. Open questions
 
 Each has a default.
 
 1. **Default MCP source.** *Default:* GitHub's registry, mirrored hourly, with the base URL as a setting. The official registry is opt-in, per search.
-2. **Plugin marketplaces.** *Default:* Anthropic's official marketplace and the project's own, mirrored hourly.
+2. **Plugin marketplaces.** *Default:* the project's own, which holds herdr, and Anthropic's official one, mirrored hourly.
    - The project's marketplace is a small public repo holding `.claude-plugin/marketplace.json` and fxbot's own plugins, curated by pull request.
    - Adding another marketplace takes its repo, with a warning that nobody reviewed it.
 3. **skills.sh.** *Default:* on, with a setting to turn it off. Every skills search sends its words to skills.sh.
-4. **Per-bot default.** *Default:* on for every bot. Off means refused tools, no skills, and no instructions, though the schemas stay visible ([Bots and add-ons](#bots-and-add-ons)).
+4. **Per-bot default.** *Default:* for all bots, switchable to chosen bots. A bot not chosen gets refused tools, no skills, and no instructions, though the schemas stay visible ([Bots and add-ons](#bots-and-add-ons)).
 5. **Remote icons.** *Default:* not loaded, which avoids tracking and mixed content. Cards and pages show the add-on's initial. Grok Bot and Cursor show logos. fxbot could fetch raster icons on the server and serve them itself.
 6. **A tool budget.** *Default:* no limit, but the page warns past 40 tools, because every bot pays for every schema.

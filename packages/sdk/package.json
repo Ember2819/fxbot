@@ -10,6 +10,7 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
+    "@modelcontextprotocol/client": "2.4.0",
     "libfx": "0.0.16",
     "postgres": "3.4.9"
   }

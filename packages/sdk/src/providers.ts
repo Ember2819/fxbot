@@ -153,7 +153,13 @@ export async function createProviders({ store, secretKey, dataDir, vercelClientI
     await entry?.agent.close();
   }
 
-  const restart = async (record: ProviderRecord) => (await stop(record.id), await start(record));
+  // Closing an agent waits for its running turns. A turn asking for it meanwhile waits for the new one.
+  const restarts = new Map<string, Promise<void>>();
+  function restart(record: ProviderRecord) {
+    const next = (restarts.get(record.id) ?? Promise.resolve()).then(async () => (await stop(record.id), await start(record)));
+    restarts.set(record.id, next.catch(() => {}));
+    return next;
+  }
 
   async function record(id: unknown) {
     if (typeof id !== "string" || !id) return fail(400, "provider is required");
@@ -207,6 +213,7 @@ export async function createProviders({ store, secretKey, dataDir, vercelClientI
     // The agent for a bot's provider, with the model metadata libfx reads when a turn opens its engine (libfx 0.0.16,
     // checked by hand). Vision stays on when unknown, so images are still tried.
     async agentFor(id: string, model: string) {
+      await restarts.get(id);
       const entry = agents.get(id) ?? fail(400, errors.get(id) ?? "This bot's provider is gone. Pick another in its settings.");
       if (entry.models && model && !entry.models[model]) {
         const current = await record(id);
@@ -223,6 +230,12 @@ export async function createProviders({ store, secretKey, dataDir, vercelClientI
     has: (id: string) => agents.has(id),
     get: record,
     list,
+    // libfx fixes an agent's tools when it is made, so a new tool list, as when an add-on comes or goes, makes every
+    // agent again.
+    async retool(next: FxAgentTool[]) {
+      tools = next;
+      await Promise.all((await store.providers.list()).map(restart));
+    },
 
     // Key and server kinds. Plans and accounts are added by signing in.
     async add(input: NewProvider) {
