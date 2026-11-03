@@ -6,13 +6,13 @@ A plugin is code that changes fxbot itself, the way [Pi's](https://github.com/ea
 - add screens, sidebar entries, and controls to the app
 - start bots' turns
 
-A plugin can also carry [skills](../_completed/phases/skills.md) and remote [MCP servers](../_completed/phases/mcp.md), in the format other agents share. It is found and added through [add-ons](../_completed/phases/addons.md).
+A plugin can also carry [skills](skills.md) and remote [MCP servers](mcp.md), in the format other agents share. It is found and added through [add-ons](addons.md).
 
-Status: being built for 0.4.0. Replanned on 2026-11-02 after the owner asked for plugins that change the app rather than sit beside it, and refreshed on 2026-11-03 for [containers](../_completed/phases/containers.md) and the project's site, [fxbot.sh](https://fxbot.sh). It builds on [add-ons](../_completed/phases/addons.md), [skills](../_completed/phases/skills.md), and [MCP servers](../_completed/phases/mcp.md). This phase proves the API with two plugins of fxbot's own: [chat rooms](chat-rooms.md) and herdr.
+Status: built on 2026-11-03, for 0.4.0. Replanned on 2026-11-02 after the owner asked for plugins that change the app rather than sit beside it, and refreshed on 2026-11-03 for [containers](containers.md) and the project's site, [fxbot.sh](https://fxbot.sh). It builds on [add-ons](addons.md), [skills](skills.md), and [MCP servers](mcp.md). This phase proves the API with two plugins of fxbot's own: [chat rooms](../../phases/chat-rooms.md) and herdr.
 
 ## 0. Core or add-on
 
-**Core: the plugin API.** The API is the seam every other add-on phase plugs into: [chat rooms](chat-rooms.md), [routines](routines.md), [triggers](triggers.md), [soul](soul.md), [permissions](permissions.md), and the rest. Chat rooms and herdr are add-ons, and the core never names them ([Core or add-on](../../CONVENTIONS.md#core-or-add-on)).
+**Core: the plugin API.** The API is the seam every other add-on phase plugs into: [chat rooms](../../phases/chat-rooms.md), [routines](../../phases/routines.md), [triggers](../../phases/triggers.md), [soul](../../phases/soul.md), [permissions](../../phases/permissions.md), and the rest. Chat rooms and herdr are add-ons, and the core never names them ([Core or add-on](../../../CONVENTIONS.md#core-or-add-on)).
 
 ## 1. Research
 
@@ -86,9 +86,9 @@ Read from source, docs, and the installed libfx, as of November 2026.
 - **What the plugin needs:** `agent.list` (no params) answers `{"type":"agent_list","agents":[…]}`, each with `pane_id`, `agent`, `name`, `agent_status` (`idle`, `working`, `blocked`, `done`, or `unknown`), and `cwd`. `pane.read` takes `pane_id`, `source` (`visible`, `recent`, `recent_unwrapped`, or `detection`), and `lines`, and answers `{"type":"pane_read","read":{"text","truncated",…}}`.
 - **No MCP server of its own.** The third-party `aelaguiz/herdr-mcp` is stdio, run through `uvx`.
 
-**Containers** (since 0.3.0, [containers](../_completed/phases/containers.md))
+**Containers** (since 0.3.0, [containers](containers.md))
 - **A release runs in fxbot's container,** as the `fxbot` user. Its data folder, `/var/lib/fxbot/data` on the machine, is a mount that survives updates and goes into the backup before migrations. The image's Node is 22, which runs TypeScript as it is.
-- **The container sees no other folder or socket of the machine.** `/opt/fxbot/compose.override.yaml`, which compose merges and fxbot never writes, can mount more. The [agent computer](computer.md) plans to use it the same way.
+- **The container sees no other folder or socket of the machine.** `/opt/fxbot/compose.override.yaml`, which compose merges and fxbot never writes, can mount more. The [agent computer](../../phases/computer.md) plans to use it the same way.
 - **A checkout runs natively,** as its user, with the database and embedder from `deploy/compose.dev.yaml`.
 
 **fxbot.sh** (live since 0.2.1)
@@ -264,7 +264,7 @@ module.exports = function setup(app) {
 - **Sources:**
   - **fxbot's list:** `plugins-registry.json` on fxbot.sh, next to the other two lists (`FXBOT_LISTS_URL`). Each entry is `{ name, description, repo, path }`, tagged **fxbot**.
   - **A GitHub repository,** with an optional folder: `owner/repo` or `owner/repo/path/to/plugin`.
-  - **A folder on this machine,** for writing a plugin in a checkout: `FXBOT_PLUGIN_DIRS` lists folders in the server's environment, which load at start, unpinned, tagged **local**. `npm run dev` also restarts the API when files in them change. A release install doesn't use it: its container sees no folder of the machine but its own.
+  - **A folder on this machine,** for writing a plugin in a checkout: `FXBOT_PLUGIN_DIRS` lists folders in the server's environment, which load at start, unpinned. fxbot loads one again a moment after its files change. A release install doesn't use it: its container sees no folder of the machine but its own.
 - **The preview** (the add-on page) pins the source's HEAD commit, then reads the plugin through `archive.ts`. Plugins get their own limits: 2 MiB a file, text only, 20 MB in all.
 - **The page shows:**
   - its description and `plugin.json`
@@ -300,7 +300,7 @@ A plugin runs with everything fxbot can reach, as Pi, opencode, and eve plugins 
 | `GET /api/plugins` | `plugins.list()`: name, version, page and CSS URLs, for the page |
 | `GET /api/plugins/:name/files/*` | `plugins.file(name, path)`: the plugin's page code and CSS, `cache-control: immutable` under the commit |
 | `* /api/plugins/:name/*` | the plugin's own routes |
-| `POST /api/addons/preview`, `POST /api/addons`, … | the [add-ons](../_completed/phases/addons.md) calls, with `{ plugin: "owner/repo/path" }` as a ref |
+| `POST /api/addons/preview`, `POST /api/addons`, … | the [add-ons](addons.md) calls, with `{ plugin: "owner/repo/path" }` as a ref |
 | `PUT /api/addons/:id/settings` | `addons.configure(id, settings)`: secrets write-only |
 | `GET /api/addons/:id/log` | `addons.log(id)`: recent log lines and errors |
 
@@ -316,18 +316,17 @@ A plugin runs with everything fxbot can reach, as Pi, opencode, and eve plugins 
   - `plugins.tsx`: the loader, `@fxbot/app`, and the error boundaries
   - the places in `app.tsx` and `steps.tsx`
   - the plugin parts of the add-on pages
-  - `vite.config.ts`: watching `FXBOT_PLUGIN_DIRS`
-- **`plugins/chat-rooms/` and `plugins/herdr/`:** fxbot's own plugins, in this repository but outside the workspaces, and never imported by the core ([question 1](#5-open-questions)). Each is added from GitHub like anyone's.
+- **`plugins/chat-rooms/` and `plugins/herdr/`:** fxbot's own plugins, in this repository but outside the workspaces, and never imported by the core ([question 1](#5-open-questions)). Each is added from GitHub like anyone's. Their page code is `page.jsx`, built into `page.js` with rolldown, which comes with Vite.
 
 ### The first plugins
 
-**Chat rooms** ([stub](chat-rooms.md)) uses every part of the API:
+**Chat rooms** ([stub](../../phases/chat-rooms.md)) uses every part of the API:
 - **Tables:** `rooms` (id, name), `members` (room, bot), `messages` (id, room, author, text, at), and `sessions` (room, bot, session).
 - **Page:** a **Rooms** group in the sidebar, with a **+** that names a room and picks its bots. The room at `/chat-rooms/rooms/<id>` shows its messages and a message box, made from the app's components.
 - **A message in a room:**
   1. The owner's message is saved.
   2. Each member bot answers once, in turn, in its own session for that room. That session is made with `fx.chats.newSession` and prompted with the room's messages since its last turn.
-  3. The `instructions` hook tells it which room it is in, and who else is there. `turn.end` saves its reply to the room.
+  3. The `instructions` hook tells it which room it is in, and who else is there. The plugin reads the bot's reply from that session's stream, from the cursor it kept, shows it as it's written, and saves it to the room at `turn_end`.
   4. Bots don't start new rounds, so the room never runs on by itself ([question 6](#5-open-questions)).
 - **Live view:** a room route streams the replying bot's session lines, so its reply shows as it is written.
 
@@ -335,17 +334,17 @@ A plugin runs with everything fxbot can reach, as Pi, opencode, and eve plugins 
 - **Tools:** `herdr_list_agents` and `herdr_read_pane` talk to herdr's socket directly, so no MCP server is needed. Both are read-only.
 - **A setting** holds the socket's path, `~/.config/herdr/herdr.sock` by default.
   - **In a checkout** run by herdr's own user, that's all.
-  - **In a release,** fxbot's container runs as the `fxbot` user, and herdr's socket is its owner's alone. The plugin's README shows the owner a relay, with `socat`, that offers the socket to the `fxbot` user in a folder of its own, and the lines for `/opt/fxbot/compose.override.yaml` that mount that folder. fxbot's core never names herdr.
+  - **In a release,** fxbot's container runs as the `fxbot` user, and herdr's socket is its owner's alone. The plugin's README shows the owner a relay, with `socat`, run by root, that offers the socket to the `fxbot` user inside fxbot's data folder, which the container already mounts. fxbot's core never names herdr.
 - **A tool view** shows the agents as a table.
 - **A skill** says when to use the tools.
 
 ### Not in this phase
 
-- Local MCP servers (stdio), setup steps that install tooling, and npm dependencies ([question 4](#5-open-questions)). A plugin can start a process from its own server code. Installed programs belong on the [agent computer](computer.md), a plugin that other plugins build on.
+- Local MCP servers (stdio), setup steps that install tooling, and npm dependencies ([question 4](#5-open-questions)). A plugin can start a process from its own server code. Installed programs belong on the [agent computer](../../phases/computer.md), a plugin that other plugins build on.
 - Claude-format plugins and marketplaces. A plugin's own skills and remote servers already use the shared format.
 - Hooks inside a model request, which libfx doesn't offer.
-- Hooks for compaction. [Context management](context-management.md) adds one when it builds compaction.
-- Any page place a first plugin doesn't need, such as a full-screen route for the [herdr screen](herdr-screen.md).
+- Hooks for compaction. [Context management](../../phases/context-management.md) adds one when it builds compaction.
+- Any page place a first plugin doesn't need, such as a full-screen route for the [herdr screen](../../phases/herdr-screen.md).
 
 ### Size
 
@@ -411,17 +410,17 @@ Checks use a sample plugin in the scratchpad that uses every hook and place, dis
 - [x] fxbot's list serves `plugins-registry.json` in the mock site, and its plugins are tagged **fxbot** on the Plugins tab.
 
 **M5. The first plugins, docs, and checks**
-- [ ] Chat rooms against the mock model:
+- [x] Chat rooms against the mock model:
   - A room with two bots: each answers once, in order. The second sees the first's reply, and the room shows both as they stream.
   - Removing a bot from the room stops its answers.
-- [ ] herdr against a stub socket: list agents and read a pane, with the table view, a socket path setting, and a missing socket answered clearly.
-- [ ] Docs:
+- [x] herdr against a stub socket: list agents and read a pane, with the table view, a socket path setting, and a missing socket answered clearly.
+- [x] Docs:
   - The owners' docs gain a how-to, "Add a plugin".
   - The SDK's pages gain a how-to, "Write a plugin", and a reference page, "Plugin API", for authors.
   - The Core and add-ons page names plugins.
   - The README's variables table lists `FXBOT_PLUGIN_DIRS`.
   - The CHANGELOG notes `0006_plugins`.
-- [ ] `npm run typecheck`, `npm run build`, `npm run build-site`, and `git diff --check` pass.
+- [x] `npm run typecheck`, `npm run build`, `npm run build-site`, and `git diff --check` pass.
 
 **The human runs these:**
 - Add chat rooms from GitHub, make a room with two bots, and talk with them.
@@ -434,7 +433,7 @@ Each has a default.
 1. **Where fxbot's own plugins live.** *Default:* `plugins/<name>/` in this repository, outside the workspaces and never imported by the core, added from GitHub like anyone's. The alternative is a repository of their own.
 2. **The namespace.** *Settled:* `sh.fxbot`, from fxbot.sh, which is live.
 3. **Dependencies.** *Default:* none installed. A plugin bundles what it needs. Pi installs `dependencies`, which brings install scripts and a slower add.
-4. **Local MCP servers and setup steps.** *Default:* the [agent computer](computer.md) phase. A plugin that needs a process starts it from its own code, as herdr's talks to a socket instead of running herdr-mcp.
+4. **Local MCP servers and setup steps.** *Default:* the [agent computer](../../phases/computer.md) phase. A plugin that needs a process starts it from its own code, as herdr's talks to a socket instead of running herdr-mcp.
 5. **How page code loads.** *Default:* a CommonJS bundle run with the app's `require`, as opencode does. The alternative is ES modules with an import map, which needs files that re-export the app's React, made at build time.
 6. **Who answers in a room.** *Default:* each member bot answers each of the owner's messages once, in turn, and bots never start rounds. Later choices could be only the bot that's named, or bots answering each other with a cap on rounds.
 7. **Turns a plugin starts in a bot's own chat.** *Default:* shown with "From <plugin>" on the message.

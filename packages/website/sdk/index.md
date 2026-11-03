@@ -10,6 +10,7 @@ New to it? Start with the tutorial, [Build a terminal chat](/sdk/tutorials/termi
 - **Providers.** ChatGPT, Grok, and Vercel accounts signed in with a device code, API keys for OpenAI, AI Gateway, OpenRouter, and OpenCode, and local model servers such as Ollama and LM Studio.
 - **Replies as they're written.** Each chat is a stream of lines: text, thinking, and tool calls, in the order they happen, which a small function folds into turns.
 - **Tools.** Every bot searches its own past chats, keeps [memories](/sdk/how-to/memories/), and reads and saves files in the library. Remote MCP servers and skills add more.
+- **Plugins.** Code that changes fxbot itself, with hooks into each turn and tool call, tools, routes, tables, settings, and screens of its own. See [Write a plugin](/sdk/how-to/write-a-plugin/).
 - **Records in Postgres.** Bots, chats, files, memories, and settings live in Postgres, with every key and token sealed under a key your app holds. The database moves forward through numbered migrations when your app starts.
 
 ## Two entries

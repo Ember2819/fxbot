@@ -40,6 +40,10 @@ A registry entry says who published it, checked by the registry, but not that it
 
 A skill is someone else's instructions, which a bot follows like its own. fxbot shows a skill's `SKILL.md` before you add it, and keeps it pinned to the commit of its repository that page came from. When its files change there, it waits for you to update it. Nothing in a skill runs: fxbot keeps only its text files, and bots read its scripts as text. Each skills search on the Skills tab sends its words to skills.sh, and adding a skill fetches its repository from GitHub.
 
+## Plugins
+
+A plugin is code that runs inside fxbot, with everything fxbot can reach: its database, the keys it opens, every bot's chats, and in a release, whatever fxbot's container reaches. Adding one trusts its author as much as fxbot's own. So fxbot shows a plugin's code before you add it, keeps it pinned to the commit of its repository that page came from, and waits for you when its files change there, showing what changed. Only the page code and CSS that its `plugin.json` names are served to the page. A plugin's secret settings are sealed like a provider's key, and the page never gets them back.
+
 ## What it doesn't cover
 
 - Each message goes to the provider its bot uses, which sees the chat. Only a local model server keeps it on your network. With a provider's embedding model for memory search, that provider also receives the text of every memory and message it turns into a vector.

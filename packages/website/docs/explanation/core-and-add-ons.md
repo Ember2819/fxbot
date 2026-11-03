@@ -17,11 +17,14 @@ It also holds the seams that add-ons plug into: **Add-ons** itself, which finds,
 
 ## Add-ons
 
-Everything else is an add-on. Today an add-on is one of these:
+Everything else is an add-on. An add-on is one of these:
 - an [MCP server](/docs/how-to/add-an-mcp-server/), which gives bots tools from a remote service
 - a [skill](/docs/how-to/add-a-skill/), with instructions that a bot reads when a task needs them
+- a [plugin](/docs/how-to/add-a-plugin/), which changes fxbot itself: it runs inside fxbot, and can add screens, tools, its own tables and settings, and the turns it starts
 
-Each goes to all bots, or only to the ones you choose. fxbot's own lists suggest a few, tagged **fxbot**, and search finds more. What each kind may do is in the [Security model](/docs/explanation/security/#mcp-servers).
+Each goes to all bots, or only to the ones you choose; a plugin's screens are for everyone. fxbot's own lists suggest a few, tagged **fxbot**, and search finds more. What each kind may do is in the [Security model](/docs/explanation/security/#mcp-servers).
+
+The plugin API is the seam that most later features plug into. fxbot's own plugins, such as chat rooms, use it as anyone's do.
 
 ## Why the line is there
 

@@ -1,10 +1,10 @@
 # Skills
 
-Bots use skills: [Agent Skills](https://agentskills.io/specification), folders with a `SKILL.md`. Skills come from [add-ons](addons.md): a skill found on skills.sh, the skills inside a [plugin](../../phases/plugins.md), or the skills an [MCP server](mcp.md) serves. Each bot sees a short list of its skills, and reads one only when a task needs it.
+Bots use skills: [Agent Skills](https://agentskills.io/specification), folders with a `SKILL.md`. Skills come from [add-ons](addons.md): a skill found on skills.sh, the skills inside a [plugin](plugins.md), or the skills an [MCP server](mcp.md) serves. Each bot sees a short list of its skills, and reads one only when a task needs it.
 
 This page's first idea was that profiles grow skills from use, kept small enough to read and audit. That comes later and builds on the same records and tool ([Later](#later-skills-bots-write)).
 
-Status: built on 2026-11-02, for 0.2.0. [Add-ons](addons.md) built the records, per-bot choice, consent by hash, the search over tabs, and the marks and Update. This phase added skills from skills.sh and from fxbot's own skills list, the `skill` tool, and each bot's catalog. Every skill installs the way skills.sh installs it, from a GitHub repository, and is kept as libfx's own `SkillRecord`. Skills that MCP servers serve come after 0.2.0 ([question 5](#5-open-questions)). Plugins' skills come with [plugins](../../phases/plugins.md).
+Status: built on 2026-11-02, for 0.2.0. [Add-ons](addons.md) built the records, per-bot choice, consent by hash, the search over tabs, and the marks and Update. This phase added skills from skills.sh and from fxbot's own skills list, the `skill` tool, and each bot's catalog. Every skill installs the way skills.sh installs it, from a GitHub repository, and is kept as libfx's own `SkillRecord`. Skills that MCP servers serve come after 0.2.0 ([question 5](#5-open-questions)). Plugins' skills come with [plugins](plugins.md).
 
 ## 1. Research
 
@@ -61,7 +61,7 @@ These are read from specs, source, docs, and read-only requests, as of November 
   - `skills/`
   - dozens of agent folders, such as `.agents/skills` and `.claude/skills`
   - the paths a Claude plugin manifest lists (`src/plugin-manifest.ts`)
-- **Plugins.** The shared Agent Plugins format has "exactly two component types: skills and MCP servers", with skills at `skills/<name>/SKILL.md` ([plugins](../../phases/plugins.md#1-research)).
+- **Plugins.** The shared Agent Plugins format has "exactly two component types: skills and MCP servers", with skills at `skills/<name>/SKILL.md` ([plugins](plugins.md#1-research)).
   - Twilio's plugin holds 57 skills, from 4 KB to 37 KB each and 632 KB in all (`twilio/ai`, counted here).
 - **GitHub without its API.** `GET https://github.com/<owner>/<repo>.git/info/refs?service=git-upload-pack` answers with the commit `HEAD` points at, without a key and outside the API's 60-an-hour limit, and `https://codeload.github.com/<owner>/<repo>/tar.gz/<commit>` serves that commit's files. Both were checked here against `anthropics/skills`.
 - **MCP servers.** The `io.modelcontextprotocol/skills` extension (SEP-2640, at the Beta stage) lets a server serve skills ([overview](https://modelcontextprotocol.io/extensions/skills/overview)).
@@ -96,7 +96,7 @@ skills (addon_id text not null references addons on delete cascade,
         primary key (addon_id, name))
 ```
 
-- **One add-on, one skill.** A skill from skills.sh or fxbot's list is one add-on. The table holds more than one per add-on for [plugins](../../phases/plugins.md), which bring many.
+- **One add-on, one skill.** A skill from skills.sh or fxbot's list is one add-on. The table holds more than one per add-on for [plugins](plugins.md), which bring many.
 - **Source.** `{ skill: "<owner>/<repo>/<skillId>", commit, from: "fxbot" | "skills.sh" }`: the id both lists use, the commit the files came from, and the list it was found in.
 - **Parsing.** fxbot reads the frontmatter with the `yaml` package, which has no dependencies, pinned exactly, and builds the `SkillRecord` itself, since libfx's `loadSkillFile` misreads folded and quoted descriptions and Windows line endings.
   - `name` and `description` are required, with the spec's limits.
@@ -229,7 +229,7 @@ When a task matches a skill's description, call the skill tool with the skill's 
 - **`packages/sdk`:**
   - `skills.ts`: records, parsing, the catalog, the tool, previews, and updates.
   - `providers.ts`: `contextWindow(provider, model)`, for the catalog's budget.
-  - `archive.ts`: `HEAD` by `info/refs`, and the streamed tar reader, shared later with [plugins](../../phases/plugins.md).
+  - `archive.ts`: `HEAD` by `info/refs`, and the streamed tar reader, shared later with [plugins](plugins.md).
   - `registry.ts`: the skills.sh search and fxbot's skills list, beside the MCP sources.
   - `skills-registry.json`: fxbot's skills list, which the website build also publishes.
   - `index.ts`: the add-on calls pass by kind, `instructionsFor` adds the catalog, and the tool joins `chat_history`.

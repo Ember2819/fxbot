@@ -8,7 +8,7 @@ Status: built on 2026-11-02, on `release/0.3.0`. The human checks at the end of 
 
 **Core.** Every bot needs to keep what it learns ([Core or add-on](../../../CONVENTIONS.md#core-or-add-on)), and memories are a bot's own data, like its chat and its files. The core is storing a bot's memories, finding them, and putting them back in front of the bot, plus the owner's view of them and the embedding model that search uses.
 
-These are add-ons, on hooks in the [plugin API](../../phases/plugins.md):
+These are add-ons, on hooks in the [plugin API](plugins.md):
 - Saving memories automatically, such as a review after turns (mem0, Hermes) or a nightly pass that tidies them ("dreams"). A plugin can do it on `turn.end` or a schedule.
 - Memories shared by a team of bots.
 - Other ways to organize what a bot knows, such as a [knowledge graph](../../phases/knowledge-base.md).
@@ -174,7 +174,7 @@ EmbeddingGemma 2 scores 68.5 on the English MTEB v2 mean, and Qwen3-Embedding-0.
 - Every turn opens the session with the bot's instructions, the handoff summary, and the skills catalog, which takes 1% of the model's context window at 4 characters a token, or 8,000 characters when the window is unknown ([`index.ts`](../../../packages/sdk/src/index.ts)). A bot's own instructions may be up to 64 KiB.
 - The library's tools are `library_search`, `library_read`, and `library_save`. The chat shows each fxbot tool as a sentence ([`steps.tsx`](../../../packages/ui/src/steps.tsx)).
 - The bot panel has two tabs, Details and Library. Settings holds the default provider (`settings` table).
-- Migrations are numbered SQL files, run in one transaction after a backup. The newest is `0004_skills`, so this phase adds `0005_memories`, and [plugins](../../phases/plugins.md) takes `0006`.
+- Migrations are numbered SQL files, run in one transaction after a backup. The newest is `0004_skills`, so this phase adds `0005_memories`, and [plugins](plugins.md) takes `0006`.
 
 ## 2. Key takeaways
 

@@ -58,7 +58,7 @@ const features: { shape: Shape; color: Color; title: string; link: string; body:
     color: "purple",
     title: "Add-ons",
     link: "/docs/explanation/core-and-add-ons/",
-    body: <>Skills from fxbot's picks or skills.sh, which bots read when a task needs them. Remote MCP servers from GitHub's registry or by address, with only the tools you allow. Each goes to all bots or the ones you choose, and costs nothing until you add it.</>,
+    body: <>Skills from fxbot's picks or skills.sh, which bots read when a task needs them. Remote MCP servers from GitHub's registry or by address, with only the tools you allow. Plugins that change the app itself, such as chat rooms. Each costs nothing until you add it.</>,
   },
   {
     shape: "hexagon",
@@ -129,7 +129,7 @@ export function Home() {
           </div>
           <h1 className="mt-8 max-w-3xl text-4xl font-semibold tracking-tight text-balance sm:text-6xl">Your bot, built and configured how you want it.</h1>
           <p className="mt-5 max-w-2xl text-lg text-pretty text-muted-foreground sm:text-xl">
-            fxbot starts simple: a lean, fast core with bots, their chats, and their files. It is local first. It runs on a machine you own and works with local models as well as hosted ones. Make each bot yours, from its look and instructions to its model and tools, and grow fxbot with only the add-ons you want: skills and MCP servers today, and plugins next.
+            fxbot starts simple: a lean, fast core with bots, their chats, and their files. It is local first. It runs on a machine you own and works with local models as well as hosted ones. Make each bot yours, from its look and instructions to its model and tools, and grow fxbot with only the add-ons you want: skills, MCP servers, and plugins that change the app itself.
           </p>
           <div className="mt-8 max-w-2xl">
             <Command>{installCommand}</Command>

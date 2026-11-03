@@ -1,0 +1,13 @@
+{
+  "name": "chat-rooms",
+  "version": "0.1.0",
+  "description": "Rooms where several of your bots talk with you, each answering in turn.",
+  "license": "Apache-2.0",
+  "extensions": {
+    "sh.fxbot": {
+      "server": "./fxbot/server.ts",
+      "page": "./fxbot/page.js",
+      "migrations": "./fxbot/migrations"
+    }
+  }
+}

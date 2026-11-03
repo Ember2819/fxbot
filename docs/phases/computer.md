@@ -2,7 +2,7 @@
 
 Each bot gets a Linux computer of its own to use during its turns: a shell, files that last, and the programs other plugins install. The computer is a plugin. A bot with it on runs commands, reads and writes files, and shares what it makes to its library. Other plugins add programs to every computer through setup steps, the way the browser plugin in this phase adds a web browser. Computers start on a bot's first call and stop when they sit idle. They run in a rootless container engine that belongs to a user of their own on the machine, so they stay apart from fxbot's own files and from each other. From [issue #6](https://github.com/iammrduncan/fxbot/issues/6).
 
-Status: planned, not built. Research and plan only, written on 2026-11-02. It builds on the [plugin API](plugins.md), and on the [containers](../_completed/phases/containers.md) install for the app's side of the engine. A checkout runs it as well. The issue asked for computers before plugins. Since then the stub made the computer a plugin, so this phase comes after plugins.
+Status: planned, not built. Research and plan only, written on 2026-11-02. It builds on the [plugin API](../_completed/phases/plugins.md), and on the [containers](../_completed/phases/containers.md) install for the app's side of the engine. A checkout runs it as well. The issue asked for computers before plugins. Since then the stub made the computer a plugin, so this phase comes after plugins.
 
 ## 0. Core or add-on
 
@@ -142,7 +142,7 @@ fxbot has no login of its own, so a computer that reaches the tailnet address ca
 
 ### The plugins
 
-Both live in this repository, outside the workspaces, as [plugins](plugins.md#5-open-questions) question 1 has it, and are added from fxbot's list like anyone's.
+Both live in this repository, outside the workspaces, as [plugins](../_completed/phases/plugins.md#5-open-questions) question 1 has it, and are added from fxbot's list like anyone's.
 
 ```text
 plugins/computer/
@@ -372,7 +372,7 @@ About 750 lines in all:
 
 ## 4. Checklist
 
-Checks use disposable Postgres, the mock model, Playwright, and fxbot's list served by the mock site, as the [plugins](plugins.md#4-checklist) checks do.
+Checks use disposable Postgres, the mock model, Playwright, and fxbot's list served by the mock site, as the [plugins](../_completed/phases/plugins.md#4-checklist) checks do.
 
 **About this machine.** Making a user, its lingering, an nftables table, and a systemd unit here needs the owner's go-ahead.
 - **With it:** `setup.sh` runs with another user name (`--name fxbot-computer-check`), the checks run against that engine, and `setup.sh --remove` takes it away after.

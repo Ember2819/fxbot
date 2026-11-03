@@ -46,8 +46,8 @@ For typed calls from a page or a script, use [the client](/sdk/reference/client/
 | Method | Path | Body or query | Answer |
 | --- | --- | --- | --- |
 | `GET` | `/api/addons` | | `Addon[]` |
-| `GET` | `/api/addons/search` | `q`, `kind` (`mcp` or `skill`), `everything=1` | `AddonSearch`, or `SkillSearch` for `kind=skill` |
-| `POST` | `/api/addons/preview` | `{ "ref": AddonRef }` | `AddonPreview`, or `SkillPreview` for a skill |
+| `GET` | `/api/addons/search` | `q`, `kind` (`mcp`, `skill`, or `plugin`), `everything=1` | `AddonSearch`, `SkillSearch` for `kind=skill`, or `PluginSearch` for `kind=plugin` |
+| `POST` | `/api/addons/preview` | `{ "ref": AddonRef }` | `AddonPreview`, `SkillPreview` for a skill, or `PluginPreview` for a plugin |
 | `POST` | `/api/addons` | `{ "ref": AddonRef, "hash": "<preview's hash>" }` | 201 and `Addon` |
 | `POST` | `/api/addons/<id>/update` | `{ "hash": "<preview's hash>" }` | `Addon` |
 | `PATCH` | `/api/addons/<id>` | Any of `enabled`, `bots` (`all` or `each`), `allowed` (tool names) | `Addon` |
@@ -55,9 +55,11 @@ For typed calls from a page or a script, use [the client](/sdk/reference/client/
 | `PUT` | `/api/addons/<id>/secrets` | Any of `headers` (name to value), `clientId`, `clientSecret` | `Addon` |
 | `GET` | `/api/addons/<id>/skills` | `?file=`, default `SKILL.md` | `{ "text": "<file>" }` |
 | `POST` | `/api/addons/<id>/sign-in` | | 201 and `OAuthAttempt`. The request's `Origin` is where the sign-in comes back to. |
+| `PUT` | `/api/addons/<id>/settings` | A plugin's settings, name to value, `""` for its default | `PluginAddon`. Secrets never come back. |
+| `GET` | `/api/addons/<id>/log` | | `{ "lines": [...] }`, a plugin's recent log |
 | `PUT` | `/api/profiles/<id>/addons/<addonId>` | `{ "enabled": true }` | `Addon`. Turns the add-on on or off for one bot. |
 
-`AddonRef` is `{ url, transport?, headers?, allowLocal? }`, `{ registry, version?, allowLocal?, from? }`, or `{ skill, from? }`: see [Add-ons](/sdk/reference/server-api/#add-ons).
+`AddonRef` is `{ url, transport?, headers?, allowLocal? }`, `{ registry, version?, allowLocal?, from? }`, `{ skill, from? }`, or `{ plugin, from? }`: see [Add-ons](/sdk/reference/server-api/#add-ons).
 
 ## OAuth
 
@@ -158,6 +160,14 @@ The lines' fields are in [Stream lines](/sdk/reference/client/#stream-lines).
 ```sh
 curl -N "http://127.0.0.1:8787/api/profiles/<id>/stream?cursor=0"
 ```
+
+## Plugins
+
+| Method | Path | Answer |
+| --- | --- | --- |
+| `GET` | `/api/plugins` | `PluginPage[]`: each running plugin's page code and CSS, by URL |
+| `GET` | `/api/plugins/<name>/files/<path>` | The plugin's page code or CSS, and nothing else of its files. A pinned plugin's is kept for good, under its commit. |
+| Any | `/api/plugins/<name>/<path>` | The plugin's own route. See [Plugin API](/sdk/reference/plugin-api/#routes). |
 
 ## Outside /api
 

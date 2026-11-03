@@ -1,4 +1,5 @@
 import { createHash } from "node:crypto";
+import { watch, type FSWatcher } from "node:fs";
 import { mkdir, readdir, readFile, rm, stat, writeFile } from "node:fs/promises";
 import { dirname, join, resolve } from "node:path";
 import { pathToFileURL } from "node:url";
@@ -323,6 +324,36 @@ export async function createPlugins(options: {
   const first = setTimeout(() => void check().catch(() => {}), 60_000);
   first.unref();
 
+  // A local plugin loads again a moment after its files change, so its author sees each change without a restart.
+  const watchers: FSWatcher[] = [];
+  async function reload(plugin: Plugin) {
+    if (plugins.get(plugin.record.id) !== plugin || !plugin.record.enabled) return;
+    try {
+      const manifest = parseManifest(await readFile(resolve(folderOf(plugin.record), "plugin.json"), "utf8"));
+      if (manifest.name !== plugin.record.name) throw new Error(`plugin.json now names ${manifest.name}. Restart fxbot to add it.`);
+      plugin.record = { ...plugin.record, config: manifest };
+      await store.addons.update(plugin.record.id, { config: manifest });
+    } catch (error) {
+      return report(plugin, "Loading it again", error);
+    }
+    await unload(plugin);
+    await load(plugin);
+    onChange();
+  }
+  function watchFolder(plugin: Plugin) {
+    let wait: NodeJS.Timeout | undefined;
+    try {
+      const watcher = watch(folderOf(plugin.record), { recursive: true }, () => {
+        clearTimeout(wait);
+        wait = setTimeout(() => void reload(plugin), 300);
+      });
+      watcher.unref();
+      watchers.push(watcher);
+    } catch (error) {
+      report(plugin, "Watching its folder", error);
+    }
+  }
+
   // The defaults, then what the owner set, kept in the same object, which the plugin holds.
   function settle(plugin: Plugin) {
     for (const key of Object.keys(plugin.settings)) delete plugin.settings[key];
@@ -534,6 +565,7 @@ export async function createPlugins(options: {
     // this machine.
     async start() {
       for (const { plugin, servers } of fresh) await addServers(plugin, servers, true);
+      for (const plugin of plugins.values()) if ("local" in plugin.record.source && folders.has(folderOf(plugin.record))) watchFolder(plugin);
       for (const plugin of plugins.values()) {
         plugin.saved = (await secrets.get<{ values: Record<string, string> }>(plugin.record.id).catch(() => undefined))?.values ?? {};
         if (plugin.record.enabled) await load(plugin);
@@ -706,6 +738,7 @@ export async function createPlugins(options: {
     async close() {
       clearInterval(timer);
       clearTimeout(first);
+      for (const watcher of watchers) watcher.close();
       for (const plugin of plugins.values()) await unload(plugin);
     },
   };

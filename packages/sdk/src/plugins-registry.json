@@ -1,1 +1,16 @@
-{ "plugins": [] }
+{
+  "plugins": [
+    {
+      "name": "chat-rooms",
+      "description": "Rooms where several of your bots talk with you, each answering in turn.",
+      "repo": "iammrduncan/fxbot",
+      "path": "plugins/chat-rooms"
+    },
+    {
+      "name": "herdr",
+      "description": "Bots see the coding agents herdr runs, and read what their panes show.",
+      "repo": "iammrduncan/fxbot",
+      "path": "plugins/herdr"
+    }
+  ]
+}

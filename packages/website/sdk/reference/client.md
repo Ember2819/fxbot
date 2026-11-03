@@ -117,6 +117,10 @@ A file itself is read through its item's `url`, `/api/library/<id>/file`.
 | `addons.forBot(profileId, addonId, enabled)` | `PUT /api/profiles/<profileId>/addons/<addonId>` | `Addon` |
 | `addons.readSkill(id, file?)` | `GET /api/addons/<id>/skills?file=` | `string` |
 | `addons.signIn(id)` | `POST /api/addons/<id>/sign-in` | `OAuthAttempt` |
+| `addons.searchPlugins(q)` | `GET /api/addons/search?q=&kind=plugin` | `PluginSearch` |
+| `addons.configure(id, settings)` | `PUT /api/addons/<id>/settings` | `PluginAddon` |
+| `addons.log(id)` | `GET /api/addons/<id>/log` | `string[]` |
+| `plugins.list()` | `GET /api/plugins` | `PluginPage[]` |
 | `oauth.get(attemptId)` | `GET /api/oauth/attempts/<attemptId>` | `OAuthStatus` |
 | `oauth.paste(attemptId, address)` | `POST /api/oauth/attempts/<attemptId>/paste` | `OAuthStatus` |
 

@@ -13,7 +13,7 @@ A feature is core only when it is one of these:
 
 Everything else is an add-on. A knowledge graph, chat rooms, web search, a password manager, and herdr are add-ons.
 
-Plugins are real extensions of the app, not features bolted on beside it. The plugin API ([plugins](docs/phases/plugins.md), not built yet) lets a plugin change core behavior as well as add its own:
+Plugins are real extensions of the app, not features bolted on beside it. The plugin API ([plugins](docs/_completed/phases/plugins.md), built in 0.4.0) lets a plugin change core behavior as well as add its own:
 - hook into a bot's turns and tool calls: change a message before it runs, a bot's instructions, or a tool's input or result, or block a call
 - add tools, server routes, and data of its own
 - add to the app: a screen, a sidebar entry, a button in the message box, a way to show a message, or a panel in Settings

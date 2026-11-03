@@ -140,7 +140,7 @@ An item's `url` is `/api/library/<id>/file`, a route of fxbot's server.
 
 ## Add-ons
 
-Remote MCP servers and skills. See [Give bots tools](/sdk/how-to/tools/).
+Remote MCP servers, skills, and plugins. See [Give bots tools](/sdk/how-to/tools/), and for plugins, [Plugin API](/sdk/reference/plugin-api/).
 
 | Call | What it does | Returns |
 | --- | --- | --- |
@@ -154,7 +154,9 @@ Remote MCP servers and skills. See [Give bots tools](/sdk/how-to/tools/).
 | `addons.setSecrets(id, secrets)` | A server's header values, or the owner's own OAuth `clientId` and `clientSecret`. Write-only. | `Addon` |
 | `addons.forBot(profileId, addonId, enabled)` | Turns an add-on on or off for one bot. It counts when the add-on's `bots` is `"each"`. | `Addon` |
 | `addons.readSkill(id, file?)` | Synchronous. One of an installed skill's files, `SKILL.md` by default. | `string` |
-| `addons.check()` | Runs the hourly check of the skills' repositories now | nothing |
+| `addons.check()` | Runs the hourly check of the skills' and plugins' repositories now | nothing |
+| `addons.configure(id, settings)` | A plugin's settings: a value for each one named, or `""` for its default. Secrets are write-only. | `PluginAddon` |
+| `addons.log(id)` | Synchronous. A plugin's recent log lines and errors | `string[]` |
 
 An `AddonRef` is one of:
 
@@ -163,6 +165,7 @@ An `AddonRef` is one of:
 | `{ url, transport?, headers?, allowLocal? }` | A server by its address. `transport` is `streamable-http` (default) or `sse`. `headers` names the headers it needs. The address is `https`. A local or private address needs `allowLocal`, and may then use `http`. |
 | `{ registry, version?, allowLocal?, from? }` | A registry entry, from `github` (default), `fxbot`, or `official` |
 | `{ skill, from? }` | A skill, as `<owner>/<repo>/<skillId>` |
+| `{ plugin, from? }` | A plugin, as `<owner>/<repo>` or `<owner>/<repo>/<folder>`, from `github` (default) or `fxbot` |
 
 A server's `allowed` starts as its read-only tools. A header value is one line, up to 8 KiB, for a header the server was added with.
 
@@ -178,6 +181,18 @@ A server's `allowed` starts as its read-only tools. A header value is one line, 
 | `oauth.callback(query)` | Finishes a redirect, from its query string as `URLSearchParams` | `OAuthStatus` |
 
 `origin` is the page's origin, which the server has checked against its own host.
+
+## Plugins
+
+What fxbot's server serves for plugins. Their own API is [Plugin API](/sdk/reference/plugin-api/).
+
+| Call | What it does | Returns |
+| --- | --- | --- |
+| `plugins.pages()` | The running plugins' page code and CSS, by URL | `PluginPage[]` |
+| `plugins.file(name, path)` | A running plugin's page code or CSS, and nothing else of its files. `pinned` says its URL names a commit. | `{ type, data, pinned }` |
+| `plugins.handle(name, request, path)` | Answers a request to `/api/plugins/<name>/<path>` with the plugin's route | `Response` |
+
+`createFxbot` takes `pluginDirs`: plugin folders that load at start, for writing a plugin.
 
 ## Release and close
 

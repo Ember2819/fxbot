@@ -20,6 +20,7 @@ export const groups: Group[] = [
       { slug: "how-to/add-a-provider", label: "Add a provider" },
       { slug: "how-to/add-a-skill", label: "Add a skill" },
       { slug: "how-to/add-an-mcp-server", label: "Add an MCP server" },
+      { slug: "how-to/add-a-plugin", label: "Add a plugin" },
       { slug: "how-to/memory-search", label: "Choose memory search's vectors" },
       { slug: "how-to/reach-it", label: "Reach it from other devices" },
       { slug: "how-to/tailscale-service", label: "Serve it at its own name" },
@@ -71,6 +72,7 @@ export const sdkGroups: Group[] = [
       { slug: "how-to/tools", label: "Give bots tools" },
       { slug: "how-to/memories", label: "Work with memories" },
       { slug: "how-to/web-page", label: "Build a page on the client" },
+      { slug: "how-to/write-a-plugin", label: "Write a plugin" },
     ],
   },
   {
@@ -81,6 +83,7 @@ export const sdkGroups: Group[] = [
       { slug: "reference/server-api", label: "The fxbot object" },
       { slug: "reference/client", label: "The client" },
       { slug: "reference/http-api", label: "HTTP API" },
+      { slug: "reference/plugin-api", label: "Plugin API" },
     ],
   },
   {

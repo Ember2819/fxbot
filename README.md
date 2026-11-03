@@ -2,7 +2,7 @@
 
 Join the Hackers in the Loop community on [Discord](https://discord.gg/3Qs2uejUf9) to talk about fxbot, share what you build with it, and get help.
 
-fxbot is your bot, built and configured how you want it. It starts simple, with a lean, fast core: bots, their chats, and their files. Make each bot yours, from its look and instructions to its model and tools. Grow fxbot with only the add-ons you want: skills and MCP servers today, and plugins that change the app itself next.
+fxbot is your bot, built and configured how you want it. It starts simple, with a lean, fast core: bots, their chats, and their files. Make each bot yours, from its look and instructions to its model and tools. Grow fxbot with only the add-ons you want: skills, MCP servers, and plugins that change the app itself.
 
 fxbot is local first. One Node server and Postgres run on your own machine, and the browser is the UI on desktop and mobile. [libfx](https://fx.sh/docs/lib) sends each chat to the provider its bot uses: a local model server such as Ollama or LM Studio, an API key, or a ChatGPT, Grok, or Vercel account signed in with a device code.
 
@@ -37,7 +37,7 @@ In order of execution priority. Checked phases are built. Each is marked **core*
 - [x] [Skills](docs/_completed/phases/skills.md) (core seam): instructions bots read when a task needs them, from fxbot's list and skills.sh
 - [x] [Containers](docs/_completed/phases/containers.md) (core): podman or docker, one compose file for fxbot and its database with pgvector, and updates through the machine's `fxbot` command
 - [x] [Memories](docs/_completed/phases/memories.md) (core): each bot keeps what it has learned, and search by meaning from a local or remote embedder
-- [ ] [Plugins](docs/phases/plugins.md) (core: the plugin API): add-ons that change the app, with hooks, tools, data, and screens of their own; [chat rooms](docs/phases/chat-rooms.md) and herdr first
+- [x] [Plugins](docs/_completed/phases/plugins.md) (core: the plugin API): add-ons that change the app, with hooks, tools, data, and screens of their own; fxbot's first two, [chat rooms](plugins/chat-rooms/README.md) and [herdr](plugins/herdr/README.md), are in `plugins/`
 - [ ] [Agent computer](docs/phases/computer.md) (add-on, a plugin others build on): a shell, files, and programs for bots, for the add-ons that need one
 - [ ] [Permissions](docs/phases/permissions.md) (add-on, on a core hook): ask, auto, and yolo modes for tool calls
 - [ ] [Cross-bot messaging](docs/phases/cross-bot-messaging.md) (add-on): bots message each other
@@ -165,10 +165,11 @@ The server reads these from the environment, or from an uncommitted `.env` in th
 | `FXBOT_CLIENT_METADATA_URL` | Optional. The project's published OAuth client document, for MCP servers that sign in with one. Without it, fxbot registers itself with each server |
 | `FXBOT_MCP_REGISTRY` | Optional. The MCP registry that fxbot mirrors hourly for search, and that registry entries come from. Default GitHub's, `https://api.mcp.github.com` |
 | `FXBOT_MCP_EVERYTHING` | Optional. The registry that Search everything asks, once per search. Default the official one, `https://registry.modelcontextprotocol.io` |
-| `FXBOT_LISTS_URL` | Optional. The site that publishes fxbot's own lists of MCP servers and skills. fxbot reads its `mcp-registry.json` and `skills-registry.json` hourly, and keeps the lists the release shipped with until a read succeeds. Default fxbot's site, `https://fxbot.sh` |
+| `FXBOT_LISTS_URL` | Optional. The site that publishes fxbot's own lists of MCP servers, skills, and plugins. fxbot reads its `mcp-registry.json`, `skills-registry.json`, and `plugins-registry.json` hourly, and keeps the lists the release shipped with until a read succeeds. Default fxbot's site, `https://fxbot.sh` |
 | `FXBOT_BACKUPS` | Where the database and chat files are backed up before migrations run. Default `./backups`. The backup uses `pg_dump`, which must be Postgres 17's |
 | `FXBOT_CONTROL` | Set by a release install's compose file: the folder where the app asks the machine for updates. Without it, Settings doesn't update |
 | `FXBOT_EMBED_URL` | Optional. The local embedder for memory search, an OpenAI-style address such as `http://127.0.0.1:8081/v1` from `deploy/compose.dev.yaml`. A release install's compose file sets it. Without it, there is no local embedder |
+| `FXBOT_PLUGIN_DIRS` | Optional, for writing a plugin in a checkout. Plugin folders, separated by `:`, that fxbot adds on first sight and loads at start, unpinned. It loads one again a moment after its files change |
 | `FXBOT_UPDATE_CHECK` | `off` stops the daily check for a newer release, which asks GitHub about the repository in `package.json` |
 | `FXBOT_RELEASES_URL` | Optional. Where that check reads the newest release, in the shape of GitHub's `releases/latest`, for a fork or a mirror |
 

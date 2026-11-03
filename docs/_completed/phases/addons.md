@@ -3,7 +3,7 @@
 One place to find and add the things that work with fxbot. A search box over live registries lists MCP servers, skills, and plugins, and one Add puts them into fxbot.
 - An [MCP server](mcp.md) gives bots tools from a remote service.
 - A [skill](skills.md) is instructions that a bot reads when a task needs them.
-- A [plugin](../../phases/plugins.md) bundles MCP servers and skills. It can also run code on this machine: local MCP servers, tooling such as herdr, and hooks.
+- A [plugin](plugins.md) bundles MCP servers and skills. It can also run code on this machine: local MCP servers, tooling such as herdr, and hooks.
 
 Every add-on has a page that lists what it installs, like Grok Bot's plugin page.
 
@@ -15,7 +15,7 @@ This page owns what they share:
 
 Status: built on 2026-11-02, for MCP servers. The [MCP phase](mcp.md) built the add-on records, consent by hash, per-bot choice, and allowed tools. This phase added fxbot's own list of MCP servers, the mirror of GitHub's registry, everything mode, search, the add-on page for a registry entry, marks on installed add-ons, and Update. The Add-ons page is now a search above four tabs: Installed, Skills, MCP, and Plugins.
 
-[Skills](skills.md) joined the same search and records after, with fxbot's skills list and skills.sh. What this page says about plugins (their marketplaces, page sections, and records) is not built; until [plugins](../../phases/plugins.md) are, their tab says they aren't in fxbot yet.
+[Skills](skills.md) joined the same search and records after, with fxbot's skills list and skills.sh. What this page says about plugins (their marketplaces, page sections, and records) is not built; until [plugins](plugins.md) are, their tab says they aren't in fxbot yet.
 
 ## 1. Research
 
@@ -88,7 +88,7 @@ These are read from docs, source, and read-only requests to public APIs, as of N
    - Searching the whole official registry is an opt-in, "everything, unmoderated" mode.
 2. **Install from what entries already say.**
    - A registry entry's `remotes` become an [MCP server](mcp.md).
-   - Its `packages` mean a process on this machine, so they install as a [plugin](../../phases/plugins.md).
+   - Its `packages` mean a process on this machine, so they install as a [plugin](plugins.md).
    - A marketplace entry is a plugin, and a skills.sh result is a [skill](skills.md).
 3. **Plugins come from marketplaces in Claude's format,** which Codex and Grok Build read too. The defaults:
    - Anthropic's official marketplace: 315 plugins, all pinned, and 192 of them only MCP servers and skills.
@@ -143,7 +143,7 @@ These are read from docs, source, and read-only requests to public APIs, as of N
 
 ### The add-on page
 
-Opening a card fetches the add-on's definition and shows its page. The definition is a registry entry, a plugin at its pin, or a skill at its commit. Nothing is saved yet. The page for herdr, the first plugin ([plugins](../../phases/plugins.md#a-plugin)):
+Opening a card fetches the add-on's definition and shows its page. The definition is a registry entry, a plugin at its pin, or a skill at its commit. Nothing is saved yet. The page for herdr, the first plugin ([plugins](plugins.md#a-plugin)):
 
 ```text
 herdr                                                         [Add]
@@ -172,7 +172,7 @@ Information
 - **Sections,** each shown only when the add-on has one:
   - **MCP servers:** each server's name, host, and sign-in (none, keys, or OAuth, found by probing it). See [mcp.md](mcp.md#adding-a-server).
   - **Skills:** each skill's name and description, five at a time, each opening its text. See [skills.md](skills.md#ui).
-  - **Runs on this machine, Hooks, and Setup:** every command with its arguments, untruncated. `sh -c`, `curl | sh`, and `sudo` are flagged. See [plugins.md](../../phases/plugins.md#installing-updating-and-removing).
+  - **Runs on this machine, Hooks, and Setup:** every command with its arguments, untruncated. `sh -c`, `curl | sh`, and `sudo` are flagged. See [plugins.md](plugins.md#installing-updating-and-removing).
   - **Not used by fxbot:** a count of each part that fxbot doesn't run, such as commands, agents, LSP servers, and other clients' hooks.
   - **Information:**
     - what it includes
@@ -182,7 +182,7 @@ Information
 - **Add** records a hash of the definition and saves the add-on, then the add-on's own flow runs: secrets, sign-in, settings, or setup.
   - The server fetches the definition again, and refuses if its hash differs from the page's.
 - **Changes.** A changed definition shows the page again, marking what changed, and needs Add again.
-- **In this phase,** only MCP server entries reach the page, with their MCP servers section and Information. An entry that runs only as a package (`packages`, a process on this machine) shows its page with "Runs on this machine: comes with plugins", and no Add, until the [plugins](../../phases/plugins.md) phase.
+- **In this phase,** only MCP server entries reach the page, with their MCP servers section and Information. An entry that runs only as a package (`packages`, a process on this machine) shows its page with "Runs on this machine: comes with plugins", and no Add, until the [plugins](plugins.md) phase.
 
 ### Bots and add-ons
 
@@ -236,7 +236,7 @@ Built here marks what this phase added: two routes, the marks, and the Informati
 | `PUT /api/profiles/:id/addons/:addon` | `addons.forBot(profile, addon, enabled)` | MCP phase |
 | `DELETE /api/addons/:id` | `addons.remove(id)`: stops processes, deletes secrets and skills | MCP phase |
 
-The routes that sign in, set secrets, read skills, and run setup are in [mcp.md](mcp.md#api-sdk-and-client), [skills.md](skills.md#api-sdk-and-client), and [plugins.md](../../phases/plugins.md#api-sdk-and-client).
+The routes that sign in, set secrets, read skills, and run setup are in [mcp.md](mcp.md#api-sdk-and-client), [skills.md](skills.md#api-sdk-and-client), and [plugins.md](plugins.md#api-sdk-and-client).
 
 ### UI
 
@@ -315,11 +315,11 @@ Planned at about 420 lines. Built in about 570, mostly in the UI, which became a
 | The migration, two routes, types, and the client | about 30 | about 60 |
 | UI: search, tabs, the cards, the add-on page, the marks, and the tool count | about 180 | about 250 |
 
-Plus [skills.md](skills.md#size) and [plugins.md](../../phases/plugins.md#size), which add their own sources and page sections.
+Plus [skills.md](skills.md#size) and [plugins.md](plugins.md#size), which add their own sources and page sections.
 
 ## 4. Checklist
 
-All checked on 2026-11-02: 37 checks in the SDK, 35 in a browser, and the MCP phase's 67 again. Checks use disposable Postgres, the [MCP checks'](mcp.md#4-checklist) mock server, and a mock registry served from the scratchpad. Nothing reaches the live sources except the human's checks. [Skills](skills.md#4-checklist) and [plugins](../../phases/plugins.md#4-checklist) check their own sources when they join the search.
+All checked on 2026-11-02: 37 checks in the SDK, 35 in a browser, and the MCP phase's 67 again. Checks use disposable Postgres, the [MCP checks'](mcp.md#4-checklist) mock server, and a mock registry served from the scratchpad. Nothing reaches the live sources except the human's checks. [Skills](skills.md#4-checklist) and [plugins](plugins.md#4-checklist) check their own sources when they join the search.
 
 **M1. Sources**
 - [x] A sync reads every page of the mock registry, then only `updated_since` changes.

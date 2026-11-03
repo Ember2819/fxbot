@@ -6,6 +6,10 @@ Each release of fxbot, newest first. A release that adds migrations, bumps libfx
 
 **Before upgrading.** Migration `0006_plugins` adds a `plugin` column to `sent` and a `plugin_sessions` table, for plugins.
 
+- **Plugins.** Add-ons that change fxbot itself. A plugin runs inside fxbot: it can hook into each message, each chat's instructions, every tool call, and each turn's start and end, and add tools, routes, tables of its own, settings, and places in the app, from a screen and a sidebar group to a control beside the message box. Add one from the new Plugins tab in Add-ons, from fxbot's list or any GitHub repository: its page shows the code that runs before you add it, and it stays pinned to that commit until you update it. For writing one in a checkout, `FXBOT_PLUGIN_DIRS` loads plugin folders, again each time they change.
+- **Chat rooms**, fxbot's first plugin: rooms where several of your bots talk with you, each answering every message once, in turn.
+- **herdr**, its second: bots see the coding agents [herdr](https://herdr.dev) runs, and read what their panes show.
+- The site's SDK pages have [Write a plugin](https://fxbot.sh/sdk/how-to/write-a-plugin/) and the [Plugin API](https://fxbot.sh/sdk/reference/plugin-api/), and its docs [Add a plugin](https://fxbot.sh/docs/how-to/add-a-plugin/).
 - The SDK's `close()` waits for the save of a reply that just finished, so a script can close right after a turn. A reply that can't be saved, such as one whose bot was just deleted, is logged instead of stopping the process.
 
 ## 0.3.0 (2026-11-02)

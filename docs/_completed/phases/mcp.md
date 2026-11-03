@@ -1,6 +1,6 @@
 # MCP servers
 
-Add any remote MCP server to fxbot, by its URL or from [add-ons](addons.md). fxbot connects from the server, signs in with OAuth when the server asks, and gives the server's tools to the bots that use it. A server can also serve [skills](skills.md). Local MCP servers, which run code on this machine, come in [plugins](../../phases/plugins.md), and plugins can bundle remote servers too.
+Add any remote MCP server to fxbot, by its URL or from [add-ons](addons.md). fxbot connects from the server, signs in with OAuth when the server asks, and gives the server's tools to the bots that use it. A server can also serve [skills](skills.md). Local MCP servers, which run code on this machine, come in [plugins](plugins.md), and plugins can bundle remote servers too.
 
 The hard part is signing in. fxbot runs on a tailnet or on localhost, with no public address, and the project should not have to register its own OAuth client with every MCP provider. This page answers that: [section 2](#2-key-takeaways) in short, [OAuth sign-in](#oauth-sign-in) in full.
 
@@ -26,7 +26,7 @@ These are read from specs, source, docs, and read-only requests, as of November 
 - **Skills.** The `io.modelcontextprotocol/skills` extension lets a server serve skills through `skills/list`, `skills/get`, and `resources/read` ([skills](skills.md#1-research)).
 - **[Security best practices](https://modelcontextprotocol.io/specification/2026-07-28/basic/security_best_practices).**
   - Discovery makes the client fetch URLs that a server names (`resource_metadata`, authorization servers), so a client on a server must guard against SSRF.
-  - Script injected into a web client can run commands through a proxy that starts local servers. That matters for [plugins](../../phases/plugins.md).
+  - Script injected into a web client can run commands through a proxy that starts local servers. That matters for [plugins](plugins.md).
 
 **What servers support** (each server's metadata, fetched read-only; nothing registered)
 - **Both mechanisms.** Of 31 endpoints that need auth, 24 support DCR, and 14 of those also advertise CIMD: Notion, Linear, Sentry, Cloudflare, Vercel, Canva, monday, Neon, Hugging Face, PostHog, Context7, Exa, Airtable, and Todoist.
@@ -284,7 +284,7 @@ Checks use the mock Chat Completions server, a mock MCP server (Streamable HTTP,
 Each has a default, and the build took every one. Until the owner publishes the metadata document, its address is a setting, `FXBOT_CLIENT_METADATA_URL`, and fxbot skips CIMD without it.
 
 1. **Callback origin.** Is it set by hand, or read from `tailscale status`? *Answered:* neither. It is the page's own origin, checked by the server.
-2. **The CIMD document.** Where does the public document live? *Default:* the project's GitHub Pages site, whose domain also gives fxbot's plugin namespace ([plugins](../../phases/plugins.md#5-open-questions)). The owner publishes it.
+2. **The CIMD document.** Where does the public document live? *Default:* the project's GitHub Pages site, whose domain also gives fxbot's plugin namespace ([plugins](plugins.md#5-open-questions)). The owner publishes it.
 3. **Trust before permissions.** *Answered:* read-only tools only, until the owner allows others by name.
 4. **Per-bot default.** *Default:* a new server is on for every bot. See [add-ons](addons.md#bots-and-add-ons) for why every bot still sees its tool list.
 5. **Private addresses.** *Default:* refused, with an "allow local address" switch per add-on.
