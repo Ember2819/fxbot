@@ -23,7 +23,9 @@ function DiscordMark() {
   );
 }
 
-function Header({ section }: { section?: "docs" | "changelog" }) {
+type Section = "docs" | "sdk" | "changelog";
+
+function Header({ section }: { section?: Section }) {
   const link = (active: boolean) => `rounded-md px-2.5 py-1.5 transition-colors hover:text-foreground ${active ? "text-foreground" : "text-muted-foreground"}`;
   return (
     <header className="sticky top-0 z-30 border-b border-border/70 bg-background/85 backdrop-blur supports-[backdrop-filter]:bg-background/70">
@@ -36,8 +38,11 @@ function Header({ section }: { section?: "docs" | "changelog" }) {
           <a href={href("/docs/")} className={link(section === "docs")} aria-current={section === "docs" ? "page" : undefined}>
             Docs
           </a>
-          {/* Below 360px wide, the footer's link is the one that fits. */}
-          <a href={href(changelogPath)} className={`${link(section === "changelog")} max-[359px]:hidden`} aria-current={section === "changelog" ? "page" : undefined}>
+          <a href={href("/sdk/")} className={link(section === "sdk")} aria-current={section === "sdk" ? "page" : undefined}>
+            SDK
+          </a>
+          {/* Below 420px wide, the footer's link is the one that fits. */}
+          <a href={href(changelogPath)} className={`${link(section === "changelog")} max-[420px]:hidden`} aria-current={section === "changelog" ? "page" : undefined}>
             Changelog
           </a>
         </nav>
@@ -73,6 +78,9 @@ function Footer() {
           <a className="hover:text-foreground" href={href("/docs/")}>
             Docs
           </a>
+          <a className="hover:text-foreground" href={href("/sdk/")}>
+            SDK
+          </a>
           <a className="hover:text-foreground" href={href(changelogPath)}>
             Changelog
           </a>
@@ -89,7 +97,7 @@ function Footer() {
 }
 
 // Every page: the header, its content, and the footer.
-export function Shell({ section, children }: { section?: "docs" | "changelog"; children: ReactNode }) {
+export function Shell({ section, children }: { section?: Section; children: ReactNode }) {
   return (
     <div className="flex min-h-dvh flex-col">
       <a href="#content" className="sr-only focus:not-sr-only focus:absolute focus:top-2 focus:left-2 focus:z-50 focus:rounded-md focus:bg-background focus:px-3 focus:py-2">

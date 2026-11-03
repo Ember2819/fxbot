@@ -1,7 +1,7 @@
 import type { ReactElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { Blob } from "./blob.tsx";
-import { docs } from "./content.ts";
+import { docs, sdk } from "./content.ts";
 import { DocPage } from "./docs.tsx";
 import { Home } from "./home.tsx";
 import { Shell } from "./layout.tsx";
@@ -59,6 +59,7 @@ export function pages() {
   return [
     page("", "fxbot: your bot, built how you want it", about, <Home />),
     ...docs.map((doc) => page(doc.path, `${doc.title} · fxbot docs`, doc.description || about, <DocPage doc={doc} />)),
+    ...sdk.map((doc) => page(doc.path, `${doc.title} · fxbot SDK`, doc.description || about, <DocPage doc={doc} />)),
     {
       file: "404.html",
       url: undefined,

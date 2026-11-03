@@ -1,6 +1,6 @@
 # @fxbot/sdk
 
-The agent system behind fxbot, for building another server or UI on it. It has two entries.
+The agent system behind fxbot, for building another server or UI on it. It has two entries. [fxbot's site](https://fxbot.sh/sdk/) has a tutorial, how-to guides, and a reference for building your own app on it.
 
 `@fxbot/sdk` runs on the server. It keeps fxbot's records in Postgres: providers, bot profiles, settings, the library of files, and every message, with keys and tokens only sealed. It runs one [libfx](https://fx.sh/docs/lib) agent per provider, and a durable chat with each bot. Call it from your backend, which holds the key that seals the secrets.
 

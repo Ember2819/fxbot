@@ -12,7 +12,7 @@ export function CopyButton() {
 }
 export const copyButton = renderToStaticMarkup(<CopyButton />);
 
-// A command to copy, as Markdown's code blocks render it.
+// A command or code to copy, as Markdown's code blocks render it.
 export function Command({ children }: { children: string }) {
   return (
     <div className="code" data-code>
