@@ -1,0 +1,18 @@
+{
+  "name": "computer",
+  "version": "0.1.0",
+  "description": "A Linux computer for each bot: a shell, files, and the programs other plugins install.",
+  "license": "Apache-2.0",
+  "extensions": {
+    "sh.fxbot": {
+      "server": "./fxbot/server.ts",
+      "page": "./fxbot/page.js",
+      "settings": [
+        { "name": "engine", "description": "The engine's socket, when it isn't where the setup script puts it" },
+        { "name": "memoryMiB", "description": "Memory for each computer, in MiB", "default": "2048" },
+        { "name": "cpus", "description": "CPUs for each computer", "default": "2" },
+        { "name": "idleMinutes", "description": "Minutes without a call before a computer stops", "default": "15" }
+      ]
+    }
+  }
+}
