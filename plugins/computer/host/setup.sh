@@ -49,6 +49,8 @@ if [ -n "$remove" ]; then
     pkill -KILL -u "$uid" 2>/dev/null || true
     sleep 1
     userdel "$name" 2>/dev/null || true
+    # Its group stays while a checkout's login is in it.
+    groupdel "$name" 2>/dev/null || true
     sed -i "/^$name:/d" /etc/subuid /etc/subgid
     rm -rf "$home" "/etc/systemd/system/user@$uid.service.d/$name.conf"
     rmdir "/etc/systemd/system/user@$uid.service.d" 2>/dev/null || true
@@ -57,11 +59,13 @@ if [ -n "$remove" ]; then
   nft delete table inet "$table" 2>/dev/null || true
   rm -f "/etc/systemd/system/$unit" "$rules"
   systemctl daemon-reload
+  removed=""
   if [ -n "$release" ] && grep -qxF "$marker" "$override" 2>/dev/null; then
     rm -f "$override"
     "$install/fxbot" up
+    removed=", and $override"
   fi
-  echo "Removed $name: its computers and files, its firewall${release:+, and $override}. The packages stay."
+  echo "Removed $name: its computers and files, and its firewall$removed. The packages stay."
   exit 0
 fi
 
@@ -138,16 +142,17 @@ if [ "$engine" = podman ]; then
   as systemctl --user enable podman.socket >/dev/null 2>&1
   as systemctl --user restart podman.socket
 else
-  # The unit dockerd-rootless-setuptool.sh writes, with the socket moved and its group left to the user's own.
+  # The unit dockerd-rootless-setuptool.sh writes, with the socket moved. An empty --group leaves the socket the user's
+  # own group: the default, docker, lands on a subordinate gid inside RootlessKit's namespace.
   install -d -o "$name" -g "$name" "$config" "$config/docker" "$config/systemd" "$config/systemd/user"
-  printf '{ "hosts": ["unix://%s"], "group": "" }\n' "$sock" >"$config/docker/daemon.json"
+  printf '{ "hosts": ["unix://%s"] }\n' "$sock" >"$config/docker/daemon.json"
   cat >"$config/systemd/user/docker.service" <<EOF
 [Unit]
 Description=Docker, rootless, for fxbot's computers
 
 [Service]
 Environment=PATH=$(dirname "$rootless"):/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
-ExecStart=$rootless
+ExecStart=$rootless --group=
 ExecReload=/bin/kill -s HUP \$MAINPID
 TimeoutSec=0
 RestartSec=2
