@@ -8,7 +8,7 @@ export const newId = () => randomBytes(6).toString("hex");
 
 export type Sql = postgres.Sql;
 export type ProviderRecord = { id: string; kind: string; name: string; baseUrl: string | null; model: string; contextWindow: number | null; teamId: string | null };
-export type AddonRecord<Config = unknown> = {
+export type PluginRecord<Config = unknown> = {
   id: string;
   kind: string;
   name: string;
@@ -85,12 +85,12 @@ export async function createStore({ databaseUrl, dataDir, backupsDir }: MigrateO
       },
       remove: async (id: string) => void (await sql`delete from providers where id = ${id}`),
     },
-    addons: {
-      list: async () => sql<AddonRecord[]>`select id, kind, name, source, config, approved_hash, enabled, bots, allowed, status from addons order by created_at, id`,
-      create: async (r: AddonRecord) =>
-        void (await sql`insert into addons (id, kind, name, source, config, approved_hash, enabled, bots, allowed, status)
+    plugins: {
+      list: async () => sql<PluginRecord[]>`select id, kind, name, source, config, approved_hash, enabled, bots, allowed, status from plugins order by created_at, id`,
+      create: async (r: PluginRecord) =>
+        void (await sql`insert into plugins (id, kind, name, source, config, approved_hash, enabled, bots, allowed, status)
           values (${r.id}, ${r.kind}, ${r.name}, ${sql.json(r.source as postgres.JSONValue)}, ${sql.json(r.config as postgres.JSONValue)}, ${r.approvedHash}, ${r.enabled}, ${r.bots}, ${r.allowed && sql.json(r.allowed)}, ${r.status})`),
-      update: async (id: string, fields: Partial<Pick<AddonRecord, "config" | "enabled" | "bots" | "allowed" | "status" | "source" | "approvedHash">>) => {
+      update: async (id: string, fields: Partial<Pick<PluginRecord, "config" | "enabled" | "bots" | "allowed" | "status" | "source" | "approvedHash">>) => {
         const { config, allowed, source, ...rest } = fields;
         const values = {
           ...rest,
@@ -98,14 +98,14 @@ export async function createStore({ databaseUrl, dataDir, backupsDir }: MigrateO
           ...(allowed ? { allowed: sql.json(allowed) } : {}),
           ...(source === undefined ? {} : { source: sql.json(source as postgres.JSONValue) }),
         };
-        if (Object.keys(values).length) await sql`update addons set ${sql(values)} where id = ${id}`;
+        if (Object.keys(values).length) await sql`update plugins set ${sql(values)} where id = ${id}`;
       },
-      remove: async (id: string) => void (await sql`delete from addons where id = ${id}`),
-      // The bots each add-on is switched on for. Only an add-on chosen bot by bot reads them.
-      on: async () => sql<{ profileId: string; addonId: string }[]>`select profile_id, addon_id from profile_addons where enabled`,
-      forBot: async (profileId: string, addonId: string, enabled: boolean) =>
-        void (await sql`insert into profile_addons values (${profileId}, ${addonId}, ${enabled})
-          on conflict (profile_id, addon_id) do update set enabled = excluded.enabled`),
+      remove: async (id: string) => void (await sql`delete from plugins where id = ${id}`),
+      // The bots each plugin is switched on for. Only a plugin chosen bot by bot reads them.
+      on: async () => sql<{ profileId: string; pluginId: string }[]>`select profile_id, plugin_id from profile_plugins where enabled`,
+      forBot: async (profileId: string, pluginId: string, enabled: boolean) =>
+        void (await sql`insert into profile_plugins values (${profileId}, ${pluginId}, ${enabled})
+          on conflict (profile_id, plugin_id) do update set enabled = excluded.enabled`),
     },
     sent: {
       get: async (id: string, messageId: string): Promise<Sent | null> =>

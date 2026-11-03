@@ -57,7 +57,7 @@ export type PluginApi = {
     /** A session's lines as NDJSON, from `cursor` on, then each new one. */
     stream(bot: string, session: string, cursor?: number): Promise<ReadableStream<Uint8Array>>;
   };
-  /** Writes to the plugin's log, which shows on its row in Add-ons. */
+  /** Writes to the plugin's log, which shows on its row in Plugins. */
   log(...parts: unknown[]): void;
   /** Aborts when the plugin unloads. */
   signal: AbortSignal;

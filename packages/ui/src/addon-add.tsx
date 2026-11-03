@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
-import type { Addon, AddonCard, AddonFrom, AddonInfo, AddonPreview, AddonRef, AddonSearch } from "@fxbot/sdk/client";
+import type { Plugin, McpCard, RegistryFrom, RegistryInfo, McpPreview, PluginRef, McpSearch } from "@fxbot/sdk/client";
 import { client } from "./client.ts";
 
 export const label = "grid gap-1.5 text-sm font-medium";
@@ -22,12 +22,12 @@ function keyHeader(key: string): [string, string] {
 }
 const compact = (n: number) => new Intl.NumberFormat("en", { notation: "compact" }).format(n);
 // Where an entry comes from: fxbot's own list stands out, and a registry is named.
-const fromLabel: Record<AddonFrom, string> = { fxbot: "fxbot", github: "GitHub registry", official: "Official registry" };
-const fromText: Record<AddonFrom, string> = { fxbot: "fxbot's list", github: "GitHub's registry", official: "The official registry, unmoderated" };
+const fromLabel: Record<RegistryFrom, string> = { fxbot: "fxbot", github: "GitHub registry", official: "Official registry" };
+const fromText: Record<RegistryFrom, string> = { fxbot: "fxbot's list", github: "GitHub's registry", official: "The official registry, unmoderated" };
 
 // The registry's search for the page's words, once typing stops. The official registry is asked once per search.
 export function useSearch(query: string, everything: boolean) {
-  const [result, setResult] = useState<AddonSearch | null>(null);
+  const [result, setResult] = useState<McpSearch | null>(null);
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(true);
   useEffect(() => {
@@ -35,7 +35,7 @@ export function useSearch(query: string, everything: boolean) {
     setBusy(true);
     const wait = setTimeout(
       () =>
-        client.addons
+        client.plugins
           .search(query, { kind: "mcp", everything })
           .then((found) => !stopped && (setResult(found), setError("")), (e: Error) => !stopped && setError(e.message))
           .finally(() => !stopped && setBusy(false)),
@@ -48,7 +48,7 @@ export function useSearch(query: string, everything: boolean) {
 
 // The MCP tab: fxbot's list and GitHub's registry as cards, the switch to search everything, and adding by address.
 // `added` holds the names and addresses of what is installed.
-export function Results({ search, everything, onEverything, added, onOpen, onAddress }: { search: ReturnType<typeof useSearch>; everything: boolean; onEverything: (on: boolean) => void; added: Set<string>; onOpen: (card: AddonCard) => void; onAddress: () => void }) {
+export function Results({ search, everything, onEverything, added, onOpen, onAddress }: { search: ReturnType<typeof useSearch>; everything: boolean; onEverything: (on: boolean) => void; added: Set<string>; onOpen: (card: McpCard) => void; onAddress: () => void }) {
   const { result, error } = search;
   return (
     <div className="grid gap-2">
@@ -81,7 +81,7 @@ export const Initial = ({ title }: { title: string }) => (
 );
 
 // What a card says under its description: where it runs, what it needs, and anything to be wary of.
-function facts(card: AddonCard, added: boolean) {
+function facts(card: McpCard, added: boolean) {
   return [
     <Badge key="from" variant={card.from === "fxbot" ? "default" : "outline"}>
       {fromLabel[card.from]}
@@ -94,7 +94,7 @@ function facts(card: AddonCard, added: boolean) {
   ].filter(Boolean);
 }
 
-function Card({ card, added, onOpen }: { card: AddonCard; added: boolean; onOpen: () => void }) {
+function Card({ card, added, onOpen }: { card: McpCard; added: boolean; onOpen: () => void }) {
   return (
     <button type="button" onClick={onOpen} className="flex w-full min-w-0 gap-3 rounded-lg border p-3 text-left transition-colors outline-none hover:bg-muted/50 focus-visible:ring-3 focus-visible:ring-ring/50">
       <Initial title={card.title} />
@@ -128,7 +128,7 @@ export function Details({ rows }: { rows: [string, ReactNode][] }) {
 }
 
 // An entry's Information: who published it, where it comes from, and its registry's notes.
-export function Information({ info }: { info: AddonInfo }) {
+export function Information({ info }: { info: RegistryInfo }) {
   const link = (url?: string) => (url && /^https?:\/\//.test(url) ? <a href={url} target="_blank" rel="noopener noreferrer" className="break-all underline underline-offset-4">{url.replace(/^https?:\/\//, "")}</a> : url);
   const rows: [string, ReactNode][] = [
     ["Publisher", <span key="ns" className="font-mono text-xs">{info.namespace}</span>],
@@ -145,14 +145,14 @@ export function Information({ info }: { info: AddonInfo }) {
 
 // A registry entry's page, and the consent to add it. It looks at the server first; nothing is saved before Add, and
 // an entry that changed since is shown again.
-export function EntryDialog({ card, onAdded, onClose }: { card: AddonCard; onAdded: (addon: Addon) => void; onClose: () => void }) {
+export function EntryDialog({ card, onAdded, onClose }: { card: McpCard; onAdded: (addon: Plugin) => void; onClose: () => void }) {
   const [allowLocal, setAllowLocal] = useState(false);
-  const [page, setPage] = useState<AddonPreview | null>(null);
+  const [page, setPage] = useState<McpPreview | null>(null);
   const [error, setError] = useState("");
   const [values, setValues] = useState<Record<string, string>>({});
   const [busy, setBusy] = useState(false);
-  const ref: AddonRef = { registry: card.name, allowLocal, from: card.from };
-  const look = () => (setPage(null), client.addons.preview(ref).then(setPage, (e: Error) => setError(e.message)));
+  const ref: PluginRef = { registry: card.name, allowLocal, from: card.from };
+  const look = () => (setPage(null), client.plugins.preview(ref).then(setPage, (e: Error) => setError(e.message)));
   useEffect(() => void (setError(""), look()), [allowLocal]);
   const info = page?.info ?? card;
 
@@ -160,9 +160,9 @@ export function EntryDialog({ card, onAdded, onClose }: { card: AddonCard; onAdd
     setBusy(true);
     setError("");
     try {
-      let addon = await client.addons.add(ref, page!.hash);
+      let addon = await client.plugins.add(ref, page!.hash);
       const filled = Object.entries(values).filter(([, value]) => value.trim());
-      if (filled.length) addon = await client.addons.setSecrets(addon.id, { headers: Object.fromEntries(filled.map(([name, value]) => [name, name === "Authorization" ? bearer(value) : value.trim()])) });
+      if (filled.length) addon = await client.plugins.setSecrets(addon.id, { headers: Object.fromEntries(filled.map(([name, value]) => [name, name === "Authorization" ? bearer(value) : value.trim()])) });
       onAdded(addon);
     } catch (e) {
       setError((e as Error).message);
@@ -251,10 +251,10 @@ export function EntryDialog({ card, onAdded, onClose }: { card: AddonCard; onAdd
 // For a server no registry lists: the address, then what is there, its name and how it signs in. A server that takes
 // a key gets one field, and one that signs in with OAuth can take a key instead. A key names a header, which the add
 // approves.
-export function AddressDialog({ onAdded, onClose }: { onAdded: (addon: Addon) => void; onClose: () => void }) {
+export function AddressDialog({ onAdded, onClose }: { onAdded: (addon: Plugin) => void; onClose: () => void }) {
   const [url, setUrl] = useState("");
   const [allowLocal, setAllowLocal] = useState(false);
-  const [page, setPage] = useState<AddonPreview | null>(null);
+  const [page, setPage] = useState<McpPreview | null>(null);
   const [useKey, setUseKey] = useState(false);
   const [key, setKey] = useState("");
   const [busy, setBusy] = useState(false);
@@ -269,15 +269,15 @@ export function AddressDialog({ onAdded, onClose }: { onAdded: (addon: Addon) =>
     setBusy(false);
   }
   const look = (event: FormEvent) => (
-    event.preventDefault(), run(async () => (setPage(null), setPage(await client.addons.preview({ url, allowLocal })), setUseKey(false), setKey("")))
+    event.preventDefault(), run(async () => (setPage(null), setPage(await client.plugins.preview({ url, allowLocal })), setUseKey(false), setKey("")))
   );
   const add = () =>
     run(async () => {
-      if (!keyed) return onAdded(await client.addons.add({ url, allowLocal }, page!.hash));
+      if (!keyed) return onAdded(await client.plugins.add({ url, allowLocal }, page!.hash));
       const [name, value] = keyHeader(key);
       const ref = { url, allowLocal, headers: [name] };
-      const addon = await client.addons.add(ref, (await client.addons.preview(ref)).hash);
-      onAdded(await client.addons.setSecrets(addon.id, { headers: { [name]: value } }));
+      const addon = await client.plugins.add(ref, (await client.plugins.preview(ref)).hash);
+      onAdded(await client.plugins.setSecrets(addon.id, { headers: { [name]: value } }));
     });
 
   return (

@@ -23,20 +23,20 @@ import { infoOf, type Entry } from "./registry.ts";
 import { lookup } from "node:dns/promises";
 import { BlockList, isIP } from "node:net";
 import { createSecrets } from "./secrets.ts";
-import { newId, type AddonRecord, type Store } from "./store.ts";
-import type { AddonFrom, AddonPreview, AddonRef, AddonSecrets, McpAddon as Addon, OAuthAttempt, OAuthStatus, PluginRef, SkillRef, Transport } from "./types.ts";
+import { newId, type PluginRecord, type Store } from "./store.ts";
+import type { RegistryFrom, McpPreview, PluginRef, PluginSecrets, McpPlugin as Plugin, OAuthAttempt, OAuthStatus, RepoRef, SkillRef, Transport } from "./types.ts";
 
 const fail = (status: number, message: string): never => {
   throw Object.assign(new Error(message), { status });
 };
 
 // A server's record. `tools` is its last listing, so its tools stay with the bots while it is away, and `prefix`
-// starts each tool's name, unique among add-ons.
+// starts each tool's name, unique among plugins.
 // A server by its address, or a registry entry.
-type McpRef = Exclude<AddonRef, SkillRef | PluginRef>;
-type Config = { url: string; transport: Transport; headers: string[]; auth: Addon["auth"]; allowLocal: boolean; prefix: string; tools: Tool[] };
-type McpRecord = AddonRecord<Config>;
-// Sealed per add-on: header values, the person's own OAuth client, clients registered by issuer and redirect URI,
+type McpRef = Exclude<PluginRef, SkillRef | RepoRef>;
+type Config = { url: string; transport: Transport; headers: string[]; auth: Plugin["auth"]; allowLocal: boolean; prefix: string; tools: Tool[] };
+type McpRecord = PluginRecord<Config>;
+// Sealed per plugin: header values, the person's own OAuth client, clients registered by issuer and redirect URI,
 // and the tokens with what renewing them needs.
 type Secret = {
   headers?: Record<string, string>;
@@ -47,7 +47,7 @@ type Secret = {
 };
 // A sign-in in progress. What claims the tokens stays here, never in the page.
 type Attempt = OAuthAttempt & {
-  addonId: string;
+  pluginId: string;
   state: string;
   redirectUrl: string;
   clientMetadataUrl?: string;
@@ -69,14 +69,14 @@ export type McpOptions = {
   /** The project's client ID metadata document, once it is published. */
   clientMetadataUrl?: string;
   /** A registry entry by name, from where it came, or null when there is none. */
-  findEntry: (name: string, from: AddonFrom, version: string) => Promise<Entry | null>;
+  findEntry: (name: string, from: RegistryFrom, version: string) => Promise<Entry | null>;
   /** The tools bots can use have changed. */
   onChange: () => void;
-  /** Names other add-ons' tools start with, which a server's prefix must not take. */
+  /** Names other plugins' tools start with, which a server's prefix must not take. */
   reserved?: () => string[];
 };
 
-// Addresses a server's URL must not reach unless its add-on allows local addresses: this machine, private networks,
+// Addresses a server's URL must not reach unless its plugin allows local addresses: this machine, private networks,
 // link-local, and the tailnet's 100.64.0.0/10.
 const local = new BlockList();
 for (const [net, bits] of [["0.0.0.0", 8], ["10.0.0.0", 8], ["100.64.0.0", 10], ["127.0.0.0", 8], ["169.254.0.0", 16], ["172.16.0.0", 12], ["192.168.0.0", 16]] as const)
@@ -151,29 +151,29 @@ function slug(name: string) {
   const word = labels.length > 1 ? (labels.slice(0, -1).find((l) => !["mcp", "api", "www"].includes(l)) ?? labels[0]) : host;
   return word.match(/[a-z0-9]+/g)?.join("_").slice(0, 24) || "mcp";
 }
-// An add-on's source names a registry entry, for the marks and Update, or else the address it was added by.
-const registered = (source: unknown): source is NonNullable<Addon["source"]> =>
+// A plugin's source names a registry entry, for the marks and Update, or else the address it was added by.
+const registered = (source: unknown): source is NonNullable<Plugin["source"]> =>
   typeof source === "object" && source !== null && typeof (source as { registry?: unknown }).registry === "string";
 const headerName = (name: unknown) => (typeof name === "string" && /^[A-Za-z0-9!#$%&'*+.^_`|~-]{1,100}$/.test(name) ? name : fail(400, "Each header needs a name of letters, digits, and dashes."));
 
-// Remote MCP servers as add-ons: their records, connections, sign-ins, and the tools bots get from them.
+// Remote MCP servers as plugins: their records, connections, sign-ins, and the tools bots get from them.
 export async function createMcp({ store, secretKey, fetch, localUrl, clientMetadataUrl, findEntry, onChange, reserved = () => [] }: McpOptions) {
-  const secrets = createSecrets(store.sql, secretKey, "addon_secrets");
-  const records = new Map((await store.addons.list()).filter((r) => r.kind === "mcp").map((r) => [r.id, r as McpRecord] as [string, McpRecord]));
+  const secrets = createSecrets(store.sql, secretKey, "plugin_secrets");
+  const records = new Map((await store.plugins.list()).filter((r) => r.kind === "mcp").map((r) => [r.id, r as McpRecord] as [string, McpRecord]));
   const on = new Map<string, Set<string>>();
-  for (const { profileId, addonId } of await store.addons.on()) on.set(addonId, (on.get(addonId) ?? new Set()).add(profileId));
+  for (const { profileId, pluginId } of await store.plugins.on()) on.set(pluginId, (on.get(pluginId) ?? new Set()).add(profileId));
   // The tools bots get: the ones the person picked, or else the read-only ones.
   const allowedOf = (record: McpRecord) => record.allowed ?? record.config.tools.filter((t) => t.annotations?.readOnlyHint === true).map((t) => t.name);
 
-  const get = (id: string) => records.get(id) ?? fail(404, "add-on not found");
+  const get = (id: string) => records.get(id) ?? fail(404, "plugin not found");
   async function save(id: string, fields: Partial<Pick<McpRecord, "config" | "enabled" | "bots" | "allowed" | "status" | "source" | "approvedHash">>) {
     const record = records.get(id);
     if (!record) return;
     records.set(id, { ...record, ...fields });
-    await store.addons.update(id, fields);
+    await store.plugins.update(id, fields);
   }
 
-  // One queue per add-on for its sealed values, so a token renewal and an edit never interleave, and two renewals at
+  // One queue per plugin for its sealed values, so a token renewal and an edit never interleave, and two renewals at
   // once spend one refresh token.
   const locks = new Map<string, Promise<unknown>>();
   function locked<T>(id: string, run: () => Promise<T>): Promise<T> {
@@ -185,7 +185,7 @@ export async function createMcp({ store, secretKey, fetch, localUrl, clientMetad
   const edit = (id: string, change: (secret: Secret) => Secret) => locked(id, async () => secrets.put(id, change(await read(id))));
 
   // A token is renewed when it is within 5 minutes of expiring, or half its life for a short-lived one, and once after
-  // a 401. A renewal the authorization server refuses drops the token, so the add-on asks for a new sign-in; one that
+  // a 401. A renewal the authorization server refuses drops the token, so the plugin asks for a new sign-in; one that
   // cannot reach it keeps the token for the next try.
   async function accessToken(id: string) {
     const tokens = (await read(id)).tokens ?? fail(401, "Sign in to this server first.");
@@ -218,7 +218,7 @@ export async function createMcp({ store, secretKey, fetch, localUrl, clientMetad
     });
   }
 
-  // Requests to an add-on's own server carry its header values and its token. Nothing goes to another origin.
+  // Requests to a plugin's own server carry its header values and its token. Nothing goes to another origin.
   function authed(record: McpRecord): FetchLike {
     const { id, config } = record;
     const plain = guarded(fetch, config.allowLocal);
@@ -240,7 +240,7 @@ export async function createMcp({ store, secretKey, fetch, localUrl, clientMetad
     };
   }
 
-  // What an add-on still needs from the person before it can connect.
+  // What a plugin still needs from the person before it can connect.
   async function waitsFor(record: McpRecord) {
     const secret = await read(record.id).catch(() => ({}) as Secret);
     if (record.config.auth === "oauth" && !secret.tokens) return "Sign in to use it";
@@ -336,16 +336,16 @@ export async function createMcp({ store, secretKey, fetch, localUrl, clientMetad
         async execute(input, context) {
           const bot = (context.context as { bot?: string } | undefined)?.bot;
           const now = records.get(record.id);
-          if (!now?.enabled) throw new Error(`${record.name} is no longer in Add-ons.`);
+          if (!now?.enabled) throw new Error(`${record.name} is no longer in Plugins.`);
           if (now.bots === "each" && !(bot && on.get(record.id)?.has(bot))) throw new Error("This tool is off for this bot.");
-          if (!allowedOf(now).includes(name)) throw new Error(`${name} is not allowed in Add-ons.`);
+          if (!allowedOf(now).includes(name)) throw new Error(`${name} is not allowed in Plugins.`);
           return tool.execute(input, context);
         },
       };
     });
   }
 
-  async function view(record: McpRecord): Promise<Addon> {
+  async function view(record: McpRecord): Promise<Plugin> {
     const secret = await read(record.id).catch(() => ({}) as Secret);
     const { url, transport, auth, headers, allowLocal, tools } = record.config;
     return {
@@ -369,14 +369,14 @@ export async function createMcp({ store, secretKey, fetch, localUrl, clientMetad
     };
   }
 
-  // What an add-on is, from the address the person typed or the registry entry they picked. The registry's address
+  // What a plugin is, from the address the person typed or the registry entry they picked. The registry's address
   // is configured, not typed, so it is fetched as is.
   async function define(ref: McpRef) {
     if (!ref || typeof ref !== "object") return fail(400, "ref must be an object");
     if ("registry" in ref) {
       if (typeof ref.registry !== "string" || !ref.registry) fail(400, "registry must name a server");
       const version = typeof ref.version === "string" && ref.version ? ref.version : "latest";
-      const from: AddonFrom = ref.from === "fxbot" || ref.from === "official" ? ref.from : "github";
+      const from: RegistryFrom = ref.from === "fxbot" || ref.from === "official" ? ref.from : "github";
       const entry = (await findEntry(ref.registry, from, version).catch(() => fail(502, `The registry didn't answer for ${ref.registry}.`))) ?? fail(404, `The registry has no ${ref.registry} ${version}.`);
       const { server } = entry;
       const info = infoOf(entry, from);
@@ -426,13 +426,13 @@ export async function createMcp({ store, secretKey, fetch, localUrl, clientMetad
     try {
       await client.connect(transportFor(url, transport, watch));
       const info = client.getServerVersion();
-      return { name: definition.name || info?.title || info?.name || host, auth: (headers.length ? "headers" : "none") as Addon["auth"], tools: await listTools(client) };
+      return { name: definition.name || info?.title || info?.name || host, auth: (headers.length ? "headers" : "none") as Plugin["auth"], tools: await listTools(client) };
     } catch (error) {
       if (!challenged) return fail(502, `Cannot reach ${host}: ${(error as Error).message}`);
       const found = await discoverOAuthServerInfo(url, { fetchFn: plain }).catch(() => null);
       const name = definition.name || found?.resourceMetadata?.resource_name || host;
       // Some servers take a key as well as OAuth. Headers the person names mean the key.
-      return { name, auth: (found?.authorizationServerMetadata && !headers.length ? "oauth" : "headers") as Addon["auth"], tools: null };
+      return { name, auth: (found?.authorizationServerMetadata && !headers.length ? "oauth" : "headers") as Plugin["auth"], tools: null };
     } finally {
       await client.close().catch(() => {});
     }
@@ -442,13 +442,13 @@ export async function createMcp({ store, secretKey, fetch, localUrl, clientMetad
     const definition = await define(ref);
     const info = "info" in definition ? { info: definition.info } : {};
     if ("local" in definition) {
-      const page: AddonPreview = { hash: "", name: definition.name, url: "", transport: definition.transport, auth: "none", headers: [], allowLocal: false, tools: null, local: true, ...info };
-      return { page, definition, found: { name: definition.name, auth: "none" as Addon["auth"], tools: null } };
+      const page: McpPreview = { hash: "", name: definition.name, url: "", transport: definition.transport, auth: "none", headers: [], allowLocal: false, tools: null, local: true, ...info };
+      return { page, definition, found: { name: definition.name, auth: "none" as Plugin["auth"], tools: null } };
     }
     const found = await probe(definition);
     const { url, transport, allowLocal, headers } = definition;
     const hash = createHash("sha256").update(JSON.stringify([url, transport, allowLocal, headers, found.auth])).digest("hex");
-    const page: AddonPreview = { hash, name: found.name, url, transport, auth: found.auth, headers, allowLocal, tools: found.tools?.map(toolView) ?? null, ...info };
+    const page: McpPreview = { hash, name: found.name, url, transport, auth: found.auth, headers, allowLocal, tools: found.tools?.map(toolView) ?? null, ...info };
     return { page, definition, found };
   }
 
@@ -467,7 +467,7 @@ export async function createMcp({ store, secretKey, fetch, localUrl, clientMetad
   }
 
   const attempts = new Map<string, Attempt>();
-  const expired = "This sign-in expired. Start it again from Add-ons.";
+  const expired = "This sign-in expired. Start it again from Plugins.";
 
   // The SDK's OAuth flow, held to one attempt: it registers or picks the client, and gives back the authorization URL
   // instead of opening a browser.
@@ -485,15 +485,15 @@ export async function createMcp({ store, secretKey, fetch, localUrl, clientMetad
         ...(attempt.applicationType ? { application_type: attempt.applicationType } : {}),
       } as OAuthClientMetadata,
       state: () => attempt.state,
-      clientInformation: async (ctx) => (attempt.client = own ?? (await read(attempt.addonId)).clients?.[key(ctx?.issuer)]),
+      clientInformation: async (ctx) => (attempt.client = own ?? (await read(attempt.pluginId)).clients?.[key(ctx?.issuer)]),
       async saveClientInformation(info, ctx) {
         attempt.client = info;
-        if (!own) await edit(attempt.addonId, (s) => ({ ...s, clients: { ...s.clients, [key(ctx?.issuer ?? info.issuer)]: info } }));
+        if (!own) await edit(attempt.pluginId, (s) => ({ ...s, clients: { ...s.clients, [key(ctx?.issuer ?? info.issuer)]: info } }));
       },
       tokens: () => undefined,
       async saveTokens(tokens) {
         const session = { client: attempt.client!, authorizationServerUrl: attempt.discovery!.authorizationServerUrl, metadata: attempt.discovery!.authorizationServerMetadata, resource: attempt.resource };
-        await edit(attempt.addonId, (s) => ({ ...s, tokens: stamp(tokens), session }));
+        await edit(attempt.pluginId, (s) => ({ ...s, tokens: stamp(tokens), session }));
       },
       redirectToAuthorization: (url) => void (attempt.url = url.href),
       saveCodeVerifier: (verifier) => void (attempt.verifier = verifier),
@@ -528,7 +528,7 @@ export async function createMcp({ store, secretKey, fetch, localUrl, clientMetad
             ? { redirectUrl: loopback, applicationType: "native" }
             : fail(400, `${record.name} registers no apps itself. Register an OAuth app with it, with ${callback || loopback} as its redirect URI, and enter its client id.`);
     for (const [key, other] of attempts) {
-      if (other.addonId === id && other.status.status === "waiting") other.status = { status: "failed", error: "A newer sign-in replaced this one." };
+      if (other.pluginId === id && other.status.status === "waiting") other.status = { status: "failed", error: "A newer sign-in replaced this one." };
       if (other.expiresAt < Date.now() - 60 * 60 * 1000) attempts.delete(key);
     }
     const attempt: Attempt = {
@@ -536,7 +536,7 @@ export async function createMcp({ store, secretKey, fetch, localUrl, clientMetad
       url: "",
       mode: choice.redirectUrl === callback ? "redirect" : "paste",
       expiresAt: Date.now() + 10 * 60 * 1000,
-      addonId: id,
+      pluginId: id,
       state: randomBytes(24).toString("base64url"),
       ...choice,
       discovery: { authorizationServerUrl: info.authorizationServerUrl, resourceMetadata: info.resourceMetadata, authorizationServerMetadata: metadata },
@@ -552,24 +552,24 @@ export async function createMcp({ store, secretKey, fetch, localUrl, clientMetad
   // trades the code for tokens with the attempt's verifier.
   function pendingFor(state: string | null) {
     const attempt = [...attempts.values()].find((a) => a.state === state);
-    if (!state || !attempt) return fail(400, "This sign-in is unknown or already used. Start it again from Add-ons.");
+    if (!state || !attempt) return fail(400, "This sign-in is unknown or already used. Start it again from Plugins.");
     if (attempt.expiresAt < Date.now()) {
       if (attempt.status.status === "waiting") attempt.status = { status: "failed", error: expired };
       fail(400, expired);
     }
-    if (attempt.used || attempt.status.status !== "waiting") fail(400, "This sign-in is unknown or already used. Start it again from Add-ons.");
+    if (attempt.used || attempt.status.status !== "waiting") fail(400, "This sign-in is unknown or already used. Start it again from Plugins.");
     return attempt;
   }
   async function finish(attempt: Attempt, query: URLSearchParams) {
     attempt.used = true;
     try {
-      const record = records.get(attempt.addonId) ?? fail(404, "This server is no longer in Add-ons.");
+      const record = records.get(attempt.pluginId) ?? fail(404, "This server is no longer in Plugins.");
       if (query.get("error")) throw new Error(query.get("error_description") || query.get("error")!);
       const code = query.get("code") || fail(400, "The address has no code.");
-      const { own } = await read(attempt.addonId);
+      const { own } = await read(attempt.pluginId);
       await auth(provider(attempt, own), { serverUrl: record.config.url, authorizationCode: code, iss: query.get("iss") ?? undefined, fetchFn: guarded(fetch, record.config.allowLocal) });
       attempt.status = { status: "done" };
-      await start(records.get(attempt.addonId)!);
+      await start(records.get(attempt.pluginId)!);
     } catch (error) {
       attempt.status = { status: "failed", error: (error as Error).message };
     }
@@ -602,7 +602,7 @@ export async function createMcp({ store, secretKey, fetch, localUrl, clientMetad
         allowed: null,
         status: null,
       };
-      await store.addons.create(record);
+      await store.plugins.create(record);
       records.set(record.id, record);
       await start(record);
       if (record.config.tools.length) onChange();
@@ -625,7 +625,7 @@ export async function createMcp({ store, secretKey, fetch, localUrl, clientMetad
       if (switched || allowed !== undefined) onChange();
       return view(records.get(id)!);
     },
-    // Moves an add-on from a registry to the definition its newer page showed, once the owner adds it again. Its
+    // Moves a plugin from a registry to the definition its newer page showed, once the owner adds it again. Its
     // values stay; a header it didn't have before waits for its value.
     async update(id: string, hash: unknown) {
       const record = get(id);
@@ -645,12 +645,12 @@ export async function createMcp({ store, secretKey, fetch, localUrl, clientMetad
       live.delete(id);
       records.delete(id);
       on.delete(id);
-      await store.addons.remove(id);
+      await store.plugins.remove(id);
       secrets.forget(id);
       onChange();
     },
-    // Write-only. Header values must be for the headers the add-on was approved with.
-    async setSecrets(id: string, input: AddonSecrets) {
+    // Write-only. Header values must be for the headers the plugin was approved with.
+    async setSecrets(id: string, input: PluginSecrets) {
       const record = get(id);
       const { headers, clientId, clientSecret } = input ?? {};
       if (headers !== undefined) {
@@ -667,14 +667,14 @@ export async function createMcp({ store, secretKey, fetch, localUrl, clientMetad
       if (headers) await start(record);
       return view(records.get(id)!);
     },
-    async forBot(profileId: string, addonId: string, enabled: unknown) {
-      const record = get(addonId);
+    async forBot(profileId: string, pluginId: string, enabled: unknown) {
+      const record = get(pluginId);
       if (typeof enabled !== "boolean") fail(400, "enabled must be true or false");
-      await store.addons.forBot(profileId, addonId, enabled as boolean);
-      const bots = on.get(addonId) ?? new Set<string>();
+      await store.plugins.forBot(profileId, pluginId, enabled as boolean);
+      const bots = on.get(pluginId) ?? new Set<string>();
       if (enabled) bots.add(profileId);
       else bots.delete(profileId);
-      on.set(addonId, bots);
+      on.set(pluginId, bots);
       return view(record);
     },
 

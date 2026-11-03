@@ -239,7 +239,7 @@ export async function createProviders({ store, secretKey, dataDir, vercelClientI
       return { url: `${current.baseUrl}/embeddings`, apiKey: await keyOf(current), fetch };
     },
     list,
-    // libfx fixes an agent's tools when it is made, so a new tool list, as when an add-on comes or goes, makes every
+    // libfx fixes an agent's tools when it is made, so a new tool list, as when a plugin comes or goes, makes every
     // agent again.
     async retool(next: FxAgentTool[]) {
       tools = next;

@@ -8,7 +8,7 @@ import { Input } from "@/components/ui/input";
 import { SidebarTrigger } from "@/components/ui/sidebar";
 import { Switch } from "@/components/ui/switch";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import type { Addon, AddonCard, AddonMark, AddonPreview, McpAddon, OAuthAttempt, OAuthStatus, Profile, SkillCard } from "@fxbot/sdk/client";
+import type { Plugin, McpCard, PluginMark, McpPreview, McpPlugin, OAuthAttempt, OAuthStatus, Profile, SkillCard } from "@fxbot/sdk/client";
 import { AddressDialog, bearer, EntryDialog, heading, hint, hostOf, Information, label, Results, signsIn, useSearch } from "./addon-add.tsx";
 import { Blob } from "./blob.tsx";
 import { client } from "./client.ts";
@@ -20,19 +20,19 @@ import { SkillDialog, SkillResults, SkillSettings, useSkillSearch } from "./skil
 const toolBudget = 40;
 
 // Under an add-on's name: what it is, or how a server is and how many of its tools bots get, and which bots.
-function summary(addon: Addon, profiles: Profile[] | null) {
+function summary(addon: Plugin, profiles: Profile[] | null) {
   if (!addon.enabled) return "Off";
   const chosen = profiles?.filter((p) => addon.on.includes(p.id)).length ?? addon.on.length;
   const bots = addon.bots === "all" ? "All bots" : `${chosen} bot${chosen === 1 ? "" : "s"}`;
   if (addon.kind === "skill") return `Skill · ${bots}`;
-  if (addon.kind === "plugin") return addon.error ? `Plugin · Off: ${addon.error}` : `Plugin · ${bots}`;
+  if (addon.kind === "package") return addon.error ? `Plugin · Off: ${addon.error}` : `Plugin · ${bots}`;
   const allowed = addon.tools.filter((t) => addon.allowed.includes(t.name)).length;
   return [addon.status, addon.tools.length ? `${allowed} of ${addon.tools.length} tools` : "", bots].filter(Boolean).join(" · ");
 }
-const markText: Record<Addon["kind"], Record<AddonMark["kind"], string>> = {
+const markText: Record<Plugin["kind"], Record<PluginMark["kind"], string>> = {
   mcp: { update: "Update available", deprecated: "Deprecated", removed: "Removed from the registry" },
   skill: { update: "Update available", deprecated: "Deprecated", removed: "Removed from its repository" },
-  plugin: { update: "Update available", deprecated: "Deprecated", removed: "Removed from its repository" },
+  package: { update: "Update available", deprecated: "Deprecated", removed: "Removed from its repository" },
 };
 
 type Tab = "installed" | "skills" | "mcp" | "plugins";
@@ -42,21 +42,21 @@ type Tab = "installed" | "skills" | "mcp" | "plugins";
 // fxbot's skills list and skills.sh, the MCP tab the MCP registries, and the Plugins tab fxbot's plugins list, beside
 // any plugin on GitHub.
 export function AddonsPage({ profiles }: { profiles: Profile[] | null }) {
-  const [addons, setAddons] = useState<Addon[] | null>(null);
+  const [addons, setAddons] = useState<Plugin[] | null>(null);
   const [error, setError] = useState("");
   const [query, setQuery] = useState("");
   const [everything, setEverything] = useState(false);
   const [chosen, setChosen] = useState<Tab | null>(null);
-  const [entry, setEntry] = useState<AddonCard | null>(null);
+  const [entry, setEntry] = useState<McpCard | null>(null);
   const [skill, setSkill] = useState<SkillCard | null>(null);
   const [plugin, setPlugin] = useState<PluginTarget | null>(null);
   const [byAddress, setByAddress] = useState(false);
   const [openId, setOpenId] = useState<string | null>(null);
-  const [signingIn, setSigningIn] = useState<McpAddon | null>(null);
+  const [signingIn, setSigningIn] = useState<McpPlugin | null>(null);
   const search = useSearch(query, everything);
   const skillSearch = useSkillSearch(query);
   const pluginSearch = usePluginSearch(query);
-  const load = () => client.addons.list().then((list) => (setAddons(list), setError("")), (e: Error) => setError(e.message));
+  const load = () => client.plugins.list().then((list) => (setAddons(list), setError("")), (e: Error) => setError(e.message));
   useEffect(() => void load(), []);
   // A server's status changes by itself while it connects.
   useEffect(() => {
@@ -64,14 +64,14 @@ export function AddonsPage({ profiles }: { profiles: Profile[] | null }) {
     const again = setTimeout(load, 1500);
     return () => clearTimeout(again);
   }, [addons]);
-  const replace = (next: Addon) => setAddons((all) => all?.map((a) => (a.id === next.id ? next : a)) ?? null);
+  const replace = (next: Plugin) => setAddons((all) => all?.map((a) => (a.id === next.id ? next : a)) ?? null);
   // A plugin added, removed, turned on or off, or updated changes what the page loads.
-  const plugins = (addons ?? []).flatMap((a) => (a.kind === "plugin" ? [`${a.id}:${a.enabled}:${a.version}:${a.parts.page}:${a.error ?? ""}`] : [])).join(" ");
+  const plugins = (addons ?? []).flatMap((a) => (a.kind === "package" ? [`${a.id}:${a.enabled}:${a.version}:${a.parts.page}:${a.error ?? ""}`] : [])).join(" ");
   useEffect(() => void (addons && loadPlugins()), [plugins]);
   const open = addons?.find((a) => a.id === openId);
   const servers = (addons ?? []).flatMap((a) => (a.kind === "mcp" ? [a] : []));
   const reaching = servers.filter((a) => a.enabled).reduce((n, a) => n + a.tools.filter((t) => a.allowed.includes(t.name)).length, 0);
-  const signIn = (addon: McpAddon) => (setOpenId(null), setSigningIn(addon));
+  const signIn = (addon: McpPlugin) => (setOpenId(null), setSigningIn(addon));
   // Installed first when there is anything installed, else the registry.
   const tab = chosen ?? (addons?.length ? "installed" : "mcp");
   const words = query.trim().toLowerCase();
@@ -88,8 +88,8 @@ export function AddonsPage({ profiles }: { profiles: Profile[] | null }) {
   const count = (n: number) => <span className="text-muted-foreground tabular-nums">{n >= 20 ? "20+" : n}</span>;
   const added = new Set(servers.flatMap((a) => [a.url, ...(a.source ? [a.source.registry] : [])]));
   const skillsAdded = new Set((addons ?? []).flatMap((a) => (a.kind === "skill" ? [a.source.skill] : [])));
-  const pluginsAdded = new Set((addons ?? []).flatMap((a) => (a.kind === "plugin" && "repo" in a.source ? [`${a.source.repo}${a.source.path ? `/${a.source.path}` : ""}`] : [])));
-  const onAdded = (addon: Addon) => {
+  const pluginsAdded = new Set((addons ?? []).flatMap((a) => (a.kind === "package" && "repo" in a.source ? [`${a.source.repo}${a.source.path ? `/${a.source.path}` : ""}`] : [])));
+  const onAdded = (addon: Plugin) => {
     setEntry(null);
     setSkill(null);
     setPlugin(null);
@@ -169,7 +169,7 @@ export function AddonsPage({ profiles }: { profiles: Profile[] | null }) {
                   <Button variant="ghost" size="icon-sm" aria-label={`Edit ${addon.name}`} onClick={() => setOpenId(addon.id)}>
                     <PencilIcon />
                   </Button>
-                  <Switch aria-label={`Use ${addon.name}`} checked={addon.enabled} onCheckedChange={(enabled) => client.addons.change(addon.id, { enabled }).then(replace, (e: Error) => setError(e.message))} />
+                  <Switch aria-label={`Use ${addon.name}`} checked={addon.enabled} onCheckedChange={(enabled) => client.plugins.change(addon.id, { enabled }).then(replace, (e: Error) => setError(e.message))} />
                 </li>
               ))}
             </ul>
@@ -207,7 +207,7 @@ export function AddonsPage({ profiles }: { profiles: Profile[] | null }) {
           onClose={() => setOpenId(null)}
         />
       )}
-      {open?.kind === "plugin" && (
+      {open?.kind === "package" && (
         <PluginSettings
           addon={open}
           bots={<BotsChoice addon={open} profiles={profiles} onChange={replace} />}
@@ -222,20 +222,20 @@ export function AddonsPage({ profiles }: { profiles: Profile[] | null }) {
 }
 
 // One server: its sign-in or key, which bots have it, and which of its tools they get. Changes save as they are made.
-function AddonSettings({ addon, profiles, onChange, onSignIn, onRemoved, onClose }: { addon: McpAddon; profiles: Profile[] | null; onChange: (addon: Addon) => void; onSignIn: () => void; onRemoved: () => void; onClose: () => void }) {
+function AddonSettings({ addon, profiles, onChange, onSignIn, onRemoved, onClose }: { addon: McpPlugin; profiles: Profile[] | null; onChange: (addon: Plugin) => void; onSignIn: () => void; onRemoved: () => void; onClose: () => void }) {
   const [keys, setKeys] = useState<Record<string, string> | null>(null);
   const [error, setError] = useState("");
-  const saved = (work: Promise<Addon>) => (setError(""), work.then(onChange, (e: Error) => setError(e.message)));
-  const change = (fields: Pick<Partial<McpAddon>, "bots" | "allowed">) => (onChange({ ...addon, ...fields }), saved(client.addons.change(addon.id, fields)));
+  const saved = (work: Promise<Plugin>) => (setError(""), work.then(onChange, (e: Error) => setError(e.message)));
+  const change = (fields: Pick<Partial<McpPlugin>, "bots" | "allowed">) => (onChange({ ...addon, ...fields }), saved(client.plugins.change(addon.id, fields)));
   const allow = (name: string, on: boolean) => change({ allowed: on ? [...addon.allowed, name] : addon.allowed.filter((n) => n !== name) });
   const allowed = addon.tools.filter((t) => addon.allowed.includes(t.name)).length;
   const saveKeys = (event: FormEvent) => (
     event.preventDefault(),
-    saved(client.addons.setSecrets(addon.id, { headers: Object.fromEntries(Object.entries(keys!).filter(([, v]) => v.trim()).map(([n, v]) => [n, n === "Authorization" ? bearer(v) : v.trim()])) })).then(() => setKeys(null))
+    saved(client.plugins.setSecrets(addon.id, { headers: Object.fromEntries(Object.entries(keys!).filter(([, v]) => v.trim()).map(([n, v]) => [n, n === "Authorization" ? bearer(v) : v.trim()])) })).then(() => setKeys(null))
   );
   async function remove() {
     if (!confirm(`Remove ${addon.name}? Its tools leave every bot.`)) return;
-    await client.addons.remove(addon.id).then(onRemoved, (e: Error) => setError(e.message));
+    await client.plugins.remove(addon.id).then(onRemoved, (e: Error) => setError(e.message));
   }
 
   return (
@@ -321,16 +321,16 @@ function AddonSettings({ addon, profiles, onChange, onSignIn, onRemoved, onClose
 }
 
 // Which bots have an add-on: all of them, or those chosen here, each with a switch. Changes save as they are made.
-function BotsChoice({ addon, profiles, onChange }: { addon: Addon; profiles: Profile[] | null; onChange: (addon: Addon) => void }) {
+function BotsChoice({ addon, profiles, onChange }: { addon: Plugin; profiles: Profile[] | null; onChange: (addon: Plugin) => void }) {
   const [error, setError] = useState("");
-  const saved = (work: Promise<Addon>) => (setError(""), work.then(onChange, (e: Error) => setError(e.message)));
-  const forBot = (id: string, on: boolean) => (onChange({ ...addon, on: on ? [...addon.on, id] : addon.on.filter((b) => b !== id) }), saved(client.addons.forBot(id, addon.id, on)));
-  const choose = (bots: Addon["bots"]) => (onChange({ ...addon, bots }), saved(client.addons.change(addon.id, { bots })));
+  const saved = (work: Promise<Plugin>) => (setError(""), work.then(onChange, (e: Error) => setError(e.message)));
+  const forBot = (id: string, on: boolean) => (onChange({ ...addon, on: on ? [...addon.on, id] : addon.on.filter((b) => b !== id) }), saved(client.plugins.forBot(id, addon.id, on)));
+  const choose = (bots: Plugin["bots"]) => (onChange({ ...addon, bots }), saved(client.plugins.change(addon.id, { bots })));
   return (
     <section className="grid gap-2">
       <div className="flex items-center justify-between gap-3">
         <h3 className={heading}>Bots</h3>
-        <Tabs value={addon.bots} onValueChange={(bots) => choose(bots as Addon["bots"])}>
+        <Tabs value={addon.bots} onValueChange={(bots) => choose(bots as Plugin["bots"])}>
           <TabsList>
             <TabsTrigger value="all">All bots</TabsTrigger>
             <TabsTrigger value="each">Choose</TabsTrigger>
@@ -352,17 +352,17 @@ function BotsChoice({ addon, profiles, onChange }: { addon: Addon; profiles: Pro
 
 // An add-on from a registry: what the registry says about it now, and when there is a newer version, the newer page
 // with what changed, which needs the owner's Update before anything moves.
-function FromRegistry({ addon, onChange }: { addon: McpAddon; onChange: (addon: Addon) => void }) {
-  const [next, setNext] = useState<AddonPreview | null>(null);
+function FromRegistry({ addon, onChange }: { addon: McpPlugin; onChange: (addon: Plugin) => void }) {
+  const [next, setNext] = useState<McpPreview | null>(null);
   const [looking, setLooking] = useState(false);
   const [error, setError] = useState("");
   const source = addon.source!;
   const look = () => (
     setLooking(true),
     setError(""),
-    client.addons.preview({ registry: source.registry, allowLocal: addon.allowLocal, from: source.from }).then(setNext, (e: Error) => setError(e.message)).finally(() => setLooking(false))
+    client.plugins.preview({ registry: source.registry, allowLocal: addon.allowLocal, from: source.from }).then(setNext, (e: Error) => setError(e.message)).finally(() => setLooking(false))
   );
-  const update = () => client.addons.update(addon.id, next!.hash).then((moved) => (setNext(null), onChange(moved)), (e: Error) => setError(e.message));
+  const update = () => client.plugins.update(addon.id, next!.hash).then((moved) => (setNext(null), onChange(moved)), (e: Error) => setError(e.message));
   const changes = next
     ? [
         next.info && next.info.version !== source.version && `Version ${source.version} → ${next.info.version}`,
@@ -419,7 +419,7 @@ function FromRegistry({ addon, onChange }: { addon: McpAddon; onChange: (addon: 
 // Opens the server's sign-in page in a tab, then waits. A loopback redirect cannot load on a phone, so the person
 // pastes the address of the page that failed instead. When signing in cannot start, the person's own OAuth app can
 // stand in for one fxbot registers.
-function SignIn({ addon, onClose }: { addon: McpAddon; onClose: () => void }) {
+function SignIn({ addon, onClose }: { addon: McpPlugin; onClose: () => void }) {
   const [attempt, setAttempt] = useState<OAuthAttempt | null>(null);
   const [status, setStatus] = useState<OAuthStatus>({ status: "waiting" });
   const [address, setAddress] = useState("");
@@ -427,7 +427,7 @@ function SignIn({ addon, onClose }: { addon: McpAddon; onClose: () => void }) {
   const [own, setOwn] = useState({ clientId: "", clientSecret: "" });
   const [tries, setTries] = useState(0);
   useEffect(() => {
-    client.addons.signIn(addon.id).then(setAttempt, (e: Error) => (setCannotStart(true), setStatus({ status: "failed", error: e.message })));
+    client.plugins.signIn(addon.id).then(setAttempt, (e: Error) => (setCannotStart(true), setStatus({ status: "failed", error: e.message })));
   }, [addon.id, tries]);
   useEffect(() => {
     if (!attempt || status.status !== "waiting") return;
@@ -437,7 +437,7 @@ function SignIn({ addon, onClose }: { addon: McpAddon; onClose: () => void }) {
   const paste = (event: FormEvent) => (event.preventDefault(), client.oauth.paste(attempt!.id, address).then(setStatus, (e: Error) => setStatus({ status: "waiting", error: e.message })));
   const withOwn = (event: FormEvent) => (
     event.preventDefault(),
-    client.addons.setSecrets(addon.id, own).then(
+    client.plugins.setSecrets(addon.id, own).then(
       () => (setCannotStart(false), setStatus({ status: "waiting" }), setTries((n) => n + 1)),
       (e: Error) => setStatus({ status: "failed", error: e.message }),
     )
@@ -499,12 +499,12 @@ function SignIn({ addon, onClose }: { addon: McpAddon; onClose: () => void }) {
 
 // A bot's settings list the servers that are on: those for every bot, and a switch for each one chosen bot by bot.
 export function BotAddons({ profileId }: { profileId: string }) {
-  const [addons, setAddons] = useState<Addon[]>([]);
+  const [addons, setAddons] = useState<Plugin[]>([]);
   const [error, setError] = useState("");
-  useEffect(() => void client.addons.list().then((all) => setAddons(all.filter((a) => a.enabled)), () => {}), []);
+  useEffect(() => void client.plugins.list().then((all) => setAddons(all.filter((a) => a.enabled)), () => {}), []);
   if (!addons.length) return null;
-  const set = (addon: Addon, on: boolean) =>
-    client.addons.forBot(profileId, addon.id, on).then((next) => setAddons((all) => all.map((a) => (a.id === next.id ? next : a))), (e: Error) => setError(e.message));
+  const set = (addon: Plugin, on: boolean) =>
+    client.plugins.forBot(profileId, addon.id, on).then((next) => setAddons((all) => all.map((a) => (a.id === next.id ? next : a))), (e: Error) => setError(e.message));
   return (
     <fieldset className="grid gap-2">
       <legend className="mb-1.5 text-sm font-medium">Add-ons</legend>

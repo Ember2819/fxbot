@@ -120,7 +120,7 @@ async function run(name: string, version: string, url: string): Promise<Places> 
 // Reads the list of running plugins, and loads the ones that are new or changed. A plugin that's gone loses its
 // places; its code stays in the page until it reloads. Adding, updating, or removing one calls this again.
 export async function loadPlugins() {
-  const list = await client.plugins.list().catch(() => null);
+  const list = await client.plugins.pages().catch(() => null);
   if (!list) return;
   const next: Loaded[] = [];
   for (const { name, version, page, css } of list) {

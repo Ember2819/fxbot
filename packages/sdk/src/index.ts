@@ -12,7 +12,7 @@ import { createReleases } from "./releases.ts";
 import { readKey } from "./secrets.ts";
 import { createSkills } from "./skills.ts";
 import { createStore, isId, type StoredProfile } from "./store.ts";
-import { colors, maxPinned, shapes, type Addon, type AddonRef, type PluginRef, type AddonSecrets, type Fields, type Kind, type LibraryQuery, type Message, type NewProvider, type Profile, type ProfileUpdate, type ProviderUpdate, type Settings, type StreamLine, embeddingKinds, type SkillRef, type Upload } from "./types.ts";
+import { colors, maxPinned, shapes, type Plugin, type PluginRef, type RepoRef, type PluginSecrets, type Fields, type Kind, type LibraryQuery, type Message, type NewProvider, type Profile, type ProfileUpdate, type ProviderUpdate, type Settings, type StreamLine, embeddingKinds, type SkillRef, type Upload } from "./types.ts";
 
 export type * from "./types.ts";
 export type * from "./plugin-api.ts";
@@ -60,9 +60,9 @@ const fail = (status: 400 | 404 | 409 | 502, message: string): never => {
   throw Object.assign(new Error(message), { status });
 };
 // A skill is named by its skills.sh id; a server by its address or its registry entry.
-const isSkill = (ref: AddonRef): ref is SkillRef => typeof (ref as SkillRef | undefined)?.skill === "string";
+const isSkill = (ref: PluginRef): ref is SkillRef => typeof (ref as SkillRef | undefined)?.skill === "string";
 // A plugin by its GitHub repository and folder.
-const isPlugin = (ref: AddonRef): ref is PluginRef => typeof (ref as PluginRef | undefined)?.plugin === "string";
+const isRepo = (ref: PluginRef): ref is RepoRef => typeof (ref as RepoRef | undefined)?.repo === "string";
 
 // libfx's limits for one prompt's images.
 const maxImage = 3.75 * 2 ** 20;
@@ -125,7 +125,7 @@ export async function createFxbot(options: FxbotOptions) {
     clientMetadataUrl: options.clientMetadataUrl,
     findEntry: registry.lookup,
     onChange: () => void retool(),
-    reserved: () => plugins.names(),
+    reserved: () => packages.names(),
   });
   const archives = createArchives({ fetch });
   const skills = await createSkills({
@@ -133,13 +133,13 @@ export async function createFxbot(options: FxbotOptions) {
     archives,
     fromOf: (skill) => (registry.ourSkill(skill) ? "fxbot" : "skills.sh"),
     onChange: () => void retool(),
-    carried: () => plugins.carried(),
+    carried: () => packages.carried(),
   });
   // Plugins load before the agents, so their tools are there from the start. Every tool passes through their hooks.
   // A plugin that starts turns from its setup is told to wait: the agents come after it.
   let ready = false;
   const started = () => ready || fail(400, "fxbot is still starting. Start turns after setup.");
-  const plugins = await createPlugins({
+  const packages = await createPlugins({
     store,
     databaseUrl,
     secretKey: key,
@@ -176,9 +176,9 @@ export async function createFxbot(options: FxbotOptions) {
       removeServer: (id) => mcp.remove(id),
     },
   });
-  await plugins.start();
+  await packages.start();
   const toolsNow = async () =>
-    [history.tool, ...memories.tools, ...library.tools, ...(skills.any() ? [skills.tool] : []), ...(await mcp.tools()), ...plugins.tools()].map(plugins.wrap);
+    [history.tool, ...memories.tools, ...library.tools, ...(skills.any() ? [skills.tool] : []), ...(await mcp.tools()), ...packages.tools()].map(packages.wrap);
   const providers = await createProviders({ store, secretKey: key, dataDir, vercelClientId, fetch, tools: await toolsNow() });
   // Vectors that rows lack, from where Settings says, in the background.
   embeddings.nudge();
@@ -215,9 +215,9 @@ export async function createFxbot(options: FxbotOptions) {
     const room = 64 * 1024 - 1024 - Buffer.byteLength([...instructionsFor(profile), catalog].join("\n\n"));
     const memory = await memories.section(profile.id, Math.min(share(0.02), room));
     let instructions = [...instructionsFor(profile), memory, catalog].filter(Boolean);
-    if (plugins.hooked("instructions")) {
+    if (packages.hooked("instructions")) {
       const event = { bot: profile.id, session: sessionId, instructions };
-      await plugins.run("instructions", event);
+      await packages.run("instructions", event);
       instructions = (Array.isArray(event.instructions) ? event.instructions : []).filter((entry) => typeof entry === "string" && entry);
     }
     return agent.session(sessionId, { model: model || undefined, instructions, context: { bot: profile.id } });
@@ -275,12 +275,12 @@ export async function createFxbot(options: FxbotOptions) {
     try {
       for await (const event of turn) if (event.type === "text_delta") reply += event.delta;
     } catch (error) {
-      if (turn.messageId) plugins.observe("turn.end", { bot: id, session: sessionId, messageId: turn.messageId, ...sent, reply, error: (error as Error).message });
+      if (turn.messageId) packages.observe("turn.end", { bot: id, session: sessionId, messageId: turn.messageId, ...sent, reply, error: (error as Error).message });
       return;
     } finally {
       count(id, -1);
     }
-    if (turn.messageId) plugins.observe("turn.end", { bot: id, session: sessionId, messageId: turn.messageId, ...sent, reply });
+    if (turn.messageId) packages.observe("turn.end", { bot: id, session: sessionId, messageId: turn.messageId, ...sent, reply });
     if (!reply.trim() || !turn.messageId) return;
     await history.record(id, sessionId, turn.messageId, "assistant", reply);
     // A reply in a plugin's session isn't the bot's own chat's.
@@ -361,9 +361,9 @@ export async function createFxbot(options: FxbotOptions) {
     const sessionId = session ?? profile.sessionId!;
     const by = from ? { from } : {};
     // Plugins may change the message, or handle it themselves, and then no turn runs.
-    if (plugins.hooked("message")) {
+    if (packages.hooked("message")) {
       const event = { bot: id, session: sessionId, text, files, ...by };
-      if ((await plugins.run("message", event))?.handled) return { messageId, sessionId, handled: true as const };
+      if ((await packages.run("message", event))?.handled) return { messageId, sessionId, handled: true as const };
       ({ text, files } = event);
       if (typeof text !== "string" || !Array.isArray(files)) fail(400, "A plugin left this message without text or files.");
     }
@@ -378,7 +378,7 @@ export async function createFxbot(options: FxbotOptions) {
       const accepted = await turn.accepted;
       const names = files.length ? `\n[files: ${files.map((f) => f.name).join(", ")}]` : "";
       await history.record(id, accepted.sessionId, messageId, "user", text + names);
-      plugins.observe("turn.start", { bot: id, session: accepted.sessionId, messageId, text, ...by });
+      packages.observe("turn.start", { bot: id, session: accepted.sessionId, messageId, text, ...by });
       finish(id, accepted.sessionId, turn, { text, ...by });
       return accepted;
     } catch (error) {
@@ -511,55 +511,52 @@ export async function createFxbot(options: FxbotOptions) {
       remove: (id: string) => library.remove(id),
     },
 
-    // Remote MCP servers and skills. Adding one takes the `hash` its preview showed, and fails if it changed since.
-    // Secrets are write-only; a listed add-on says only whether it holds them.
-    addons: {
+    // Plugins: MCP servers, skills, and packages, one list. Adding one takes the `hash` its preview showed, and fails if
+    // it changed since. Secrets are write-only; a listed plugin says only whether it holds them.
+    plugins: {
       // With what the registry says about each server now: its details, and a mark when it has a newer version, or is
-      // deprecated or gone. Skills carry their marks from the hourly check of their repositories.
-      list: async (): Promise<Addon[]> => [...(await registry.decorate(await mcp.list())), ...skills.list(), ...plugins.list()],
+      // deprecated or gone. Skills and packages carry their marks from the hourly check of their repositories.
+      list: async (): Promise<Plugin[]> => [...(await registry.decorate(await mcp.list())), ...skills.list(), ...packages.list()],
       // fxbot's list and GitHub's registry, and with `everything`, the official one's own search too. Skills: fxbot's
       // skills list, then skills.sh's.
       search: (q: unknown, options: { kind?: unknown; everything?: boolean }) =>
-        options.kind === "skill" ? registry.searchSkills(q) : options.kind === "plugin" ? registry.searchPlugins(q) : registry.search(q, options),
-      preview: (ref: AddonRef) => (isPlugin(ref) ? plugins.preview(ref) : isSkill(ref) ? skills.preview(ref) : mcp.preview(ref)),
-      add: (ref: AddonRef, hash: string) => (isPlugin(ref) ? plugins.add(ref, hash) : isSkill(ref) ? skills.add(ref, hash) : mcp.add(ref, hash)),
-      update: (id: string, hash: unknown) => (plugins.has(id) ? plugins.update(id, hash) : skills.has(id) ? skills.update(id, hash) : mcp.update(id, hash)),
+        options.kind === "skill" ? registry.searchSkills(q) : options.kind === "package" ? registry.searchPackages(q) : registry.search(q, options),
+      preview: (ref: PluginRef) => (isRepo(ref) ? packages.preview(ref) : isSkill(ref) ? skills.preview(ref) : mcp.preview(ref)),
+      add: (ref: PluginRef, hash: string) => (isRepo(ref) ? packages.add(ref, hash) : isSkill(ref) ? skills.add(ref, hash) : mcp.add(ref, hash)),
+      update: (id: string, hash: unknown) => (packages.has(id) ? packages.update(id, hash) : skills.has(id) ? skills.update(id, hash) : mcp.update(id, hash)),
       change: (id: string, input: { enabled?: boolean; bots?: "all" | "each"; allowed?: string[] }) =>
-        plugins.has(id) ? plugins.change(id, input) : skills.has(id) ? skills.change(id, input) : mcp.change(id, input),
-      remove: (id: string) => (plugins.has(id) ? plugins.remove(id) : skills.has(id) ? skills.remove(id) : mcp.remove(id)),
-      setSecrets: (id: string, input: AddonSecrets) => mcp.setSecrets(id, input),
-      // A bot's switch, read when the add-on is chosen bot by bot.
-      async forBot(profileId: string, addonId: string, enabled: boolean) {
+        packages.has(id) ? packages.change(id, input) : skills.has(id) ? skills.change(id, input) : mcp.change(id, input),
+      remove: (id: string) => (packages.has(id) ? packages.remove(id) : skills.has(id) ? skills.remove(id) : mcp.remove(id)),
+      setSecrets: (id: string, input: PluginSecrets) => mcp.setSecrets(id, input),
+      // A bot's switch, read when the plugin is chosen bot by bot.
+      async forBot(profileId: string, pluginId: string, enabled: boolean) {
         await get(profileId);
-        return plugins.has(addonId) ? plugins.forBot(profileId, addonId, enabled) : skills.has(addonId) ? skills.forBot(profileId, addonId, enabled) : mcp.forBot(profileId, addonId, enabled);
+        return packages.has(pluginId) ? packages.forBot(profileId, pluginId, enabled) : skills.has(pluginId) ? skills.forBot(profileId, pluginId, enabled) : mcp.forBot(profileId, pluginId, enabled);
       },
       // A plugin's recent log lines and errors.
-      log: (id: string) => plugins.log(id),
+      log: (id: string) => packages.log(id),
       // A plugin's settings. Secrets are write-only.
-      configure: (id: string, settings: Record<string, unknown>) => plugins.configure(id, settings),
+      configure: (id: string, settings: Record<string, unknown>) => packages.configure(id, settings),
       // One of an installed skill's files, to read on its page.
       readSkill: (id: string, file: unknown) => skills.read(id, file),
       // Checks the skills' and plugins' repositories now, as the hourly check does, and marks what changed there.
-      check: async () => (await skills.check(), await plugins.check()),
+      check: async () => (await skills.check(), await packages.check()),
+      // What the page loads for packages, and their own routes, under `/api/plugins/<name>/`.
+      pages: () => packages.pages(),
+      file: (name: string, path: string) => packages.file(name, path),
+      handle: (name: string, request: Request, path: string) => packages.handle(name, request, path),
     },
 
     // OAuth sign-in to an MCP server: start with the page's origin, then poll. The browser comes back to that origin's
     // `/api/oauth/callback`, or the person pastes the address of the page a loopback redirect could not load.
     oauth: mcp.oauth,
 
-    // Plugins: what the page loads, and their own routes, under `/api/plugins/<name>/`.
-    plugins: {
-      pages: () => plugins.pages(),
-      file: (name: string, path: string) => plugins.file(name, path),
-      handle: (name: string, request: Request, path: string) => plugins.handle(name, request, path),
-    },
-
     // The running version, and the newest stable release when it is newer.
     release: releases.get,
 
     // Waits for the turns this process started and the saves of their replies, then lets Postgres go.
     async close() {
-      await plugins.close();
+      await packages.close();
       embeddings.close();
       releases.close();
       registry.close();

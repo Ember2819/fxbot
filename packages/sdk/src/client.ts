@@ -1,10 +1,10 @@
 import type {
-  Addon,
+  Plugin,
   BotSkill,
-  AddonPreview,
-  AddonRef,
-  AddonSearch,
-  AddonSecrets,
+  McpPreview,
+  PluginRef,
+  McpSearch,
+  PluginSecrets,
   Fields,
   Kind,
   LibraryItem,
@@ -15,11 +15,11 @@ import type {
   NewProvider,
   OAuthAttempt,
   OAuthStatus,
-  PluginAddon,
+  PackagePlugin,
   PluginPage,
-  PluginPreview,
-  PluginRef,
-  PluginSearch,
+  PackagePreview,
+  RepoRef,
+  PackageSearch,
   Profile,
   ProfileUpdate,
   Provider,
@@ -172,37 +172,35 @@ export function createClient({ baseUrl = "", onVersion }: ClientOptions = {}) {
       get: (id: string) => call<LibraryItem>(`/library/${id}`),
       remove: (id: string) => call<{ ok: true }>(`/library/${id}`, "DELETE"),
     },
-    // Remote MCP servers and skills. Preview one, then add it with the preview's hash. Header values and an OAuth
+    // Plugins: MCP servers, skills, and packages. Preview one, then add it with the preview's hash. Header values and an OAuth
     // client go to the server once and never come back.
-    addons: {
-      list: () => call<Addon[]>("/addons"),
-      preview: <R extends AddonRef>(ref: R) => call<R extends SkillRef ? SkillPreview : R extends PluginRef ? PluginPreview : AddonPreview>("/addons/preview", "POST", { ref }),
-      add: (ref: AddonRef, hash: string) => call<Addon>("/addons", "POST", { ref, hash }),
+    plugins: {
+      list: () => call<Plugin[]>("/plugins"),
+      preview: <R extends PluginRef>(ref: R) => call<R extends SkillRef ? SkillPreview : R extends RepoRef ? PackagePreview : McpPreview>("/plugins/preview", "POST", { ref }),
+      add: (ref: PluginRef, hash: string) => call<Plugin>("/plugins", "POST", { ref, hash }),
       // The registry's entries; `everything` also asks the official registry, unmoderated.
       search: (q: string, { kind, everything }: { kind?: string; everything?: boolean } = {}) =>
-        call<AddonSearch>(`/addons/search?${new URLSearchParams({ q, ...(kind ? { kind } : {}), ...(everything ? { everything: "1" } : {}) })}`),
+        call<McpSearch>(`/plugins/search?${new URLSearchParams({ q, ...(kind ? { kind } : {}), ...(everything ? { everything: "1" } : {}) })}`),
       // fxbot's skills list, then skills.sh's results for 2 characters or more.
-      searchSkills: (q: string) => call<SkillSearch>(`/addons/search?${new URLSearchParams({ q, kind: "skill" })}`),
+      searchSkills: (q: string) => call<SkillSearch>(`/plugins/search?${new URLSearchParams({ q, kind: "skill" })}`),
       // fxbot's plugins list.
-      searchPlugins: (q: string) => call<PluginSearch>(`/addons/search?${new URLSearchParams({ q, kind: "plugin" })}`),
+      searchPackages: (q: string) => call<PackageSearch>(`/plugins/search?${new URLSearchParams({ q, kind: "package" })}`),
       // One of an installed skill's files; SKILL.md by default.
-      readSkill: (id: string, file?: string) => call<{ text: string }>(`/addons/${id}/skills?${new URLSearchParams(file ? { file } : {})}`).then((r) => r.text),
-      // Moves an add-on to the newer definition its page showed, with that page's hash.
-      update: (id: string, hash: string) => call<Addon>(`/addons/${id}/update`, "POST", { hash }),
-      change: (id: string, fields: { enabled?: boolean; bots?: "all" | "each"; allowed?: string[] }) => call<Addon>(`/addons/${id}`, "PATCH", fields),
-      remove: (id: string) => call<{ ok: true }>(`/addons/${id}`, "DELETE"),
-      setSecrets: (id: string, secrets: AddonSecrets) => call<Addon>(`/addons/${id}/secrets`, "PUT", secrets),
-      forBot: (profileId: string, addonId: string, enabled: boolean) => call<Addon>(`/profiles/${profileId}/addons/${addonId}`, "PUT", { enabled }),
+      readSkill: (id: string, file?: string) => call<{ text: string }>(`/plugins/${id}/skills?${new URLSearchParams(file ? { file } : {})}`).then((r) => r.text),
+      // Moves a plugin to the newer definition its page showed, with that page's hash.
+      update: (id: string, hash: string) => call<Plugin>(`/plugins/${id}/update`, "POST", { hash }),
+      change: (id: string, fields: { enabled?: boolean; bots?: "all" | "each"; allowed?: string[] }) => call<Plugin>(`/plugins/${id}`, "PATCH", fields),
+      remove: (id: string) => call<{ ok: true }>(`/plugins/${id}`, "DELETE"),
+      setSecrets: (id: string, secrets: PluginSecrets) => call<Plugin>(`/plugins/${id}/secrets`, "PUT", secrets),
+      forBot: (profileId: string, pluginId: string, enabled: boolean) => call<Plugin>(`/profiles/${profileId}/plugins/${pluginId}`, "PUT", { enabled }),
       // Open `url`, then poll `oauth.get` until the status is done or failed.
-      signIn: (id: string) => call<OAuthAttempt>(`/addons/${id}/sign-in`, "POST"),
+      signIn: (id: string) => call<OAuthAttempt>(`/plugins/${id}/sign-in`, "POST"),
       // A plugin's settings: a value for each one named, or "" for its default. Secrets go in and never come back.
-      configure: (id: string, settings: Record<string, string>) => call<PluginAddon>(`/addons/${id}/settings`, "PUT", settings),
+      configure: (id: string, settings: Record<string, string>) => call<PackagePlugin>(`/plugins/${id}/settings`, "PUT", settings),
       // A plugin's recent log lines and errors.
-      log: (id: string) => call<{ lines: string[] }>(`/addons/${id}/log`).then((r) => r.lines),
-    },
-    // The running plugins' page code and CSS, for the page to load.
-    plugins: {
-      list: () => call<PluginPage[]>("/plugins"),
+      log: (id: string) => call<{ lines: string[] }>(`/plugins/${id}/log`).then((r) => r.lines),
+      // The running packages' page code and CSS, for the page to load.
+      pages: () => call<PluginPage[]>("/plugins/pages"),
     },
     oauth: {
       get: (id: string) => call<OAuthStatus>(`/oauth/attempts/${id}`),

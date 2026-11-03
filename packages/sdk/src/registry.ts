@@ -1,6 +1,6 @@
 import { readFileSync } from "node:fs";
 import type { Sql } from "./store.ts";
-import type { AddonCard, AddonFrom, AddonInfo, AddonMark, AddonSearch, PluginCard, PluginSearch, SkillCard, SkillSearch } from "./types.ts";
+import type { McpCard, RegistryFrom, RegistryInfo, PluginMark, McpSearch, PackageCard, PackageSearch, SkillCard, SkillSearch } from "./types.ts";
 
 type Fetch = typeof fetch;
 const hour = 60 * 60 * 1000;
@@ -35,7 +35,7 @@ function domainOf(namespace: string) {
   return namespace.includes(".") && !namespace.startsWith("io.github.") ? namespace.split(".").reverse().join(".") : undefined;
 }
 
-export function infoOf(entry: Entry, from: AddonFrom): AddonInfo {
+export function infoOf(entry: Entry, from: RegistryFrom): RegistryInfo {
   const { server } = entry;
   const repo = github(entry);
   const namespace = server.name.split("/")[0];
@@ -56,7 +56,7 @@ export function infoOf(entry: Entry, from: AddonFrom): AddonInfo {
   };
 }
 
-export function cardOf(entry: Entry, from: AddonFrom): AddonCard {
+export function cardOf(entry: Entry, from: RegistryFrom): McpCard {
   const info = infoOf(entry, from);
   const remote = entry.server.remotes?.find((r) => r.type === "streamable-http" || r.type === "sse");
   const host = remote && URL.canParse(remote.url) ? new URL(remote.url).hostname : undefined;
@@ -133,7 +133,7 @@ export function createRegistry({
   const skillSearches = new Map<string, { at: number; entries: SkillEntry[] }>();
   let notBefore = 0;
   let running: Promise<void> | undefined;
-  const searches = new Map<string, { at: number; cards: AddonCard[] }>();
+  const searches = new Map<string, { at: number; cards: McpCard[] }>();
   const latest = new Map<string, { at: number; entry: Entry | null | undefined }>();
   const get = (url: string | URL) => fetch(url, { headers: { accept: "application/json" }, signal: AbortSignal.timeout(30_000) });
 
@@ -262,7 +262,7 @@ export function createRegistry({
     return entries;
   }
 
-  // An official entry's newest version, for an add-on from it, asked at most hourly. Null when the registry has none.
+  // An official entry's newest version, for a plugin from it, asked at most hourly. Null when the registry has none.
   async function officialLatest(name: string) {
     const hit = latest.get(name);
     if (hit && Date.now() - hit.at < hour) return hit.entry;
@@ -272,10 +272,10 @@ export function createRegistry({
     return entry;
   }
 
-  // An entry for its add-on page, read when the page opens and again at Add or Update: fxbot's list as stored, or the
-  // registry's own answer. Null when there is no such entry. A registry's latest is kept too, so that an add-on
+  // An entry for its plugin page, read when the page opens and again at Add or Update: fxbot's list as stored, or the
+  // registry's own answer. Null when there is no such entry. A registry's latest is kept too, so that a plugin
   // updated between syncs isn't marked with an older version.
-  async function lookup(name: string, from: AddonFrom, version = "latest"): Promise<Entry | null> {
+  async function lookup(name: string, from: RegistryFrom, version = "latest"): Promise<Entry | null> {
     if (from === "fxbot") {
       const entry = (await listed()).get(name);
       return entry && (version === "latest" || version === entry.server.version) ? entry : null;
@@ -301,9 +301,9 @@ export function createRegistry({
     // fxbot's list and the mirror, one card per server, fxbot's when both have it. Ranked by the server's own name,
     // then its title, then its namespace, then its description, and within each, fxbot's first, then by stars. No
     // words lists fxbot's, then the most-starred.
-    async search(q: unknown, { kind, everything }: { kind?: unknown; everything?: boolean } = {}): Promise<AddonSearch> {
+    async search(q: unknown, { kind, everything }: { kind?: unknown; everything?: boolean } = {}): Promise<McpSearch> {
       const [state] = await sql<{ syncedAt: Date | null; error: string | null }[]>`select synced_at, error from registry_syncs where source = ${mirrorUrl}`;
-      const result: AddonSearch = { cards: [], syncedAt: state?.syncedAt?.toISOString() ?? null, ...(state?.error ? { error: state.error } : {}) };
+      const result: McpSearch = { cards: [], syncedAt: state?.syncedAt?.toISOString() ?? null, ...(state?.error ? { error: state.error } : {}) };
       if (kind !== undefined && kind !== "" && kind !== "mcp") return result;
       const text = typeof q === "string" ? q.trim().slice(0, 100) : "";
       const like = `%${text.replace(/[\\%_]/g, "\\$&")}%`;
@@ -333,16 +333,16 @@ export function createRegistry({
       }
       return result;
     },
-    // What its source says now about each add-on from one, and a mark when there is a newer version, or the entry is
+    // What its source says now about each plugin from one, and a mark when there is a newer version, or the entry is
     // deprecated or gone. Nothing changes by itself.
-    async decorate<T extends { source?: { registry: string; version: string; from?: AddonFrom } }>(addons: T[]) {
-      const names = addons.flatMap((a) => (a.source && (a.source.from ?? "github") === "github" ? [a.source.registry] : []));
+    async decorate<T extends { source?: { registry: string; version: string; from?: RegistryFrom } }>(plugins: T[]) {
+      const names = plugins.flatMap((a) => (a.source && (a.source.from ?? "github") === "github" ? [a.source.registry] : []));
       const rows = names.length ? await sql<{ name: string; entry: Entry }[]>`select name, entry from registry_entries where source = ${mirrorUrl} and name in ${sql(names)}` : [];
       const [state] = await sql<{ syncedAt: Date | null }[]>`select synced_at from registry_syncs where source = ${mirrorUrl}`;
       const mirrored = new Map(rows.map((r) => [r.name, r.entry]));
-      const ourList = addons.some((a) => a.source?.from === "fxbot") ? await listed() : new Map<string, Entry>();
+      const ourList = plugins.some((a) => a.source?.from === "fxbot") ? await listed() : new Map<string, Entry>();
       return Promise.all(
-        addons.map(async (addon): Promise<T & { info?: AddonInfo; mark?: AddonMark }> => {
+        plugins.map(async (addon): Promise<T & { info?: RegistryInfo; mark?: PluginMark }> => {
           const { source } = addon;
           if (!source) return addon;
           const from = source.from ?? "github";
@@ -352,7 +352,7 @@ export function createRegistry({
           if (entry === undefined) return addon;
           if (entry === null) return { ...addon, mark: { kind: "removed" } };
           const info = infoOf(entry, from);
-          const mark: AddonMark | undefined =
+          const mark: PluginMark | undefined =
             info.status === "deleted" ? { kind: "removed" } : info.status === "deprecated" ? { kind: "deprecated" } : info.version !== source.version ? { kind: "update", version: info.version } : undefined;
           return { ...addon, info, ...(mark ? { mark } : {}) };
         }),
@@ -377,11 +377,11 @@ export function createRegistry({
     // A skill in fxbot's list, for its page.
     ourSkill: (id: string) => ourSkills.find((e) => e.id === id),
     // fxbot's plugins that match, all of them with no words.
-    searchPlugins(q: unknown): PluginSearch {
+    searchPackages(q: unknown): PackageSearch {
       const words = typeof q === "string" ? q.trim().toLowerCase().slice(0, 100) : "";
       const cards = ourPlugins
         .filter((e) => !words || [e.name, e.repo, e.description].some((t) => t.toLowerCase().includes(words)))
-        .map((e): PluginCard => ({ kind: "plugin", name: e.name.slice(0, 64), description: e.description.slice(0, 1024), ref: `${e.repo}${e.path ? `/${e.path}` : ""}`, from: "fxbot" }));
+        .map((e): PackageCard => ({ kind: "package", name: e.name.slice(0, 64), description: e.description.slice(0, 1024), ref: `${e.repo}${e.path ? `/${e.path}` : ""}`, from: "fxbot" }));
       return { cards };
     },
     close: () => clearInterval(timer),

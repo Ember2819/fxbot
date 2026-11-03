@@ -4,8 +4,8 @@ import { createSkillsAdapter } from "libfx/skills";
 import { parse } from "yaml";
 import type { RepoFiles } from "./archive.ts";
 import { cutBytes } from "./history.ts";
-import { newId, type AddonRecord, type Store } from "./store.ts";
-import type { AddonMark, SkillAddon, SkillFile, SkillPreview, SkillRef, SkillSource } from "./types.ts";
+import { newId, type PluginRecord, type Store } from "./store.ts";
+import type { PluginMark, SkillPlugin, SkillFile, SkillPreview, SkillRef, SkillSource } from "./types.ts";
 
 const fail = (status: number, message: string): never => {
   throw Object.assign(new Error(message), { status });
@@ -18,9 +18,9 @@ const skillIdOf = /^([A-Za-z0-9-]{1,39}\/[A-Za-z0-9._-]{1,100})\/([A-Za-z0-9._-]
 
 type Archives = { head(repo: string): Promise<string>; files(repo: string, commit: string): Promise<RepoFiles> };
 type Config = { files: SkillFile[]; license?: string };
-type SkillRecord = AddonRecord<Config> & { source: SkillSource };
+type SkillRecord = PluginRecord<Config> & { source: SkillSource };
 // libfx's SkillRecord, as kept in Postgres, with `manual` for a skill only a person calls by name.
-export type Row = { addonId: string; name: string; description: string; instructions: string; resources: { uri: string; text: string }[]; manual: boolean };
+export type Row = { pluginId: string; name: string; description: string; instructions: string; resources: { uri: string; text: string }[]; manual: boolean };
 
 const sha = (text: string) => createHash("sha256").update(text).digest("hex");
 const bytes = (text: string) => Buffer.byteLength(text);
@@ -67,7 +67,7 @@ function findSkill(files: RepoFiles, repo: string, skillId: string) {
   return { path, inside, relative };
 }
 
-// Skills as add-ons: one skill each, from a GitHub repository at a pinned commit. Each bot's catalog lists the skills
+// Skills as plugins: one skill each, from a GitHub repository at a pinned commit. Each bot's catalog lists the skills
 // it has, and the `skill` tool reads one when a task needs it. A change that adds the first skill or removes the last
 // rebuilds the agents, since only then does the tool come or go.
 // Skills plugins carry: each with an id to tell it apart, and whether it is on for a bot.
@@ -76,17 +76,17 @@ export type CarriedSkill = { id: string; row: Row; applies: (bot: string) => boo
 export async function createSkills(options: { store: Store; archives: Archives; fromOf: (skill: string) => SkillSource["from"]; onChange: () => void; carried?: () => CarriedSkill[] }) {
   const { store, archives, fromOf, onChange, carried = () => [] } = options;
   const { sql } = store;
-  const records = new Map((await store.addons.list()).filter((r) => r.kind === "skill").map((r) => [r.id, r as SkillRecord]));
-  const rows = new Map((await sql<Row[]>`select addon_id, name, description, instructions, resources, manual from skills`).map((r) => [r.addonId, r]));
+  const records = new Map((await store.plugins.list()).filter((r) => r.kind === "skill").map((r) => [r.id, r as SkillRecord]));
+  const rows = new Map((await sql<Row[]>`select plugin_id, name, description, instructions, resources, manual from skills`).map((r) => [r.pluginId, r]));
   const on = new Map<string, Set<string>>();
-  for (const { profileId, addonId } of await store.addons.on()) if (records.has(addonId)) on.set(addonId, (on.get(addonId) ?? new Set()).add(profileId));
-  const marks = new Map<string, AddonMark>();
+  for (const { profileId, pluginId } of await store.plugins.on()) if (records.has(pluginId)) on.set(pluginId, (on.get(pluginId) ?? new Set()).add(profileId));
+  const marks = new Map<string, PluginMark>();
   // A commit the hourly check found the skill unchanged at, so it isn't read again.
   const same = new Map<string, string>();
-  const get = (id: string) => records.get(id) ?? fail(404, "add-on not found");
+  const get = (id: string) => records.get(id) ?? fail(404, "plugin not found");
   const any = () => [...records.values()].some((r) => r.enabled) || carried().length > 0;
 
-  function view(record: SkillRecord): SkillAddon {
+  function view(record: SkillRecord): SkillPlugin {
     const row = rows.get(record.id);
     return {
       id: record.id,
@@ -130,13 +130,13 @@ export async function createSkills(options: { store: Store; archives: Archives; 
     return { page, row: { name: parsed.name, description: parsed.description, instructions: parsed.body, resources, manual: parsed.manual } };
   }
 
-  async function saveRow(addonId: string, row: Omit<Row, "addonId">) {
-    await sql`insert into skills (addon_id, name, description, instructions, resources, manual)
-      values (${addonId}, ${row.name}, ${row.description}, ${row.instructions}, ${sql.json(row.resources)}, ${row.manual})
-      on conflict (addon_id, name) do update set description = excluded.description, instructions = excluded.instructions,
+  async function saveRow(pluginId: string, row: Omit<Row, "pluginId">) {
+    await sql`insert into skills (plugin_id, name, description, instructions, resources, manual)
+      values (${pluginId}, ${row.name}, ${row.description}, ${row.instructions}, ${sql.json(row.resources)}, ${row.manual})
+      on conflict (plugin_id, name) do update set description = excluded.description, instructions = excluded.instructions,
         resources = excluded.resources, manual = excluded.manual`;
-    await sql`delete from skills where addon_id = ${addonId} and name <> ${row.name}`;
-    rows.set(addonId, { addonId, ...row });
+    await sql`delete from skills where plugin_id = ${pluginId} and name <> ${row.name}`;
+    rows.set(pluginId, { pluginId, ...row });
   }
 
   // Every hour: each repository's HEAD, once. When it moved, the skill is read again there, and marked only when its
@@ -167,7 +167,7 @@ export async function createSkills(options: { store: Store; archives: Archives; 
   first.unref();
 
   // A bot's skills, in the order they were added. A name two skills share is shown as the later one's id.
-  // Plugins' skills come after the add-ons'.
+  // Packages' skills come after the others'.
   function forBot(bot: string) {
     const seen = new Set<string>();
     const all = [
@@ -287,7 +287,7 @@ export async function createSkills(options: { store: Store; archives: Archives; 
       if ([...records.values()].some((r) => r.source.skill === page.source.skill)) fail(409, `${page.name} is already added.`);
       const before = any();
       const record: SkillRecord = { id: newId(), kind: "skill", name: page.name, source: page.source, config: { files: page.files, ...(page.license ? { license: page.license } : {}) }, approvedHash: page.hash, enabled: true, bots: "all", allowed: null, status: null };
-      await store.addons.create(record);
+      await store.plugins.create(record);
       await saveRow(record.id, row);
       records.set(record.id, record);
       if (any() !== before) onChange();
@@ -300,7 +300,7 @@ export async function createSkills(options: { store: Store; archives: Archives; 
       if (page.error || !row) return fail(400, page.error ?? "This skill can't be updated.");
       if (hash !== page.hash) fail(409, "This skill changed since its page was shown. Look at it again before updating.");
       const config: Config = { files: page.files, ...(page.license ? { license: page.license } : {}) };
-      await store.addons.update(id, { source: page.source, config, approvedHash: page.hash });
+      await store.plugins.update(id, { source: page.source, config, approvedHash: page.hash });
       await saveRow(id, row);
       Object.assign(record, { name: page.name, source: page.source, config, approvedHash: page.hash });
       marks.delete(id);
@@ -315,25 +315,25 @@ export async function createSkills(options: { store: Store; archives: Archives; 
       if (bots !== undefined && bots !== "all" && bots !== "each") fail(400, "bots must be all or each");
       const before = any();
       const fields = { ...(enabled === undefined ? {} : { enabled: enabled as boolean }), ...(bots === undefined ? {} : { bots: bots as SkillRecord["bots"] }) };
-      await store.addons.update(id, fields);
+      await store.plugins.update(id, fields);
       Object.assign(record, fields);
       if (any() !== before) onChange();
       return view(record);
     },
-    async forBot(profileId: string, addonId: string, enabled: unknown) {
-      const record = get(addonId);
+    async forBot(profileId: string, pluginId: string, enabled: unknown) {
+      const record = get(pluginId);
       if (typeof enabled !== "boolean") fail(400, "enabled must be true or false");
-      await store.addons.forBot(profileId, addonId, enabled as boolean);
-      const bots = on.get(addonId) ?? new Set<string>();
+      await store.plugins.forBot(profileId, pluginId, enabled as boolean);
+      const bots = on.get(pluginId) ?? new Set<string>();
       if (enabled) bots.add(profileId);
       else bots.delete(profileId);
-      on.set(addonId, bots);
+      on.set(pluginId, bots);
       return view(record);
     },
     async remove(id: string) {
       get(id);
       const before = any();
-      await store.addons.remove(id);
+      await store.plugins.remove(id);
       for (const map of [records, rows, on, marks, same]) map.delete(id);
       if (any() !== before) onChange();
     },

@@ -1,4 +1,4 @@
-import { createFxbot, releasesUrlFor, type AddonRef, type ItemKind, type LocalEmbedder, type Settings, type UpdateStatus } from "@fxbot/sdk";
+import { createFxbot, releasesUrlFor, type PluginRef, type ItemKind, type LocalEmbedder, type Settings, type UpdateStatus } from "@fxbot/sdk";
 import { readFileSync, statSync } from "node:fs";
 import { createServer, type IncomingMessage, type ServerResponse } from "node:http";
 import { delimiter, extname, join, normalize } from "node:path";
@@ -131,38 +131,43 @@ async function api(req: IncomingMessage, res: ServerResponse, url: URL) {
   const method = req.method;
   const ok = { ok: true };
   if (resource === "health" && !id && method === "GET") return json(res, 200, { ok: true, version });
-  if (resource === "plugins" && !id && method === "GET") return json(res, 200, await fxbot.plugins.pages());
-  // A plugin's page code and CSS. A pinned plugin's URL names its commit, so the browser keeps it.
-  if (resource === "plugins" && id && action === "files" && method === "GET") {
-    const { type, data, pinned } = await fxbot.plugins.file(id, url.pathname.split("/").slice(5).join("/"));
-    return void res.writeHead(200, { "content-type": type, "x-content-type-options": "nosniff", "cache-control": pinned ? "public, max-age=31536000, immutable" : "no-cache" }).end(data);
-  }
-  if (resource === "plugins" && id) return pluginRoute(req, res, url, id);
   if (resource === "update" && !id) {
     if (method === "GET") return json(res, 200, updateStatus());
     // To the newest release the check found, never one the page names.
     if (method === "POST") return json(res, 202, startUpdate());
     return fail(404, "not found");
   }
-  if (resource === "addons" && extra === undefined) {
-    if (id === "preview" && !action && method === "POST") return json(res, 200, await fxbot.addons.preview((await body<{ ref: AddonRef }>(req)).ref));
-    if (id === "search" && !action && method === "GET")
-      return json(res, 200, await fxbot.addons.search(url.searchParams.get("q") ?? "", { kind: url.searchParams.get("kind") ?? undefined, everything: url.searchParams.get("everything") === "1" }));
-    if (id && action === "update" && method === "POST") return json(res, 200, await fxbot.addons.update(id, (await body<{ hash?: unknown }>(req)).hash));
-    if (!id && method === "GET") return json(res, 200, await fxbot.addons.list());
+  // fxbot's own calls on plugins: the list, search, preview, the page's list, and each plugin by its id. Anything else
+  // under a package's name is the package's: its page files and its own routes.
+  if (resource === "plugins") {
+    if (!id && method === "GET") return json(res, 200, await fxbot.plugins.list());
     if (!id && method === "POST") {
-      const { ref, hash } = await body<{ ref: AddonRef; hash: string }>(req);
-      return json(res, 201, await fxbot.addons.add(ref, hash));
+      const { ref, hash } = await body<{ ref: PluginRef; hash: string }>(req);
+      return json(res, 201, await fxbot.plugins.add(ref, hash));
     }
-    if (id && !action && method === "PATCH") return json(res, 200, await fxbot.addons.change(id, await body(req)));
-    if (id && !action && method === "DELETE") return json(res, 200, (await fxbot.addons.remove(id), ok));
-    if (id && action === "secrets" && method === "PUT") return json(res, 200, await fxbot.addons.setSecrets(id, await body(req)));
-    if (id && action === "skills" && method === "GET") return json(res, 200, { text: fxbot.addons.readSkill(id, url.searchParams.get("file") ?? undefined) });
-    if (id && action === "log" && method === "GET") return json(res, 200, { lines: fxbot.addons.log(id) });
-    if (id && action === "settings" && method === "PUT") return json(res, 200, await fxbot.addons.configure(id, await body(req)));
-    // The checked origin is where the sign-in comes back to.
-    if (id && action === "sign-in" && method === "POST") return json(res, 201, await fxbot.oauth.start(id, req.headers.origin));
-    return fail(404, "not found");
+    if (id === "pages" && !action && method === "GET") return json(res, 200, await fxbot.plugins.pages());
+    if (id === "preview" && !action && method === "POST") return json(res, 200, await fxbot.plugins.preview((await body<{ ref: PluginRef }>(req)).ref));
+    if (id === "search" && !action && method === "GET")
+      return json(res, 200, await fxbot.plugins.search(url.searchParams.get("q") ?? "", { kind: url.searchParams.get("kind") ?? undefined, everything: url.searchParams.get("everything") === "1" }));
+    if (/^[0-9a-f]{12}$/.test(id) && extra === undefined) {
+      if (action === "update" && method === "POST") return json(res, 200, await fxbot.plugins.update(id, (await body<{ hash?: unknown }>(req)).hash));
+      if (!action && method === "PATCH") return json(res, 200, await fxbot.plugins.change(id, await body(req)));
+      if (!action && method === "DELETE") return json(res, 200, (await fxbot.plugins.remove(id), ok));
+      if (action === "secrets" && method === "PUT") return json(res, 200, await fxbot.plugins.setSecrets(id, await body(req)));
+      if (action === "skills" && method === "GET") return json(res, 200, { text: fxbot.plugins.readSkill(id, url.searchParams.get("file") ?? undefined) });
+      if (action === "log" && method === "GET") return json(res, 200, { lines: fxbot.plugins.log(id) });
+      if (action === "settings" && method === "PUT") return json(res, 200, await fxbot.plugins.configure(id, await body(req)));
+      // The checked origin is where the sign-in comes back to.
+      if (action === "sign-in" && method === "POST") return json(res, 201, await fxbot.oauth.start(id, req.headers.origin));
+      return fail(404, "not found");
+    }
+    // A package's page code and CSS. A pinned package's URL names its commit, so the browser keeps it.
+    if (id && action === "files" && method === "GET") {
+      const { type, data, pinned } = await fxbot.plugins.file(id, url.pathname.split("/").slice(5).join("/"));
+      return void res.writeHead(200, { "content-type": type, "x-content-type-options": "nosniff", "cache-control": pinned ? "public, max-age=31536000, immutable" : "no-cache" }).end(data);
+    }
+    if (id) return pluginRoute(req, res, url, id);
+    return fail(405, "method not allowed");
   }
   if (resource === "oauth") {
     if (id === "callback" && !action && method === "GET") return signedIn(res, url.searchParams);
@@ -170,8 +175,8 @@ async function api(req: IncomingMessage, res: ServerResponse, url: URL) {
     if (id === "attempts" && action && extra === "paste" && method === "POST") return json(res, 200, await fxbot.oauth.paste(action, (await body<{ address: string }>(req)).address));
     return fail(404, "not found");
   }
-  if (resource === "profiles" && action === "addons" && extra && method === "PUT")
-    return json(res, 200, await fxbot.addons.forBot(id, extra, (await body<{ enabled: boolean }>(req)).enabled));
+  if (resource === "profiles" && action === "plugins" && extra && method === "PUT")
+    return json(res, 200, await fxbot.plugins.forBot(id, extra, (await body<{ enabled: boolean }>(req)).enabled));
   if (resource === "settings" && !id) {
     if (method === "GET") return json(res, 200, await fxbot.settings.get());
     if (method === "PATCH") {

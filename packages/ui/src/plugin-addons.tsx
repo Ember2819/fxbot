@@ -4,7 +4,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
-import type { Addon, PluginAddon, PluginCard, PluginPreview, PluginSearch } from "@fxbot/sdk/client";
+import type { Plugin, PackagePlugin, PackageCard, PackagePreview, PackageSearch } from "@fxbot/sdk/client";
 import { Details, heading, hint, Initial } from "./addon-add.tsx";
 import { client } from "./client.ts";
 
@@ -24,11 +24,11 @@ const Text = ({ text }: { text: string }) => <pre className="max-h-80 overflow-a
 
 // fxbot's plugins list, filtered by the page's words.
 export function usePluginSearch(query: string) {
-  const [result, setResult] = useState<PluginSearch | null>(null);
+  const [result, setResult] = useState<PackageSearch | null>(null);
   const [error, setError] = useState("");
   useEffect(() => {
     let stopped = false;
-    client.addons.searchPlugins(query).then((found) => !stopped && (setResult(found), setError("")), (e: Error) => !stopped && setError(e.message));
+    client.plugins.searchPackages(query).then((found) => !stopped && (setResult(found), setError("")), (e: Error) => !stopped && setError(e.message));
     return () => void (stopped = true);
   }, [query]);
   return { result, error };
@@ -42,7 +42,7 @@ export function PluginResults({ search, added, onOpen }: { search: ReturnType<ty
     <div className="grid gap-2">
       <p className="text-sm text-muted-foreground">A plugin changes fxbot itself: it runs inside fxbot, and can add screens, tools, and more.</p>
       {search.error && <p role="alert" className="text-sm text-destructive">{search.error}</p>}
-      {search.result?.cards.map((card: PluginCard) => (
+      {search.result?.cards.map((card: PackageCard) => (
         <button
           key={card.ref}
           type="button"
@@ -105,7 +105,7 @@ function Readable({ paths, texts, sizes }: { paths: string[]; texts: Record<stri
 }
 
 // What a plugin's page shows, before Add and before an update: what runs inside fxbot, and the rest it carries.
-function Contents({ page }: { page: PluginPreview }) {
+function Contents({ page }: { page: PackagePreview }) {
   const sizes = Object.fromEntries(page.files.map((f) => [f.path, f.size]));
   return (
     <>
@@ -162,19 +162,19 @@ function Contents({ page }: { page: PluginPreview }) {
 
 // A plugin's page, from its repository's current commit, and the consent to add it. Nothing is saved before Add, and a
 // plugin that changed since is shown again.
-export function PluginDialog({ target, onAdded, onClose }: { target: PluginTarget; onAdded: (addon: Addon) => void; onClose: () => void }) {
-  const [page, setPage] = useState<PluginPreview | null>(null);
+export function PluginDialog({ target, onAdded, onClose }: { target: PluginTarget; onAdded: (addon: Plugin) => void; onClose: () => void }) {
+  const [page, setPage] = useState<PackagePreview | null>(null);
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
-  const ref = { plugin: target.ref, from: target.from };
-  const look = () => (setPage(null), setError(""), client.addons.preview(ref).then(setPage, (e: Error) => setError(e.message)));
+  const ref = { repo: target.ref, from: target.from };
+  const look = () => (setPage(null), setError(""), client.plugins.preview(ref).then(setPage, (e: Error) => setError(e.message)));
   useEffect(() => void look(), []);
 
   async function add() {
     setBusy(true);
     setError("");
     try {
-      onAdded(await client.addons.add(ref, page!.hash));
+      onAdded(await client.plugins.add(ref, page!.hash));
     } catch (e) {
       setError((e as Error).message);
       if ((e as Error).message.includes("changed since")) await look();
@@ -230,10 +230,10 @@ export function PluginDialog({ target, onAdded, onClose }: { target: PluginTarge
 
 // An installed plugin: which bots it reaches, its settings, what it added to fxbot, its log, and its source, with
 // Update when its files changed there, which shows what changed and needs the owner's Update before anything moves.
-export function PluginSettings({ addon, bots, onChange, onRemoved, onClose }: { addon: PluginAddon; bots: ReactNode; onChange: (addon: Addon) => void; onRemoved: () => void; onClose: () => void }) {
+export function PluginSettings({ addon, bots, onChange, onRemoved, onClose }: { addon: PackagePlugin; bots: ReactNode; onChange: (addon: Plugin) => void; onRemoved: () => void; onClose: () => void }) {
   const [values, setValues] = useState<Record<string, string>>({});
   const [log, setLog] = useState<string[] | null>(null);
-  const [next, setNext] = useState<PluginPreview | null>(null);
+  const [next, setNext] = useState<PackagePreview | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const { source } = addon;
@@ -242,18 +242,18 @@ export function PluginSettings({ addon, bots, onChange, onRemoved, onClose }: { 
     if (!("repo" in source)) return;
     setBusy(true);
     setError("");
-    client.addons
-      .preview({ plugin: `${source.repo}${source.path ? `/${source.path}` : ""}`, from: source.from })
+    client.plugins
+      .preview({ repo: `${source.repo}${source.path ? `/${source.path}` : ""}`, from: source.from })
       .then(setNext, (e: Error) => setError(e.message))
       .finally(() => setBusy(false));
   };
-  const update = () => (setBusy(true), client.addons.update(addon.id, next!.hash).then((moved) => (setNext(null), onChange(moved)), (e: Error) => setError(e.message)).finally(() => setBusy(false)));
+  const update = () => (setBusy(true), client.plugins.update(addon.id, next!.hash).then((moved) => (setNext(null), onChange(moved)), (e: Error) => setError(e.message)).finally(() => setBusy(false)));
   const save = (event: FormEvent) => (
-    event.preventDefault(), setError(""), client.addons.configure(addon.id, values).then((saved) => (setValues({}), onChange(saved)), (e: Error) => setError(e.message))
+    event.preventDefault(), setError(""), client.plugins.configure(addon.id, values).then((saved) => (setValues({}), onChange(saved)), (e: Error) => setError(e.message))
   );
   async function remove() {
     if (!confirm(`Remove ${addon.name}? Its tables and settings go with it.`)) return;
-    await client.addons.remove(addon.id).then(onRemoved, (e: Error) => setError(e.message));
+    await client.plugins.remove(addon.id).then(onRemoved, (e: Error) => setError(e.message));
   }
   const parts = [
     ...addon.parts.tools.map((t) => `Tool ${t}`),
@@ -311,7 +311,7 @@ export function PluginSettings({ addon, bots, onChange, onRemoved, onClose }: { 
           <section className="grid gap-2">
             <h3 className={heading}>Log</h3>
             {log === null ? (
-              <Button size="sm" variant="outline" className="justify-self-start" onClick={() => client.addons.log(addon.id).then(setLog, (e: Error) => setError(e.message))}>
+              <Button size="sm" variant="outline" className="justify-self-start" onClick={() => client.plugins.log(addon.id).then(setLog, (e: Error) => setError(e.message))}>
                 Show the log
               </Button>
             ) : (

@@ -3,7 +3,7 @@ import { LoaderCircleIcon } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import type { Addon, SkillAddon, SkillCard, SkillFile, SkillPreview, SkillSearch } from "@fxbot/sdk/client";
+import type { Plugin, SkillPlugin, SkillCard, SkillFile, SkillPreview, SkillSearch } from "@fxbot/sdk/client";
 import { Details, heading, hint, Initial } from "./addon-add.tsx";
 import { client } from "./client.ts";
 
@@ -30,7 +30,7 @@ export function useSkillSearch(query: string) {
     setBusy(true);
     const wait = setTimeout(
       () =>
-        client.addons
+        client.plugins
           .searchSkills(query)
           .then((found) => !stopped && (setResult(found), setError("")), (e: Error) => !stopped && setError(e.message))
           .finally(() => !stopped && setBusy(false)),
@@ -117,19 +117,19 @@ const Manual = () => <p className="text-sm text-muted-foreground">Only called by
 
 // A skill's page, from its repository's current commit, and the consent to add it. Nothing is saved before Add, and a
 // skill that changed since is shown again.
-export function SkillDialog({ card, onAdded, onClose }: { card: SkillCard; onAdded: (addon: Addon) => void; onClose: () => void }) {
+export function SkillDialog({ card, onAdded, onClose }: { card: SkillCard; onAdded: (addon: Plugin) => void; onClose: () => void }) {
   const [page, setPage] = useState<SkillPreview | null>(null);
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
   const ref = { skill: card.id, from: card.from };
-  const look = () => (setPage(null), client.addons.preview(ref).then(setPage, (e: Error) => setError(e.message)));
+  const look = () => (setPage(null), client.plugins.preview(ref).then(setPage, (e: Error) => setError(e.message)));
   useEffect(() => void look(), []);
 
   async function add() {
     setBusy(true);
     setError("");
     try {
-      onAdded(await client.addons.add(ref, page!.hash));
+      onAdded(await client.plugins.add(ref, page!.hash));
     } catch (e) {
       setError((e as Error).message);
       if ((e as Error).message.includes("changed since")) await look();
@@ -190,19 +190,19 @@ export function SkillDialog({ card, onAdded, onClose }: { card: SkillCard; onAdd
 
 // An installed skill: which bots have it, its files to read, and its repository, with Update when its skill changed
 // there, which shows what changed and needs the owner's Update before anything moves.
-export function SkillSettings({ addon, bots, onChange, onRemoved, onClose }: { addon: SkillAddon; bots: ReactNode; onChange: (addon: Addon) => void; onRemoved: () => void; onClose: () => void }) {
+export function SkillSettings({ addon, bots, onChange, onRemoved, onClose }: { addon: SkillPlugin; bots: ReactNode; onChange: (addon: Plugin) => void; onRemoved: () => void; onClose: () => void }) {
   const [next, setNext] = useState<SkillPreview | null>(null);
   const [looking, setLooking] = useState(false);
   const [error, setError] = useState("");
   const look = () => (
     setLooking(true),
     setError(""),
-    client.addons.preview({ skill: addon.source.skill, from: addon.source.from }).then(setNext, (e: Error) => setError(e.message)).finally(() => setLooking(false))
+    client.plugins.preview({ skill: addon.source.skill, from: addon.source.from }).then(setNext, (e: Error) => setError(e.message)).finally(() => setLooking(false))
   );
-  const update = () => client.addons.update(addon.id, next!.hash).then((moved) => (setNext(null), onChange(moved)), (e: Error) => setError(e.message));
+  const update = () => client.plugins.update(addon.id, next!.hash).then((moved) => (setNext(null), onChange(moved)), (e: Error) => setError(e.message));
   async function remove() {
     if (!confirm(`Remove ${addon.name}? It leaves every bot.`)) return;
-    await client.addons.remove(addon.id).then(onRemoved, (e: Error) => setError(e.message));
+    await client.plugins.remove(addon.id).then(onRemoved, (e: Error) => setError(e.message));
   }
   const before = new Map(addon.files.map((f) => [f.path, f.hash]));
   const after = new Map(next?.files.map((f) => [f.path, f.hash]) ?? []);
@@ -226,7 +226,7 @@ export function SkillSettings({ addon, bots, onChange, onRemoved, onClose }: { a
           {bots}
           <section className="grid gap-2">
             <h3 className={heading}>Files</h3>
-            <Files files={addon.files} read={(path) => client.addons.readSkill(addon.id, path)} />
+            <Files files={addon.files} read={(path) => client.plugins.readSkill(addon.id, path)} />
           </section>
           <section className="grid gap-2">
             <h3 className={heading}>From its repository</h3>
