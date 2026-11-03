@@ -33,7 +33,18 @@ export async function openSessions(sql: postgres.Sql, options: MigrateOptions) {
     await sessions.close?.();
     throw error;
   });
-  return { durability: world(sessions, { name: "postgres", store: "fxbot" }), close: async () => sessions.close?.() };
+  return {
+    durability: world(sessions, { name: "postgres", store: "fxbot" }),
+    // How many lines a session's chat has, which is its newest line's cursor. libfx writes them to one stream per
+    // session, named as its uiStreamOf does, and counts them the same way.
+    async end(runId: string) {
+      const info = (await sessions.streams.getInfo(runId, `${runId.replace(/^wrun_/, "strm_")}_user_${Buffer.from("libfx-ui").toString("base64url")}`)) as {
+        tailIndex: number;
+      };
+      return info.tailIndex + 1;
+    },
+    close: async () => sessions.close?.(),
+  };
 }
 
 // The package's migrations run, after a backup, when the schema was last set up by another version of it. The version

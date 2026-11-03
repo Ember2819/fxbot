@@ -526,6 +526,8 @@ function SettingsForm() {
 }
 
 const newMessageId = () => Date.now().toString(36) + Math.random().toString(36).slice(2);
+// How many turns a chat shows when it opens, and adds each time it's scrolled to the top.
+const turnsAtOnce = 20;
 
 function Chat({ id, profiles, onChange }: { id: string; profiles: Profile[] | null; onChange: () => void }) {
   const [profile, setProfile] = useState<Profile | null>(null);
@@ -542,7 +544,23 @@ function Chat({ id, profiles, onChange }: { id: string; profiles: Profile[] | nu
   const picker = useRef<HTMLInputElement>(null);
   const skills = useSkillPicker(id, box, draft, setDraft);
   const skillNames = new Set(skills.skills.map((s) => s.name));
-  const { turns, setTurns, connected } = useTurnStream(id, Boolean(profile?.sessionId));
+  const { turns, setTurns, connected, ready } = useTurnStream(id, Boolean(profile?.sessionId));
+  // A long chat shows its newest turns, and more each time it's scrolled near its top, or while they all fit. Turns
+  // that arrive later are added below, so `from` holds still.
+  const viewport = useRef<HTMLDivElement>(null);
+  const [from, setFrom] = useState<number | null>(null);
+  const first = from ?? Math.max(0, turns.length - turnsAtOnce);
+  useEffect(() => {
+    if (ready && from === null) setFrom(first);
+  }, [ready]); // Once, when the chat so far has arrived.
+  const showEarlier = () => {
+    const view = viewport.current;
+    if (view && first > 0 && view.scrollTop < view.clientHeight / 2) setFrom(Math.max(0, first - turnsAtOnce));
+  };
+  useEffect(() => {
+    const view = viewport.current;
+    if (view && first > 0 && view.scrollHeight <= view.clientHeight) setFrom(Math.max(0, first - turnsAtOnce));
+  });
   const panel = usePanel();
   // A provider switch starts a new chat. The earlier ones stay readable above the handoff, though the bot now sees only
   // their summary and its chat_history search.
@@ -629,7 +647,8 @@ function Chat({ id, profiles, onChange }: { id: string; profiles: Profile[] | nu
   }
 
   const offline = error || (!connected && unreachable);
-  const empty = turns.length === 0 && earlier.length === 0;
+  // A chat whose lines are still arriving isn't empty: it shows its messages' place, without the greeting.
+  const empty = turns.length === 0 && earlier.length === 0 && (ready || !profile?.sessionId);
   return (
     <div className="flex min-h-0 flex-1">
       <div className="flex min-w-0 flex-1 flex-col">
@@ -689,13 +708,12 @@ function Chat({ id, profiles, onChange }: { id: string; profiles: Profile[] | nu
               </>
             ) : (
               <MessageScroller className="flex-1">
-                <MessageScrollerViewport>
+                <MessageScrollerViewport ref={viewport} onScroll={showEarlier}>
                   <MessageScrollerContent className="mx-auto w-full max-w-3xl gap-6 px-4 py-4">
-                    {earlier.map((turn) => (
-                      <TurnView key={turn.messageId} turn={turn} color={profile?.color} skills={skillNames} />
-                    ))}
-                    {profile?.handoff && <Handoff text={profile.handoff} />}
-                    {turns.map((turn) => (
+                    {first === 0 &&
+                      earlier.map((turn) => <TurnView key={turn.messageId} turn={turn} color={profile?.color} skills={skillNames} />)}
+                    {first === 0 && profile?.handoff && <Handoff text={profile.handoff} />}
+                    {turns.slice(first).map((turn) => (
                       <TurnView key={turn.messageId} turn={turn} color={profile?.color} skills={skillNames} retry={() => send(turn.text, turn.messageId, turn.files ?? [])} />
                     ))}
                   </MessageScrollerContent>

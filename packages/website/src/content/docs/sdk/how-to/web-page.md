@@ -81,7 +81,7 @@ The page needs a bot. Make one in fxbot's own page, or from yours with `client.p
 ## What the client does
 
 - Each call throws an `Error` with the server's message, or `Cannot reach the server.` when no answer comes.
-- `client.stream(id, { cursor, signal, onConnection })` replays the chat from `cursor`, 0 by default, then waits for new lines. After a drop, it asks again from the last cursor every 2 seconds, and `onConnection` hears it go and come back. It hides lines from an older epoch, as libfx asks. Abort `signal` to stop it.
+- `client.stream(id, { cursor, signal, onConnection, onCaughtUp })` replays the chat from `cursor`, 0 by default, then waits for new lines. `onCaughtUp` hears the replay end. After a drop, it asks again from the last cursor every 2 seconds, and `onConnection` hears it go and come back. It hides lines from an older epoch, as libfx asks. Abort `signal` to stop it.
 - `send` resolves once the server has stored the message. The reply comes on the stream.
 - `client.providers.add({ kind, apiKey })` sends a key once. A listed provider says only `hasKey`.
 - `createClient({ onVersion })` hears the server's version on every answer, so a page can notice a new release.

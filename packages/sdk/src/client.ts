@@ -58,6 +58,8 @@ export type StreamOptions = {
   signal?: AbortSignal;
   /** Hears the connection drop and come back. */
   onConnection?: (connected: boolean) => void;
+  /** Hears each connection catch up: every line the chat had when it opened has been yielded. */
+  onCaughtUp?: () => void;
 };
 
 // A typed client for an fxbot server's /api routes, for a page or a script. It carries no credentials: secrets stay
@@ -84,7 +86,7 @@ export function createClient({ baseUrl = "", onVersion }: ClientOptions = {}) {
 
   // Every line of a bot's chat from `cursor` on, then each new one, until `signal` aborts. After a dropped
   // connection it asks again from the last cursor it read, every 2 seconds.
-  async function* stream(id: string, { cursor = 0, signal, onConnection }: StreamOptions = {}): AsyncGenerator<StreamLine> {
+  async function* stream(id: string, { cursor = 0, signal, onConnection, onCaughtUp }: StreamOptions = {}): AsyncGenerator<StreamLine> {
     let epoch = 0;
     while (!signal?.aborted) {
       try {
@@ -93,6 +95,15 @@ export function createClient({ baseUrl = "", onVersion }: ClientOptions = {}) {
         const version = res.headers.get("x-fxbot-version");
         if (version) onVersion?.(version);
         onConnection?.(true);
+        // The chat's newest line when the server opened the stream. A server without the header is caught up at once.
+        const end = Number(res.headers.get("x-fxbot-end") ?? 0);
+        let behind = true;
+        const caughtUp = () => {
+          if (!behind || cursor < end) return;
+          behind = false;
+          onCaughtUp?.();
+        };
+        caughtUp();
         const reader = res.body.pipeThrough(new TextDecoderStream()).getReader();
         let rest = "";
         for (;;) {
@@ -104,9 +115,13 @@ export function createClient({ baseUrl = "", onVersion }: ClientOptions = {}) {
             const line: StreamLine = JSON.parse(part);
             cursor = line.cursor ?? cursor;
             // libfx's rule: hide a line whose epoch is lower than one before it.
-            if (line.epoch !== undefined && line.epoch < epoch) continue;
+            if (line.epoch !== undefined && line.epoch < epoch) {
+              caughtUp();
+              continue;
+            }
             epoch = line.epoch ?? epoch;
             yield line;
+            caughtUp();
           }
         }
       } catch {}

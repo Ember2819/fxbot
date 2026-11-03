@@ -132,7 +132,7 @@ After `plugins.signIn`, open the attempt's `url`, then call `oauth.get` until th
 ## stream
 
 ```ts
-stream(id: string, options?: { cursor?: number; signal?: AbortSignal; onConnection?: (connected: boolean) => void }): AsyncGenerator<StreamLine>
+stream(id: string, options?: { cursor?: number; signal?: AbortSignal; onConnection?: (connected: boolean) => void; onCaughtUp?: () => void }): AsyncGenerator<StreamLine>
 ```
 
 | Option | Default | What it does |
@@ -140,11 +140,13 @@ stream(id: string, options?: { cursor?: number; signal?: AbortSignal; onConnecti
 | `cursor` | `0` | Where to start. 0 replays the whole chat. |
 | `signal` | None | Stops the stream. The generator then returns. |
 | `onConnection` | None | Hears `true` on each connection, and `false` when one drops |
+| `onCaughtUp` | None | Hears each connection catch up: every line the chat had when it opened has been yielded, so the lines before were the replay |
 
 - It yields every line of the bot's chat from `cursor` on, then each new line, until `signal` aborts.
 - It keeps the `cursor` of the last line it read. When the connection drops, the server answers with an error, or the stream ends, it waits 2 seconds and asks again from that cursor. The server ends the stream at once for a bot with no chat yet, so the client asks again every 2 seconds until the chat starts.
 - It hides a line whose `epoch` is lower than one it has already seen, as libfx's rule says.
-- Each connection's `x-fxbot-version` header goes to `onVersion`.
+- Each connection's `x-fxbot-version` header goes to `onVersion`. Its `x-fxbot-end` header, the chat's newest cursor, says when to call `onCaughtUp`. A server without it is caught up at once.
+- A page can hold the replay's lines and show them together at `onCaughtUp`, so a chat opens at its end instead of scrolling past each turn as it arrives. fxbot's own page does.
 
 ## applyLine
 

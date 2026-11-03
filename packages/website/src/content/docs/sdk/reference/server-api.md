@@ -54,6 +54,7 @@ Other keys are ignored. An update also takes `pinned`:
 | --- | --- | --- |
 | `send(id, message)` | Sends a message to the bot. It resolves once libfx has stored the prompt. The reply arrives on the stream. | `{ messageId, sessionId }` |
 | `stream(id, cursor = 0)` | Every line of the bot's chat from `cursor` on, as NDJSON, then each new line. Cancel the stream to stop it. | `ReadableStream<Uint8Array>` |
+| `streamEnd(id)` | The cursor of the newest line in the bot's chat, 0 for none. A stream opened after it replays up to that cursor, then follows. | `number` |
 
 `send` takes a `Message`:
 

@@ -535,6 +535,13 @@ export async function createFxbot(options: FxbotOptions) {
       return (await lines(profile, profile.sessionId, cursor)).pipeThrough(new TextEncoderStream());
     },
 
+    // The cursor of the newest line in the bot's chat, 0 for none. A stream opened after asking replays up to it, then
+    // follows, so a page can show the replay at once.
+    async streamEnd(id: string) {
+      const profile = await get(id);
+      return profile.sessionId && providers.has(profile.provider) ? sessions.end(profile.sessionId) : 0;
+    },
+
     // Every bot's files in one place. `file` and `upload` (an image's URL from before the library) return the bytes,
     // or null bytes when `ifNoneMatch` already names them.
     library: {

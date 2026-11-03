@@ -5,6 +5,7 @@ import { delimiter, extname, join, normalize } from "node:path";
 import { Readable } from "node:stream";
 import { pipeline } from "node:stream/promises";
 import type { ReadableStream } from "node:stream/web";
+import { constants, createGzip } from "node:zlib";
 import { canUpdate, lastUpdate, localEmbedder, repository, requestEmbedder, requestUpdate, version, waiting } from "./control.ts";
 
 // Loopback by default. Other devices reach it through `tailscale serve`; the page never holds a secret. In its container
@@ -260,10 +261,19 @@ async function api(req: IncomingMessage, res: ServerResponse, url: URL) {
   } else if (action === "skills" && method === "GET") {
     return json(res, 200, await fxbot.profiles.skills(id));
   } else if (action === "stream" && method === "GET") {
-    const lines = await fxbot.stream(id, Number(url.searchParams.get("cursor") ?? 0));
-    res.writeHead(200, { "content-type": "application/x-ndjson", "cache-control": "no-store" }).flushHeaders();
-    // Replays from the cursor, then stays open. A closed response cancels the stream.
-    return pipeline(Readable.fromWeb(lines as ReadableStream<Uint8Array>), res).catch(() => {});
+    const end = await fxbot.streamEnd(id);
+    const lines = Readable.fromWeb((await fxbot.stream(id, Number(url.searchParams.get("cursor") ?? 0))) as ReadableStream<Uint8Array>);
+    // A long chat's replay is mostly repeated JSON, which gzip makes many times smaller for a phone. Each write is
+    // flushed, so a new line still arrives at once.
+    const gzip = /\bgzip\b/.test(String(req.headers["accept-encoding"] ?? ""));
+    res.writeHead(200, {
+      "content-type": "application/x-ndjson",
+      "cache-control": "no-store",
+      "x-fxbot-end": String(end),
+      ...(gzip ? { "content-encoding": "gzip", vary: "accept-encoding" } : {}),
+    }).flushHeaders();
+    // Replays from the cursor up to x-fxbot-end, then stays open for new lines. A closed response cancels the stream.
+    return (gzip ? pipeline(lines, createGzip({ flush: constants.Z_SYNC_FLUSH }), res) : pipeline(lines, res)).catch(() => {});
   }
   return fail(action ? 404 : 405, action ? "not found" : "method not allowed");
 }

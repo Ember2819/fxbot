@@ -157,7 +157,8 @@ A file's answer has these headers:
 
 The stream:
 
-- answers 200 with `content-type: application/x-ndjson` and `cache-control: no-store`, and the `x-fxbot-version` header
+- answers 200 with `content-type: application/x-ndjson` and `cache-control: no-store`, the `x-fxbot-version` header, and `x-fxbot-end`, the cursor of the chat's newest line when the stream opened. The lines up to it are the replay.
+- is gzipped, flushed after each line, when the request accepts gzip
 - replays the chat's lines from `cursor`, then stays open for new ones. 0 replays the whole chat. Each line's `cursor` is where to ask again to get the lines after it.
 - ends at once for a bot with no chat yet, or whose provider is gone
 - stops when the client closes the connection
@@ -171,4 +172,4 @@ curl -N "http://127.0.0.1:8787/api/profiles/<id>/stream?cursor=0"
 
 ## Outside /api
 
-`GET /callback` finishes an MCP sign-in, as above. Every other path serves the page from `packages/ui/dist/`: the file at that path, or `index.html`, so the app's routes load. Without a build, it gets 404, `{ "error": "no build in packages/ui/dist/; run npm run build" }`.
+`GET /callback` finishes an MCP sign-in, as above. A `GET` or `HEAD` of every other path serves the page from `packages/ui/dist/`: the file at that path, or `index.html`, so the app's routes load. Any other method gets 405. Without a build, it gets 404, `{ "error": "no build in packages/ui/dist/; run npm run build" }`.
