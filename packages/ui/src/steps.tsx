@@ -3,6 +3,7 @@ import { BookOpenIcon, BrainIcon, CircleAlertIcon, CircleCheckIcon, EraserIcon, 
 import { Streamdown } from "streamdown";
 import { Trace, TraceCollapsible, TraceCollapsibleContent, TraceCollapsibleTrigger, TraceDescription, TraceIcon, TraceLine, TraceTitle } from "@/components/ui/trace";
 import type { Part, Turn } from "@fxbot/sdk/client";
+import { PluginPart, usePluginToolView } from "./plugins.tsx";
 
 type Tool = Extract<Part, { type: "tool" }>;
 type Step = Extract<Part, { type: "reasoning" | "tool" }>;
@@ -99,6 +100,8 @@ function ToolCall({ call }: { call: Tool }) {
   const title = known ? (!call.done ? known.doing : failed ? known.failed : known.done) : !call.done ? <>Running {name}</> : failed ? <>{name} failed</> : <>Ran {name}</>;
   const gist = String((known?.gist ? known.gist(input) : firstText(input)) ?? "");
   const shown = call.output !== undefined && call.output.length > shownChars ? `${call.output.slice(0, shownChars)}…` : call.output;
+  // A plugin's tool can show its call its own way.
+  const view = usePluginToolView(call.name);
   return (
     <TraceCollapsible>
       <TraceCollapsibleTrigger>
@@ -111,8 +114,16 @@ function ToolCall({ call }: { call: Tool }) {
         </TraceLine>
       </TraceCollapsibleTrigger>
       <TraceCollapsibleContent className="grid gap-2">
-        <Output label="Input" text={call.inputPreview ? `${call.inputPreview}…` : JSON.stringify(call.input ?? {}, null, 2)} />
-        {shown !== undefined && <Output label={call.error ? "Error" : "Result"} text={shown} error={call.error} />}
+        {view ? (
+          <PluginPart plugin={view.plugin}>
+            <view.View call={call} />
+          </PluginPart>
+        ) : (
+          <>
+            <Output label="Input" text={call.inputPreview ? `${call.inputPreview}…` : JSON.stringify(call.input ?? {}, null, 2)} />
+            {shown !== undefined && <Output label={call.error ? "Error" : "Result"} text={shown} error={call.error} />}
+          </>
+        )}
         {call.done && call.output === undefined && <p className="text-sm text-destructive">The reply ended before this tool did.</p>}
       </TraceCollapsibleContent>
     </TraceCollapsible>

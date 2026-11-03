@@ -1,4 +1,4 @@
-import { readdir, readFile } from "node:fs/promises";
+import { readdir, readFile, stat } from "node:fs/promises";
 import { join, resolve } from "node:path";
 import { pathToFileURL } from "node:url";
 import type { FxAgentHostTool, FxAgentTool } from "libfx";
@@ -6,7 +6,7 @@ import postgres, { type Sql } from "postgres";
 import type { Hook, HookEvents, PluginApi, PluginRoute, PluginTool } from "./plugin-api.ts";
 import { createSecrets } from "./secrets.ts";
 import { newId, type AddonRecord, type Store } from "./store.ts";
-import type { PluginAddon, PluginSetting, PluginSource } from "./types.ts";
+import type { PluginAddon, PluginPage, PluginSetting, PluginSource } from "./types.ts";
 
 const fail = (status: 400 | 404, message: string): never => {
   throw Object.assign(new Error(message), { status });
@@ -356,6 +356,27 @@ export async function createPlugins(options: { store: Store; databaseUrl: string
         plugin.saved = (await secrets.get<{ values: Record<string, string> }>(plugin.record.id).catch(() => undefined))?.values ?? {};
         if (plugin.record.enabled) await load(plugin);
       }
+    },
+    // The running plugins' page code and CSS, by URL. A pinned plugin's URL names its commit, so it can be kept for
+    // good; a local one's names when its file last changed.
+    async pages(): Promise<PluginPage[]> {
+      const pages: PluginPage[] = [];
+      for (const { record, loaded } of plugins.values()) {
+        const { page, css, version } = record.config;
+        if (!loaded || !record.enabled || (!page && !css)) continue;
+        const stamp = async (file: string) =>
+          "commit" in record.source ? record.source.commit.slice(0, 12) : String(Math.floor((await stat(resolve(folderOf(record), file))).mtimeMs));
+        const url = async (file?: string) => (file ? { [file === page ? "page" : "css"]: `/api/plugins/${record.name}/files/${file}?v=${await stamp(file)}` } : {});
+        pages.push({ name: record.name, version, ...(await url(page)), ...(await url(css)) });
+      }
+      return pages;
+    },
+    // A running plugin's page code or CSS, and nothing else of its files.
+    async file(name: string, path: string) {
+      const plugin = [...plugins.values()].find((p) => p.record.name === name && p.loaded && p.record.enabled) ?? fail(404, `No plugin named ${name} is running.`);
+      const { page, css } = plugin.record.config;
+      if (path !== page && path !== css) fail(404, "not found");
+      return { type: path === page ? "text/javascript; charset=utf-8" : "text/css; charset=utf-8", data: await readFile(resolve(folderOf(plugin.record), path)), pinned: "commit" in plugin.record.source };
     },
     // A request to `/api/plugins/<name>/<path>`, answered by the plugin's route for it.
     async handle(name: string, request: Request, path: string): Promise<Response> {

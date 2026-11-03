@@ -30,7 +30,6 @@ import {
   SidebarMenuButton,
   SidebarMenuItem,
   SidebarProvider,
-  SidebarTrigger,
   useSidebar,
 } from "@/components/ui/sidebar";
 import { Textarea } from "@/components/ui/textarea";
@@ -46,6 +45,8 @@ import { MemorySearch } from "./memory-search.tsx";
 import { Version } from "./release.tsx";
 import { Reply } from "./steps.tsx";
 import { follow, go } from "./nav.ts";
+import { Header } from "./header.tsx";
+import { BotsProvider, loadPlugins, Place, usePluginNav, usePluginScreen } from "./plugins.tsx";
 import { ModelField, Providers } from "./providers.tsx";
 import { install, keepDraft, reload, takeDraft, useInstall, useNewVersion } from "./pwa.ts";
 import { useTurnStream } from "./use-turn-stream.ts";
@@ -91,6 +92,10 @@ export function App() {
     return () => clearTimeout(again);
   }, [profiles]);
 
+  // Plugins' page code, once; Add-ons loads it again after a change.
+  useEffect(() => void loadPlugins(), []);
+  const pluginScreen = usePluginScreen(path);
+
   const [creating, setCreating] = useState(false);
   const created = (profile: Profile) => {
     setCreating(false);
@@ -106,20 +111,23 @@ export function App() {
   else if (path === "/addons") screen = <AddonsPage profiles={profiles} />;
   else if (top === "profiles" && id && sub === "edit") screen = <ProfileForm key={id} id={id} onSaved={refresh} />;
   else if (top === "profiles" && id && sub === undefined) screen = <Chat key={id} id={id} profiles={profiles} onChange={refresh} />;
+  else if (pluginScreen) screen = pluginScreen;
   else screen = <Header title="Not found" />;
 
   return (
-    <TooltipProvider>
-      <SidebarProvider>
-        <BotSidebar profiles={profiles} offline={offline} active={id} onNew={() => setCreating(true)} onChange={refresh} />
-        {/* An installed app draws under the notch and the home indicator (viewport-fit=cover), so each edge pads by its
-            inset. The left one belongs to the sidebar while it is open beside the page. */}
-        <SidebarInset className="h-dvh overflow-hidden pr-[env(safe-area-inset-right)] pl-[env(safe-area-inset-left)] md:peer-data-[state=expanded]:pl-0">
-          {screen}
-        </SidebarInset>
-        <NewBot open={creating} onOpenChange={setCreating} onCreated={created} />
-      </SidebarProvider>
-    </TooltipProvider>
+    <BotsProvider value={profiles}>
+      <TooltipProvider>
+        <SidebarProvider>
+          <BotSidebar profiles={profiles} offline={offline} active={id} onNew={() => setCreating(true)} onChange={refresh} />
+          {/* An installed app draws under the notch and the home indicator (viewport-fit=cover), so each edge pads by its
+              inset. The left one belongs to the sidebar while it is open beside the page. */}
+          <SidebarInset className="h-dvh overflow-hidden pr-[env(safe-area-inset-right)] pl-[env(safe-area-inset-left)] md:peer-data-[state=expanded]:pl-0">
+            {screen}
+          </SidebarInset>
+          <NewBot open={creating} onOpenChange={setCreating} onCreated={created} />
+        </SidebarProvider>
+      </TooltipProvider>
+    </BotsProvider>
   );
 }
 
@@ -188,6 +196,7 @@ function BotSidebar({ profiles, offline, active, onNew, onChange }: { profiles: 
   const pinned = profiles?.filter((p) => p.pinned) ?? [];
   const full = pinned.length >= maxPinned;
   const newVersion = useNewVersion();
+  const pluginNav = usePluginNav();
   return (
     <Sidebar className="bg-sidebar pl-[env(safe-area-inset-left)]">
       <SidebarHeader className="flex-row items-center justify-end pt-[calc(0.5rem+env(safe-area-inset-top))]">
@@ -255,6 +264,7 @@ function BotSidebar({ profiles, offline, active, onNew, onChange }: { profiles: 
               ))}
           </SidebarMenu>
         </SidebarGroup>
+        <Place pick={(places) => places.sidebar} props={{}} />
       </SidebarContent>
       <SidebarFooter className="pb-[calc(0.5rem+env(safe-area-inset-bottom))]">
         {/* A new build is waiting (pwa.ts). The page stays on its own build until this reloads it. */}
@@ -292,6 +302,23 @@ function BotSidebar({ profiles, offline, active, onNew, onChange }: { profiles: 
             </TooltipTrigger>
             <TooltipContent>Library</TooltipContent>
           </Tooltip>
+          {pluginNav.map(({ plugin, label, href, icon: Icon }) => (
+            <Tooltip key={href}>
+              <TooltipTrigger asChild>
+                <a
+                  href={href}
+                  onClick={open}
+                  aria-label={label}
+                  aria-current={location.pathname === href ? "page" : undefined}
+                  className={buttonVariants({ variant: "ghost", size: "icon", className: "shrink-0 aria-[current=page]:bg-sidebar-accent" })}
+                >
+                  {Icon ? <Icon className="size-4" /> : <span className="text-sm font-medium">{label.slice(0, 1)}</span>}
+                  <span className="sr-only">{plugin}</span>
+                </a>
+              </TooltipTrigger>
+              <TooltipContent>{label}</TooltipContent>
+            </Tooltip>
+          ))}
           <Tooltip>
             <TooltipTrigger asChild>
               <a
@@ -309,17 +336,6 @@ function BotSidebar({ profiles, offline, active, onNew, onChange }: { profiles: 
         </div>
       </SidebarFooter>
     </Sidebar>
-  );
-}
-
-function Header({ title, lead, children }: { title: ReactNode; lead?: ReactNode; children?: ReactNode }) {
-  return (
-    <header className="box-content flex h-14 shrink-0 items-center gap-2 px-3 pt-[env(safe-area-inset-top)]">
-      <SidebarTrigger />
-      {lead}
-      <h1 className="min-w-0 flex-1 truncate font-medium">{title}</h1>
-      {children}
-    </header>
   );
 }
 
@@ -363,12 +379,15 @@ function ProfileForm({ id, onSaved }: { id: string; onSaved: () => void }) {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const [providers, setProviders] = useState<Provider[]>([]);
+  const [bot, setBot] = useState<Profile | null>(null);
   // Where the bot's chat lives now, so a move to another provider can warn first.
   const [chat, setChat] = useState<{ provider: string; sessionId: string | null }>({ provider: "", sessionId: null });
   useEffect(() => {
     client.providers.list().then(setProviders, () => {});
     client.profiles.get(id).then(
-      ({ name, instructions, model, provider, shape, color, sessionId }) => {
+      (profile) => {
+        const { name, instructions, model, provider, shape, color, sessionId } = profile;
+        setBot(profile);
         setFields({ name, instructions, model, provider, shape, color });
         setChat({ provider, sessionId });
         setLoaded(true);
@@ -443,6 +462,7 @@ function ProfileForm({ id, onSaved }: { id: string; onSaved: () => void }) {
             <Textarea rows={8} className="max-h-[50dvh]" value={fields.instructions} onChange={set("instructions")} disabled={!loaded} />
           </label>
           <BotAddons profileId={id} />
+          {bot && <Place pick={(places) => places.botSettings} props={{ bot }} />}
           {error && <Problem>{error}</Problem>}
           <div className="flex gap-2">
             <Button type="submit" disabled={busy || !loaded}>
@@ -483,6 +503,7 @@ function SettingsForm() {
           {settings && <Providers defaultProvider={settings.defaultProvider} onDefault={makeDefault} />}
           <p className="text-sm text-muted-foreground">New bots start on the default provider, with its default model.</p>
           <MemorySearch />
+          <Place pick={(places) => places.settings} props={{}} />
           <Version />
         </div>
       </main>
@@ -561,7 +582,8 @@ function Chat({ id, profiles, onChange }: { id: string; profiles: Profile[] | nu
     const pending = { messageId, text, files, reply: "", done: false };
     setTurns((all) => (all.some((t) => t.messageId === messageId) ? all.map((t) => (t.messageId === messageId ? pending : t)) : [...all, pending]));
     try {
-      const { sessionId } = await client.send(id, { text, messageId, files: files.map(({ name, type, data }) => ({ name, type, data })) });
+      const { sessionId, handled } = await client.send(id, { text, messageId, files: files.map(({ name, type, data }) => ({ name, type, data })) });
+      if (handled) setTurns((all) => all.map((t) => (t.messageId === messageId ? { ...t, done: true, handled } : t)));
       setProfile((current) => current && { ...current, sessionId });
       onChange();
     } catch (e) {
@@ -683,6 +705,7 @@ function Chat({ id, profiles, onChange }: { id: string; profiles: Profile[] | nu
                   <InputGroupButton size="icon-sm" className="rounded-full" disabled={stuck} aria-label="Attach files" onClick={() => picker.current?.click()}>
                     <PaperclipIcon />
                   </InputGroupButton>
+                  {profile && <Place pick={(places) => places.composer} props={{ bot: profile, setDraft, attach: (files: File[]) => void attach(files) }} />}
                 </InputGroupAddon>
                 <InputGroupTextarea
                   ref={box}
@@ -766,6 +789,7 @@ function TurnView({ turn, color, skills, retry }: { turn: Turn; color?: Color; s
         <Message>
           <MessageContent>
             <Reply turn={turn} />
+            {turn.handled && <p className="text-sm text-muted-foreground">A plugin took this message.</p>}
             {turn.note && (
               <p className="text-sm text-destructive">
                 {turn.note}{" "}

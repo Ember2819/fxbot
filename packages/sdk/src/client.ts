@@ -15,6 +15,8 @@ import type {
   NewProvider,
   OAuthAttempt,
   OAuthStatus,
+  PluginAddon,
+  PluginPage,
   Profile,
   ProfileUpdate,
   Provider,
@@ -188,13 +190,22 @@ export function createClient({ baseUrl = "", onVersion }: ClientOptions = {}) {
       forBot: (profileId: string, addonId: string, enabled: boolean) => call<Addon>(`/profiles/${profileId}/addons/${addonId}`, "PUT", { enabled }),
       // Open `url`, then poll `oauth.get` until the status is done or failed.
       signIn: (id: string) => call<OAuthAttempt>(`/addons/${id}/sign-in`, "POST"),
+      // A plugin's settings: a value for each one named, or "" for its default. Secrets go in and never come back.
+      configure: (id: string, settings: Record<string, string>) => call<PluginAddon>(`/addons/${id}/settings`, "PUT", settings),
+      // A plugin's recent log lines and errors.
+      log: (id: string) => call<{ lines: string[] }>(`/addons/${id}/log`).then((r) => r.lines),
+    },
+    // The running plugins' page code and CSS, for the page to load.
+    plugins: {
+      list: () => call<PluginPage[]>("/plugins"),
     },
     oauth: {
       get: (id: string) => call<OAuthStatus>(`/oauth/attempts/${id}`),
       paste: (id: string, address: string) => call<OAuthStatus>(`/oauth/attempts/${id}/paste`, "POST", { address }),
     },
     // Resolves once the server has stored the message; the reply arrives on the stream.
-    send: (id: string, message: Message) => call<{ messageId: string; sessionId: string }>(`/profiles/${id}/messages`, "POST", message),
+    // `handled` says a plugin took the message, and no turn runs.
+    send: (id: string, message: Message) => call<{ messageId: string; sessionId: string; handled?: true }>(`/profiles/${id}/messages`, "POST", message),
     stream,
   };
 }
@@ -210,8 +221,8 @@ export type Part =
 
 // One message and its reply. `parts` is the reply step by step; `reply` is its text alone, the parts' text joined, and
 // all a turn from an earlier chat has. `unsent` marks a message the server never took, which can be sent again.
-// `from` names the plugin that sent the message, when one did.
-export type Turn = { messageId: string; text: string; files?: Upload[]; reply: string; parts?: Part[]; done: boolean; note?: string; unsent?: boolean; from?: string };
+// `from` names the plugin that sent the message, when one did. `handled` is for a page: a plugin took the message.
+export type Turn = { messageId: string; text: string; files?: Upload[]; reply: string; parts?: Part[]; done: boolean; note?: string; unsent?: boolean; from?: string; handled?: true };
 
 // Folds one stream line into a thread. Lines without a messageId, such as `idle`, change nothing.
 export function applyLine(turns: Turn[], line: StreamLine): Turn[] {

@@ -534,6 +534,8 @@ export async function createFxbot(options: FxbotOptions) {
 
     // Plugins: what the page loads, and their own routes, under `/api/plugins/<name>/`.
     plugins: {
+      pages: () => plugins.pages(),
+      file: (name: string, path: string) => plugins.file(name, path),
       handle: (name: string, request: Request, path: string) => plugins.handle(name, request, path),
     },
 

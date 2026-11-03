@@ -181,6 +181,8 @@ export type PluginAddon = AddonCommon & {
   error?: string;
 };
 export type Addon = McpAddon | SkillAddon | PluginAddon;
+// What the page loads for a running plugin: its page code and its CSS, by URL.
+export type PluginPage = { name: string; version: string; page?: string; css?: string };
 // Where a registry entry comes from: fxbot's own list, GitHub's registry, or the official one, unmoderated.
 export type AddonFrom = "fxbot" | "github" | "official";
 // What the page asks to add: a server by its URL, with the names of any headers it needs, or a registry entry, from

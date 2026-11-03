@@ -12,6 +12,7 @@ import type { Addon, AddonCard, AddonMark, AddonPreview, McpAddon, OAuthAttempt,
 import { AddressDialog, bearer, EntryDialog, heading, hint, hostOf, Information, label, Results, signsIn, useSearch } from "./addon-add.tsx";
 import { Blob } from "./blob.tsx";
 import { client } from "./client.ts";
+import { loadPlugins } from "./plugins.tsx";
 import { SkillDialog, SkillResults, SkillSettings, useSkillSearch } from "./skills.tsx";
 
 // Past this many, the page says how many tools reach the bots: each one's schema rides along with every message.
@@ -60,6 +61,9 @@ export function AddonsPage({ profiles }: { profiles: Profile[] | null }) {
     return () => clearTimeout(again);
   }, [addons]);
   const replace = (next: Addon) => setAddons((all) => all?.map((a) => (a.id === next.id ? next : a)) ?? null);
+  // A plugin added, removed, turned on or off, or updated changes what the page loads.
+  const plugins = (addons ?? []).flatMap((a) => (a.kind === "plugin" ? [`${a.id}:${a.enabled}:${a.version}:${a.parts.page}:${a.error ?? ""}`] : [])).join(" ");
+  useEffect(() => void (addons && loadPlugins()), [plugins]);
   const open = addons?.find((a) => a.id === openId);
   const servers = (addons ?? []).flatMap((a) => (a.kind === "mcp" ? [a] : []));
   const reaching = servers.filter((a) => a.enabled).reduce((n, a) => n + a.tools.filter((t) => a.allowed.includes(t.name)).length, 0);

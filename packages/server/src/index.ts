@@ -131,6 +131,12 @@ async function api(req: IncomingMessage, res: ServerResponse, url: URL) {
   const method = req.method;
   const ok = { ok: true };
   if (resource === "health" && !id && method === "GET") return json(res, 200, { ok: true, version });
+  if (resource === "plugins" && !id && method === "GET") return json(res, 200, await fxbot.plugins.pages());
+  // A plugin's page code and CSS. A pinned plugin's URL names its commit, so the browser keeps it.
+  if (resource === "plugins" && id && action === "files" && method === "GET") {
+    const { type, data, pinned } = await fxbot.plugins.file(id, url.pathname.split("/").slice(5).join("/"));
+    return void res.writeHead(200, { "content-type": type, "x-content-type-options": "nosniff", "cache-control": pinned ? "public, max-age=31536000, immutable" : "no-cache" }).end(data);
+  }
   if (resource === "plugins" && id) return pluginRoute(req, res, url, id);
   if (resource === "update" && !id) {
     if (method === "GET") return json(res, 200, updateStatus());

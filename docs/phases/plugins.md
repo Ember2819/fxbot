@@ -237,7 +237,7 @@ const { useState } = require("react");
 module.exports = function setup(app) {
   app.route("/rooms/:id", RoomScreen);                          // the page at /<plugin>/rooms/<id>
   app.sidebar(RoomsGroup);                                      // a group in the sidebar, after the bots
-  app.nav({ icon: "users", label: "Rooms", path: "/rooms" });   // a button in the sidebar's footer row
+  app.nav({ icon: UsersIcon, label: "Rooms", path: "/rooms" }); // a button in the sidebar's footer row; icon: a component
   app.composer(Button);                                         // a control beside the attach button: gets { bot, setDraft, attach }
   app.toolView("say", SayStep);                                 // how a call of <plugin>_say shows in a reply
   app.settings(RoomsSettings);                                  // a section in Settings
@@ -249,12 +249,15 @@ module.exports = function setup(app) {
 - **`client`:** the app's `@fxbot/sdk/client`, with `applyLine`
 - **`api(path, init)`:** fetches the plugin's own routes
 - **`go(path)` and `useBots()`**
-- **`ui`:** the app's shadcn components (Button, Input, Textarea, Dialog, Card, Badge, Switch, Field, Sidebar parts, Attachment parts), and `Streamdown` for Markdown
+- **`ui`:** the app's shadcn components (Button, Input, Textarea, Badge, Switch, Checkbox, Dialog, Empty, Sidebar, Attachment, Message, Bubble, and MessageScroller parts), `Streamdown` for Markdown, and the app's own `Header` (a screen's top bar), `Blob` (a bot's look), and `Reply` (a turn's reply, steps and all)
 
 **How the app runs plugin parts:**
 - **The routes** are `/<plugin>/…`, checked after the core's paths.
 - **Each part sits in an error boundary.** A plugin that throws shows a short card in its place, and the rest of the app keeps working.
 - **Adding, updating, or removing a plugin** reloads the plugin list. Its old code stays loaded until the page reloads.
+- **A nav entry without an icon** shows its label's first letter.
+- **A message a plugin handled** shows "A plugin took this message." under it, and one a plugin sent shows "From <plugin>".
+- **Only the page and CSS files** that `plugin.json` names are served, from `/api/plugins/<name>/files/`. A pinned plugin's URL names its commit and is kept for good; a local one's names when the file last changed.
 
 ### Installing, updating, and removing
 
@@ -386,14 +389,14 @@ Checks use a sample plugin in the scratchpad that uses every hook and place, dis
   - After a provider switch, `send` to the old session answers 409.
 
 **M3. The page**
-- [ ] A plugin's page bundle loads with the app's React: its component uses `useState`, and React reports one copy.
-- [ ] Each place renders:
+- [x] A plugin's page bundle loads with the app's React: its component uses `useState`, and React reports one copy.
+- [x] Each place renders:
   - a route, the sidebar, and a footer button
   - a composer control that sets the draft
   - a tool view, Settings, and a bot's settings
-- [ ] A plugin part that throws shows its card, and the chat still works.
-- [ ] With no plugins added, the page loads no plugin code (checked in Playwright's request log).
-- [ ] Phone width: the sidebar group, the footer button, and a route fit.
+- [x] A plugin part that throws shows its card, and the chat still works.
+- [x] With no plugins added, the page loads no plugin code (checked in Playwright's request log).
+- [x] Phone width: the sidebar group, the footer button, and a route fit.
 
 **M4. Installing**
 - [ ] Mock GitHub (the skills checks' mocks) serves a plugin repository with a folder.
