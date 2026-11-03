@@ -118,6 +118,8 @@ export default defineConfig({
     proxy: {
       "/api": {
         target: `http://127.0.0.1:${apiPort}`,
+        // Plugins' sockets (fx.socket) are WebSockets under /api.
+        ws: true,
         // Vite's proxy keeps the page's stream open after the API server stops. Close it too, so the chat sees the drop.
         configure: (proxy) => proxy.on("proxyRes", (upstream, _req, res) => upstream.on("close", () => upstream.complete || res.destroy())),
       },

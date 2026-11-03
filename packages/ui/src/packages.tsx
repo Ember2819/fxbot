@@ -254,6 +254,7 @@ export function PluginSettings({
     ...addon.parts.tools.map((t) => `Tool ${t}`),
     ...addon.parts.hooks.map((h) => `Hook ${h}`),
     ...addon.parts.routes.map((r) => `Route ${r}`),
+    ...(addon.parts.sockets ?? []).map((s) => `Socket ${s}`),
     ...(addon.parts.page ? ["Parts of the page"] : []),
   ];
 

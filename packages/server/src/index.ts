@@ -1,11 +1,12 @@
-import { createFxbot, releasesUrlFor, type PluginRef, type ItemKind, type LocalEmbedder, type Settings, type UpdateStatus } from "@fxbot/sdk";
+import { createFxbot, releasesUrlFor, type PluginRef, type PluginSocket, type ItemKind, type LocalEmbedder, type Settings, type UpdateStatus } from "@fxbot/sdk";
 import { readFileSync, statSync } from "node:fs";
 import { createServer, type IncomingMessage, type ServerResponse } from "node:http";
 import { delimiter, extname, join, normalize } from "node:path";
-import { Readable } from "node:stream";
+import { Readable, type Duplex } from "node:stream";
 import { pipeline } from "node:stream/promises";
 import type { ReadableStream } from "node:stream/web";
 import { constants, createGzip } from "node:zlib";
+import { WebSocketServer, type WebSocket } from "ws";
 import { canUpdate, lastUpdate, localEmbedder, repository, requestEmbedder, requestUpdate, version, waiting } from "./control.ts";
 
 // Loopback by default. Other devices reach it through `tailscale serve`; the page never holds a secret. In its container
@@ -315,12 +316,50 @@ const server = createServer(async (req, res) => {
   }
 });
 
+// A plugin's own WebSocket, at `/api/plugins/<name>/<path>`. A browser opens one with a GET, which the write check above
+// doesn't cover, so the upgrade checks the page's origin itself: a page on another site can't open one.
+const sockets = new WebSocketServer({ noServer: true, maxPayload: 16 << 20 });
+server.on("upgrade", (req: IncomingMessage, socket: Duplex, head: Buffer) => {
+  const refuse = (status: string) => socket.end(`HTTP/1.1 ${status}\r\nconnection: close\r\ncontent-length: 0\r\n\r\n`);
+  const url = new URL(req.url ?? "/", "http://localhost");
+  const [, root, resource, name, ...rest] = url.pathname.split("/");
+  if (root !== "api" || resource !== "plugins" || !name) return refuse("404 Not Found");
+  const origin = req.headers.origin;
+  if (origin !== undefined && (!URL.canParse(origin) || new URL(origin).host !== req.headers.host)) return refuse("403 Forbidden");
+  let open: ReturnType<typeof fxbot.plugins.socket>;
+  try {
+    open = fxbot.plugins.socket(name, rest.join("/"));
+  } catch {
+    return refuse("404 Not Found");
+  }
+  const headers = Object.entries(req.headers).flatMap(([key, value]) => (value === undefined ? [] : [value].flat().map((one) => [key, one] as [string, string])));
+  const request = new Request(new URL(url.pathname + url.search, "http://localhost"), { headers });
+  sockets.handleUpgrade(req, socket, head, (ws) => open(adapt(ws), request));
+});
+// `ws`'s socket, as a plugin gets it.
+function adapt(ws: WebSocket): PluginSocket {
+  const socket: PluginSocket = {
+    send: (data) => void (ws.readyState === ws.OPEN && ws.send(data)),
+    close: (code, reason) => ws.close(code, reason),
+    onmessage: null,
+    onclose: null,
+    get bufferedAmount() {
+      return ws.bufferedAmount;
+    },
+  };
+  ws.on("message", (data, binary) => socket.onmessage?.(binary ? (data as Buffer) : data.toString()));
+  ws.on("close", () => socket.onclose?.());
+  ws.on("error", () => ws.terminate());
+  return socket;
+}
+
 server.listen(port, host, () => console.log(`fxbot server on http://${host}:${port}`));
 
 // Stop taking requests, then let libfx finish the turns this process started.
 async function shutdown() {
   server.close();
   server.closeAllConnections();
+  for (const ws of sockets.clients) ws.terminate();
   await fxbot.close();
   process.exit(0);
 }

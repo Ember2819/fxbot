@@ -43,12 +43,26 @@ export type Dependent = { name: string; version: string; needs: Record<string, u
 // A route under `/api/plugins/<plugin>/`, such as `/rooms/:id`. `params` holds the named parts.
 export type PluginRoute = (request: Request, params: Record<string, string>) => Response | Promise<Response>;
 
+// A WebSocket the page opened to one of the plugin's sockets. Binary messages come as a Buffer, text as a string.
+export type PluginSocket = {
+  send(data: string | Uint8Array): void;
+  close(code?: number, reason?: string): void;
+  onmessage: ((data: Buffer | string) => void) | null;
+  onclose: (() => void) | null;
+  /** Bytes queued to send and not yet sent, for flow control. */
+  readonly bufferedAmount: number;
+};
+// A socket under `/api/plugins/<plugin>/`, such as `/desktop/:bot`, with the request that opened it.
+export type PluginSocketHandler = (socket: PluginSocket, request: Request, params: Record<string, string>) => unknown;
+
 export type PluginApi = {
   /** The plugin's name, its id in fxbot. */
   name: string;
   on<E extends keyof HookEvents>(event: E, handler: Hook<E>): void;
   tool(tool: PluginTool): void;
   route(method: string, path: string, handler: PluginRoute): void;
+  /** A WebSocket at `/api/plugins/<plugin><path>`, for a two-way stream a route can't carry. */
+  socket(path: string, handler: PluginSocketHandler): void;
   /** Postgres, in the plugin's own schema, `plugin_<name>`, which its migrations made. */
   sql: Sql;
   /** Its settings, with secrets opened. Kept up to date in place. */

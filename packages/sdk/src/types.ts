@@ -170,7 +170,7 @@ export type SkillPlugin = PluginCommon & { kind: "skill"; source: SkillSource; d
 // a folder of FXBOT_PLUGIN_DIRS. `parts` is what it registered when it loaded; `error` is why it is off.
 export type PackageSource = { local: string } | { repo: string; path: string; commit: string; from: "fxbot" | "github" };
 export type PluginSetting = { name: string; description: string; default?: string; isRequired?: boolean; isSecret?: boolean };
-export type PackageParts = { tools: string[]; hooks: string[]; routes: string[]; page: boolean };
+export type PackageParts = { tools: string[]; hooks: string[]; routes: string[]; sockets: string[]; page: boolean };
 export type PackagePlugin = PluginCommon & {
   kind: "package";
   source: PackageSource;

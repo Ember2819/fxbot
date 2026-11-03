@@ -6,6 +6,10 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "@fxbot/sdk": "*"
+    "@fxbot/sdk": "*",
+    "ws": "8.22.0"
+  },
+  "devDependencies": {
+    "@types/ws": "8.18.2"
   }
 }

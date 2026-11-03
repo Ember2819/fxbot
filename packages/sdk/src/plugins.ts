@@ -5,7 +5,7 @@ import { dirname, join, resolve } from "node:path";
 import { pathToFileURL } from "node:url";
 import type { FxAgentHostTool, FxAgentTool } from "libfx";
 import postgres, { type Sql } from "postgres";
-import type { Dependent, Hook, HookEvents, PluginApi, PluginRoute, PluginTool } from "./plugin-api.ts";
+import type { Dependent, Hook, HookEvents, PluginApi, PluginRoute, PluginSocket, PluginSocketHandler, PluginTool } from "./plugin-api.ts";
 import type { RepoFiles } from "./archive.ts";
 import { createSecrets } from "./secrets.ts";
 import { parseSkill, type CarriedSkill, type Row } from "./skills.ts";
@@ -50,7 +50,18 @@ export type Manifest = {
 type Config = Manifest & { files?: SkillFile[]; servers?: string[] };
 type PackageRecord = PluginRecord<Config> & { kind: "package"; source: PackageSource };
 type Route = { method: string; path: string; parts: string[]; handler: PluginRoute };
-type Loaded = { hooks: Map<keyof HookEvents, Hook<keyof HookEvents>[]>; tools: PluginTool[]; routes: Route[]; sql?: Sql; cleanup?: () => unknown; controller: AbortController };
+type Socket = { path: string; parts: string[]; handler: PluginSocketHandler };
+// `open` holds its sockets that are open now, which close when it unloads.
+type Loaded = {
+  hooks: Map<keyof HookEvents, Hook<keyof HookEvents>[]>;
+  tools: PluginTool[];
+  routes: Route[];
+  sockets: Socket[];
+  open: Set<PluginSocket>;
+  sql?: Sql;
+  cleanup?: () => unknown;
+  controller: AbortController;
+};
 // `saved` holds the owner's settings, and `settings` those with the defaults, which the plugin reads.
 // `skills` are the ones it carries, read when it loads.
 type Package = { record: PackageRecord; loaded?: Loaded; error?: string; log: string[]; saved: Record<string, string>; settings: Record<string, string>; skills: Row[] };
@@ -430,7 +441,7 @@ export async function createPlugins(options: {
   // with its error on its row.
   async function load(plugin: Package) {
     const { record } = plugin;
-    const loaded: Loaded = { hooks: new Map(), tools: [], routes: [], controller: new AbortController() };
+    const loaded: Loaded = { hooks: new Map(), tools: [], routes: [], sockets: [], open: new Set(), controller: new AbortController() };
     const api: PluginApi = {
       name: record.name,
       on(event, handler) {
@@ -450,6 +461,10 @@ export async function createPlugins(options: {
         if (typeof method !== "string" || typeof path !== "string" || !path.startsWith("/") || typeof handler !== "function")
           throw new Error("A route needs a method, a path that starts with /, and a handler.");
         loaded.routes.push({ method: method.toUpperCase(), path, parts: path.split("/").filter(Boolean), handler });
+      },
+      socket(path, handler) {
+        if (typeof path !== "string" || !path.startsWith("/") || typeof handler !== "function") throw new Error("A socket needs a path that starts with / and a handler.");
+        loaded.sockets.push({ path, parts: path.split("/").filter(Boolean), handler });
       },
       sql: undefined as never,
       settings: plugin.settings,
@@ -501,6 +516,7 @@ export async function createPlugins(options: {
     plugin.loaded = undefined;
     plugin.skills = [];
     loaded.controller.abort();
+    for (const socket of loaded.open) socket.close(1001, "The plugin stopped.");
     await within(() => loaded.cleanup?.(), limit, "Its cleanup").catch((error) => report(plugin, "Cleanup", error));
     await loaded.sql?.end({ timeout: 5 });
   }
@@ -600,6 +616,7 @@ export async function createPlugins(options: {
         tools: (loaded?.tools ?? []).map((t) => `${record.name}_${t.name}`),
         hooks: [...(loaded?.hooks.keys() ?? [])],
         routes: (loaded?.routes ?? []).map((r) => `${r.method} ${r.path}`),
+        sockets: (loaded?.sockets ?? []).map((s) => s.path),
         page: Boolean(record.config.page),
       },
       ...(plugin.error ? { error: plugin.error } : {}),
@@ -672,6 +689,27 @@ export async function createPlugins(options: {
         }
       }
       return Response.json({ error: "not found" }, { status: 404 });
+    },
+    // The plugin's socket for `/api/plugins/<name>/<path>`: a function that hands it an open WebSocket, or a 404 before
+    // anything is upgraded. A handler that throws closes the socket, and the error goes in the plugin's log.
+    socket(name: string, path: string) {
+      const plugin = [...plugins.values()].find((p) => p.record.name === name && p.loaded && p.record.enabled) ?? fail(404, `No plugin named ${name} is running.`);
+      const segments = path.split("/").filter(Boolean);
+      for (const target of plugin.loaded!.sockets) {
+        const params = match(target.parts, segments);
+        if (!params) continue;
+        return (socket: PluginSocket, request: Request) => {
+          const loaded = plugin.loaded;
+          if (!loaded) return socket.close(1001, "The plugin stopped.");
+          loaded.open.add(socket);
+          const closed = socket.onclose;
+          socket.onclose = () => (loaded.open.delete(socket), closed?.());
+          Promise.resolve()
+            .then(() => target.handler(socket, request, params))
+            .catch((error) => (report(plugin, `The socket ${target.path}`, error), socket.close(1011, "The plugin failed.")));
+        };
+      }
+      return fail(404, "not found");
     },
     // The owner's settings: a value for each one named, or "" to go back to its default. Secrets go in and never out.
     async configure(id: string, input: Record<string, unknown>) {

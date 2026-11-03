@@ -591,6 +591,7 @@ export async function createFxbot(options: FxbotOptions) {
       pages: () => packages.pages(),
       file: (name: string, path: string) => packages.file(name, path),
       handle: (name: string, request: Request, path: string) => packages.handle(name, request, path),
+      socket: (name: string, path: string) => packages.socket(name, path),
     },
 
     // OAuth sign-in to an MCP server: start with the page's origin, then poll. The browser comes back to that origin's

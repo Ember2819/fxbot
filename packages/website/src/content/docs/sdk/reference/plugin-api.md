@@ -54,6 +54,7 @@ export default async function setup(fx: PluginApi) {
 | `fx.on(event, handler)` | A hook. See [Hooks](#hooks). |
 | `fx.tool(tool)` | A tool for bots. See [Tools](#tools). |
 | `fx.route(method, path, handler)` | A route. See [Routes](#routes). |
+| `fx.socket(path, handler)` | A WebSocket. See [Sockets](#sockets). |
 | `fx.sql` | A [postgres](https://github.com/porsager/postgres) client in the plugin's own schema, with two connections at most |
 | `fx.settings` | Its settings, with defaults, and secrets opened. The same object, kept up to date. |
 | `fx.bots.list()`, `fx.bots.get(id)` | The bots, as [the fxbot object](/sdk/reference/server-api/) lists them |
@@ -120,6 +121,20 @@ fx.route("GET", "/rooms/:id", async (request, { id }) => Response.json({ id }));
 - fxbot's server checks first: a write from another site's page gets 403, and a body over 12 MiB 413.
 - A handler that throws answers 500, `{ "error": "<message>" }`, and the error goes in the log.
 - `/api/plugins/<name>/files/` serves its page code and CSS, and no route there is reached.
+
+## Sockets
+
+```ts
+fx.socket("/desktop/:bot", (socket, request, { bot }) => {
+  socket.onmessage = (data) => socket.send(data);
+  socket.onclose = () => {};
+});
+```
+
+- A socket is a WebSocket at `/api/plugins/<name>/<path>`, for a two-way stream that a route's request and response can't carry. The page opens one with `ws:` or `wss:`, matching its own address.
+- `socket` has `send(data)`, `close(code?, reason?)`, `bufferedAmount`, and two handlers to set: `onmessage`, which gets a binary message as a `Buffer` and text as a string, and `onclose`.
+- fxbot's server checks first: a socket opened from another site's page gets 403, since a WebSocket opens with a GET, which the write check doesn't cover. A path no socket has gets 404.
+- A handler that throws closes its socket with code 1011, and the error goes in the log. Turning the plugin off, removing it, or stopping fxbot closes its open sockets.
 
 ## Data
 
