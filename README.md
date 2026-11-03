@@ -40,6 +40,7 @@ In order of execution priority. Checked phases are built. Each is marked **core*
 - [x] [Plugins](docs/_completed/phases/plugins.md) (core: the plugin API): plugins that change the app, with hooks, tools, data, and screens of their own; fxbot's first two, [chat rooms](plugins/chat-rooms/README.md) and [herdr](plugins/herdr/README.md), are in `plugins/`
 - [x] [One kind of plugin](docs/_completed/phases/one-kind-of-plugin.md) (core seam): one name and one list. A plugin carries any mix of code, MCP servers, and skills, and only the ones fxbot vets show until a switch in Settings
 - [x] [Agent computer](docs/_completed/phases/computer.md) (plugin, one others build on): a Linux computer for each bot, in the machine's own podman or docker, run rootless; the [computer](plugins/computer/README.md) and the [browser](plugins/browser/README.md), which needs it, are in `plugins/`
+- [ ] [Computer v2](docs/phases/computer-v2.md) (plugin, with one core hook): a whole computer in one plugin: a desktop the owner watches and takes over, a shared terminal, a browser on the desktop, and the tools to drive them by pixels, accessibility trees, and text
 - [ ] [Permissions](docs/phases/permissions.md) (plugin, on a core hook): ask, auto, and yolo modes for tool calls
 - [ ] [Cross-bot messaging](docs/phases/cross-bot-messaging.md) (plugin): bots message each other
 - [ ] [Routines](docs/phases/routines.md) (plugin): saved tasks a bot runs on a schedule
