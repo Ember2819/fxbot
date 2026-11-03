@@ -105,6 +105,20 @@ export function App() {
   };
 
   const [, top, id, sub] = path.split("/");
+  // The app paints once its first screen is whole: the bots, and on a chat its messages. Until then it's laid out but
+  // hidden, so nothing flashes in as it loads. After that, a chat hides only its own messages while it loads.
+  const [chatShown, setChatShown] = useState(false);
+  const onChat = top === "profiles" && Boolean(id) && sub === undefined;
+  const whole = (profiles !== null || offline) && (!onChat || chatShown);
+  const [shown, setShown] = useState(false);
+  useEffect(() => {
+    if (whole) setShown(true);
+  }, [whole]);
+  // A screen that never says it's whole still shows.
+  useEffect(() => {
+    const late = setTimeout(() => setShown(true), 3000);
+    return () => clearTimeout(late);
+  }, []);
   let screen: ReactNode;
   if (path === "/") screen = <Home profiles={profiles} offline={offline} onNew={() => setCreating(true)} />;
   else if (path === "/settings") screen = <SettingsForm />;
@@ -112,14 +126,14 @@ export function App() {
   // /addons is where it was before 0.4.0.
   else if (path === "/plugins" || path === "/addons") screen = <PluginsPage profiles={profiles} />;
   else if (top === "profiles" && id && sub === "edit") screen = <ProfileForm key={id} id={id} onSaved={refresh} />;
-  else if (top === "profiles" && id && sub === undefined) screen = <Chat key={id} id={id} profiles={profiles} onChange={refresh} />;
+  else if (top === "profiles" && id && sub === undefined) screen = <Chat key={id} id={id} profiles={profiles} onChange={refresh} onShown={() => setChatShown(true)} />;
   else if (pluginScreen) screen = pluginScreen;
   else screen = <Header title="Not found" />;
 
   return (
     <BotsProvider value={profiles}>
       <TooltipProvider>
-        <SidebarProvider>
+        <SidebarProvider className={shown || whole ? undefined : hidden}>
           <BotSidebar profiles={profiles} offline={offline} active={id} onNew={() => setCreating(true)} onChange={refresh} />
           {/* An installed app draws under the notch and the home indicator (viewport-fit=cover), so each edge pads by its
               inset. The left one belongs to the sidebar while it is open beside the page. */}
@@ -526,10 +540,40 @@ function SettingsForm() {
 }
 
 const newMessageId = () => Date.now().toString(36) + Math.random().toString(36).slice(2);
+// Laid out but not painted, and not clickable. Not `invisible`: buttons transition every property, and a transition
+// from hidden shows them a frame after the rest.
+const hidden = "pointer-events-none opacity-0";
 // How many turns a chat shows when it opens, and adds each time it's scrolled to the top.
 const turnsAtOnce = 20;
 
-function Chat({ id, profiles, onChange }: { id: string; profiles: Profile[] | null; onChange: () => void }) {
+// True once `ready` and the element's content has held its height for 100 ms with every image loaded, or 1.5 s after
+// `ready`, whichever is first. Content can grow after its first render, as lazy code and images load.
+function useSettled(element: { current: HTMLElement | null }, ready: boolean) {
+  const [settled, setSettled] = useState(false);
+  useEffect(() => {
+    if (!ready || settled) return;
+    const start = performance.now();
+    let frame = 0;
+    let height = -1;
+    let since = start;
+    const check = (now: number) => {
+      const view = element.current;
+      const size = view?.scrollHeight ?? 0;
+      const loaded = !view || [...view.querySelectorAll("img")].every((img) => img.complete);
+      if (size !== height || !loaded) {
+        height = size;
+        since = now;
+      }
+      if (now - since >= 100 || now - start >= 1500) setSettled(true);
+      else frame = requestAnimationFrame(check);
+    };
+    frame = requestAnimationFrame(check);
+    return () => cancelAnimationFrame(frame);
+  }, [ready, settled]);
+  return settled;
+}
+
+function Chat({ id, profiles, onChange, onShown }: { id: string; profiles: Profile[] | null; onChange: () => void; onShown: () => void }) {
   const [profile, setProfile] = useState<Profile | null>(null);
   const [error, setError] = useState("");
   // A draft left before a new build's reload comes back (pwa.ts).
@@ -566,8 +610,9 @@ function Chat({ id, profiles, onChange }: { id: string; profiles: Profile[] | nu
   // their summary and its chat_history search.
   const [earlier, setEarlier] = useState<Turn[]>([]);
   const switched = Boolean(profile?.handoff);
+  const [earlierRead, setEarlierRead] = useState(false);
   useEffect(() => {
-    if (switched) client.profiles.earlier(id).then(setEarlier, () => {});
+    if (switched) client.profiles.earlier(id).then(setEarlier, () => {}).finally(() => setEarlierRead(true));
   }, [id, switched, profile?.sessionId]);
   // A bot with no provider cannot send: it points to Settings instead of offering the composer.
   const stuck = !profile || !profile.provider;
@@ -647,6 +692,13 @@ function Chat({ id, profiles, onChange }: { id: string; profiles: Profile[] | nu
   }
 
   const offline = error || (!connected && unreachable);
+  // The chat paints once it's whole: its lines, the turns from before a provider switch, and the code, diagrams, and
+  // images that finish after the first render. Until then it's hidden. A chat that can't load shows what there is, with the problem.
+  const whole = Boolean(error) || (profile !== null && (!profile.sessionId || ready || !connected) && (!profile.handoff || earlierRead));
+  const settled = useSettled(viewport, whole);
+  useEffect(() => {
+    if (settled) onShown();
+  }, [settled]); // Once; onShown is a new function on every render.
   // A chat whose lines are still arriving isn't empty: it shows its messages' place, without the greeting.
   const empty = turns.length === 0 && earlier.length === 0 && (ready || !profile?.sessionId);
   return (
@@ -671,7 +723,7 @@ function Chat({ id, profiles, onChange }: { id: string; profiles: Profile[] | nu
         <MessageScrollerProvider autoScroll>
           {/* The composer keeps its place in the tree, so it keeps focus when the first turn arrives. */}
           <div
-            className={`flex min-h-0 flex-1 flex-col ${empty ? "justify-center gap-6 pb-[15dvh]" : ""}`}
+            className={`flex min-h-0 flex-1 flex-col ${empty ? "justify-center gap-6 pb-[15dvh]" : ""} ${settled ? "" : hidden}`}
             onDragOver={(e) => e.dataTransfer.types.includes("Files") && e.preventDefault()}
             onDrop={(e) => {
               if (!e.dataTransfer.files.length || stuck) return;
