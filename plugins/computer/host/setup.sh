@@ -187,14 +187,22 @@ cat >"$rules" <<EOF
 table inet $table
 delete table inet $table
 table inet $table {
+  # Only the user's own packets: a reset or an ICMP error the kernel sends has no socket, and passes.
   chain output {
     type filter hook output priority 0; policy accept;
-    meta skuid != $uid accept
+    meta skuid $uid jump computers
+  }
+  chain computers {
     $accept4
     $accept6
-    fib daddr type local reject with icmpx admin-prohibited
-    ip daddr { 0.0.0.0/8, 10.0.0.0/8, 100.64.0.0/10, 127.0.0.0/8, 169.254.0.0/16, 172.16.0.0/12, 192.168.0.0/16, 224.0.0.0/3 } reject with icmpx admin-prohibited
-    ip6 daddr { ::1, fc00::/7, fe80::/10, ff00::/8 } reject with icmpx admin-prohibited
+    fib daddr type local jump refuse
+    ip daddr { 0.0.0.0/8, 10.0.0.0/8, 100.64.0.0/10, 127.0.0.0/8, 169.254.0.0/16, 172.16.0.0/12, 192.168.0.0/16, 224.0.0.0/3 } jump refuse
+    ip6 daddr { ::1, fc00::/7, fe80::/10, ff00::/8 } jump refuse
+  }
+  # A refused connection fails at once, instead of waiting out its timeout.
+  chain refuse {
+    meta l4proto tcp reject with tcp reset
+    reject with icmpx admin-prohibited
   }
 }
 EOF
