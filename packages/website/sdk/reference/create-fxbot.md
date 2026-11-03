@@ -73,7 +73,7 @@ In order:
 2. Connects to Postgres and runs the migrations it hasn't run. See [Migrations](#migrations). If they fail, it closes the connection and throws.
 3. Starts the release check, when `releasesUrl` is set: at once, then once a day.
 4. Starts the registry sync, unless `syncRegistry` is `false`: fxbot's two lists and the mirror of `registryUrl`. It runs again every hour.
-5. Loads the MCP servers and skills in Add-ons. The skills' repositories are checked for changes a minute after start, then hourly.
+5. Loads the MCP servers and skills in Plugins. The skills' repositories are checked for changes a minute after start, then hourly.
 6. Starts one libfx agent per provider, each with every bot tool. A provider whose agent doesn't start, such as one whose secret doesn't open, lists with an `error`. The others run.
 7. Starts filling in the vectors that memories and messages lack, in the background.
 8. Connects the MCP servers, in the background.
@@ -95,8 +95,8 @@ A call that fails on purpose throws an `Error` with a `status`, so a server can 
 | `status` | When |
 | --- | --- |
 | 400 | Bad input, or a request fxbot refuses, such as a message to a bot with no provider |
-| 404 | A missing bot, or a missing provider, memory, library item, add-on, or sign-in |
-| 409 | An add-on changed since its preview, or a skill is already added |
+| 404 | A missing bot, or a missing provider, memory, library item, plugin, or sign-in |
+| 409 | A plugin changed since its preview, or a skill is already added |
 | 502 | A service fxbot asked failed: a device code sign-in, a model list, a registry, an MCP server, or the summary for a provider switch |
 
 An `Error` without a `status` is unexpected. fxbot's server answers it with 500.

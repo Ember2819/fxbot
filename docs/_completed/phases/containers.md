@@ -6,7 +6,7 @@ Status: built on 2026-11-02, on `release/0.3.0`. The human checks at the end of 
 
 ## 0. Core or add-on
 
-**Core: what fxbot needs to run** ([Core or add-on](../../../CONVENTIONS.md#core-or-add-on)). It replaces the install that [releases](releases.md) built, where `setup.sh` installed Node and the distro's Postgres on the machine, and an update built the next release in place. Distros ship different Postgres versions, and some have no pgvector, which memories needs. In containers, every machine runs the same Node, the same Postgres, and pgvector.
+**Core: what fxbot needs to run** ([Core or add-on](../../../CONVENTIONS.md#core-or-plugin)). It replaces the install that [releases](releases.md) built, where `setup.sh` installed Node and the distro's Postgres on the machine, and an update built the next release in place. Distros ship different Postgres versions, and some have no pgvector, which memories needs. In containers, every machine runs the same Node, the same Postgres, and pgvector.
 
 ## 1. Research
 

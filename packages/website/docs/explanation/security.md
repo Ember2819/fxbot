@@ -28,21 +28,25 @@ The page's code carries no credentials, and its build reads no `.env`.
 
 The library serves what chats hold as data, never as a page. Images are checked from their bytes. Documents are served as plain text, with `nosniff` and a sandbox that runs nothing, even opened in a tab of their own. HTML and SVG are never served as themselves.
 
+## Vetted plugins
+
+By default, fxbot finds and adds only the plugins on its own lists, which the project vets, tagged **fxbot**. Until you turn on **Show unvetted plugins** in Settings, fxbot asks none of the public registries, and its server refuses to look at or add anything else: an MCP server by its address, a public registry's entry, a skill from skills.sh, or a repository. Plugins you already added keep working either way. Vetting is the project's choice of what to list, not a review of every version that follows.
+
 ## MCP servers
 
 A remote MCP server's tools are code fxbot doesn't control, and a call may not be safe to run twice. Until fxbot can ask before a tool call, bots get only a server's read-only tools, until you allow others by name.
 
 Adding a server makes fxbot's server fetch its address. So fxbot takes HTTPS only, and refuses local and private addresses, the tailnet's included, unless you allow one for a server you run. A server's key, headers, and OAuth client are sealed like a provider's.
 
-A registry entry says who published it, checked by the registry, but not that its server is safe or theirs. Its page shows the server's host, in red when it isn't on the publisher's domain, and nothing is saved before **Add**. If the entry changes between the page and **Add**, fxbot refuses and shows the page again. fxbot fetches GitHub's MCP registry every hour, its own list of servers when an address for it is set, and the official registry only when you tick **Search everything**, which sends it your search words. It loads no icons from them.
+A registry entry says who published it, checked by the registry, but not that its server is safe or theirs. Its page shows the server's host, in red when it isn't on the publisher's domain, and nothing is saved before **Add**. If the entry changes between the page and **Add**, fxbot refuses and shows the page again. fxbot fetches its own lists every hour, GitHub's MCP registry every hour while unvetted plugins are on or a server from it is installed, and the official registry only when you tick **Search everything**, which sends it your search words. It loads no icons from them.
 
 ## Skills
 
-A skill is someone else's instructions, which a bot follows like its own. fxbot shows a skill's `SKILL.md` before you add it, and keeps it pinned to the commit of its repository that page came from. When its files change there, it waits for you to update it. Nothing in a skill runs: fxbot keeps only its text files, and bots read its scripts as text. Each skills search on the Skills tab sends its words to skills.sh, and adding a skill fetches its repository from GitHub.
+A skill is someone else's instructions, which a bot follows like its own. fxbot shows a skill's `SKILL.md` before you add it, and keeps it pinned to the commit of its repository that page came from. When its files change there, it waits for you to update it. Nothing in a skill runs: fxbot keeps only its text files, and bots read its scripts as text. With unvetted plugins on, each search sends its words to skills.sh, and adding a skill fetches its repository from GitHub.
 
-## Plugins
+## Plugins with code
 
-A plugin is code that runs inside fxbot, with everything fxbot can reach: its database, the keys it opens, every bot's chats, and in a release, whatever fxbot's container reaches. Adding one trusts its author as much as fxbot's own. So fxbot shows a plugin's code before you add it, keeps it pinned to the commit of its repository that page came from, and waits for you when its files change there, showing what changed. Only the page code and CSS that its `plugin.json` names are served to the page. A plugin's secret settings are sealed like a provider's key, and the page never gets them back.
+A plugin with code runs inside fxbot, with everything fxbot can reach: its database, the keys it opens, every bot's chats, and in a release, whatever fxbot's container reaches. Adding one trusts its author as much as fxbot's own. So fxbot shows its code before you add it, keeps it pinned to the commit of its repository that page came from, and waits for you when its files change there, showing what changed. Only the page code and CSS that its `plugin.json` names are served to the page. Its secret settings are sealed like a provider's key, and the page never gets them back.
 
 ## What it doesn't cover
 

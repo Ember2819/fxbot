@@ -4,9 +4,9 @@ Each bot gets a Linux computer of its own to use during its turns: a shell, file
 
 Status: planned, not built. Research and plan only, written on 2026-11-02. It builds on the [plugin API](../_completed/phases/plugins.md), and on the [containers](../_completed/phases/containers.md) install for the app's side of the engine. A checkout runs it as well. The issue asked for computers before plugins. Since then the stub made the computer a plugin, so this phase comes after plugins.
 
-## 0. Core or add-on
+## 0. Core or plugin
 
-**Add-on: a plugin that other plugins build on** ([Core or add-on](../../CONVENTIONS.md#core-or-add-on)). Many bots need no computer: chat, the library, MCP servers, and skills work without one. The core's own tools reach only its own data. A shell, a machine's files, and a browser are add-ons. A bot gets a computer only when the owner turns the plugin on for it, and an owner who never adds the plugin runs no engine, no timer, and no image.
+**Plugin: a plugin that other plugins build on** ([Core or plugin](../../CONVENTIONS.md#core-or-plugin)). Many bots need no computer: chat, the library, MCP servers, and skills work without one. The core's own tools reach only its own data. A shell, a machine's files, and a browser are plugins. A bot gets a computer only when the owner turns the plugin on for it, and an owner who never adds the plugin runs no engine, no timer, and no image.
 
 The core never names the computer. The plugin API gains the smallest pieces the computer and its first dependent need:
 - **`needs` in a plugin's manifest:** the plugins a plugin needs, each with a block of settings for that plugin. The browser plugin uses it to give the computer its setup steps.
@@ -38,7 +38,7 @@ Checked on 2026-11-02 against each project's source and docs, and with prototype
   - Each runs in its own process group, killed on timeout or Stop. Timeouts are 120 s by default and 600 s at most.
   - Output keeps the last 64 KB of each stream (`shell.ts:26-37, 250-274`).
 - **Network.** It moved Postgres to its own network because "the gateway on :5432 answered" from inside a computer (compose `1-35`). An egress proxy in the computer filters HTTP, which "a process that… opens a raw socket" gets around (`egress.ts:180-181`).
-- **No stdio MCP.** It has no way for add-ons to install programs either.
+- **No stdio MCP.** It has no way for plugins to install programs either.
 - **OpenDuet** vendors an older copy that keeps one computer per bot. **OpenDots** runs OpenBot's image with one computer per Dot, and gives each computer a token derived from the master token.
 
 **CopilotKit openmuse** (`a4944f4`):
@@ -51,7 +51,7 @@ Checked on 2026-11-02 against each project's source and docs, and with prototype
 - One sandbox per session, with tools `bash {command}`, `read_file`, and `write_file`.
 - `bash` keeps the last 50 KiB of output. After 30 s it returns `running`, a pid, and a job folder that the model reads with `tail` and stops with `kill` (`docs/concepts/built-in-tools.md:27-55`).
 - Its Docker provider runs `docker run -d … sleep` and then `docker exec`, through the host's docker command.
-- **How add-ons install programs.** An extension's install step runs once per template (a Docker image or a snapshot). A key forces a rebuild when the add-on's version changes. agent-browser's eve extension runs apt, `npm i -g agent-browser`, and `agent-browser install` that way (`packages/@agent-browser/eve/extension/lib/sandbox.ts:121-160`).
+- **How plugins install programs.** An extension's install step runs once per template (a Docker image or a snapshot). A key forces a rebuild when the plugin's version changes. agent-browser's eve extension runs apt, `npm i -g agent-browser`, and `agent-browser install` that way (`packages/@agent-browser/eve/extension/lib/sandbox.ts:121-160`).
 - "The file tools run in the app runtime and proxy into the sandbox", which holds "no secrets".
 
 **fx and libfx 0.0.16** (`0d1b727`, the installed package):
@@ -185,7 +185,7 @@ plugins/browser/
 ### The plugin API pieces (`packages/sdk/src/plugins.ts`)
 
 - **`needs`.** A manifest's `extensions.<namespace>.needs` maps plugin names to a JSON block for each, at most 16 KiB.
-  - The add-on page shows "Needs computer". Add is off until that plugin is added.
+  - The plugin page shows "Needs computer". Add is off until that plugin is added.
   - Removing a plugin that others need is refused, naming them.
   - Plugins load after the ones they need.
 - **`fx.dependents()`** returns `{ name, version, needs }` for each added plugin that needs this one, where `needs` is its block for this plugin. `fx.on("dependents", …)` hears adds, updates, and removals.
@@ -193,7 +193,7 @@ plugins/browser/
 - **`fx.skills.files(name)`** returns a skill's files as `{ path, text }`, from the rows the skill tool reads.
 - **A plugin with no code parts.** A plugin with neither `server` nor `page`, such as the browser, is valid.
 
-About 60 lines in the SDK, plus the "Needs" line on the add-on page in `packages/ui`. The server gains nothing: the plugin's routes go through the plugin API.
+About 60 lines in the SDK, plus the "Needs" line on the plugin page in `packages/ui`. The server gains nothing: the plugin's routes go through the plugin API.
 
 ### The engine (`host/setup.sh`)
 
@@ -237,7 +237,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends chromium fonts-
 
 - **Each dependent's steps** follow in name order, each step a `RUN`, with a comment naming the plugin and its version. Steps run as root, with the network.
 - **The base** is 230 MB, measured. Node isn't in it: Debian's is 20.x, and a plugin that needs Node installs the one it wants.
-- **When it builds.** On a bot's first call, if the image for the current hash is missing. Again when `dependents` changes, in the background. Build lines go to the add-on's log. A failed build keeps the old image, and the error shows on the add-on's row.
+- **When it builds.** On a bot's first call, if the image for the current hash is missing. Again when `dependents` changes, in the background. Build lines go to the plugin's log. A failed build keeps the old image, and the error shows on the plugin's row.
 - **Old images** are removed once no computer uses them.
 
 `fxbot-run <id> <seconds> <command>` is 12 lines of bash. It runs the command with `setsid timeout -s KILL <seconds> bash -c`, writes the output to `/tmp/fxbot/<id>.log` and the process group to `/tmp/fxbot/<id>.pid`, and waits. Then it prints the whole output if it is 64 KiB or less. Otherwise it prints the first 4 KiB, a line saying how much was cut and where the rest is, and the last 60 KiB. It exits with the command's code.
@@ -379,7 +379,7 @@ Checks use disposable Postgres, the mock model, Playwright, and fxbot's list ser
 - **Without it:** the checks run against an engine started by hand for an existing unprivileged user, as this research did, and the script becomes a human check.
 
 **M1. The plugin API pieces**
-- [ ] A scratch plugin that needs another: its add-on page says "Needs <name>", and Add is off until that one is added. Removing the needed plugin is refused, naming the dependent.
+- [ ] A scratch plugin that needs another: its plugin page says "Needs <name>", and Add is off until that one is added. Removing the needed plugin is refused, naming the dependent.
 - [ ] `fx.dependents()` returns the dependent's block, and `fx.on("dependents")` fires when it is added, updated, and removed.
 - [ ] `fx.library.read` refuses an item that isn't tagged for the bot. `fx.library.save` puts an image in the bot's library, tagged for the chat.
 - [ ] `fx.skills.files` returns a skill's files. A plugin with no code parts adds, and its skill joins the catalog.

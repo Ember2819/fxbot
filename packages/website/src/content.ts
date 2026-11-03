@@ -46,7 +46,7 @@ export const groups: Group[] = [
     title: "Explanation",
     about: "How fxbot works, and why it works that way.",
     pages: [
-      { slug: "explanation/core-and-add-ons", label: "Core and add-ons" },
+      { slug: "explanation/core-and-plugins", label: "Core and plugins" },
       { slug: "explanation/security", label: "Security model" },
       { slug: "explanation/releases", label: "Releases and updates" },
       { slug: "explanation/architecture", label: "Architecture" },

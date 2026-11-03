@@ -23,7 +23,7 @@ It imports nothing from `@fxbot/sdk`'s main entry, so a browser bundle can take 
 
 - Each call asks `<baseUrl>/api/...` with `fetch`, sends JSON, and resolves to the JSON answer.
 - A call that fails throws an `Error` with the server's message. When the server can't be reached, or answers with something that isn't JSON, such as a proxy's page, the message is `unreachable`: "Cannot reach the server." The `Error` carries no status.
-- The client holds no keys or tokens. A key goes to the server once, in `providers.add` or `providers.update`, and comes back only as `hasKey`. Header values and OAuth clients go up once, in `addons.setSecrets`.
+- The client holds no keys or tokens. A key goes to the server once, in `providers.add` or `providers.update`, and comes back only as `hasKey`. Header values and OAuth clients go up once, in `plugins.setSecrets`.
 - The server refuses a write with 403 when the request's `Origin` header names another host than its `Host`. A browser sends `Origin`, so a page on another origin gets 403 for every write. Node's `fetch` sends no `Origin`, so a script's writes pass. The server sends no CORS headers.
 
 ## Calls
@@ -101,30 +101,30 @@ A device code sign-in: show `userCode` and `verificationUrl`, then call `signIns
 
 A file itself is read through its item's `url`, `/api/library/<id>/file`.
 
-### Add-ons and OAuth
+### Plugins and OAuth
 
 | Call | Route | Returns |
 | --- | --- | --- |
-| `addons.list()` | `GET /api/addons` | `Addon[]` |
-| `addons.search(q, { kind?, everything? })` | `GET /api/addons/search?q=&kind=&everything=1` | `AddonSearch` |
-| `addons.searchSkills(q)` | `GET /api/addons/search?q=&kind=skill` | `SkillSearch` |
-| `addons.preview(ref)` | `POST /api/addons/preview` | `SkillPreview` for a skill ref, else `AddonPreview` |
-| `addons.add(ref, hash)` | `POST /api/addons` | `Addon` |
-| `addons.update(id, hash)` | `POST /api/addons/<id>/update` | `Addon` |
-| `addons.change(id, fields)` | `PATCH /api/addons/<id>` | `Addon` |
-| `addons.remove(id)` | `DELETE /api/addons/<id>` | `{ ok: true }` |
-| `addons.setSecrets(id, secrets)` | `PUT /api/addons/<id>/secrets` | `Addon` |
-| `addons.forBot(profileId, addonId, enabled)` | `PUT /api/profiles/<profileId>/addons/<addonId>` | `Addon` |
-| `addons.readSkill(id, file?)` | `GET /api/addons/<id>/skills?file=` | `string` |
-| `addons.signIn(id)` | `POST /api/addons/<id>/sign-in` | `OAuthAttempt` |
-| `addons.searchPlugins(q)` | `GET /api/addons/search?q=&kind=plugin` | `PluginSearch` |
-| `addons.configure(id, settings)` | `PUT /api/addons/<id>/settings` | `PluginAddon` |
-| `addons.log(id)` | `GET /api/addons/<id>/log` | `string[]` |
-| `plugins.list()` | `GET /api/plugins` | `PluginPage[]` |
+| `plugins.list()` | `GET /api/plugins` | `Plugin[]` |
+| `plugins.search(q, { kind?, everything? })` | `GET /api/plugins/search?q=&kind=&everything=1` | `McpSearch` |
+| `plugins.searchSkills(q)` | `GET /api/plugins/search?q=&kind=skill` | `SkillSearch` |
+| `plugins.preview(ref)` | `POST /api/plugins/preview` | `SkillPreview` for a skill ref, `PackagePreview` for a repo ref, else `McpPreview` |
+| `plugins.add(ref, hash)` | `POST /api/plugins` | `Plugin` |
+| `plugins.update(id, hash)` | `POST /api/plugins/<id>/update` | `Plugin` |
+| `plugins.change(id, fields)` | `PATCH /api/plugins/<id>` | `Plugin` |
+| `plugins.remove(id)` | `DELETE /api/plugins/<id>` | `{ ok: true }` |
+| `plugins.setSecrets(id, secrets)` | `PUT /api/plugins/<id>/secrets` | `Plugin` |
+| `plugins.forBot(profileId, pluginId, enabled)` | `PUT /api/profiles/<profileId>/plugins/<pluginId>` | `Plugin` |
+| `plugins.readSkill(id, file?)` | `GET /api/plugins/<id>/skills?file=` | `string` |
+| `plugins.signIn(id)` | `POST /api/plugins/<id>/sign-in` | `OAuthAttempt` |
+| `plugins.searchPackages(q)` | `GET /api/plugins/search?q=&kind=package` | `PackageSearch` |
+| `plugins.configure(id, settings)` | `PUT /api/plugins/<id>/settings` | `PackagePlugin` |
+| `plugins.log(id)` | `GET /api/plugins/<id>/log` | `string[]` |
+| `plugins.pages()` | `GET /api/plugins/pages` | `PluginPage[]` |
 | `oauth.get(attemptId)` | `GET /api/oauth/attempts/<attemptId>` | `OAuthStatus` |
 | `oauth.paste(attemptId, address)` | `POST /api/oauth/attempts/<attemptId>/paste` | `OAuthStatus` |
 
-After `addons.signIn`, open the attempt's `url`, then call `oauth.get` until the status is `done` or `failed`. The browser's `Origin` decides where the sign-in comes back to.
+After `plugins.signIn`, open the attempt's `url`, then call `oauth.get` until the status is `done` or `failed`. The browser's `Origin` decides where the sign-in comes back to.
 
 ## stream
 

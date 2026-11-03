@@ -1,6 +1,8 @@
 # Give bots tools
 
-Every bot comes with tools to search its own chats, keep memories, and use the library. Give bots more with add-ons, through `fxbot.addons`: remote MCP servers, whose tools they call, and skills, which they read.
+Every bot comes with tools to search its own chats, keep memories, and use the library. Give bots more with plugins, through `fxbot.plugins`: remote MCP servers, whose tools they call, and skills, which they read. A package can carry both, with code of its own: see [Write a plugin](/sdk/how-to/write-a-plugin/).
+
+Until Settings' `unvetted` is true, `preview` and `add` take only what fxbot's own lists name, and fail with 400 for an address, a public registry's entry, or a skills.sh skill. Turn it on first: `await fxbot.settings.update({ unvetted: true })`.
 
 ## The tools every bot has
 
@@ -18,10 +20,10 @@ Each tool finds its bot from the chat it runs in, never from what the model asks
 1. Look at the server first. `preview` connects without credentials, and answers with its name, how it signs in (`none`, `headers`, or `oauth`), its tools when it lists them without a sign-in, and a `hash`:
 
    ```ts
-   import type { AddonPreview } from "@fxbot/sdk";
+   import type { McpPreview } from "@fxbot/sdk";
 
    const ref = { url: "https://mcp.example.com/mcp" };
-   const page = (await fxbot.addons.preview(ref)) as AddonPreview;
+   const page = (await fxbot.plugins.preview(ref)) as McpPreview;
    console.log(page.name, page.auth, page.tools?.map((t) => t.name));
    ```
 
@@ -30,13 +32,13 @@ Each tool finds its bot from the chat it runs in, never from what the model asks
 2. Add it with that hash. If the server changed since the preview, `add` fails with status 409: look at it again.
 
    ```ts
-   const server = await fxbot.addons.add(ref, page.hash);
+   const server = await fxbot.plugins.add(ref, page.hash);
    ```
 
 3. Give it what it needs to connect. For a key, set the header's value:
 
    ```ts
-   await fxbot.addons.setSecrets(server.id, { headers: { Authorization: `Bearer ${key}` } });
+   await fxbot.plugins.setSecrets(server.id, { headers: { Authorization: `Bearer ${key}` } });
    ```
 
    Values go in once and are sealed. A listed server says only `signedIn: true`. For OAuth, see [Sign in with OAuth](#sign-in-with-oauth).
@@ -44,16 +46,16 @@ Each tool finds its bot from the chat it runs in, never from what the model asks
 4. Allow the tools bots may call. At first, only the server's read-only tools are allowed. Name every tool to allow, by the server's own name for it:
 
    ```ts
-   await fxbot.addons.change(server.id, { allowed: ["search_issues", "create_issue"] });
+   await fxbot.plugins.change(server.id, { allowed: ["search_issues", "create_issue"] });
    ```
 
-   `addons.list()` shows each server's `tools`, each with `readOnly`, its `allowed` list, and its `status`, such as `Connected`. A server that signs in lists its tools once it connects.
+   `plugins.list()` shows each server's `tools`, each with `readOnly`, its `allowed` list, and its `status`, such as `Connected`. A server that signs in lists its tools once it connects.
 
 5. To give the server to some bots only, choose them one by one:
 
    ```ts
-   await fxbot.addons.change(server.id, { bots: "each" });
-   await fxbot.addons.forBot(bot.id, server.id, true);
+   await fxbot.plugins.change(server.id, { bots: "each" });
+   await fxbot.plugins.forBot(bot.id, server.id, true);
    ```
 
 Bots see each tool under the server's name, such as `linear_create_issue`.
@@ -63,12 +65,12 @@ Bots see each tool under the server's name, such as `linear_create_issue`.
 Search fxbot's list of servers and its copy of GitHub's MCP registry, then add an entry by its name:
 
 ```ts
-import type { AddonSearch } from "@fxbot/sdk";
+import type { McpSearch } from "@fxbot/sdk";
 
-const { cards } = (await fxbot.addons.search("linear", {})) as AddonSearch;
+const { cards } = (await fxbot.plugins.search("linear", {})) as McpSearch;
 const ref = { registry: cards[0].name, from: cards[0].from };
-const page = (await fxbot.addons.preview(ref)) as AddonPreview;
-const server = await fxbot.addons.add(ref, page.hash);
+const page = (await fxbot.plugins.preview(ref)) as McpPreview;
+const server = await fxbot.plugins.add(ref, page.hash);
 ```
 
 Then carry on from step 3 above. A card's `from` is `fxbot` for fxbot's list, `github` for GitHub's registry, or `official`. `{ everything: true }` adds the official registry's results, for searches of 3 characters or more.
@@ -102,14 +104,14 @@ A server that registers no apps itself needs your own OAuth app: register one wi
    ```ts
    import type { SkillPreview, SkillSearch } from "@fxbot/sdk";
 
-   const { cards } = (await fxbot.addons.search("frontend", { kind: "skill" })) as SkillSearch;
+   const { cards } = (await fxbot.plugins.search("frontend", { kind: "skill" })) as SkillSearch;
    const ref = { skill: cards[0].id }; // <owner>/<repo>/<skillId>
    ```
 
 2. Look at it. `preview` reads the skill from its repository's current commit:
 
    ```ts
-   const page = (await fxbot.addons.preview(ref)) as SkillPreview;
+   const page = (await fxbot.plugins.preview(ref)) as SkillPreview;
    if (page.error) throw new Error(page.error);
    console.log(page.text); // its SKILL.md
    ```
@@ -117,7 +119,7 @@ A server that registers no apps itself needs your own OAuth app: register one wi
 3. Add it with the hash:
 
    ```ts
-   const skill = await fxbot.addons.add(ref, page.hash);
+   const skill = await fxbot.plugins.add(ref, page.hash);
    ```
 
 Each bot's instructions now list its skills, and the `skill` tool reads one when a task needs it. To be sure a bot uses a skill, name it in a message: `$name` anywhere, or `/name` at the start, sends the skill along with it:
@@ -128,22 +130,22 @@ await fxbot.send(bot.id, { text: "/frontend-design A page for a bakery", message
 
 `profiles.skills(bot.id)` lists the names a bot takes. Skills go to all bots, or to chosen ones with `change` and `forBot`, as servers do.
 
-## Keep add-ons up to date
+## Keep plugins up to date
 
-`addons.list()` marks an add-on whose source changed. Its `mark.kind` is `update`, with the newer `version`, or `deprecated`, or `removed`. Nothing changes by itself. To move one to its newer version, look at it again from the same source, then update it with that hash:
+`plugins.list()` marks a plugin whose source changed. Its `mark.kind` is `update`, with the newer `version`, or `deprecated`, or `removed`. Nothing changes by itself. To move one to its newer version, look at it again from the same source, then update it with that hash:
 
 ```ts
-for (const addon of await fxbot.addons.list()) {
+for (const addon of await fxbot.plugins.list()) {
   if (addon.mark?.kind !== "update") continue;
   const ref = addon.kind === "skill" ? { skill: addon.source.skill } : { registry: addon.source!.registry, from: addon.source!.from, allowLocal: addon.allowLocal };
-  const page = await fxbot.addons.preview(ref);
-  await fxbot.addons.update(addon.id, page.hash);
+  const page = await fxbot.plugins.preview(ref);
+  await fxbot.plugins.update(addon.id, page.hash);
 }
 ```
 
-The skills' repositories are checked every hour. `addons.check()` checks them now.
+The skills' repositories are checked every hour. `plugins.check()` checks them now.
 
-`change(id, { enabled: false })` turns an add-on off, and `remove(id)` removes it. A change to the tools bots have makes the agents again, after their running turns finish.
+`change(id, { enabled: false })` turns a plugin off, and `remove(id)` removes it. A change to the tools bots have makes the agents again, after their running turns finish.
 
 ## If it doesn't work
 
@@ -155,4 +157,4 @@ The skills' repositories are checked every hour. `addons.check()` checks them no
 - **The preview has `local: true`, and `add` refuses it.** That entry runs as a program on this machine, not as a remote server, and the SDK can't add it yet.
 - **The MCP search finds nothing.** The registry's copy hasn't synced: see [Add a server from a registry](#add-a-server-from-a-registry).
 
-fxbot's own page does the same in Add-ons: [Add an MCP server](/docs/how-to/add-an-mcp-server/) and [Add a skill](/docs/how-to/add-a-skill/).
+fxbot's own page does the same in Plugins: [Add an MCP server](/docs/how-to/add-an-mcp-server/) and [Add a skill](/docs/how-to/add-a-skill/).

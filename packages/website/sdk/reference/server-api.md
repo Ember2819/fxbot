@@ -1,6 +1,6 @@
 # The fxbot object
 
-What [`createFxbot`](/sdk/reference/create-fxbot/) resolves to: every call on bots, chats, providers, settings, the library, and add-ons.
+What [`createFxbot`](/sdk/reference/create-fxbot/) resolves to: every call on bots, chats, providers, settings, the library, and plugins.
 
 Every call returns a promise, unless its row says it is synchronous. A call that fails throws an `Error` with a `status`, as in [Errors](/sdk/reference/create-fxbot/#errors). A bot id is 12 hex characters: another shape fails with 400, and an unknown bot with 404.
 
@@ -115,6 +115,7 @@ A new Vercel account with one team gets that team.
 | Field | Type | Default | What it is |
 | --- | --- | --- | --- |
 | `defaultProvider` | `string` | `""` | The provider new bots start on, or `""` for none |
+| `unvetted` | `boolean` | `false` | Whether plugins fxbot doesn't vet can be found and added: the public registries, and adding by address or repository |
 | `embedder` | `"local"`, `"remote"`, or `"off"` | `"local"` | Where memory search's vectors come from: `embedUrl`, a provider's `/embeddings`, or none |
 | `embeddingProvider` | `string` | `""` | For `remote`: a provider whose kind is in `embeddingKinds` |
 | `embeddingModel` | `string` | `""` | For `remote`: the model's id, up to 200 characters |
@@ -138,34 +139,41 @@ A new Vercel account with one team gets that team.
 
 An item's `url` is `/api/library/<id>/file`, a route of fxbot's server.
 
-## Add-ons
+## Plugins
 
-Remote MCP servers, skills, and plugins. See [Give bots tools](/sdk/how-to/tools/), and for plugins, [Plugin API](/sdk/reference/plugin-api/).
+A plugin carries any mix of code, MCP servers, and skills. Each is one of three kinds of record: `mcp`, an MCP server; `skill`, one skill; and `package`, a folder with `plugin.json`, whose code, skills, and servers come with it. See [Give bots tools](/sdk/how-to/tools/), and for packages, [Plugin API](/sdk/reference/plugin-api/).
+
+Until Settings' `unvetted` is true, search answers only from fxbot's own lists and asks no registry, and `preview` and `add` take only refs in those lists, failing with 400 for anything else.
 
 | Call | What it does | Returns |
 | --- | --- | --- |
-| `addons.list()` | Every server and skill. A server from a registry carries that entry's `info`, and a `mark` when it has a newer version, or is deprecated or gone. A skill carries the `mark` of the hourly check. | `Addon[]` |
-| `addons.search(q, options)` | Up to 20 servers from fxbot's list and the mirror of GitHub's registry. `{ everything: true }` adds the official registry's results, for 3 characters or more. `{ kind: "skill" }` searches skills instead: fxbot's list, then skills.sh for 2 characters or more. `options` is required: pass `{}` for servers. | `AddonSearch` or `SkillSearch` |
-| `addons.preview(ref)` | An add-on's page, with a `hash`. For a server, what probing it found. For a skill, its files at its repository's current commit. | `AddonPreview` or `SkillPreview` |
-| `addons.add(ref, hash)` | Adds what the preview showed. It fails with 409 when that changed since, or the skill is already added. | `Addon` |
-| `addons.update(id, hash)` | Moves a registry server or a skill to the newer definition its page showed. It fails with 409 when that changed since. | `Addon` |
-| `addons.change(id, input)` | Sets `enabled`, `bots` (`"all"`, or `"each"` for chosen bots), and for a server, `allowed`: the names of the tools bots get | `Addon` |
-| `addons.remove(id)` | Removes the add-on | nothing |
-| `addons.setSecrets(id, secrets)` | A server's header values, or the owner's own OAuth `clientId` and `clientSecret`. Write-only. | `Addon` |
-| `addons.forBot(profileId, addonId, enabled)` | Turns an add-on on or off for one bot. It counts when the add-on's `bots` is `"each"`. | `Addon` |
-| `addons.readSkill(id, file?)` | Synchronous. One of an installed skill's files, `SKILL.md` by default. | `string` |
-| `addons.check()` | Runs the hourly check of the skills' and plugins' repositories now | nothing |
-| `addons.configure(id, settings)` | A plugin's settings: a value for each one named, or `""` for its default. Secrets are write-only. | `PluginAddon` |
-| `addons.log(id)` | Synchronous. A plugin's recent log lines and errors | `string[]` |
+| `plugins.list()` | Every plugin. A server from a registry carries that entry's `info`, and a `mark` when it has a newer version, or is deprecated or gone. A skill or a package carries the `mark` of the hourly check. A package lists the servers it added in `servers`. | `Plugin[]` |
+| `plugins.search(q, options)` | Up to 20 servers from fxbot's list and the mirror of GitHub's registry. `{ everything: true }` adds the official registry's results, for 3 characters or more. `{ kind: "skill" }` searches skills instead: fxbot's list, then skills.sh for 2 characters or more. `options` is required: pass `{}` for servers. | `McpSearch` or `SkillSearch` |
+| `plugins.preview(ref)` | A plugin's page, with a `hash`. For a server, what probing it found. For a skill or a package, its files at its repository's current commit. | `McpPreview`, `SkillPreview`, or `PackagePreview` |
+| `plugins.add(ref, hash)` | Adds what the preview showed. It fails with 409 when that changed since, or the skill is already added. | `Plugin` |
+| `plugins.update(id, hash)` | Moves a registry server or a skill to the newer definition its page showed. It fails with 409 when that changed since. | `Plugin` |
+| `plugins.change(id, input)` | Sets `enabled`, `bots` (`"all"`, or `"each"` for chosen bots), and for a server, `allowed`: the names of the tools bots get. A package's servers follow its `enabled` and `bots`. | `Plugin` |
+| `plugins.remove(id)` | Removes the plugin | nothing |
+| `plugins.setSecrets(id, secrets)` | A server's header values, or the owner's own OAuth `clientId` and `clientSecret`. Write-only. | `Plugin` |
+| `plugins.forBot(profileId, pluginId, enabled)` | Turns a plugin on or off for one bot. It counts when the plugin's `bots` is `"each"`, and a package's servers follow. | `Plugin` |
+| `plugins.readSkill(id, file?)` | Synchronous. One of an installed skill's files, `SKILL.md` by default. | `string` |
+| `plugins.check()` | Runs the hourly check of the skills' and packages' repositories now | nothing |
+| `plugins.configure(id, settings)` | A package's settings: a value for each one named, or `""` for its default. Secrets are write-only. | `PackagePlugin` |
+| `plugins.log(id)` | Synchronous. A package's recent log lines and errors | `string[]` |
+| `plugins.pages()` | The running packages' page code and CSS, by URL, for the page | `PluginPage[]` |
+| `plugins.file(name, path)` | A running package's page code or CSS, and nothing else of its files. `pinned` says its URL names a commit. | `{ type, data, pinned }` |
+| `plugins.handle(name, request, path)` | Answers a request to `/api/plugins/<name>/<path>` with the package's route | `Response` |
 
-An `AddonRef` is one of:
+`createFxbot` takes `pluginDirs`: package folders that load at start, for writing a package.
+
+A `PluginRef` is one of:
 
 | Ref | What it names |
 | --- | --- |
 | `{ url, transport?, headers?, allowLocal? }` | A server by its address. `transport` is `streamable-http` (default) or `sse`. `headers` names the headers it needs. The address is `https`. A local or private address needs `allowLocal`, and may then use `http`. |
 | `{ registry, version?, allowLocal?, from? }` | A registry entry, from `github` (default), `fxbot`, or `official` |
 | `{ skill, from? }` | A skill, as `<owner>/<repo>/<skillId>` |
-| `{ plugin, from? }` | A plugin, as `<owner>/<repo>` or `<owner>/<repo>/<folder>`, from `github` (default) or `fxbot` |
+| `{ repo, from? }` | A package, as `<owner>/<repo>` or `<owner>/<repo>/<folder>`, from `github` (default) or `fxbot` |
 
 A server's `allowed` starts as its read-only tools. A header value is one line, up to 8 KiB, for a header the server was added with.
 
@@ -181,18 +189,6 @@ A server's `allowed` starts as its read-only tools. A header value is one line, 
 | `oauth.callback(query)` | Finishes a redirect, from its query string as `URLSearchParams` | `OAuthStatus` |
 
 `origin` is the page's origin, which the server has checked against its own host.
-
-## Plugins
-
-What fxbot's server serves for plugins. Their own API is [Plugin API](/sdk/reference/plugin-api/).
-
-| Call | What it does | Returns |
-| --- | --- | --- |
-| `plugins.pages()` | The running plugins' page code and CSS, by URL | `PluginPage[]` |
-| `plugins.file(name, path)` | A running plugin's page code or CSS, and nothing else of its files. `pinned` says its URL names a commit. | `{ type, data, pinned }` |
-| `plugins.handle(name, request, path)` | Answers a request to `/api/plugins/<name>/<path>` with the plugin's route | `Response` |
-
-`createFxbot` takes `pluginDirs`: plugin folders that load at start, for writing a plugin.
 
 ## Release and close
 
@@ -215,7 +211,7 @@ Every agent has these tools. Each one acts for the bot whose chat runs it.
 | `library_read` | Opens a `library:<id>`: a document's text, up to 60,000 bytes, or an image |
 | `library_save` | Saves a document the bot wrote. The name ends in `.md`, `.txt`, `.csv`, or `.json`, and the text is up to 1 MiB. |
 | `skill` | Present while a skill is on. Loads a skill by `name`, one of its files by `file`, in parts of 60 KB, or finds skills by `search`. |
-| `<prefix>_<tool>` | Each enabled MCP server's allowed tools. The prefix comes from the server's name or host, such as `linear` for `mcp.linear.app`, and is unique among add-ons. For a server set to `each`, a call from a bot it isn't on for fails. |
+| `<prefix>_<tool>` | Each enabled MCP server's allowed tools. The prefix comes from the server's name or host, such as `linear` for `mcp.linear.app`, and is unique among plugins. For a server set to `each`, a call from a bot it isn't on for fails. |
 
 A bot's instructions on each turn are its own, then its `handoff`, its newest memories in up to 2% of the model's context window, and the list of its skills in up to 1%.
 
@@ -226,7 +222,7 @@ From `@fxbot/sdk`, besides `createFxbot`:
 | Export | Returns | What it does |
 | --- | --- | --- |
 | `readKey(text)` | `Buffer` | Decodes the key file's base64 text. It throws unless the key is 32 bytes. |
-| `rotateSecrets({ databaseUrl, from, to })` | `number` | Seals every stored secret again, providers' and add-ons', from the key `from` to the key `to`, in one transaction, on a connection of its own. Run it with the server stopped. It returns how many it sealed. |
+| `rotateSecrets({ databaseUrl, from, to })` | `number` | Seals every stored secret again, providers' and plugins', from the key `from` to the key `to`, in one transaction, on a connection of its own. Run it with the server stopped. It returns how many it sealed. |
 | `compareVersions(a, b)` | `number` | Below zero when `a` is older than `b`. A prerelease comes before its release. It throws for a string that isn't a version. |
 | `isVersion(version)` | `boolean` | Whether it is `x.y.z`, with an optional `v` before it and an optional prerelease after a dash, such as `0.4.0-rc.1` |
 | `isStable(version)` | `boolean` | Whether it is a version with no prerelease |
@@ -273,7 +269,7 @@ type Provider = {
   error: string | null; // why its agent didn't start
 };
 
-type Settings = { defaultProvider: string; embedder: "local" | "remote" | "off"; embeddingProvider: string; embeddingModel: string; messageVectors: number };
+type Settings = { defaultProvider: string; unvetted: boolean; embedder: "local" | "remote" | "off"; embeddingProvider: string; embeddingModel: string; messageVectors: number };
 
 type EmbeddingStatus = {
   model: string | null;

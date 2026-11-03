@@ -1,6 +1,6 @@
 # Plugin API
 
-What a plugin is made of, and every call it can make: its server code's `fx`, and its page code's `app` and `@fxbot/app`. A guide to writing one: [Write a plugin](/sdk/how-to/write-a-plugin/).
+What a plugin with code is made of, and every call it can make: its server code's `fx`, and its page code's `app` and `@fxbot/app`. fxbot calls such a plugin, a folder with `plugin.json`, a package. A guide to writing one: [Write a plugin](/sdk/how-to/write-a-plugin/).
 
 ## The folder
 
@@ -22,7 +22,7 @@ Only `plugin.json` is required, and only the paths it names count.
 
 | Field | What it is |
 | --- | --- |
-| `name` | Required. Up to 40 lowercase letters, digits, and dashes. Its tools are `<name>_<tool>`, its routes are under `/api/plugins/<name>/`, its page paths under `/<name>/`, and its schema is `plugin_<name>`, with `_` for `-`. It can't be `chat`, `memory`, `library`, or `skill`, or an MCP server's prefix. |
+| `name` | Required. Up to 40 lowercase letters, digits, and dashes. Its tools are `<name>_<tool>`, its routes are under `/api/plugins/<name>/`, its page paths under `/<name>/`, and its schema is `plugin_<name>`, with `_` for `-`. It can't be `chat`, `memory`, `library`, or `skill`, or an MCP server's prefix, nor a name fxbot uses itself: `pages`, `preview`, `search`, `addons`, `plugins`, `settings`, `profiles`, or 12 hex characters, which is a plugin's id. |
 | `version` | Shown on its row. Default `0.0.0` |
 | `description` | Shown on its page and its row |
 | `extensions["sh.fxbot"].server` | Its server code, a path inside the folder |
@@ -54,7 +54,7 @@ export default async function setup(fx: PluginApi) {
 | `fx.settings` | Its settings, with defaults, and secrets opened. The same object, kept up to date. |
 | `fx.bots.list()`, `fx.bots.get(id)` | The bots, as [the fxbot object](/sdk/reference/server-api/) lists them |
 | `fx.chats` | Sessions and turns of its own. See [Turns](#turns). |
-| `fx.log(...parts)` | A line in its log, which its settings in **Add-ons** show |
+| `fx.log(...parts)` | A line in its log, which its settings in **Plugins** show |
 | `fx.signal` | An `AbortSignal` that aborts when the plugin unloads |
 
 Setup gets 10 seconds. A setup that throws or runs late leaves the plugin added but off, with its error on its row. fxbot starts either way. Turns can start only after fxbot has: not from setup itself.
@@ -121,7 +121,7 @@ fx.route("GET", "/rooms/:id", async (request, { id }) => Response.json({ id }));
 
 ## Settings
 
-- The owner sets them in the plugin's settings in **Add-ons**. Each is text, up to 8 KiB. Clearing one brings back its default.
+- The owner sets them in the plugin's settings in **Plugins**. Each is text, up to 8 KiB. Clearing one brings back its default.
 - They're sealed together in Postgres. A secret one is never shown again, and its row says only that it's set.
 - `fx.settings` has them. `fx.on("settings", …)` hears a change.
 
@@ -151,7 +151,7 @@ A session belongs to the provider it started on. After the bot moves to another 
 | `app.settings(Component)` | A section in Settings |
 | `app.botSettings(Component)` | A section in a bot's settings. It gets `bot`. |
 
-Each part sits in its own error boundary: one that throws shows a short card in its place, and the rest of the app goes on. A plugin's page parts are for everyone, whichever bots it's on for. The page reads the list of plugins again after a change in **Add-ons**, and keeps code it already ran until it reloads.
+Each part sits in its own error boundary: one that throws shows a short card in its place, and the rest of the app goes on. A plugin's page parts are for everyone, whichever bots it's on for. The page reads the list of plugins again after a change in **Plugins**, and keeps code it already ran until it reloads.
 
 `@fxbot/app`:
 
@@ -170,11 +170,11 @@ The page's styles hold only the classes the app uses. A plugin brings its own CS
 
 | Source | How |
 | --- | --- |
-| GitHub | **Add-ons**, on the **Plugins** tab: `owner/repo`, or `owner/repo/folder`. Its page pins the repository's newest commit, and shows its code. **Add** writes its files to `FXBOT_DATA/plugins/<name>/<commit>/`. |
+| GitHub | **Plugins**, on **Browse**, under **From GitHub**, with unvetted plugins on: `owner/repo`, or `owner/repo/folder`. Its page pins the repository's newest commit, and shows its code. **Add** writes its files to `FXBOT_DATA/plugins/<name>/<commit>/`. |
 | fxbot's list | `plugins-registry.json` on fxbot's site, read hourly, tagged **fxbot** |
 | A folder | `FXBOT_PLUGIN_DIRS`, in a checkout. Added on first sight, loaded at start, and loaded again a moment after its files change |
 
 - From GitHub, files are text only, up to 2 MiB each and 20 MB in all.
 - The hourly check marks **Update available** when a plugin's files change in its repository. **Update** moves it to the commit its page showed, and keeps the old version running when the new one doesn't load.
-- Its skills join the catalog of the bots it's on for. Each remote server in its `mcp.json` is added as an MCP server of its own, under the usual rules for addresses, and is removed with it. A server that runs a command isn't used yet.
+- Its skills join the catalog of the bots it's on for. Each remote server in its `mcp.json` is added with it, under the usual rules for addresses: a record of its own, which shows in the package's settings, follows the package's switch and bots, and is removed with it. A server that runs a command isn't used yet.
 - In a release, fxbot runs in its container, and a plugin reaches what the container does.

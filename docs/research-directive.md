@@ -27,7 +27,7 @@ Keep it organized and neat.
 
 Remember:
 
-- first ask: is it core, or an add-on? ([Core or add-on](../CONVENTIONS.md#core-or-add-on)). An add-on phase plans the add-on, and the smallest hook it needs in the plugin API.
+- first ask: is it core, or a plugin? ([Core or plugin](../CONVENTIONS.md#core-or-plugin)). A plugin phase plans the plugin, and the smallest hook it needs in the plugin API.
 - reusable core bits to into packages/sdk
 - specific backend for serving API goes into packages/server
 - ui stuff goes into packages/ui

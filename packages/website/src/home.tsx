@@ -56,9 +56,9 @@ const features: { shape: Shape; color: Color; title: string; link: string; body:
   {
     shape: "flower",
     color: "purple",
-    title: "Add-ons",
-    link: "/docs/explanation/core-and-add-ons/",
-    body: <>Skills from fxbot's picks or skills.sh, which bots read when a task needs them. Remote MCP servers from GitHub's registry or by address, with only the tools you allow. Plugins that change the app itself, such as chat rooms. Each costs nothing until you add it.</>,
+    title: "Plugins",
+    link: "/docs/explanation/core-and-plugins/",
+    body: <>Each plugin carries skills, which bots read when a task needs them, remote MCP servers, with only the tools you allow, or code that changes the app itself, such as chat rooms. fxbot shows the ones it vets, and each costs nothing until you add it.</>,
   },
   {
     shape: "hexagon",
@@ -129,7 +129,7 @@ export function Home() {
           </div>
           <h1 className="mt-8 max-w-3xl text-4xl font-semibold tracking-tight text-balance sm:text-6xl">Your bot, built and configured how you want it.</h1>
           <p className="mt-5 max-w-2xl text-lg text-pretty text-muted-foreground sm:text-xl">
-            fxbot starts simple: a lean, fast core with bots, their chats, and their files. It is local first. It runs on a machine you own and works with local models as well as hosted ones. Make each bot yours, from its look and instructions to its model and tools, and grow fxbot with only the add-ons you want: skills, MCP servers, and plugins that change the app itself.
+            fxbot starts simple: a lean, fast core with bots, their chats, and their files. It is local first. It runs on a machine you own and works with local models as well as hosted ones. Make each bot yours, from its look and instructions to its model and tools, and grow fxbot with only the plugins you want: skills, MCP servers, and plugins that change the app itself.
           </p>
           <div className="mt-8 max-w-2xl">
             <Command>{installCommand}</Command>
@@ -202,7 +202,7 @@ export function Home() {
 
         <section className="mx-auto max-w-6xl px-4 pt-20 sm:px-6 sm:pt-28">
           <SectionTitle eyebrow="What it does" title="Bots you keep talking to">
-            Each bot is a profile with one long-running chat. The core stays small, and the rest comes as add-ons you pick. All of this ships in the current release.
+            Each bot is a profile with one long-running chat. The core stays small, and the rest comes as plugins you pick. All of this ships in the current release.
           </SectionTitle>
           <ul className="mt-10 grid gap-px overflow-hidden rounded-xl border bg-border sm:grid-cols-2 lg:grid-cols-3">
             {features.map((feature) => (

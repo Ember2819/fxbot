@@ -6,7 +6,7 @@ Status: built on 2026-11-02, on `release/0.3.0`. The human checks at the end of 
 
 ## 0. Core or add-on
 
-**Core.** Every bot needs to keep what it learns ([Core or add-on](../../../CONVENTIONS.md#core-or-add-on)), and memories are a bot's own data, like its chat and its files. The core is storing a bot's memories, finding them, and putting them back in front of the bot, plus the owner's view of them and the embedding model that search uses.
+**Core.** Every bot needs to keep what it learns ([Core or add-on](../../../CONVENTIONS.md#core-or-plugin)), and memories are a bot's own data, like its chat and its files. The core is storing a bot's memories, finding them, and putting them back in front of the bot, plus the owner's view of them and the embedding model that search uses.
 
 These are add-ons, on hooks in the [plugin API](plugins.md):
 - Saving memories automatically, such as a review after turns (mem0, Hermes) or a nightly pass that tidies them ("dreams"). A plugin can do it on `turn.end` or a schedule.

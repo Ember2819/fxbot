@@ -2,16 +2,16 @@
 
 Simplicity over complexity, small over huge, light over heavy, and performance over other things. A smaller solution that does the job beats a rule carried over from an older design.
 
-## Core or add-on
+## Core or plugin
 
-fxbot is a small core that every install runs, and add-ons that each owner adds if they want them. Like [Pi](https://github.com/earendil-works/pi), "a minimal, extensible agent harness", the core stays small so that add-ons can make fxbot what each owner wants. Before building a feature, ask: is this core, or an add-on? The default answer is add-on. Say which in the feature's phase doc, and why.
+fxbot is a small core that every install runs, and plugins that each owner adds if they want them. Like [Pi](https://github.com/earendil-works/pi), "a minimal, extensible agent harness", the core stays small so that plugins can make fxbot what each owner wants. Before building a feature, ask: is this core, or a plugin? The default answer is plugin. Say which in the feature's phase doc, and why.
 
 A feature is core only when it is one of these:
 - **What every bot needs:** a model, its instructions, a chat that lasts, its files, its memory, and context that fits the model.
-- **What add-ons plug into:** the kinds of add-on (MCP servers, skills, and plugins), finding, adding, and updating them, and the plugin API.
+- **What plugins plug into:** what a plugin can carry (code, MCP servers, and skills), finding, vetting, adding, and updating plugins, and the plugin API.
 - **What fxbot needs to run:** install, updates, migrations, and sealed secrets.
 
-Everything else is an add-on. A knowledge graph, chat rooms, web search, a password manager, and herdr are add-ons.
+Everything else is a plugin. A knowledge graph, chat rooms, web search, a password manager, and herdr are plugins.
 
 Plugins are real extensions of the app, not features bolted on beside it. The plugin API ([plugins](docs/_completed/phases/plugins.md), built in 0.4.0) lets a plugin change core behavior as well as add its own:
 - hook into a bot's turns and tool calls: change a message before it runs, a bot's instructions, or a tool's input or result, or block a call
@@ -22,11 +22,11 @@ Plugins are real extensions of the app, not features bolted on beside it. The pl
 The rules:
 - When a plugin can't do what it needs, widen the plugin API with the smallest hook or place in the app that it needs. Don't build the feature in core. Add a hook when a real plugin needs it, not before.
 - Build core features so plugins can change them: core behavior runs through the same hooks plugins get.
-- An add-on that isn't added costs nothing: no process, no timer, no request, no table, no code in the page, and no space in the app.
-- An add-on's data lives in its own tables or files, which it creates and removes. Never in a core migration.
-- The core never imports or names a particular add-on. fxbot's lists name the add-ons it suggests, as data.
-- fxbot's own add-ons use the same plugin API as anyone's. If one needs a shortcut into core, the API is missing a hook.
-- Removing an add-on leaves the core working.
+- A plugin that isn't added costs nothing: no process, no timer, no request, no table, no code in the page, and no space in the app.
+- A plugin's data lives in its own tables or files, which it creates and removes. Never in a core migration.
+- The core never imports or names a particular plugin. fxbot's lists name the plugins it suggests, as data.
+- fxbot's own plugins use the same plugin API as anyone's. If one needs a shortcut into core, the API is missing a hook.
+- Removing a plugin leaves the core working.
 
 ## Code
 

@@ -2,7 +2,7 @@
 
 fxbot had add-ons of three kinds, MCP servers, skills, and plugins, on three tabs. Now there is one kind of thing to install, a **plugin**, and one name for it everywhere. A plugin carries any mix of code, MCP servers, and skills, with at least one of them. By default, fxbot shows only the plugins it vets, tagged **fxbot**. A switch in Settings shows the public registries too.
 
-Status: being built for 0.4.0, before it ships, so 0.4.0 has one concept. It changes the [plugins](../_completed/phases/plugins.md), [add-ons](../_completed/phases/addons.md), [MCP](../_completed/phases/mcp.md), and [skills](../_completed/phases/skills.md) phases' surface, not what they do.
+Status: built on 2026-11-03, for 0.4.0, before it ships, so 0.4.0 has one concept. It changes the [plugins](plugins.md), [add-ons](addons.md), [MCP](mcp.md), and [skills](skills.md) phases' surface, not what they do.
 
 ## 0. Core or add-on
 
@@ -55,4 +55,6 @@ A package's own routes stay at `/api/plugins/<name>/`. Management takes the rest
 - [x] **M1. Names.** The SDK, the client, the server's routes, migration `0007`, and the app compile and work under the new names. The plugin checks from the plugins phase pass again.
 - [x] **M2. Vetted only.** With the switch off: search shows only fxbot's cards, and no request reaches GitHub's registry, the official one, or skills.sh; preview and add refuse an address, a repository, and a public registry's entry, with 400. With it on, all of them work.
 - [x] **M3. The page.** Plugins has Installed and Browse. Each row and card says what it carries. A package's servers show in its settings, not as rows, and follow its switch and bots. Settings has the switch. `/addons` opens Plugins. Phone width fits.
-- [ ] **M4. Docs.** The site, the README, AGENTS.md, and CONVENTIONS say plugin, the SDK's pages name the new calls and routes, and the changelog names every breaking change. `npm run typecheck`, `npm run build`, `npm run build-site`, and `git diff --check` pass.
+- [x] **M4. Docs.** The site, the README, AGENTS.md, and CONVENTIONS say plugin, the SDK's pages name the new calls and routes, and the changelog names every breaking change. `npm run typecheck`, `npm run build`, `npm run build-site`, and `git diff --check` pass.
+
+All checked on 2026-11-03 against a disposable database, the mock model, the mock GitHub, counting mocks of the public registries and skills.sh, and Chromium: the plugins phase's checks again under the new names (hooks, data, settings, routes, turns, installing, updates, chat rooms, and herdr), the vetted-only checks, and the page at desktop and phone widths. Migration `0007` also ran on a checkout's own database, whose MCP servers kept their sign-ins.

@@ -64,7 +64,7 @@ You need a checkout of fxbot that runs with `npm run dev`: see [Run from a check
    FXBOT_PLUGIN_DIRS=/path/to/my-plugins/hello
    ```
 
-2. Start `npm run dev` again. fxbot adds the plugin on first sight, and the API's output says `[plugin hello] loaded 0.1.0`. It's in **Add-ons**, under **Installed**.
+2. Start `npm run dev` again. fxbot adds the plugin on first sight, and the API's output says `[plugin hello] loaded 0.1.0`. It's in **Plugins**, under **Installed**.
 3. Ask a bot to greet someone. Its reply shows a call of `hello_greet`.
 4. Read the count from the route:
 
@@ -72,7 +72,7 @@ You need a checkout of fxbot that runs with `npm run dev`: see [Run from a check
    curl http://127.0.0.1:8788/api/plugins/hello/count
    ```
 
-Change `server.ts`, and fxbot loads the plugin again a moment later. A plugin whose setup throws stays added but off, with the error on its row in **Add-ons**, and in its log.
+Change `server.ts`, and fxbot loads the plugin again a moment later. A plugin whose setup throws stays added but off, with the error on its row in **Plugins**, and in its log.
 
 ## 3. Add a page
 
@@ -147,12 +147,12 @@ Each file runs once, in name order, in a transaction. Add a new file for each ch
 
 2. Read them as `fx.settings.greeting`. The object stays up to date, and `fx.on("settings", …)` hears a change.
 
-The owner sets them in the plugin's settings in **Add-ons**. A secret one is sealed, and the page never gets it back.
+The owner sets them in the plugin's settings in **Plugins**. A secret one is sealed, and the page never gets it back.
 
 ## 6. Publish it
 
 1. Push the plugin's folder to a public GitHub repository, at its root or in a folder of it.
-2. Anyone can add it from **Add-ons**, on the **Plugins** tab: `owner/repo`, or `owner/repo/folder`. fxbot pins it to the commit that its page showed.
+2. Anyone can add it from **Plugins**, on **Browse**, under **From GitHub**: `owner/repo`, or `owner/repo/folder`. That's there once they turn on unvetted plugins in Settings, since fxbot doesn't vet it. fxbot pins it to the commit that its page showed.
 3. When you push a change that touches its files, fxbot marks it **Update available** within the hour, and shows the owner what changes before it moves.
 
 A plugin can also carry skills, as `skills/<name>/SKILL.md`, and remote MCP servers, in `mcp.json`. To ask for a place in fxbot's own list, open a pull request that adds it to `packages/sdk/src/plugins-registry.json`.

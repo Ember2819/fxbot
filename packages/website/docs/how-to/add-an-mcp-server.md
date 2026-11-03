@@ -1,11 +1,11 @@
 # Add an MCP server
 
-Give your bots the tools of a remote MCP server, found in fxbot's list or GitHub's MCP registry, or added by its address.
+Give your bots the tools of a remote MCP server: a plugin that carries one server. fxbot's picks are on **Browse**. With unvetted plugins on, so is GitHub's MCP registry, and adding a server by its address.
 
-## From search
+## From Browse
 
-1. Open **Add-ons**, the puzzle button at the bottom of the sidebar, and choose the **MCP** tab.
-2. Type in the search above the tabs. Results tagged **fxbot** are the project's own picks; the rest come from fxbot's copy of GitHub's MCP registry, which it refreshes every hour.
+1. Open **Plugins**, the puzzle button at the bottom of the sidebar, and choose **Browse**. fxbot's picks are listed first, tagged **fxbot**: a server says **MCP server** beside its name.
+2. To find another, type in the search above the tabs. With unvetted plugins on, servers from fxbot's copy of GitHub's MCP registry show below fxbot's picks. fxbot refreshes that copy every hour while it's on.
 3. Choose a result to open its page. fxbot looks at the server and shows where it runs, how it signs in, the keys it needs, and who published it.
 4. For a server that needs a key, paste it into the field the page names.
 5. Choose the **Add** button, which names the server. fxbot shows it under **Installed**.
@@ -15,17 +15,18 @@ Give your bots the tools of a remote MCP server, found in fxbot's list or GitHub
 
 ## By its address
 
-For a server the registry doesn't list. Its docs give the address, often ending in `/mcp`.
+For a server the registry doesn't list. Its docs give the address, often ending in `/mcp`. This needs unvetted plugins on.
 
-1. On the **MCP** tab, choose **Add by address**.
+1. On **Browse**, under **MCP servers**, choose **Add by address**.
 2. Paste the address and choose **Look**. fxbot shows the server's name, and either its tools, **Takes a key**, or **Signs in with OAuth**.
 3. For a server that takes a key, paste it. It is sent as `Authorization: Bearer`; for another header, write it as `Name: value`.
 4. Choose the **Add** button, then follow steps 6 to 8 above.
 
-A bot's **Edit** page lists the servers too, under **Add-ons**.
+A bot's **Edit** page lists the servers too, under **Plugins**. A server that a plugin brought with it shows in that plugin's settings instead, and follows its switch and its bots.
 
 ## When it goes differently
 
+- **Browse shows only fxbot's picks.** Turn on **Show unvetted plugins** in Settings, under **Plugins**. fxbot doesn't vet what that shows.
 - **The search doesn't find it.** Tick **Search everything** to look in the official MCP registry as well. Nobody reviews its entries, so check who published one before you add it.
 - **The page warns that the server isn't on the publisher's domain.** The registry checks who published an entry, not where its server runs. Add it only if you trust that host.
 - **The page says it runs on this machine.** That server is a program, not a remote server, and fxbot can't add it yet.

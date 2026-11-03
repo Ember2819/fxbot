@@ -41,7 +41,7 @@ function shareTags(address: string, title: string, description: string) {
     `<meta property="og:image" content="${origin}${card}" />`,
     `<meta property="og:image:width" content="1200" />`,
     `<meta property="og:image:height" content="630" />`,
-    `<meta property="og:image:alt" content="fxbot: Your bot, built and configured how you want it. A lean core. Local first. Grows with the add-ons you pick." />`,
+    `<meta property="og:image:alt" content="fxbot: Your bot, built and configured how you want it. A lean core. Local first. Grows with the plugins you pick." />`,
     `<meta name="twitter:card" content="summary_large_image" />`,
   ];
 }
@@ -55,7 +55,7 @@ export function pages() {
     head: [`<title>${escape(title)}</title>`, `<meta name="description" content="${escape(description)}" />`, ...shareTags(url(path), title, description)].join("\n    "),
     body: renderToStaticMarkup(body),
   });
-  const about = "fxbot is your bot, built and configured how you want it: a lean, local-first core that works with local models and grows with the add-ons you pick.";
+  const about = "fxbot is your bot, built and configured how you want it: a lean, local-first core that works with local models and grows with the plugins you pick.";
   return [
     page("", "fxbot: your bot, built how you want it", about, <Home />),
     ...docs.map((doc) => page(doc.path, `${doc.title} · fxbot docs`, doc.description || about, <DocPage doc={doc} />)),

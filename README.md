@@ -2,13 +2,13 @@
 
 Join the Hackers in the Loop community on [Discord](https://discord.gg/3Qs2uejUf9) to talk about fxbot, share what you build with it, and get help.
 
-fxbot is your bot, built and configured how you want it. It starts simple, with a lean, fast core: bots, their chats, and their files. Make each bot yours, from its look and instructions to its model and tools. Grow fxbot with only the add-ons you want: skills, MCP servers, and plugins that change the app itself.
+fxbot is your bot, built and configured how you want it. It starts simple, with a lean, fast core: bots, their chats, and their files. Make each bot yours, from its look and instructions to its model and tools. Grow fxbot with only the plugins you want: skills, MCP servers, and plugins that change the app itself.
 
 fxbot is local first. One Node server and Postgres run on your own machine, and the browser is the UI on desktop and mobile. [libfx](https://fx.sh/docs/lib) sends each chat to the provider its bot uses: a local model server such as Ollama or LM Studio, an API key, or a ChatGPT, Grok, or Vercel account signed in with a device code.
 
 ![fxbot in a desktop browser: Bob's chat open, with Fernando and Securely in the sidebar](docs/screenshot.png)
 
-Simplicity is the rule: a small core, few dependencies, and no abstraction until a second real use. The core is what every bot needs, and everything else is an add-on. See [Core or add-on](CONVENTIONS.md#core-or-add-on).
+Simplicity is the rule: a small core, few dependencies, and no abstraction until a second real use. The core is what every bot needs, and everything else is a plugin. See [Core or plugin](CONVENTIONS.md#core-or-plugin).
 
 ## Stack
 
@@ -25,7 +25,7 @@ Records live in Postgres; libfx keeps each chat's session in files. No Next.js, 
 
 ## Phases
 
-In order of execution priority. Checked phases are built. Each is marked **core** or **add-on** ([Core or add-on](CONVENTIONS.md#core-or-add-on)). A core seam is a part of the core that add-ons plug into. Memories and Plugins have full plans, and the rest are one-page stubs until they are planned.
+In order of execution priority. Checked phases are built. Each is marked **core** or **plugin** ([Core or plugin](CONVENTIONS.md#core-or-plugin)). A core seam is a part of the core that plugins plug into. Memories and Plugins have full plans, and the rest are one-page stubs until they are planned.
 
 - [x] [v1](docs/_completed/v1-plan.md) (core): bot profiles and a streaming chat
 - [x] [Provider logins](docs/_completed/phases/provider-logins.md) (core): ChatGPT, Grok, and Vercel accounts, API keys, and local model servers
@@ -33,29 +33,30 @@ In order of execution priority. Checked phases are built. Each is marked **core*
 - [x] [PWA](docs/_completed/phases/pwa.md) (core): installs on phones and desktops
 - [x] [MCP servers](docs/_completed/phases/mcp.md) (core seam): tools from any remote MCP server, with OAuth sign-in
 - [x] [Releases](docs/_completed/phases/releases.md) (core): install a release, and update when the next one is ready
-- [x] [Add-ons](docs/_completed/phases/addons.md) (core seam): search GitHub's MCP registry, add a server from its page, and update installed ones
+- [x] [Plugin search](docs/_completed/phases/addons.md) (core seam): search GitHub's MCP registry, add a server from its page, and update installed ones
 - [x] [Skills](docs/_completed/phases/skills.md) (core seam): instructions bots read when a task needs them, from fxbot's list and skills.sh
 - [x] [Containers](docs/_completed/phases/containers.md) (core): podman or docker, one compose file for fxbot and its database with pgvector, and updates through the machine's `fxbot` command
 - [x] [Memories](docs/_completed/phases/memories.md) (core): each bot keeps what it has learned, and search by meaning from a local or remote embedder
-- [x] [Plugins](docs/_completed/phases/plugins.md) (core: the plugin API): add-ons that change the app, with hooks, tools, data, and screens of their own; fxbot's first two, [chat rooms](plugins/chat-rooms/README.md) and [herdr](plugins/herdr/README.md), are in `plugins/`
-- [ ] [Agent computer](docs/phases/computer.md) (add-on, a plugin others build on): a shell, files, and programs for bots, for the add-ons that need one
-- [ ] [Permissions](docs/phases/permissions.md) (add-on, on a core hook): ask, auto, and yolo modes for tool calls
-- [ ] [Cross-bot messaging](docs/phases/cross-bot-messaging.md) (add-on): bots message each other
-- [ ] [Routines](docs/phases/routines.md) (add-on): saved tasks a bot runs on a schedule
-- [ ] [Triggers](docs/phases/triggers.md) (add-ons): webhooks and new email start a bot's turn
-- [ ] [Soul](docs/phases/soul.md) (add-on): a written persona behind each bot's system prompt
+- [x] [Plugins](docs/_completed/phases/plugins.md) (core: the plugin API): plugins that change the app, with hooks, tools, data, and screens of their own; fxbot's first two, [chat rooms](plugins/chat-rooms/README.md) and [herdr](plugins/herdr/README.md), are in `plugins/`
+- [x] [One kind of plugin](docs/_completed/phases/one-kind-of-plugin.md) (core seam): one name and one list. A plugin carries any mix of code, MCP servers, and skills, and only the ones fxbot vets show until a switch in Settings
+- [ ] [Agent computer](docs/phases/computer.md) (plugin, one others build on): a shell, files, and programs for bots, for the plugins that need one
+- [ ] [Permissions](docs/phases/permissions.md) (plugin, on a core hook): ask, auto, and yolo modes for tool calls
+- [ ] [Cross-bot messaging](docs/phases/cross-bot-messaging.md) (plugin): bots message each other
+- [ ] [Routines](docs/phases/routines.md) (plugin): saved tasks a bot runs on a schedule
+- [ ] [Triggers](docs/phases/triggers.md) (plugins): webhooks and new email start a bot's turn
+- [ ] [Soul](docs/phases/soul.md) (plugin): a written persona behind each bot's system prompt
 - [ ] [Context management](docs/phases/context-management.md) (core): one never-ending chat that fits the model's context window, past the compaction libfx does
 - [ ] [Past sessions](docs/phases/past-sessions.md) (core): earlier conversations stay browsable
-- [ ] [Knowledge base](docs/phases/knowledge-base.md) (add-on): knowledge the bots draw on
-- [ ] [Pages](docs/phases/pages.md) (add-on): reports and guides bots write for reading outside the chat
-- [ ] [herdr screen](docs/phases/herdr-screen.md) (add-on): the [herdr](https://herdr.dev) interface in the app, from the herdr plugin
-- [ ] [Remote control](docs/phases/remote-control.md) (add-on): heavy work handed to coding agents through herdr
-- [ ] [Web search](docs/phases/web-search.md) (add-on): bots search and read the web, and cite it
-- [ ] [Vault](docs/phases/vault.md) (add-on): saved secrets and details bots use when allowed
-- [ ] [1Password](docs/phases/1password.md) (add-on): bots use stored logins and items from 1Password
-- [ ] [Image and video generation](docs/phases/media-generation.md) (add-on): bots create images and video
-- [ ] [Voice memos](docs/phases/voice-memos.md) (add-on): send a bot a recorded voice memo
-- [ ] [Phone calls](docs/phases/phone-calls.md) (add-on): talk with a bot by voice, in the app or over a phone line
+- [ ] [Knowledge base](docs/phases/knowledge-base.md) (plugin): knowledge the bots draw on
+- [ ] [Pages](docs/phases/pages.md) (plugin): reports and guides bots write for reading outside the chat
+- [ ] [herdr screen](docs/phases/herdr-screen.md) (plugin): the [herdr](https://herdr.dev) interface in the app, from the herdr plugin
+- [ ] [Remote control](docs/phases/remote-control.md) (plugin): heavy work handed to coding agents through herdr
+- [ ] [Web search](docs/phases/web-search.md) (plugin): bots search and read the web, and cite it
+- [ ] [Vault](docs/phases/vault.md) (plugin): saved secrets and details bots use when allowed
+- [ ] [1Password](docs/phases/1password.md) (plugin): bots use stored logins and items from 1Password
+- [ ] [Image and video generation](docs/phases/media-generation.md) (plugin): bots create images and video
+- [ ] [Voice memos](docs/phases/voice-memos.md) (plugin): send a bot a recorded voice memo
+- [ ] [Phone calls](docs/phases/phone-calls.md) (plugin): talk with a bot by voice, in the app or over a phone line
 
 The previous design and spike are in [archive/](archive/README.md). The git host may still use the old repository name until the owner renames it.
 
@@ -165,7 +166,7 @@ The server reads these from the environment, or from an uncommitted `.env` in th
 | `FXBOT_CLIENT_METADATA_URL` | Optional. The project's published OAuth client document, for MCP servers that sign in with one. Without it, fxbot registers itself with each server |
 | `FXBOT_MCP_REGISTRY` | Optional. The MCP registry that fxbot mirrors hourly for search, and that registry entries come from. Default GitHub's, `https://api.mcp.github.com` |
 | `FXBOT_MCP_EVERYTHING` | Optional. The registry that Search everything asks, once per search. Default the official one, `https://registry.modelcontextprotocol.io` |
-| `FXBOT_LISTS_URL` | Optional. The site that publishes fxbot's own lists of MCP servers, skills, and plugins. fxbot reads its `mcp-registry.json`, `skills-registry.json`, and `plugins-registry.json` hourly, and keeps the lists the release shipped with until a read succeeds. Default fxbot's site, `https://fxbot.sh` |
+| `FXBOT_LISTS_URL` | Optional. The site that publishes fxbot's own lists of the plugins it vets: MCP servers, skills, and packages. fxbot reads its `mcp-registry.json`, `skills-registry.json`, and `plugins-registry.json` hourly, and keeps the lists the release shipped with until a read succeeds. Default fxbot's site, `https://fxbot.sh` |
 | `FXBOT_BACKUPS` | Where the database and chat files are backed up before migrations run. Default `./backups`. The backup uses `pg_dump`, which must be Postgres 17's |
 | `FXBOT_CONTROL` | Set by a release install's compose file: the folder where the app asks the machine for updates. Without it, Settings doesn't update |
 | `FXBOT_EMBED_URL` | Optional. The local embedder for memory search, an OpenAI-style address such as `http://127.0.0.1:8081/v1` from `deploy/compose.dev.yaml`. A release install's compose file sets it. Without it, there is no local embedder |
@@ -220,7 +221,7 @@ The [release workflow](.github/workflows/release.yml) typechecks and builds the 
 
 ## Status
 
-v1 is built: bot profiles drawn as animated blobs, a streaming chat that survives reloads and server restarts, image and text file attachments, and an installable shell that opens offline. [Provider logins](docs/_completed/phases/provider-logins.md) is built too: device code sign-in, API keys and local servers, model discovery, sealed secrets in Postgres, and provider switches that carry a summary over. The [library](docs/_completed/phases/library.md) is built as well: one copy of every file the chats hold, images and text files sent and documents a bot saves, each tagged with the bots and chats it came from. The bento button beside Settings opens it across every bot, with search and filters, and a panel beside each chat shows that bot's own. Bots search, read, and save it through three tools. [MCP servers](docs/_completed/phases/mcp.md) are built: the puzzle button beside the library adds a remote server by its address, signs in with OAuth or takes a key, and gives the tools you allow (the read-only ones to start) to all bots or the bots you choose. [Add-ons](docs/_completed/phases/addons.md) put a search above that page's tabs: fxbot mirrors GitHub's MCP registry hourly, opens each entry's page before adding it, and marks an installed server that has a newer version, is deprecated, or was removed, and updates it only when asked. [Skills](docs/_completed/phases/skills.md) come from fxbot's own list and skills.sh, pinned to a commit of their GitHub repository: each bot sees a short list of its skills, and a `skill` tool reads one when a task needs it. In a chat, `$` or `/` picks one to send with a message. The [PWA phase](docs/_completed/phases/pwa.md) made fxbot an app to install from the tailnet address: Chrome's own Install button, the steps on an iPhone, and room for the notch, the home indicator, and the keyboard. The production build also opens offline, and its new builds wait for Reload. [Releases](docs/_completed/phases/releases.md) are built: `setup.sh` installs a tagged release, Settings updates to the next with one button, and the database moves forward through numbered migrations, backed up first. [Memories](docs/_completed/phases/memories.md) are built: each bot saves what it learns with three tools, the newest go in its instructions on every turn, and the owner sees, edits, and deletes them in a Memories tab. Memory search and `chat_history` match by words and by meaning, with vectors from a local embedder on the CPU or a GPU, or a provider's. [Containers](docs/_completed/phases/containers.md) replaced how it installs: `setup.sh` runs fxbot and pgvector's Postgres as containers, with podman or docker, and Settings' Update asks the machine's `fxbot` command, which goes back to the old release if the new one doesn't start. All of it was checked against mock servers, stubbed sign-in services, and Chromium on this machine, not with real accounts, models, or phones. The [v1 plan](docs/_completed/v1-plan.md) and the phase pages record what was checked.
+v1 is built: bot profiles drawn as animated blobs, a streaming chat that survives reloads and server restarts, image and text file attachments, and an installable shell that opens offline. [Provider logins](docs/_completed/phases/provider-logins.md) is built too: device code sign-in, API keys and local servers, model discovery, sealed secrets in Postgres, and provider switches that carry a summary over. The [library](docs/_completed/phases/library.md) is built as well: one copy of every file the chats hold, images and text files sent and documents a bot saves, each tagged with the bots and chats it came from. The bento button beside Settings opens it across every bot, with search and filters, and a panel beside each chat shows that bot's own. Bots search, read, and save it through three tools. [MCP servers](docs/_completed/phases/mcp.md) are built: the puzzle button beside the library adds a remote server by its address, signs in with OAuth or takes a key, and gives the tools you allow (the read-only ones to start) to all bots or the bots you choose. [Plugin search](docs/_completed/phases/addons.md) put a search above that page: fxbot mirrors GitHub's MCP registry hourly, opens each entry's page before adding it, and marks an installed server that has a newer version, is deprecated, or was removed, and updates it only when asked. [Skills](docs/_completed/phases/skills.md) come from fxbot's own list and skills.sh, pinned to a commit of their GitHub repository: each bot sees a short list of its skills, and a `skill` tool reads one when a task needs it. In a chat, `$` or `/` picks one to send with a message. The [PWA phase](docs/_completed/phases/pwa.md) made fxbot an app to install from the tailnet address: Chrome's own Install button, the steps on an iPhone, and room for the notch, the home indicator, and the keyboard. The production build also opens offline, and its new builds wait for Reload. [Releases](docs/_completed/phases/releases.md) are built: `setup.sh` installs a tagged release, Settings updates to the next with one button, and the database moves forward through numbered migrations, backed up first. [Memories](docs/_completed/phases/memories.md) are built: each bot saves what it learns with three tools, the newest go in its instructions on every turn, and the owner sees, edits, and deletes them in a Memories tab. Memory search and `chat_history` match by words and by meaning, with vectors from a local embedder on the CPU or a GPU, or a provider's. [Containers](docs/_completed/phases/containers.md) replaced how it installs: `setup.sh` runs fxbot and pgvector's Postgres as containers, with podman or docker, and Settings' Update asks the machine's `fxbot` command, which goes back to the old release if the new one doesn't start. [Plugins](docs/_completed/phases/plugins.md) are built: code that runs inside fxbot, with hooks into turns and tool calls, tools, routes, tables, settings, and places in the page, and fxbot's first two, chat rooms and herdr. Everything an owner installs is [one kind of plugin](docs/_completed/phases/one-kind-of-plugin.md), carrying any mix of code, MCP servers, and skills, and only the ones fxbot vets show until a switch in Settings. All of it was checked against mock servers, stubbed sign-in services, and Chromium on this machine, not with real accounts, models, or phones. The [v1 plan](docs/_completed/v1-plan.md) and the phase pages record what was checked.
 
 ## License
 

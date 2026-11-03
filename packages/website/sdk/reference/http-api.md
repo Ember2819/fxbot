@@ -19,14 +19,14 @@ For typed calls from a page or a script, use [the client](/sdk/reference/client/
 | Status | When |
 | --- | --- |
 | 200 | Done |
-| 201 | Made: a bot, a memory, a provider, a sign-in, an add-on, or an OAuth sign-in |
+| 201 | Made: a bot, a memory, a provider, a sign-in, a plugin, or an OAuth sign-in |
 | 202 | An update was asked for |
 | 304 | A library file whose ETag matches `If-None-Match` |
 | 400 | Bad input, or a request fxbot refuses |
 | 403 | A write from another site |
-| 404 | No such route, or a missing bot, provider, memory, library item, add-on, or sign-in |
+| 404 | No such route, or a missing bot, provider, memory, library item, plugin, or sign-in |
 | 405 | A method the path doesn't take |
-| 409 | An add-on changed since its preview, a skill is already added, or an update is running |
+| 409 | A plugin changed since its preview, a skill is already added, or an update is running |
 | 413 | A body over its limit |
 | 500 | An unexpected error |
 | 502 | A service fxbot asked failed |
@@ -41,25 +41,30 @@ For typed calls from a page or a script, use [the client](/sdk/reference/client/
 
 `UpdateStatus` is `{ version, latest, canUpdate, updating }`. `canUpdate` is true only in an install made by `setup.sh`, where `FXBOT_CONTROL` is set. `updating` is `{ to, steps, error? }` while an update runs, or after one failed, else `null`. `POST` gets 400 outside such an install, and when the running version is the newest, and 409 while an update runs.
 
-## Add-ons
+## Plugins
 
 | Method | Path | Body or query | Answer |
 | --- | --- | --- | --- |
-| `GET` | `/api/addons` | | `Addon[]` |
-| `GET` | `/api/addons/search` | `q`, `kind` (`mcp`, `skill`, or `plugin`), `everything=1` | `AddonSearch`, `SkillSearch` for `kind=skill`, or `PluginSearch` for `kind=plugin` |
-| `POST` | `/api/addons/preview` | `{ "ref": AddonRef }` | `AddonPreview`, `SkillPreview` for a skill, or `PluginPreview` for a plugin |
-| `POST` | `/api/addons` | `{ "ref": AddonRef, "hash": "<preview's hash>" }` | 201 and `Addon` |
-| `POST` | `/api/addons/<id>/update` | `{ "hash": "<preview's hash>" }` | `Addon` |
-| `PATCH` | `/api/addons/<id>` | Any of `enabled`, `bots` (`all` or `each`), `allowed` (tool names) | `Addon` |
-| `DELETE` | `/api/addons/<id>` | | `{ "ok": true }` |
-| `PUT` | `/api/addons/<id>/secrets` | Any of `headers` (name to value), `clientId`, `clientSecret` | `Addon` |
-| `GET` | `/api/addons/<id>/skills` | `?file=`, default `SKILL.md` | `{ "text": "<file>" }` |
-| `POST` | `/api/addons/<id>/sign-in` | | 201 and `OAuthAttempt`. The request's `Origin` is where the sign-in comes back to. |
-| `PUT` | `/api/addons/<id>/settings` | A plugin's settings, name to value, `""` for its default | `PluginAddon`. Secrets never come back. |
-| `GET` | `/api/addons/<id>/log` | | `{ "lines": [...] }`, a plugin's recent log |
-| `PUT` | `/api/profiles/<id>/addons/<addonId>` | `{ "enabled": true }` | `Addon`. Turns the add-on on or off for one bot. |
+| `GET` | `/api/plugins` | | `Plugin[]` |
+| `GET` | `/api/plugins/search` | `q`, `kind` (`mcp`, `skill`, or `package`), `everything=1` | `McpSearch`, `SkillSearch` for `kind=skill`, or `PackageSearch` for `kind=package` |
+| `POST` | `/api/plugins/preview` | `{ "ref": PluginRef }` | `McpPreview`, `SkillPreview` for a skill, or `PackagePreview` for a package |
+| `POST` | `/api/plugins` | `{ "ref": PluginRef, "hash": "<preview's hash>" }` | 201 and `Plugin` |
+| `POST` | `/api/plugins/<id>/update` | `{ "hash": "<preview's hash>" }` | `Plugin` |
+| `PATCH` | `/api/plugins/<id>` | Any of `enabled`, `bots` (`all` or `each`), `allowed` (tool names) | `Plugin` |
+| `DELETE` | `/api/plugins/<id>` | | `{ "ok": true }` |
+| `PUT` | `/api/plugins/<id>/secrets` | Any of `headers` (name to value), `clientId`, `clientSecret` | `Plugin` |
+| `GET` | `/api/plugins/<id>/skills` | `?file=`, default `SKILL.md` | `{ "text": "<file>" }` |
+| `POST` | `/api/plugins/<id>/sign-in` | | 201 and `OAuthAttempt`. The request's `Origin` is where the sign-in comes back to. |
+| `PUT` | `/api/plugins/<id>/settings` | A package's settings, name to value, `""` for its default | `PackagePlugin`. Secrets never come back. |
+| `GET` | `/api/plugins/<id>/log` | | `{ "lines": [...] }`, a package's recent log |
+| `GET` | `/api/plugins/pages` | | `PluginPage[]`: each running package's page code and CSS, by URL |
+| `GET` | `/api/plugins/<name>/files/<path>` | | A package's page code or CSS, and nothing else of its files. A pinned package's is kept for good, under its commit. |
+| Any | `/api/plugins/<name>/<path>` | | The package's own route. See [Plugin API](/sdk/reference/plugin-api/#routes). |
+| `PUT` | `/api/profiles/<id>/plugins/<pluginId>` | `{ "enabled": true }` | `Plugin`. Turns the plugin on or off for one bot. |
 
-`AddonRef` is `{ url, transport?, headers?, allowLocal? }`, `{ registry, version?, allowLocal?, from? }`, `{ skill, from? }`, or `{ plugin, from? }`: see [Add-ons](/sdk/reference/server-api/#add-ons).
+`PluginRef` is `{ url, transport?, headers?, allowLocal? }`, `{ registry, version?, allowLocal?, from? }`, `{ skill, from? }`, or `{ repo, from? }`: see [Plugins](/sdk/reference/server-api/#plugins).
+
+A plugin's id is 12 hex characters, and anything else after `/api/plugins/` that isn't `pages`, `search`, or `preview` is a package's name. Until Settings' `unvetted` is true, search answers only from fxbot's lists, and preview and add refuse anything else with 400.
 
 ## OAuth
 
@@ -76,7 +81,7 @@ For typed calls from a page or a script, use [the client](/sdk/reference/client/
 | Method | Path | Body or query | Answer |
 | --- | --- | --- | --- |
 | `GET` | `/api/settings` | | `Settings` |
-| `PATCH` | `/api/settings` | Any of `defaultProvider`, `embedder`, `embeddingProvider`, `embeddingModel`, `messageVectors`, and `local` | `Settings` |
+| `PATCH` | `/api/settings` | Any of `defaultProvider`, `unvetted`, `embedder`, `embeddingProvider`, `embeddingModel`, `messageVectors`, and `local` | `Settings` |
 | `GET` | `/api/settings/embedding` | | `EmbeddingStatus` |
 
 - `local` is `cpu`, `gpu`, or `off`. It asks the machine to run its local embedder that way. Outside an install made by `setup.sh`, it gets 400.
@@ -160,14 +165,6 @@ The lines' fields are in [Stream lines](/sdk/reference/client/#stream-lines).
 ```sh
 curl -N "http://127.0.0.1:8787/api/profiles/<id>/stream?cursor=0"
 ```
-
-## Plugins
-
-| Method | Path | Answer |
-| --- | --- | --- |
-| `GET` | `/api/plugins` | `PluginPage[]`: each running plugin's page code and CSS, by URL |
-| `GET` | `/api/plugins/<name>/files/<path>` | The plugin's page code or CSS, and nothing else of its files. A pinned plugin's is kept for good, under its commit. |
-| Any | `/api/plugins/<name>/<path>` | The plugin's own route. See [Plugin API](/sdk/reference/plugin-api/#routes). |
 
 ## Outside /api
 

@@ -35,4 +35,4 @@ A libfx session belongs to the agent that started it, and an agent's tools are f
 
 ## Kept small on purpose
 
-No web framework, no Next.js, no Vercel AI SDK, and no second agent runtime. A new abstraction waits for its second real use. The core holds only what every bot needs, and the rest comes as [add-ons](/docs/explanation/core-and-add-ons/). The repository's [CONVENTIONS.md](CONVENTIONS.md) has the rules.
+No web framework, no Next.js, no Vercel AI SDK, and no second agent runtime. A new abstraction waits for its second real use. The core holds only what every bot needs, and the rest comes as [plugins](/docs/explanation/core-and-plugins/). The repository's [CONVENTIONS.md](CONVENTIONS.md) has the rules.
