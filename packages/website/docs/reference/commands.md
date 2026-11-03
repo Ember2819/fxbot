@@ -3,8 +3,8 @@
 ## setup.sh
 
 ```sh
-curl -fsSL https://raw.githubusercontent.com/iammrduncan/fxbot/main/setup.sh | sudo bash
-curl -fsSL https://raw.githubusercontent.com/iammrduncan/fxbot/main/setup.sh | sudo bash -s -- <tag>
+curl -fsSL https://fxbot.sh/setup.sh | sudo bash
+curl -fsSL https://fxbot.sh/setup.sh | sudo bash -s -- <tag>
 ```
 
 Installs fxbot on Debian or Ubuntu as containers, as root. It uses podman, or docker when only docker is installed. When neither is, it installs podman and Compose v2, on Debian 13 or Ubuntu 24.04 and newer. What it creates is in [What setup.sh creates](/docs/reference/install-layout/).

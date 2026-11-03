@@ -65,8 +65,8 @@ The previous design and spike are in [archive/](archive/README.md). The git host
 On Debian or Ubuntu, `setup.sh` installs the newest release, or the one you name:
 
 ```sh
-curl -fsSL https://raw.githubusercontent.com/iammrduncan/fxbot/main/setup.sh | sudo bash
-curl -fsSL https://raw.githubusercontent.com/iammrduncan/fxbot/main/setup.sh | sudo bash -s -- v0.3.0
+curl -fsSL https://fxbot.sh/setup.sh | sudo bash
+curl -fsSL https://fxbot.sh/setup.sh | sudo bash -s -- v0.3.0
 ```
 
 fxbot runs as containers: the app, its database in pgvector's Postgres image, and the local embedder for memory search, from one compose file. `setup.sh` uses podman, or docker when only docker is installed. When neither is, it installs podman and Compose v2, on Debian 13 or Ubuntu 24.04 and newer; on older releases, install Docker from Docker's repository first. Then:

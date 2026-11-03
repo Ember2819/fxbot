@@ -13,7 +13,7 @@ You need:
 On the machine, run:
 
 ```sh
-curl -fsSL https://raw.githubusercontent.com/iammrduncan/fxbot/main/setup.sh | sudo bash
+curl -fsSL https://fxbot.sh/setup.sh | sudo bash
 ```
 
 The script names each step in bold as it goes: the container engine, the fxbot user and its key, the release, and the services. fxbot runs as three containers: the app, its database, and the local embedder for memory search. The script uses podman, or docker when only docker is installed, and installs podman when neither is. Downloading the three images can take a few minutes, and the embedder downloads its model, 310 MB, on its first start. It ends with:
