@@ -32,4 +32,6 @@ await rm(server, { recursive: true });
 // fxbot's own lists of MCP servers and skills, which each release also ships with, for installs that read the
 // published copies (FXBOT_LISTS_URL). The SDK's files are the only copies to edit.
 for (const list of ["mcp-registry.json", "skills-registry.json"]) await cp(join(root, "../sdk/src", list), join(out, list));
+// The install script, at fxbot.sh/setup.sh: main's, since the site deploys from main.
+await cp(join(root, "../../setup.sh"), join(out, "setup.sh"));
 console.log(`The site is in ${out}`);

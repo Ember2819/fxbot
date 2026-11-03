@@ -25,7 +25,7 @@ sudo fxbot update 0.4.0-rc.1
 0.2 ran on the machine's own Node and Postgres, and its Settings can't move it into containers. Run `setup.sh` again:
 
 ```sh
-curl -fsSL https://raw.githubusercontent.com/iammrduncan/fxbot/main/setup.sh | sudo bash
+curl -fsSL https://fxbot.sh/setup.sh | sudo bash
 ```
 
 It stops 0.2, copies its database into `/var/lib/fxbot/backups/<date>-move-to-containers/`, restores that copy into the database container, and starts the containers on the same chats, key, and settings. The 0.2 files and database stay until you remove them. `sudo fxbot status` prints the commands.

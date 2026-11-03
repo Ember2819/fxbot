@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 # Installs fxbot on Debian or Ubuntu as containers, from a release tag: the newest, or the one named.
 #
-#   curl -fsSL https://raw.githubusercontent.com/iammrduncan/fxbot/main/setup.sh | sudo bash
-#   curl -fsSL https://raw.githubusercontent.com/iammrduncan/fxbot/main/setup.sh | sudo bash -s -- v0.3.0
+#   curl -fsSL https://fxbot.sh/setup.sh | sudo bash
+#   curl -fsSL https://fxbot.sh/setup.sh | sudo bash -s -- v0.3.0
 #
 # It uses podman, or docker when only docker is installed, and installs podman and Compose when neither is. Then the
 # fxbot user with its key, /opt/fxbot (the release's compose.yaml, an .env, and the fxbot command), and the systemd
