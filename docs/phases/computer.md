@@ -2,11 +2,11 @@
 
 Each bot gets a Linux computer of its own to use during its turns: a shell, files that last, and the programs other plugins install. The computer is a plugin. A bot with it on runs commands, reads and writes files, and shares what it makes to its library. Other plugins add programs to every computer through setup steps, the way the browser plugin in this phase adds a web browser. Computers start on a bot's first call and stop when they sit idle. They run in a rootless container engine that belongs to a user of their own on the machine, so they stay apart from fxbot's own files and from each other. From [issue #6](https://github.com/iammrduncan/fxbot/issues/6).
 
-Status: planned, not built. Research and plan only, written on 2026-11-02. It builds on the [plugin API](../_completed/phases/plugins.md), and on the [containers](../_completed/phases/containers.md) install for the app's side of the engine. A checkout runs it as well. The issue asked for computers before plugins. Since then the stub made the computer a plugin, so this phase comes after plugins.
+Status: planned, not built. Research and plan only, written on 2026-11-02. On 2026-11-03 it was checked against the code after [one kind of plugin](../_completed/phases/one-kind-of-plugin.md) (the `sh.fxbot` namespace, Plugins, vetted lists) and the docs' move to Starlight, and brought up to date. It builds on the [plugin API](../_completed/phases/plugins.md), and on the [containers](../_completed/phases/containers.md) install for the app's side of the engine. A checkout runs it as well. The issue asked for computers before plugins. Since then the stub made the computer a plugin, so this phase comes after plugins. Build it on the open release branch, a milestone to a commit.
 
 ## 0. Core or plugin
 
-**Plugin: a plugin that other plugins build on** ([Core or plugin](../../CONVENTIONS.md#core-or-plugin)). Many bots need no computer: chat, the library, MCP servers, and skills work without one. The core's own tools reach only its own data. A shell, a machine's files, and a browser are plugins. A bot gets a computer only when the owner turns the plugin on for it, and an owner who never adds the plugin runs no engine, no timer, and no image.
+**Plugin: a plugin that other plugins build on** ([Core or plugin](../../CONVENTIONS.md#core-or-plugin)). Many bots need no computer: chat, the library, MCP servers, and skills work without one. The core's own tools reach only its own data. A shell, a machine's files, and a browser are plugins. A bot gets a computer only while the plugin is on for it: like any plugin, it is on for every bot once added, and its **Bots** setting narrows that. An owner who never adds the plugin runs no engine, no timer, and no image.
 
 The core never names the computer. The plugin API gains the smallest pieces the computer and its first dependent need:
 - **`needs` in a plugin's manifest:** the plugins a plugin needs, each with a block of settings for that plugin. The browser plugin uses it to give the computer its setup steps.
@@ -14,7 +14,7 @@ The core never names the computer. The plugin API gains the smallest pieces the 
 - **`fx.library.read` and `fx.library.save`:** to move files between a bot's library and its computer.
 - **`fx.skills.files`:** a skill's files, so scripts can run on the computer.
 
-A way for one plugin's code to call another's, such as `fx.need("computer")`, waits for the first plugin that needs it. The browser plugin is setup steps and a skill, with no code.
+A way for one plugin's code to call another's, such as `fx.need("computer")`, waits for the first plugin that needs it. The browser plugin is setup steps and a skill, with no code, which a plugin can already be since one kind of plugin.
 
 ## 1. Research
 
@@ -56,6 +56,7 @@ Checked on 2026-11-02 against each project's source and docs, and with prototype
 
 **fx and libfx 0.0.16** (`0d1b727`, the installed package):
 - **fx's own tools:** `shell` (`run`, `interact`, `stop`, with a 30 s yield before it hands back a session id), `read_file`, `write_file`, `edit_file`, `glob_files`, and `grep_files`. Results are capped at 64 KiB, keeping the start, and the rest is paged with `read_tool_result`.
+- **Calls at once.** "On the native backend, calls to idempotent tools from one model response run at the same time, up to 16 at once. A tool that isn't idempotent runs alone" (libfx's README). A host tool's context has the call's `executionId`, which fxbot's plugin API doesn't pass on.
 - **No sandbox.** fx has had none on Linux since 0.0.5, which retired its sandbox setting.
 - **libfx gives no shell or file tools.** The native backend "doesn't turn on fx's built-in shell or file tools". `FxWorkspace` (`exec` with `timeoutMs` and `outputLimitBytes`) belongs to the browser terminal, not to agents. So the computer's tools are host tools.
 - **Images in results.** A host tool can return an `FxToolResult` with up to 8 images, so a bot can look at a screenshot it took.
@@ -136,7 +137,7 @@ fxbot has no login of its own, so a computer that reaches the tailnet address ca
 5. **The internet only, by uid.** An nftables table refuses the engine user's connections to the machine, its tailnet, the LAN, and the container networks, except DNS to the machine's resolvers. It is one rule set on the host, and it covers every computer whichever way a process connects.
 6. **Plugins install programs as image layers.** Each plugin that needs the computer names setup steps, as eve's extensions and Grok bot's setup scripts do. The computer builds one image from them, which every bot's computer shares, so Chromium is on disk once. A bot's own `apt-get` lasts until the image changes. Its home lasts until it is reset.
 7. **Four tools, in the shape the references share:** a shell that takes one command, with a deadline and a process group; reading a file, an image included; writing one; and sharing one to the library. The shell keeps both ends of long output and the whole of it in a file, as Pi does. There are no interactive shell sessions: a server runs with `setsid`, as fx's own description says.
-8. **Host setup is the plugin's, and the owner runs it once.** The plugin ships the script, and its page shows the command. The core's host command never names it. A compose override file, which compose reads beside its own file, gives the app the socket.
+8. **Host setup is the plugin's, and the owner runs it once.** The plugin ships the script, and its Settings section shows the command and the script's text. The core's host command never names it. `compose.override.yaml` gives the app the socket: the host `fxbot` command already adds that file when it exists (`deploy/fxbot`), and updates and `setup.sh` leave it alone.
 
 ## 3. Implementation
 
@@ -146,29 +147,33 @@ Both live in this repository, outside the workspaces, as [plugins](../_completed
 
 ```text
 plugins/computer/
+├── README.md                what it is, its files, and how to build page.js, as herdr's README has
 ├── plugin.json
 ├── fxbot/
 │   ├── server.ts            the engine client, computers, tools, and routes
 │   ├── fxbot-run            copied into the image: runs one command
-│   ├── page.js              its Settings and bot settings sections (built from page.tsx)
-│   └── page.tsx
+│   ├── page.jsx             its Settings and bot settings sections
+│   └── page.js              page.jsx, built with rolldown
 └── host/setup.sh            run once on the machine, as root
 
 plugins/browser/
+├── README.md
 ├── plugin.json              setup steps for the computer
 └── skills/browser/SKILL.md
 ```
+
+fxbot writes every text file of a plugin from GitHub to `<FXBOT_DATA>/plugins/<name>/<commit>/`, so `server.ts` finds `fxbot-run` and `host/setup.sh` beside itself, through `import.meta.dirname`. `page.js` is built as herdr's is: `npx rolldown fxbot/page.jsx --format cjs -e react -e react/jsx-runtime -e @fxbot/app --file fxbot/page.js`.
 
 `plugins/computer/plugin.json`:
 
 ```json
 {
-  "$schema": "https://agent-plugins.org/schemas/1.0.0/plugin.schema.json",
   "name": "computer",
   "version": "0.1.0",
-  "description": "A Linux computer for each bot: a shell, files, and the programs other plugins install",
+  "description": "A Linux computer for each bot: a shell, files, and the programs other plugins install.",
+  "license": "Apache-2.0",
   "extensions": {
-    "io.github.iammrduncan.fxbot": {
+    "sh.fxbot": {
       "server": "./fxbot/server.ts",
       "page": "./fxbot/page.js",
       "settings": [
@@ -184,20 +189,20 @@ plugins/browser/
 
 ### The plugin API pieces (`packages/sdk/src/plugins.ts`)
 
-- **`needs`.** A manifest's `extensions.<namespace>.needs` maps plugin names to a JSON block for each, at most 16 KiB.
-  - The plugin page shows "Needs computer". Add is off until that plugin is added.
+- **`needs`.** A manifest's `extensions["sh.fxbot"].needs` maps plugin names to a JSON object for each, at most 16 KiB in all. `parseManifest` checks it, and `Manifest` and the plugin's view gain it.
+  - The plugin page shows "Needs computer". Add is off until that plugin is added, and the SDK refuses it with "Add computer first."
   - Removing a plugin that others need is refused, naming them.
   - Plugins load after the ones they need.
-- **`fx.dependents()`** returns `{ name, version, needs }` for each added plugin that needs this one, where `needs` is its block for this plugin. `fx.on("dependents", …)` hears adds, updates, and removals.
-- **`fx.library.read(bot, id)`** returns an item's name, type, and bytes, if the item is tagged for that bot. **`fx.library.save({ bot, session, name, type, bytes })`** saves through the library's own checks, with origin `generated`. These are the same functions the library tools use.
-- **`fx.skills.files(name)`** returns a skill's files as `{ path, text }`, from the rows the skill tool reads.
-- **A plugin with no code parts.** A plugin with neither `server` nor `page`, such as the browser, is valid.
+  - A bot's plugin switches note "Needs computer on this bot" beside a plugin whose needed plugin is off for that bot.
+- **`fx.dependents()`** returns `{ name, version, needs }` for each added plugin that needs this one, where `needs` is its block for this plugin. A new hook event, `fx.on("dependents", …)`, hears adds, updates, and removals.
+- **`fx.library.read(bot, id)`** returns an item's name, type, and bytes, if the item is tagged for that bot: the library's `get` and `file`, with the tag check `library_read` makes. **`fx.library.save({ bot, session, name, type, bytes })`** is the library's `save`, with its checks and origin `generated`.
+- **`fx.skills.files(bot, name)`** returns the files of the skill that bot sees by that name, as `{ path, text }`: the `resources` of the skills rows the core `skill` tool reads, found as it finds them.
 
-About 60 lines in the SDK, plus the "Needs" line on the plugin page in `packages/ui`. The server gains nothing: the plugin's routes go through the plugin API.
+No migration: `needs` is kept in the plugin's stored manifest, as its settings are. A plugin with neither `server` nor `page`, such as the browser, can already be added. About 75 lines in the SDK (`plugins.ts`, `plugin-api.ts`, and a few in `library.ts` and `skills.ts`), plus the "Needs" lines on the plugin page and a bot's switches in `packages/ui`. The server gains nothing: the plugin's routes go through the plugin API.
 
 ### The engine (`host/setup.sh`)
 
-The owner runs it once, as root. The plugin's Settings section shows the exact command, from the pinned files fxbot already keeps: `sudo bash /var/lib/fxbot/data/plugins/computer/<commit>/host/setup.sh`. For a checkout, the path is under its own `FXBOT_DATA`, and the command adds `--user <login>`. The script is about 110 lines and safe to run again. In order:
+The owner runs it once, as root. The plugin's Settings section shows the exact command, from the pinned files fxbot already keeps, and the script's text under it, so the owner reads what runs as root first. In a release install the command is `sudo bash /var/lib/fxbot/data/plugins/computer/<commit>/host/setup.sh`: the app's container mounts that folder at the same path as on the machine. For a checkout, the path is under its own `FXBOT_DATA`, or in `plugins/computer/` when `FXBOT_PLUGIN_DIRS` loads it, and the command adds `--user <login>`. The script is about 110 lines and safe to run again. In order:
 1. **Checks:** root, systemd, apt, and podman 4.9 or newer available (Debian 13, Ubuntu 24.04).
 2. **Packages:** `podman uidmap passt dbus-user-session`, with `--no-install-recommends`. A machine that runs fxbot under docker gets podman beside it, for computers only.
 3. **The user:** `fxbot-computer`, a system user with its home at `/var/lib/fxbot-computer` (mode 0750), a subordinate uid and gid range of 65,536 that doesn't overlap another, and lingering on.
@@ -211,7 +216,7 @@ The owner runs it once, as root. The plugin's Settings section shows the exact c
    - It rejects 127.0.0.0/8, 10.0.0.0/8, 172.16.0.0/12, 192.168.0.0/16, 100.64.0.0/10, 169.254.0.0/16, and multicast, and `::1`, `fc00::/7`, `fe80::/10`, and `ff00::/8` for IPv6.
    - `fxbot-computer-firewall.service` (oneshot, `nft -f`) loads it at boot.
 6. **The app's access:**
-   - **A containers install:** the script writes `/opt/fxbot/compose.override.yaml`, which mounts `/var/lib/fxbot-computer/run` at `/run/fxbot-computer` with the user's gid in `group_add`, then runs `fxbot up`. Compose merges an override file beside its own when it runs without `-f`, so the [containers](../_completed/phases/containers.md) phase's `fxbot` command must call it that way, and its updates must leave the file alone.
+   - **A containers install:** the script writes `/opt/fxbot/compose.override.yaml`, which mounts `/var/lib/fxbot-computer/run` at `/run/fxbot-computer` with the user's gid in `group_add`, then runs `fxbot up`. The [containers](../_completed/phases/containers.md) phase's `fxbot` command already adds that file to `COMPOSE_FILE` when it exists, and its updates and `setup.sh` leave it alone.
    - **A checkout:** `--user <login>` adds that user to the `fxbot-computer` group. The plugin's `engine` setting is then `/var/lib/fxbot-computer/run/engine.sock`.
 7. **It prints** the socket path and what it changed.
 
@@ -231,7 +236,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
   && rm -rf /var/lib/apt/lists/*
 COPY fxbot-run /usr/local/bin/fxbot-run
 # browser 0.1.0
-RUN arch=$(dpkg --print-architecture) && curl -fsSL -o /usr/local/bin/agent-browser …
+RUN case $(dpkg --print-architecture) in … esac && curl -fsSL -o /usr/local/bin/agent-browser …
 RUN apt-get update && apt-get install -y --no-install-recommends chromium fonts-dejavu-core && rm -rf /var/lib/apt/lists/*
 ```
 
@@ -240,7 +245,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends chromium fonts-
 - **When it builds.** On a bot's first call, if the image for the current hash is missing. Again when `dependents` changes, in the background. Build lines go to the plugin's log. A failed build keeps the old image, and the error shows on the plugin's row.
 - **Old images** are removed once no computer uses them.
 
-`fxbot-run <id> <seconds> <command>` is 12 lines of bash. It runs the command with `setsid timeout -s KILL <seconds> bash -c`, writes the output to `/tmp/fxbot/<id>.log` and the process group to `/tmp/fxbot/<id>.pid`, and waits. Then it prints the whole output if it is 64 KiB or less. Otherwise it prints the first 4 KiB, a line saying how much was cut and where the rest is, and the last 60 KiB. It exits with the command's code.
+`fxbot-run <id> <seconds> <command>` is 12 lines of bash, where `<id>` is a random id the plugin makes for the call. It runs the command with `setsid timeout -s KILL <seconds> bash -c`, writes the output to `/tmp/fxbot/<id>.log` and the process group to `/tmp/fxbot/<id>.pid`, and waits. Then it prints the whole output if it is 64 KiB or less. Otherwise it prints the first 4 KiB, a line saying how much was cut and where the rest is, and the last 60 KiB. It exits with the command's code.
 
 ### Computers (`fxbot/server.ts`)
 
@@ -254,6 +259,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends chromium fonts-
 | Restart | none. The plugin starts it |
 
 - **The first call** builds the image if needed, makes the volume and the container, and starts it. A later call to a stopped computer starts it (about 0.1 s). A computer on an old image is made again from the new one when it next starts; its home stays.
+- **One start at a time.** Each bot has one start in flight at most, and calls in parallel wait on it. One image build runs at a time for all bots.
 - **Idle stop.** A computer with no call for `idleMinutes` stops. One timer runs while any computer runs, and none runs otherwise.
 - **After fxbot restarts,** the plugin lists containers by label and counts the running ones as just used.
 - **A deleted bot's** computer and home are removed when the plugin loads, and whenever the idle timer stops a computer.
@@ -268,13 +274,13 @@ The plugin's tools reach only the bots it is on for, named `computer_<tool>`:
 
 | Tool | Input | Does |
 | --- | --- | --- |
-| `computer_shell` | `command`, `timeout` (seconds, default 120, at most 600) | Runs `fxbot-run` with the call's `executionId`. Returns `exit <code>` and the output, or "Stopped after <n> s". When the turn is cancelled, a second exec kills the process group. |
-| `computer_read_file` | `path`, `offset`, `limit` (lines) | Text: up to 2,000 lines or 256 KiB from `offset`, saying where it stopped. An image (PNG, JPEG, GIF, or WebP, up to 3.75 MiB) comes back as an image, so the bot sees it. |
+| `computer_shell` | `command`, `timeout` (seconds, default 120, at most 600) | Runs `fxbot-run` with an id it makes for the call. Returns `exit <code>` and the output, or "Stopped after <n> s". When the call's `signal` aborts (the turn is cancelled), a second exec kills the process group. |
+| `computer_read_file` | `path`, `offset`, `limit` (lines) | Text: up to 2,000 lines or 256 KiB from `offset`, saying where it stopped. An image (PNG, JPEG, GIF, or WebP, up to 3.75 MiB) comes back as an image, so the bot sees it: a libfx `FxToolResult`, as `library_read` returns one. |
 | `computer_write_file` | `path`, and `text` or `library` (a `library:<id>`) | Writes the text, or the library item's bytes, making folders as needed. Text up to 1 MiB. |
-| `computer_to_library` | `path`, `name` (optional) | Saves an image or a text file from the computer to the bot's library, tagged for the chat, and returns its `library:<id>`. Other files are refused, since the library keeps only images and text. |
+| `computer_to_library` | `path`, `name` (optional) | Saves an image (up to 3.75 MiB) or a text file (up to 1 MiB) from the computer to the bot's library, tagged for the chat, and returns its `library:<id>`. Other files are refused, since the library keeps only images and text. |
 
 - **Relative paths** start at `/root`. The bot is root on its own computer, so there is no path check: everything there is the bot's.
-- **Calls in parallel.** `computer_shell` has `idempotent: false`, so libfx runs its calls one at a time. The others are idempotent: writing the same bytes twice, or saving the same item, changes nothing.
+- **Calls in parallel.** `computer_shell` has `idempotent: false`, so libfx runs each of its calls alone. The others are idempotent, so calls from one response run at once: writing the same bytes twice, or saving the same item, changes nothing.
 - **Commands get** `HOME=/root`, the image's `PATH`, and `DEBIAN_FRONTEND=noninteractive`, and no environment from fxbot.
 - **`computer_shell`'s description** tells the bot:
   - that this is its own Debian computer, where it is root
@@ -282,25 +288,26 @@ The plugin's tools reach only the bots it is on for, named `computer_<tool>`:
   - that a server keeps running with `setsid cmd > log 2>&1 &` until the computer stops after its idle minutes
   - where the whole of a long output is
   - that the computer reaches the internet, but not this machine or its network
-- **Skills that run scripts.** On `tool.after` of the core `skill` tool, for a bot with a computer, when the skill has files besides `SKILL.md`:
-  - The hook writes them to `/skills/<name>/` on that bot's computer, starting it if needed.
-  - It adds a line to the result: "Its files are also at /skills/<name> on your computer."
+- **Skills that run scripts.** On `tool.after` of the core `skill` tool, for a bot the plugin is on for, when `fx.skills.files(bot, name)` has files besides `SKILL.md`:
+  - The hook notes the skill for that bot's computer, and adds a line to the result: "Its files are at /skills/<name> on your computer."
+  - The plugin writes noted skills' files to `/skills/<name>/` before that bot's next computer call, and at once if its computer is running. The hook never starts a computer: a hook gets 5 s, and a first start can wait about 35 s for the image.
 
-### The page (`fxbot/page.tsx`)
+### The page (`fxbot/page.jsx`)
 
 - **Settings section:**
-  - the engine's state: ready, not reachable (with the host command to copy), or refused as rootful
+  - the engine's state: ready, not reachable (with the host command to copy, and **Read the script** to show its text), or refused as rootful
   - the image's hash and size, or its build, live
   - each computer: its bot, running or stopped, its home's size, and its last use
   - **Rebuild image** (pulls the base again) and **Delete all computers**
 - **A bot's settings section:** its computer's state, **Stop**, and **Reset**, which deletes the computer and its home after a confirm.
 - **Routes**, under `/api/plugins/computer/`:
   - `GET status`
+  - `GET script`, the setup script's text
   - `POST rebuild`
   - `POST bots/:id/stop` and `POST bots/:id/reset`
   - `DELETE computers`
 
-The generic tool steps show the computer's calls in replies, so this phase adds no tool view. About 120 lines.
+The generic tool steps show the computer's calls in replies, so this phase adds no tool view. About 125 lines.
 
 ### The browser plugin
 
@@ -308,16 +315,16 @@ The generic tool steps show the computer's calls in replies, so this phase adds 
 
 ```json
 {
-  "$schema": "https://agent-plugins.org/schemas/1.0.0/plugin.schema.json",
   "name": "browser",
   "version": "0.1.0",
-  "description": "A web browser on each bot's computer, driven with agent-browser",
+  "description": "A web browser on each bot's computer, driven with agent-browser.",
+  "license": "Apache-2.0",
   "extensions": {
-    "io.github.iammrduncan.fxbot": {
+    "sh.fxbot": {
       "needs": {
         "computer": {
           "setup": [
-            "arch=$(dpkg --print-architecture) && curl -fsSL -o /usr/local/bin/agent-browser https://github.com/vercel-labs/agent-browser/releases/download/v0.41.1/agent-browser-linux-$([ \"$arch\" = amd64 ] && echo x64 || echo arm64) && echo \"<sha256 for $arch>  /usr/local/bin/agent-browser\" | sha256sum -c && chmod +x /usr/local/bin/agent-browser",
+            "case $(dpkg --print-architecture) in amd64) f=x64 s=2a89295b62ddd497986a9a80b52e1dbe4c1f6bd68ffde67eaae82eec2206af61 ;; arm64) f=arm64 s=f0b3bdaa40abf2a5111ec08e6d242110aaf56045ef5108cbc633bacc8e53ca17 ;; *) exit 1 ;; esac && curl -fsSL -o /usr/local/bin/agent-browser https://github.com/vercel-labs/agent-browser/releases/download/v0.41.1/agent-browser-linux-$f && echo \"$s  /usr/local/bin/agent-browser\" | sha256sum -c && chmod +x /usr/local/bin/agent-browser",
             "apt-get update && apt-get install -y --no-install-recommends chromium fonts-dejavu-core && rm -rf /var/lib/apt/lists/*"
           ]
         }
@@ -327,13 +334,13 @@ The generic tool steps show the computer's calls in replies, so this phase adds 
 }
 ```
 
-- **The binary** is checked against the release's sha256 for each CPU. Debian's `chromium` runs on amd64 and arm64, where Chrome for Testing has no Linux arm64 build. agent-browser finds it by name.
+- **The binary** is checked against the release's sha256 for each CPU. The digests above are the ones GitHub lists for v0.41.1's `agent-browser-linux-x64` and `agent-browser-linux-arm64`, still the newest release on 2026-11-03. A newer release at build time means new digests from the same place. Debian's `chromium` runs on amd64 and arm64, where Chrome for Testing has no Linux arm64 build. agent-browser finds it by name.
 - **`skills/browser/SKILL.md`** tells the bot:
   - to run `agent-browser skills get core` first
   - to save screenshots under `/root` and look at them with `computer_read_file`
   - to share what the person should see with `computer_to_library`
   - to close the browser when done, since an open page holds about 200 MB
-- **A bot's switches.** A bot with the browser but no computer gets the skill and no shell, so the browser's bot switches note "Needs computer on this bot".
+- **A bot's switches.** A bot with the browser but no computer gets the skill and no shell, so its switches note "Needs computer on this bot", from the plugin API piece above.
 
 ### Speed and cost
 
@@ -359,14 +366,14 @@ The generic tool steps show the computer's calls in replies, so this phase adds 
 
 ### Size
 
-About 750 lines in all:
+About 780 lines in all, plus the two READMEs and the docs:
 
 | Part | Lines |
 | --- | --- |
-| Plugin API pieces and the "Needs" line | about 75 |
-| `server.ts`: the engine client 90, computers and the image 130, tools and the skill hook 140, routes 30 | about 390 |
+| Plugin API pieces and the "Needs" lines | about 90 |
+| `server.ts`: the engine client 90, computers and the image 130, tools and the skill hook 140, routes 35 | about 395 |
 | `fxbot-run` | 12 |
-| `page.tsx` | about 120 |
+| `page.jsx` | about 125 |
 | `host/setup.sh` | about 110 |
 | The browser plugin | about 40 |
 
@@ -379,10 +386,11 @@ Checks use disposable Postgres, the mock model, Playwright, and fxbot's list ser
 - **Without it:** the checks run against an engine started by hand for an existing unprivileged user, as this research did, and the script becomes a human check.
 
 **M1. The plugin API pieces**
-- [ ] A scratch plugin that needs another: its plugin page says "Needs <name>", and Add is off until that one is added. Removing the needed plugin is refused, naming the dependent.
+- [ ] A scratch plugin that needs another: its plugin page says "Needs <name>", Add is off until that one is added, and the API refuses it with "Add <name> first." Removing the needed plugin is refused, naming the dependent.
+- [ ] With both added, a bot that has the dependent on and the needed one off shows "Needs <name> on this bot" in its switches.
 - [ ] `fx.dependents()` returns the dependent's block, and `fx.on("dependents")` fires when it is added, updated, and removed.
 - [ ] `fx.library.read` refuses an item that isn't tagged for the bot. `fx.library.save` puts an image in the bot's library, tagged for the chat.
-- [ ] `fx.skills.files` returns a skill's files. A plugin with no code parts adds, and its skill joins the catalog.
+- [ ] `fx.skills.files(bot, name)` returns the files of the skill the bot sees by that name. The browser plugin, with no code parts, adds, and its skill joins the catalog.
 
 **M2. The engine**
 - [ ] `setup.sh`:
@@ -392,6 +400,7 @@ Checks use disposable Postgres, the mock model, Playwright, and fxbot's list ser
   - `--remove` takes it all away
 - [ ] The containers stack merges the override: after `fxbot up` and after an update, the app has the socket folder and the group.
 - [ ] From the app's container (the containers stack) and from a checkout, the plugin reaches the engine. A rootful socket in the setting is refused with its message.
+- [ ] The Settings section shows the host command with the right path, for a release install and for a checkout, and **Read the script** shows `setup.sh`'s text.
 - [ ] A computer's `memory.max`, `pids.max`, and `cpu.max` match the settings.
 
 **M3. Computers**
@@ -405,6 +414,7 @@ Checks use disposable Postgres, the mock model, Playwright, and fxbot's list ser
 - [ ] Deleting a bot removes its computer and home.
 - [ ] Stop, Reset, and Delete all computers work from the page.
 - [ ] With the plugin added and no bot calling, no timer runs and no engine call is made after the load check.
+- [ ] Three `computer_read_file` calls in one mock-model response, to a stopped computer, start it once.
 
 **M4. Tools**, through the mock model:
 - [ ] `computer_shell`:
@@ -418,7 +428,7 @@ Checks use disposable Postgres, the mock model, Playwright, and fxbot's list ser
   - returns a PNG as an image, which reaches the mock model's request as an image
 - [ ] `computer_write_file` writes text into a new folder, and writes a library image's bytes.
 - [ ] `computer_to_library` puts a PNG in the library panel.
-- [ ] Reading a skill with a `scripts/` file puts it in `/skills/<name>/`, and the bot runs it.
+- [ ] A bot with no computer yet reads a skill with a `scripts/` file: the hook returns at once, the file is in `/skills/<name>/` by its first computer call, and the bot runs it.
 
 **M5. What a computer reaches**
 - [ ] From a computer:
@@ -435,13 +445,15 @@ Checks use disposable Postgres, the mock model, Playwright, and fxbot's list ser
 - [ ] Memory with the page open is noted.
 
 **M7. Docs and checks**
-- [ ] The site gains a how-to, "Give bots a computer": add it, run the host command, and turn it on for bots. Its reference covers the tools, the settings, and what a computer reaches.
-- [ ] The "Add a plugin" how-to shows a plugin that needs another.
+- [ ] The docs gain a how-to, `packages/website/src/content/docs/docs/how-to/give-bots-a-computer.md` ("Give bots a computer": add it, run the host command, and choose its bots), and a reference page, `docs/reference/computer.md` beside it (the tools, the settings, and what a computer reaches), each listed in `src/sidebar.ts`.
+- [ ] The "Add a plugin" how-to shows a plugin that needs another. The SDK's Plugin API reference (`sdk/reference/plugin-api.md`) and its "Write a plugin" how-to cover `needs`, `fx.dependents()`, the `dependents` event, `fx.library`, and `fx.skills.files`.
 - [ ] fxbot's `plugins-registry.json` lists the computer and the browser, tagged **fxbot**.
+- [ ] `CHANGELOG.md` gains Unreleased lines for the computer, the browser, and the plugin API pieces.
+- [ ] The computer's `page.js` is built from its `page.jsx` by its README's command, and both are committed.
 - [ ] `npm run typecheck`, `npm run build`, `npm run build-site`, and `git diff --check` pass. `bash -n` and `shellcheck` pass on `setup.sh` and `fxbot-run`, where shellcheck is installed.
 
 **The human runs these:**
-- On their own install: add the computer, run the command it shows, and turn it on for one bot. Ask the bot to make a chart with Python and share it, then check it in the library.
+- On their own install: add the computer, run the command it shows, and narrow its **Bots** to one bot. Ask the bot to make a chart with Python and share it, then check it in the library.
 - Add the browser, and ask the bot to look something up on a site and send a screenshot.
 - From a computer, check that fxbot's tailnet address doesn't answer.
 
