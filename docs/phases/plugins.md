@@ -8,7 +8,7 @@ A plugin is code that changes fxbot itself, the way [Pi's](https://github.com/ea
 
 A plugin can also carry [skills](../_completed/phases/skills.md) and remote [MCP servers](../_completed/phases/mcp.md), in the format other agents share. It is found and added through [add-ons](../_completed/phases/addons.md).
 
-Status: planned, not built. Research and plan only, replanned on 2026-11-02 after the owner asked for plugins that change the app rather than sit beside it. It builds on [add-ons](../_completed/phases/addons.md), [skills](../_completed/phases/skills.md), and [MCP servers](../_completed/phases/mcp.md). This phase proves the API with two plugins of fxbot's own: [chat rooms](chat-rooms.md) and herdr.
+Status: being built for 0.4.0. Replanned on 2026-11-02 after the owner asked for plugins that change the app rather than sit beside it, and refreshed on 2026-11-03 for [containers](../_completed/phases/containers.md) and the project's site, [fxbot.sh](https://fxbot.sh). It builds on [add-ons](../_completed/phases/addons.md), [skills](../_completed/phases/skills.md), and [MCP servers](../_completed/phases/mcp.md). This phase proves the API with two plugins of fxbot's own: [chat rooms](chat-rooms.md) and herdr.
 
 ## 0. Core or add-on
 
@@ -81,13 +81,23 @@ Read from source, docs, and the installed libfx, as of November 2026.
 - The page has no content security policy, so `new Function` runs. The service worker precaches the build, and never answers `/api/`.
 - Add-ons already have a `kind`, a choice of all bots or each, and per-bot switches (`addons`, `profile_addons`), and the SDK can fetch a pinned GitHub commit (`archive.ts`).
 
-**herdr** ([herdr.dev](https://herdr.dev), [socket API](https://herdr.dev/docs/socket-api); read for the first plan)
-- **It is controlled through a socket.** A newline-delimited JSON socket at `~/.config/herdr/herdr.sock` takes commands such as `pane.send_keys` and `agent.prompt`. No auth is documented.
+**herdr** ([herdr.dev](https://herdr.dev), [socket API](https://herdr.dev/docs/socket-api), and `herdr api schema --json` from herdr 0.9.3, protocol 22)
+- **It is controlled through a socket.** A newline-delimited JSON socket at `~/.config/herdr/herdr.sock`, or `HERDR_SOCKET_PATH`, takes `{"id","method","params"}` and answers `{"id","result"}` or `{"id","error":{"code","message"}}`. No auth is documented; the socket is its user's alone (mode 600).
+- **What the plugin needs:** `agent.list` (no params) answers `{"type":"agent_list","agents":[…]}`, each with `pane_id`, `agent`, `name`, `agent_status` (`idle`, `working`, `blocked`, `done`, or `unknown`), and `cwd`. `pane.read` takes `pane_id`, `source` (`visible`, `recent`, `recent_unwrapped`, or `detection`), and `lines`, and answers `{"type":"pane_read","read":{"text","truncated",…}}`.
 - **No MCP server of its own.** The third-party `aelaguiz/herdr-mcp` is stdio, run through `uvx`.
+
+**Containers** (since 0.3.0, [containers](../_completed/phases/containers.md))
+- **A release runs in fxbot's container,** as the `fxbot` user. Its data folder, `/var/lib/fxbot/data` on the machine, is a mount that survives updates and goes into the backup before migrations. The image's Node is 22, which runs TypeScript as it is.
+- **The container sees no other folder or socket of the machine.** `/opt/fxbot/compose.override.yaml`, which compose merges and fxbot never writes, can mount more. The [agent computer](computer.md) plans to use it the same way.
+- **A checkout runs natively,** as its user, with the database and embedder from `deploy/compose.dev.yaml`.
+
+**fxbot.sh** (live since 0.2.1)
+- The site publishes fxbot's own lists, `mcp-registry.json` and `skills-registry.json`, copied from the SDK at build (`packages/website/build.ts`). Since 0.3.0, fxbot reads them from `https://fxbot.sh` by default (`FXBOT_LISTS_URL`).
+- The site has the [SDK's pages](https://fxbot.sh/sdk/), for people who build on fxbot, beside the owners' docs.
 
 ## 2. Key takeaways
 
-1. **Plugins run in fxbot's process, as in Pi, opencode, and eve.** A server module gets the plugin API; a page bundle gets the app's API. No sandbox and no second process: that is what lets a plugin change the app, and it keeps plugins light.
+1. **Plugins run in fxbot's process, as in Pi, opencode, and eve.** A server module gets the plugin API; a page bundle gets the app's API. No sandbox and no second process: that is what lets a plugin change the app, and it keeps plugins light. In a release, that process is fxbot's container, so a plugin reaches what the container does, and the owner mounts anything more.
 2. **Hooks change things where fxbot's own code runs, and chain in order.** Before a message runs, when instructions are built, before and after every tool call, and after a turn. libfx has no seam inside a model request, so fxbot has no `context` hook: a plugin changes what a bot knows through instructions and messages instead, as eve does.
 3. **Load page code the way opencode does.** The server serves the plugin's prebuilt bundle. The page runs it with a `require` that hands over the app's own React, its components, and its client. No import maps, no build step at install, and one copy of React.
 4. **Places in the app are named, and few.** Use opencode's slot idea, but only the places the first plugins need: a route, the sidebar, a footer button, the message box, a tool call's view, Settings, and a bot's settings. A new place comes with the plugin that needs it.
@@ -121,7 +131,7 @@ chat-rooms/
   "version": "0.1.0",
   "description": "Rooms where several bots talk with you",
   "extensions": {
-    "io.github.iammrduncan.fxbot": {
+    "sh.fxbot": {
       "server": "./fxbot/server.ts",
       "page": "./fxbot/page.js",
       "css": "./fxbot/page.css",
@@ -133,7 +143,7 @@ chat-rooms/
 ```
 
 - **The name.** The plugin's name is its id in fxbot, `^[a-z0-9]+(-[a-z0-9]+)*$`, up to 40 characters. Its tools are `<name>_<tool>`, as MCP servers' tools take their prefix. Its routes live under `/api/plugins/<name>/`, its page paths under `/<name>/`, and its schema is `plugin_<name>` with `_` for `-`.
-- **The namespace** is a reverse-domain name the project controls ([question 2](#5-open-questions)).
+- **The namespace** is `sh.fxbot`, the reverse of the project's domain, fxbot.sh ([question 2](#5-open-questions)).
 - **The code parts:**
   - `server` is plain JavaScript, or TypeScript that Node 22 strips as it runs, with no other build.
   - `page` is a CommonJS bundle that leaves `react`, `react/jsx-runtime`, and `@fxbot/app` out, for example `esbuild page.tsx --bundle --format=cjs --external:react --external:react/jsx-runtime --external:@fxbot/app`.
@@ -144,7 +154,7 @@ chat-rooms/
 `server.ts` exports one function. fxbot calls it when the plugin loads:
 
 ```ts
-import type { PluginApi } from "../../../packages/sdk/src/plugin-api.ts"; // types only
+import type { PluginApi } from "@fxbot/sdk"; // types only: Node erases the import
 
 export default async function setup(fx: PluginApi) {
   fx.on("message", async (e) => { if (e.text === "/ping") return { handled: true }; });
@@ -248,9 +258,9 @@ module.exports = function setup(app) {
 ### Installing, updating, and removing
 
 - **Sources:**
-  - **fxbot's list:** `plugins-registry.json` on the site, next to the other two lists (`FXBOT_LISTS_URL`). Each entry is `{ name, description, repo, path }`, tagged **fxbot**.
+  - **fxbot's list:** `plugins-registry.json` on fxbot.sh, next to the other two lists (`FXBOT_LISTS_URL`). Each entry is `{ name, description, repo, path }`, tagged **fxbot**.
   - **A GitHub repository,** with an optional folder: `owner/repo` or `owner/repo/path/to/plugin`.
-  - **A folder on this machine,** for writing a plugin: `FXBOT_PLUGIN_DIRS` lists folders in the server's environment, which load at start, unpinned, tagged **local**. `npm run dev` also restarts the API when files in them change.
+  - **A folder on this machine,** for writing a plugin in a checkout: `FXBOT_PLUGIN_DIRS` lists folders in the server's environment, which load at start, unpinned, tagged **local**. `npm run dev` also restarts the API when files in them change. A release install doesn't use it: its container sees no folder of the machine but its own.
 - **The preview** (the add-on page) pins the source's HEAD commit, then reads the plugin through `archive.ts`. Plugins get their own limits: 2 MiB a file, text only, 20 MB in all.
 - **The page shows:**
   - its description and `plugin.json`
@@ -258,7 +268,7 @@ module.exports = function setup(app) {
   - its settings, its migrations (readable), and its skills and remote servers
   - what's not used yet, such as stdio servers
 - **Add** checks the hash the page saw, then:
-  1. writes the files to `FXBOT_DATA/plugins/<name>/<commit>/`
+  1. writes the files to `FXBOT_DATA/plugins/<name>/<commit>/`, which in a release is `/var/lib/fxbot/data/plugins/` on the machine
   2. makes the schema and runs the migrations
   3. saves the add-on and its secrets
   4. imports the server module, calls `setup`, and remakes the agents if it added tools
@@ -275,7 +285,7 @@ module.exports = function setup(app) {
 
 ### Trust
 
-A plugin runs with everything fxbot can reach, as Pi, opencode, and eve plugins do. The add-on page says so before **Add**. Plugins are pinned to a commit, ask again before any change, and never update on their own.
+A plugin runs with everything fxbot can reach, as Pi, opencode, and eve plugins do: in a release, everything fxbot's container can reach. The add-on page says so before **Add**. Plugins are pinned to a commit, ask again before any change, and never update on their own.
 
 ### API, SDK, and client
 
@@ -292,9 +302,10 @@ A plugin runs with everything fxbot can reach, as Pi, opencode, and eve plugins 
 
 - **`packages/sdk`:**
   - `plugins.ts`: loading, the server API, hooks, schemas and migrations, settings, and install, update, and remove
-  - `plugin-api.ts`: its types
+  - `plugin-api.ts`: its types, exported from `@fxbot/sdk` for plugin authors
   - In `index.ts`: the hook sites, `from`, sessions for plugins, and tools through the wrapper. Also `registry.ts` (the plugins list), `archive.ts` (per-caller limits), and `0006_plugins.sql`.
 - **`packages/server`:** the routes above, and `FXBOT_PLUGIN_DIRS`.
+- **`packages/website`:** `plugins-registry.json` copied to the site with the other two lists.
 - **`packages/ui`:**
   - `plugins.tsx`: the loader, `@fxbot/app`, and the error boundaries
   - the places in `app.tsx` and `steps.tsx`
@@ -316,7 +327,9 @@ A plugin runs with everything fxbot can reach, as Pi, opencode, and eve plugins 
 
 **herdr** is small, and proves tools, settings, and a tool view:
 - **Tools:** `herdr_list_agents` and `herdr_read_pane` talk to herdr's socket directly, so no MCP server is needed. Both are read-only.
-- **A setting** holds the socket's path. A release runs as the `fxbot` user, so the owner points it at a socket that user can reach.
+- **A setting** holds the socket's path, `~/.config/herdr/herdr.sock` by default.
+  - **In a checkout** run by herdr's own user, that's all.
+  - **In a release,** fxbot's container runs as the `fxbot` user, and herdr's socket is its owner's alone. The plugin's README shows the owner a relay, with `socat`, that offers the socket to the `fxbot` user in a folder of its own, and the lines for `/opt/fxbot/compose.override.yaml` that mount that folder. fxbot's core never names herdr.
 - **A tool view** shows the agents as a table.
 - **A skill** says when to use the tools.
 
@@ -397,7 +410,8 @@ Checks use a sample plugin in the scratchpad that uses every hook and place, dis
   - Removing a bot from the room stops its answers.
 - [ ] herdr against a stub socket: list agents and read a pane, with the table view, a socket path setting, and a missing socket answered clearly.
 - [ ] Docs:
-  - The site gains a how-to, "Add a plugin", and a reference page, "Plugin API", for authors.
+  - The owners' docs gain a how-to, "Add a plugin".
+  - The SDK's pages gain a how-to, "Write a plugin", and a reference page, "Plugin API", for authors.
   - The Core and add-ons page names plugins.
   - The README's variables table lists `FXBOT_PLUGIN_DIRS`.
   - The CHANGELOG notes `0006_plugins`.
@@ -405,14 +419,14 @@ Checks use a sample plugin in the scratchpad that uses every hook and place, dis
 
 **The human runs these:**
 - Add chat rooms from GitHub, make a room with two bots, and talk with them.
-- Add herdr, point it at their socket, and ask a bot what herdr is running.
+- Add herdr, point it at their socket (through the relay in a release), and ask a bot what herdr is running.
 
 ## 5. Open questions
 
 Each has a default.
 
 1. **Where fxbot's own plugins live.** *Default:* `plugins/<name>/` in this repository, outside the workspaces and never imported by the core, added from GitHub like anyone's. The alternative is a repository of their own.
-2. **The namespace.** *Default:* `io.github.iammrduncan.fxbot`, which the project's GitHub account controls, until the project's domain is ready.
+2. **The namespace.** *Settled:* `sh.fxbot`, from fxbot.sh, which is live.
 3. **Dependencies.** *Default:* none installed. A plugin bundles what it needs. Pi installs `dependencies`, which brings install scripts and a slower add.
 4. **Local MCP servers and setup steps.** *Default:* the [agent computer](computer.md) phase. A plugin that needs a process starts it from its own code, as herdr's talks to a socket instead of running herdr-mcp.
 5. **How page code loads.** *Default:* a CommonJS bundle run with the app's `require`, as opencode does. The alternative is ES modules with an import map, which needs files that re-export the app's React, made at build time.
