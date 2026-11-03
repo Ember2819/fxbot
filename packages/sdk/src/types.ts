@@ -178,8 +178,12 @@ export type PackagePlugin = PluginCommon & {
   description: string;
   /** Its files when it was added or updated, to show what an update changes. A local plugin's aren't kept. */
   files: SkillFile[];
-  /** The MCP servers it added, which go when it does. */
+  /** The MCP servers it added, which follow its switch and its bots, and go when it does. */
   servers: string[];
+  /** Whether it runs code inside fxbot: a server module or page code. */
+  code: boolean;
+  /** The skills it carries, while it runs. */
+  skills: string[];
   /** Its settings, with each value but a secret's, which says only whether it is set. */
   settings: (PluginSetting & { value?: string; set: boolean })[];
   parts: PackageParts;

@@ -1,5 +1,6 @@
 import { useEffect, useState, type FormEvent } from "react";
 import { ExternalLinkIcon, LoaderCircleIcon, PencilIcon, PuzzleIcon, SearchIcon } from "lucide-react";
+import { Badge } from "@/components/ui/badge";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -8,26 +9,34 @@ import { Input } from "@/components/ui/input";
 import { SidebarTrigger } from "@/components/ui/sidebar";
 import { Switch } from "@/components/ui/switch";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import type { Plugin, McpCard, PluginMark, McpPreview, McpPlugin, OAuthAttempt, OAuthStatus, Profile, SkillCard } from "@fxbot/sdk/client";
-import { AddressDialog, bearer, EntryDialog, heading, hint, hostOf, Information, label, Results, signsIn, useSearch } from "./addon-add.tsx";
+import type { Plugin, McpCard, PluginMark, McpPreview, McpPlugin, OAuthAttempt, OAuthStatus, PackagePlugin, Profile, SkillCard } from "@fxbot/sdk/client";
+import { AddressDialog, bearer, EntryDialog, heading, hint, hostOf, Information, Initial, label, Results, signsIn, useSearch } from "./mcp-add.tsx";
 import { Blob } from "./blob.tsx";
 import { client } from "./client.ts";
-import { PluginDialog, PluginResults, PluginSettings, usePluginSearch, type PluginTarget } from "./plugin-addons.tsx";
+import { follow } from "./nav.ts";
+import { PluginDialog, PluginSettings, RepoForm, usePackageSearch, type PluginTarget } from "./packages.tsx";
 import { loadPlugins } from "./plugins.tsx";
 import { SkillDialog, SkillResults, SkillSettings, useSkillSearch } from "./skills.tsx";
 
 // Past this many, the page says how many tools reach the bots: each one's schema rides along with every message.
 const toolBudget = 40;
+const plural = (n: number, one: string) => `${n} ${one}${n === 1 ? "" : "s"}`;
 
-// Under an add-on's name: what it is, or how a server is and how many of its tools bots get, and which bots.
-function summary(addon: Plugin, profiles: Profile[] | null) {
-  if (!addon.enabled) return "Off";
-  const chosen = profiles?.filter((p) => addon.on.includes(p.id)).length ?? addon.on.length;
-  const bots = addon.bots === "all" ? "All bots" : `${chosen} bot${chosen === 1 ? "" : "s"}`;
-  if (addon.kind === "skill") return `Skill · ${bots}`;
-  if (addon.kind === "package") return addon.error ? `Plugin · Off: ${addon.error}` : `Plugin · ${bots}`;
-  const allowed = addon.tools.filter((t) => addon.allowed.includes(t.name)).length;
-  return [addon.status, addon.tools.length ? `${allowed} of ${addon.tools.length} tools` : "", bots].filter(Boolean).join(" · ");
+// What a plugin carries: code, MCP servers, and skills, in any mix.
+function carries(plugin: Plugin) {
+  if (plugin.kind === "mcp") return "MCP server";
+  if (plugin.kind === "skill") return "Skill";
+  return [plugin.code && "Code", plugin.servers.length && plural(plugin.servers.length, "MCP server"), plugin.skills.length && plural(plugin.skills.length, "skill")].filter(Boolean).join(" · ");
+}
+
+// Under a plugin's name: what it carries, how a server is and how many of its tools bots get, and which bots.
+function summary(plugin: Plugin, profiles: Profile[] | null) {
+  if (!plugin.enabled) return `${carries(plugin)} · Off`;
+  if (plugin.kind === "package" && plugin.error) return `Off: ${plugin.error}`;
+  const chosen = profiles?.filter((p) => plugin.on.includes(p.id)).length ?? plugin.on.length;
+  const bots = plugin.bots === "all" ? "All bots" : plural(chosen, "bot");
+  const tools = plugin.kind === "mcp" && plugin.tools.length ? `${plugin.tools.filter((t) => plugin.allowed.includes(t.name)).length} of ${plugin.tools.length} tools` : "";
+  return [carries(plugin), plugin.kind === "mcp" ? plugin.status : "", tools, bots].filter(Boolean).join(" · ");
 }
 const markText: Record<Plugin["kind"], Record<PluginMark["kind"], string>> = {
   mcp: { update: "Update available", deprecated: "Deprecated", removed: "Removed from the registry" },
@@ -35,14 +44,17 @@ const markText: Record<Plugin["kind"], Record<PluginMark["kind"], string>> = {
   package: { update: "Update available", deprecated: "Deprecated", removed: "Removed from its repository" },
 };
 
-type Tab = "installed" | "skills" | "mcp" | "plugins";
+type Tab = "installed" | "browse";
+// A card in fxbot's picks: a plugin from one of its three lists.
+type Card = { key: string; name: string; carries: string; description: string; added: boolean; open: () => void };
 
-// One search over every kind of add-on, with a tab for what is installed and one per kind. Installed lists servers,
-// skills, and plugins, one row each with a switch and an edit button that opens its settings. The Skills tab searches
-// fxbot's skills list and skills.sh, the MCP tab the MCP registries, and the Plugins tab fxbot's plugins list, beside
-// any plugin on GitHub.
-export function AddonsPage({ profiles }: { profiles: Profile[] | null }) {
+// One list of plugins. Installed has one row each, with a switch and an edit button that opens its settings; a
+// package's MCP servers show in its settings. Browse shows fxbot's picks, the plugins it vets; with unvetted plugins on
+// in Settings, it also searches the public MCP registries and skills.sh, and adds a server by address or a package
+// from GitHub.
+export function PluginsPage({ profiles }: { profiles: Profile[] | null }) {
   const [addons, setAddons] = useState<Plugin[] | null>(null);
+  const [unvetted, setUnvetted] = useState(false);
   const [error, setError] = useState("");
   const [query, setQuery] = useState("");
   const [everything, setEverything] = useState(false);
@@ -55,9 +67,10 @@ export function AddonsPage({ profiles }: { profiles: Profile[] | null }) {
   const [signingIn, setSigningIn] = useState<McpPlugin | null>(null);
   const search = useSearch(query, everything);
   const skillSearch = useSkillSearch(query);
-  const pluginSearch = usePluginSearch(query);
+  const packageSearch = usePackageSearch(query);
   const load = () => client.plugins.list().then((list) => (setAddons(list), setError("")), (e: Error) => setError(e.message));
   useEffect(() => void load(), []);
+  useEffect(() => void client.settings.get().then((settings) => setUnvetted(settings.unvetted), () => {}), []);
   // A server's status changes by itself while it connects.
   useEffect(() => {
     if (!addons?.some((a) => a.status === "Connecting")) return;
@@ -65,30 +78,37 @@ export function AddonsPage({ profiles }: { profiles: Profile[] | null }) {
     return () => clearTimeout(again);
   }, [addons]);
   const replace = (next: Plugin) => setAddons((all) => all?.map((a) => (a.id === next.id ? next : a)) ?? null);
-  // A plugin added, removed, turned on or off, or updated changes what the page loads.
-  const plugins = (addons ?? []).flatMap((a) => (a.kind === "package" ? [`${a.id}:${a.enabled}:${a.version}:${a.parts.page}:${a.error ?? ""}`] : [])).join(" ");
-  useEffect(() => void (addons && loadPlugins()), [plugins]);
+  // A package added, removed, turned on or off, or updated changes what the page loads, and its servers' state.
+  const packages = (addons ?? []).flatMap((a) => (a.kind === "package" ? [`${a.id}:${a.enabled}:${a.bots}:${a.on.join()}:${a.version}:${a.parts.page}:${a.error ?? ""}`] : [])).join(" ");
+  useEffect(() => void (addons && (loadPlugins(), load())), [packages]);
   const open = addons?.find((a) => a.id === openId);
+  // A package's servers follow it, and show in its settings rather than as rows.
+  const owned = new Map((addons ?? []).flatMap((a) => (a.kind === "package" ? a.servers.map((id) => [id, a] as const) : [])));
   const servers = (addons ?? []).flatMap((a) => (a.kind === "mcp" ? [a] : []));
   const reaching = servers.filter((a) => a.enabled).reduce((n, a) => n + a.tools.filter((t) => a.allowed.includes(t.name)).length, 0);
   const signIn = (addon: McpPlugin) => (setOpenId(null), setSigningIn(addon));
-  // Installed first when there is anything installed, else the registry.
-  const tab = chosen ?? (addons?.length ? "installed" : "mcp");
+  // Installed first when there is anything installed, else Browse.
+  const tab = chosen ?? (addons?.length ? "installed" : "browse");
   const words = query.trim().toLowerCase();
   const mine = (addons ?? []).filter(
     (a) =>
-      !words ||
-      (a.kind === "mcp" ? [a.name, a.source?.registry ?? "", hostOf(a.url)] : a.kind === "skill" ? [a.name, a.source.skill, a.description] : [a.name, a.description]).some((text) =>
-        text.toLowerCase().includes(words),
-      ),
+      !owned.has(a.id) &&
+      (!words ||
+        (a.kind === "mcp" ? [a.name, a.source?.registry ?? "", hostOf(a.url)] : a.kind === "skill" ? [a.name, a.source.skill, a.description] : [a.name, a.description]).some((text) =>
+          text.toLowerCase().includes(words),
+        )),
   );
-  const found = words && search.result ? search.result.cards.length : undefined;
-  const skillsFound = words && skillSearch.result ? skillSearch.result.cards.length : undefined;
-  // The mirror gives 20 at most.
-  const count = (n: number) => <span className="text-muted-foreground tabular-nums">{n >= 20 ? "20+" : n}</span>;
   const added = new Set(servers.flatMap((a) => [a.url, ...(a.source ? [a.source.registry] : [])]));
   const skillsAdded = new Set((addons ?? []).flatMap((a) => (a.kind === "skill" ? [a.source.skill] : [])));
-  const pluginsAdded = new Set((addons ?? []).flatMap((a) => (a.kind === "package" && "repo" in a.source ? [`${a.source.repo}${a.source.path ? `/${a.source.path}` : ""}`] : [])));
+  const packagesAdded = new Set((addons ?? []).flatMap((a) => (a.kind === "package" && "repo" in a.source ? [`${a.source.repo}${a.source.path ? `/${a.source.path}` : ""}`] : [])));
+  // fxbot's picks from its three lists, as one list: packages, then servers, then skills.
+  const picks: Card[] = [
+    ...(packageSearch.result?.cards ?? []).map((c) => ({ key: `p:${c.ref}`, name: c.name, carries: "", description: c.description, added: packagesAdded.has(c.ref), open: () => setPlugin({ ref: c.ref, from: "fxbot", name: c.name, description: c.description }) })),
+    ...(search.result?.cards ?? []).filter((c) => c.from === "fxbot").map((c) => ({ key: `m:${c.name}`, name: c.title || c.name, carries: "MCP server", description: c.description, added: added.has(c.name), open: () => setEntry(c) })),
+    ...(skillSearch.result?.cards ?? []).filter((c) => c.from === "fxbot").map((c) => ({ key: `s:${c.id}`, name: c.name, carries: "Skill", description: c.description ?? "", added: skillsAdded.has(c.id), open: () => setSkill(c) })),
+  ];
+  const publicServers = { ...search, result: search.result && { ...search.result, cards: search.result.cards.filter((c) => c.from !== "fxbot") } };
+  const publicSkills = { ...skillSearch, result: skillSearch.result && { ...skillSearch.result, cards: skillSearch.result.cards.filter((c) => c.from !== "fxbot") } };
   const onAdded = (addon: Plugin) => {
     setEntry(null);
     setSkill(null);
@@ -99,26 +119,25 @@ export function AddonsPage({ profiles }: { profiles: Profile[] | null }) {
     setChosen("installed");
     if (addon.kind === "mcp" && addon.auth === "oauth") signIn(addon);
   };
+  const removed = (id: string) => (setOpenId(null), void load(), setAddons((all) => all?.filter((a) => a.id !== id) ?? null));
 
   return (
     <>
       <header className="box-content flex h-14 shrink-0 items-center gap-2 px-3 pt-[env(safe-area-inset-top)]">
         <SidebarTrigger />
-        <h1 className="flex-1 font-medium">Add-ons</h1>
+        <h1 className="flex-1 font-medium">Plugins</h1>
       </header>
       <main className="flex flex-1 flex-col overflow-y-auto px-4 pb-6">
         <div className="mx-auto grid w-full max-w-xl gap-3">
           <div className="relative">
             <SearchIcon className="absolute top-2.5 left-2.5 size-4 text-muted-foreground" />
-            <Input enterKeyHint="search" aria-label="Search add-ons" placeholder="Search add-ons" className="pl-8" value={query} onChange={(e) => setQuery(e.target.value)} />
-            {(tab === "skills" ? skillSearch.busy : search.busy) && words && <LoaderCircleIcon className="absolute top-2.5 right-3 size-4 animate-spin text-muted-foreground" />}
+            <Input enterKeyHint="search" aria-label="Search plugins" placeholder="Search plugins" className="pl-8" value={query} onChange={(e) => setQuery(e.target.value)} />
+            {(search.busy || skillSearch.busy) && words && <LoaderCircleIcon className="absolute top-2.5 right-3 size-4 animate-spin text-muted-foreground" />}
           </div>
           <Tabs value={tab} onValueChange={(next) => setChosen(next as Tab)}>
             <TabsList className="w-full">
-              <TabsTrigger value="installed">Installed{words && addons?.length ? count(mine.length) : null}</TabsTrigger>
-              <TabsTrigger value="skills">Skills{skillsFound !== undefined ? count(skillsFound) : null}</TabsTrigger>
-              <TabsTrigger value="mcp">MCP{found !== undefined ? count(found) : null}</TabsTrigger>
-              <TabsTrigger value="plugins">Plugins</TabsTrigger>
+              <TabsTrigger value="installed">Installed{words && addons?.length ? <span className="text-muted-foreground tabular-nums">{mine.length}</span> : null}</TabsTrigger>
+              <TabsTrigger value="browse">Browse{words ? <span className="text-muted-foreground tabular-nums">{picks.length}</span> : null}</TabsTrigger>
             </TabsList>
           </Tabs>
           {error && <p role="alert" className="text-sm text-destructive">{error}</p>}
@@ -128,29 +147,20 @@ export function AddonsPage({ profiles }: { profiles: Profile[] | null }) {
                 <EmptyMedia variant="icon">
                   <PuzzleIcon />
                 </EmptyMedia>
-                <EmptyTitle>Nothing added yet</EmptyTitle>
-                <EmptyDescription>Find a skill or an MCP server above, and your bots get its instructions or its tools.</EmptyDescription>
+                <EmptyTitle>No plugins yet</EmptyTitle>
+                <EmptyDescription>A plugin gives your bots more: instructions for a kind of task, tools from a service, or new parts of fxbot.</EmptyDescription>
               </EmptyHeader>
               <EmptyContent className="flex-row justify-center">
-                <Button onClick={() => setChosen("skills")}>Browse skills</Button>
-                <Button variant="outline" onClick={() => setChosen("mcp")}>
-                  Browse MCP servers
-                </Button>
+                <Button onClick={() => setChosen("browse")}>Browse plugins</Button>
               </EmptyContent>
             </Empty>
           )}
           {tab === "installed" && Boolean(addons?.length) && mine.length === 0 && (
             <p className="text-sm text-muted-foreground">
               None of yours match.{" "}
-              {skillsFound ? (
-                <button type="button" className="text-foreground underline underline-offset-4" onClick={() => setChosen("skills")}>
-                  {skillsFound >= 20 ? "20+" : skillsFound} in Skills
-                </button>
-              ) : null}
-              {skillsFound && found ? " · " : null}
-              {found ? (
-                <button type="button" className="text-foreground underline underline-offset-4" onClick={() => setChosen("mcp")}>
-                  {found >= 20 ? "20+" : found} in MCP
+              {picks.length ? (
+                <button type="button" className="text-foreground underline underline-offset-4" onClick={() => setChosen("browse")}>
+                  {picks.length} in Browse
                 </button>
               ) : null}
             </p>
@@ -179,9 +189,66 @@ export function AddonsPage({ profiles }: { profiles: Profile[] | null }) {
               {reaching} tools reach your bots. Past {toolBudget}, every message carries more, since each tool's description goes with it. Allow fewer in each server's settings.
             </p>
           )}
-          {tab === "mcp" && <Results search={search} everything={everything} onEverything={setEverything} added={added} onOpen={setEntry} onAddress={() => setByAddress(true)} />}
-          {tab === "skills" && <SkillResults search={skillSearch} words={words} added={skillsAdded} onOpen={setSkill} />}
-          {tab === "plugins" && <PluginResults search={pluginSearch} added={pluginsAdded} onOpen={setPlugin} />}
+          {tab === "browse" && (
+            <div className="grid gap-6">
+              <section className="grid gap-2">
+                <h2 className={heading}>fxbot's picks</h2>
+                {picks.map((pick) => (
+                  <button
+                    key={pick.key}
+                    type="button"
+                    onClick={pick.open}
+                    className="flex w-full min-w-0 gap-3 rounded-lg border p-3 text-left transition-colors outline-none hover:bg-muted/50 focus-visible:ring-3 focus-visible:ring-ring/50"
+                  >
+                    <Initial title={pick.name} />
+                    <span className="grid min-w-0 flex-1 gap-0.5">
+                      <span className="flex min-w-0 items-baseline gap-2">
+                        <span className="truncate font-medium">{pick.name}</span>
+                        {pick.carries && <span className="shrink-0 text-xs text-muted-foreground">{pick.carries}</span>}
+                      </span>
+                      {pick.description && <span className="line-clamp-2 text-sm text-muted-foreground">{pick.description}</span>}
+                      <span className="mt-0.5 flex items-center gap-2 text-xs text-muted-foreground">
+                        <Badge>fxbot</Badge>
+                        {pick.added && <span className="text-foreground">Added</span>}
+                      </span>
+                    </span>
+                  </button>
+                ))}
+                {picks.length === 0 && <p className="text-sm text-muted-foreground">{words ? "None of fxbot's picks match." : "Loading fxbot's picks…"}</p>}
+                {!unvetted && (
+                  <p className="text-sm text-muted-foreground">
+                    These are the plugins fxbot vets. To browse public registries, and add any plugin by its address or repository, turn on{" "}
+                    <a href="/settings" onClick={follow} className="text-foreground underline underline-offset-4">
+                      unvetted plugins in Settings
+                    </a>
+                    .
+                  </p>
+                )}
+              </section>
+              {unvetted && (
+                <>
+                  <section className="grid gap-2">
+                    <h2 className={heading}>
+                      MCP servers <span className={hint}>from GitHub's registry, unvetted</span>
+                    </h2>
+                    <Results search={publicServers} everything={everything} onEverything={setEverything} added={added} onOpen={setEntry} onAddress={() => setByAddress(true)} />
+                  </section>
+                  <section className="grid gap-2">
+                    <h2 className={heading}>
+                      Skills <span className={hint}>from skills.sh, unvetted</span>
+                    </h2>
+                    <SkillResults search={publicSkills} words={words} added={skillsAdded} onOpen={setSkill} />
+                  </section>
+                  <section className="grid gap-2">
+                    <h2 className={heading}>
+                      From GitHub <span className={hint}>any repository or folder with plugin.json, unvetted</span>
+                    </h2>
+                    <RepoForm onOpen={setPlugin} />
+                  </section>
+                </>
+              )}
+            </div>
+          )}
         </div>
       </main>
       {entry && <EntryDialog card={entry} onAdded={onAdded} onClose={() => setEntry(null)} />}
@@ -189,30 +256,27 @@ export function AddonsPage({ profiles }: { profiles: Profile[] | null }) {
       {byAddress && <AddressDialog onAdded={onAdded} onClose={() => setByAddress(false)} />}
       {plugin && <PluginDialog target={plugin} onAdded={onAdded} onClose={() => setPlugin(null)} />}
       {open?.kind === "mcp" && (
-        <AddonSettings
+        <ServerSettings
           addon={open}
+          owner={owned.get(open.id)}
           profiles={profiles}
           onChange={replace}
           onSignIn={() => signIn(open)}
-          onRemoved={() => (setOpenId(null), setAddons((all) => all?.filter((a) => a.id !== open.id) ?? null))}
-          onClose={() => setOpenId(null)}
+          onRemoved={() => removed(open.id)}
+          onClose={() => setOpenId(owned.get(open.id)?.id ?? null)}
         />
       )}
       {open?.kind === "skill" && (
-        <SkillSettings
-          addon={open}
-          bots={<BotsChoice addon={open} profiles={profiles} onChange={replace} />}
-          onChange={replace}
-          onRemoved={() => (setOpenId(null), setAddons((all) => all?.filter((a) => a.id !== open.id) ?? null))}
-          onClose={() => setOpenId(null)}
-        />
+        <SkillSettings addon={open} bots={<BotsChoice addon={open} profiles={profiles} onChange={replace} />} onChange={replace} onRemoved={() => removed(open.id)} onClose={() => setOpenId(null)} />
       )}
       {open?.kind === "package" && (
         <PluginSettings
           addon={open}
           bots={<BotsChoice addon={open} profiles={profiles} onChange={replace} />}
+          servers={servers.filter((server) => open.servers.includes(server.id))}
+          onOpenServer={setOpenId}
           onChange={replace}
-          onRemoved={() => (setOpenId(null), setAddons((all) => all?.filter((a) => a.id !== open.id) ?? null))}
+          onRemoved={() => removed(open.id)}
           onClose={() => setOpenId(null)}
         />
       )}
@@ -222,7 +286,24 @@ export function AddonsPage({ profiles }: { profiles: Profile[] | null }) {
 }
 
 // One server: its sign-in or key, which bots have it, and which of its tools they get. Changes save as they are made.
-function AddonSettings({ addon, profiles, onChange, onSignIn, onRemoved, onClose }: { addon: McpPlugin; profiles: Profile[] | null; onChange: (addon: Plugin) => void; onSignIn: () => void; onRemoved: () => void; onClose: () => void }) {
+// A package's server follows the package's switch and bots, and goes with it.
+function ServerSettings({
+  addon,
+  owner,
+  profiles,
+  onChange,
+  onSignIn,
+  onRemoved,
+  onClose,
+}: {
+  addon: McpPlugin;
+  owner?: PackagePlugin;
+  profiles: Profile[] | null;
+  onChange: (addon: Plugin) => void;
+  onSignIn: () => void;
+  onRemoved: () => void;
+  onClose: () => void;
+}) {
   const [keys, setKeys] = useState<Record<string, string> | null>(null);
   const [error, setError] = useState("");
   const saved = (work: Promise<Plugin>) => (setError(""), work.then(onChange, (e: Error) => setError(e.message)));
@@ -276,7 +357,7 @@ function AddonSettings({ addon, profiles, onChange, onSignIn, onRemoved, onClose
 
           {addon.source && <FromRegistry addon={addon} onChange={onChange} />}
 
-          <BotsChoice addon={addon} profiles={profiles} onChange={onChange} />
+          {owner ? <p className="text-sm text-muted-foreground">Part of {owner.name}: it follows its switch and its bots.</p> : <BotsChoice addon={addon} profiles={profiles} onChange={onChange} />}
 
           <section className="grid gap-2">
             <div className="flex items-center justify-between gap-3">
@@ -312,15 +393,17 @@ function AddonSettings({ addon, profiles, onChange, onSignIn, onRemoved, onClose
           </section>
         </div>
         {error && <p role="alert" className="text-sm text-destructive">{error}</p>}
-        <Button variant="ghost" size="sm" className="justify-self-start self-start text-destructive" onClick={remove}>
-          Remove
-        </Button>
+        {!owner && (
+          <Button variant="ghost" size="sm" className="justify-self-start self-start text-destructive" onClick={remove}>
+            Remove
+          </Button>
+        )}
       </DialogContent>
     </Dialog>
   );
 }
 
-// Which bots have an add-on: all of them, or those chosen here, each with a switch. Changes save as they are made.
+// Which bots have a plugin: all of them, or those chosen here, each with a switch. Changes save as they are made.
 function BotsChoice({ addon, profiles, onChange }: { addon: Plugin; profiles: Profile[] | null; onChange: (addon: Plugin) => void }) {
   const [error, setError] = useState("");
   const saved = (work: Promise<Plugin>) => (setError(""), work.then(onChange, (e: Error) => setError(e.message)));
@@ -350,7 +433,7 @@ function BotsChoice({ addon, profiles, onChange }: { addon: Plugin; profiles: Pr
   );
 }
 
-// An add-on from a registry: what the registry says about it now, and when there is a newer version, the newer page
+// A server from a registry: what the registry says about it now, and when there is a newer version, the newer page
 // with what changed, which needs the owner's Update before anything moves.
 function FromRegistry({ addon, onChange }: { addon: McpPlugin; onChange: (addon: Plugin) => void }) {
   const [next, setNext] = useState<McpPreview | null>(null);
@@ -497,17 +580,25 @@ function SignIn({ addon, onClose }: { addon: McpPlugin; onClose: () => void }) {
   );
 }
 
-// A bot's settings list the servers that are on: those for every bot, and a switch for each one chosen bot by bot.
-export function BotAddons({ profileId }: { profileId: string }) {
+// A bot's settings list the plugins that are on: those for every bot, and a switch for each one chosen bot by bot. A
+// package's servers follow the package, so they aren't listed.
+export function BotPlugins({ profileId }: { profileId: string }) {
   const [addons, setAddons] = useState<Plugin[]>([]);
   const [error, setError] = useState("");
-  useEffect(() => void client.plugins.list().then((all) => setAddons(all.filter((a) => a.enabled)), () => {}), []);
+  useEffect(
+    () =>
+      void client.plugins.list().then((all) => {
+        const owned = new Set(all.flatMap((a) => (a.kind === "package" ? a.servers : [])));
+        setAddons(all.filter((a) => a.enabled && !owned.has(a.id)));
+      }, () => {}),
+    [],
+  );
   if (!addons.length) return null;
   const set = (addon: Plugin, on: boolean) =>
     client.plugins.forBot(profileId, addon.id, on).then((next) => setAddons((all) => all.map((a) => (a.id === next.id ? next : a))), (e: Error) => setError(e.message));
   return (
     <fieldset className="grid gap-2">
-      <legend className="mb-1.5 text-sm font-medium">Add-ons</legend>
+      <legend className="mb-1.5 text-sm font-medium">Plugins</legend>
       {addons.map((addon) => (
         <label key={addon.id} className="flex items-center justify-between gap-3 text-sm">
           {addon.name}

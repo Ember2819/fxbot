@@ -110,7 +110,7 @@ export function SkillMenu({ picker }: { picker: SkillPicker }) {
         </button>
       ))}
       {!picker.matches.length && (
-        <p className="px-2.5 py-2 text-sm text-muted-foreground">{picker.skills.length ? "No skill matches." : "This bot has no skills yet. Add them in Add-ons, on the Skills tab."}</p>
+        <p className="px-2.5 py-2 text-sm text-muted-foreground">{picker.skills.length ? "No skill matches." : "This bot has no skills yet. Add them in Plugins."}</p>
       )}
     </div>
   );

@@ -32,6 +32,7 @@ import {
   SidebarProvider,
   useSidebar,
 } from "@/components/ui/sidebar";
+import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { colors, maxPinned, unreachable, type Color, type Fields, type Profile, type Provider, type Settings, type Shape, type Turn, type Upload } from "@fxbot/sdk/client";
@@ -39,7 +40,7 @@ import { client } from "./client.ts";
 import { maxFiles, readFile } from "./attachments.ts";
 import { Blob, LookPicker } from "./blob.tsx";
 import { BotPanel, usePanel } from "./bot-panel.tsx";
-import { AddonsPage, BotAddons } from "./addons.tsx";
+import { PluginsPage, BotPlugins } from "./plugins-page.tsx";
 import { LibraryPage } from "./library.tsx";
 import { MemorySearch } from "./memory-search.tsx";
 import { Version } from "./release.tsx";
@@ -92,7 +93,7 @@ export function App() {
     return () => clearTimeout(again);
   }, [profiles]);
 
-  // Plugins' page code, once; Add-ons loads it again after a change.
+  // Plugins' page code, once; the Plugins page loads it again after a change.
   useEffect(() => void loadPlugins(), []);
   const pluginScreen = usePluginScreen(path);
 
@@ -108,7 +109,8 @@ export function App() {
   if (path === "/") screen = <Home profiles={profiles} offline={offline} onNew={() => setCreating(true)} />;
   else if (path === "/settings") screen = <SettingsForm />;
   else if (path === "/library") screen = <LibraryPage profiles={profiles} />;
-  else if (path === "/addons") screen = <AddonsPage profiles={profiles} />;
+  // /addons is where it was before 0.4.0.
+  else if (path === "/plugins" || path === "/addons") screen = <PluginsPage profiles={profiles} />;
   else if (top === "profiles" && id && sub === "edit") screen = <ProfileForm key={id} id={id} onSaved={refresh} />;
   else if (top === "profiles" && id && sub === undefined) screen = <Chat key={id} id={id} profiles={profiles} onChange={refresh} />;
   else if (pluginScreen) screen = pluginScreen;
@@ -276,7 +278,7 @@ function BotSidebar({ profiles, offline, active, onNew, onChange }: { profiles: 
             </Button>
           </div>
         )}
-        {/* One row: Settings, then the full library behind a bento button, then add-ons. */}
+        {/* One row: Settings, then the full library behind a bento button, then plugins. */}
         <div className="flex items-center gap-1">
           <SidebarMenu className="flex-1">
             <SidebarMenuItem>
@@ -322,16 +324,16 @@ function BotSidebar({ profiles, offline, active, onNew, onChange }: { profiles: 
           <Tooltip>
             <TooltipTrigger asChild>
               <a
-                href="/addons"
+                href="/plugins"
                 onClick={open}
-                aria-label="Add-ons"
-                aria-current={location.pathname === "/addons" ? "page" : undefined}
+                aria-label="Plugins"
+                aria-current={location.pathname === "/plugins" ? "page" : undefined}
                 className={buttonVariants({ variant: "ghost", size: "icon", className: "shrink-0 aria-[current=page]:bg-sidebar-accent" })}
               >
                 <PuzzleIcon />
               </a>
             </TooltipTrigger>
-            <TooltipContent>Add-ons</TooltipContent>
+            <TooltipContent>Plugins</TooltipContent>
           </Tooltip>
         </div>
       </SidebarFooter>
@@ -461,7 +463,7 @@ function ProfileForm({ id, onSaved }: { id: string; onSaved: () => void }) {
             Instructions
             <Textarea rows={8} className="max-h-[50dvh]" value={fields.instructions} onChange={set("instructions")} disabled={!loaded} />
           </label>
-          <BotAddons profileId={id} />
+          <BotPlugins profileId={id} />
           {bot && <Place pick={(places) => places.botSettings} props={{ bot }} />}
           {error && <Problem>{error}</Problem>}
           <div className="flex gap-2">
@@ -503,6 +505,18 @@ function SettingsForm() {
           {settings && <Providers defaultProvider={settings.defaultProvider} onDefault={makeDefault} />}
           <p className="text-sm text-muted-foreground">New bots start on the default provider, with its default model.</p>
           <MemorySearch />
+          {settings && (
+            <section className="grid gap-3" aria-label="Plugins">
+              <h2 className="font-medium">Plugins</h2>
+              <label className="flex items-center justify-between gap-3 text-sm">
+                Show unvetted plugins
+                <Switch checked={settings.unvetted} onCheckedChange={(unvetted) => client.settings.update({ unvetted }).then(setSettings, (e: Error) => setError(e.message))} />
+              </label>
+              <p className="text-sm text-muted-foreground">
+                fxbot shows the plugins it vets, tagged fxbot. Turn this on to also browse GitHub's MCP registry and skills.sh, and to add any MCP server by its address or any plugin by its repository. fxbot doesn't vet those: read what each one does before you add it.
+              </p>
+            </section>
+          )}
           <Place pick={(places) => places.settings} props={{}} />
           <Version />
         </div>

@@ -177,6 +177,8 @@ export async function createFxbot(options: FxbotOptions) {
         const ref = { url, headers, allowLocal, ...(transport ? { transport } : {}) };
         return (await mcp.add(ref, (await mcp.preview(ref)).hash)).id;
       },
+      changeServer: (id, input) => mcp.change(id, input),
+      serverForBot: (profileId, id, enabled) => mcp.forBot(profileId, id, enabled),
       removeServer: (id) => mcp.remove(id),
     },
   });

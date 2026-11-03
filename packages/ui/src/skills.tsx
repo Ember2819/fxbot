@@ -4,7 +4,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import type { Plugin, SkillPlugin, SkillCard, SkillFile, SkillPreview, SkillSearch } from "@fxbot/sdk/client";
-import { Details, heading, hint, Initial } from "./addon-add.tsx";
+import { Details, heading, hint, Initial } from "./mcp-add.tsx";
 import { client } from "./client.ts";
 
 const compact = (n: number) => new Intl.NumberFormat("en", { notation: "compact" }).format(n);
@@ -41,12 +41,12 @@ export function useSkillSearch(query: string) {
   return { result, error, busy };
 }
 
-// The Skills tab: fxbot's picks first, then skills.sh's results. `added` holds the ids of installed skills.
+// Unvetted skills on Browse: skills.sh's results. `added` holds the ids of installed skills.
 export function SkillResults({ search, words, added, onOpen }: { search: ReturnType<typeof useSkillSearch>; words: string; added: Set<string>; onOpen: (card: SkillCard) => void }) {
   const { result, error } = search;
   return (
     <div className="grid gap-2">
-      {!words && <p className="text-sm text-muted-foreground">fxbot's picks. Type above to search skills.sh too.</p>}
+      {!words && <p className="text-sm text-muted-foreground">Type above to search skills.sh.</p>}
       {error && <p role="alert" className="text-sm text-destructive">{error}</p>}
       {result?.error && <p className="text-sm text-destructive">{result.error}</p>}
       {result?.cards.map((card) => (
@@ -71,7 +71,7 @@ export function SkillResults({ search, words, added, onOpen }: { search: ReturnT
           </span>
         </button>
       ))}
-      {result && words.length >= 2 && result.cards.length === 0 && !result.error && <p className="text-sm text-muted-foreground">No skill matches in fxbot's list or on skills.sh.</p>}
+      {result && words.length >= 2 && result.cards.length === 0 && !result.error && <p className="text-sm text-muted-foreground">No skill on skills.sh matches.</p>}
     </div>
   );
 }

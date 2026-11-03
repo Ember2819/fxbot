@@ -46,7 +46,7 @@ export function useSearch(query: string, everything: boolean) {
   return { result, error, busy };
 }
 
-// The MCP tab: fxbot's list and GitHub's registry as cards, the switch to search everything, and adding by address.
+// Unvetted MCP servers on Browse: GitHub's registry as cards, the switch to search everything, and adding by address.
 // `added` holds the names and addresses of what is installed.
 export function Results({ search, everything, onEverything, added, onOpen, onAddress }: { search: ReturnType<typeof useSearch>; everything: boolean; onEverything: (on: boolean) => void; added: Set<string>; onOpen: (card: McpCard) => void; onAddress: () => void }) {
   const { result, error } = search;
@@ -67,13 +67,13 @@ export function Results({ search, everything, onEverything, added, onOpen, onAdd
       {result?.everythingError && <p className="text-sm text-destructive">{result.everythingError}</p>}
       {result?.cards.map((card) => <Card key={`${card.from}:${card.name}`} card={card} added={added.has(card.name) || (card.url !== undefined && added.has(card.url))} onOpen={() => onOpen(card)} />)}
       {result?.syncedAt && result.cards.length === 0 && (
-        <p className="text-sm text-muted-foreground">No server matches{everything ? "." : " in fxbot's list or GitHub's registry. Search everything to look in the official one."}</p>
+        <p className="text-sm text-muted-foreground">No server matches{everything ? "." : " in GitHub's registry. Search everything to look in the official one."}</p>
       )}
     </div>
   );
 }
 
-// The add-on's initial, in place of a remote icon, which would tell its host who looked.
+// The plugin's initial, in place of a remote icon, which would tell its host who looked.
 export const Initial = ({ title }: { title: string }) => (
   <span aria-hidden className="flex size-9 shrink-0 items-center justify-center rounded-md bg-muted font-medium">
     {(title.trim()[0] ?? "?").toUpperCase()}

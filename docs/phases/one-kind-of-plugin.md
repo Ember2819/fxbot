@@ -54,5 +54,5 @@ A package's own routes stay at `/api/plugins/<name>/`. Management takes the rest
 
 - [x] **M1. Names.** The SDK, the client, the server's routes, migration `0007`, and the app compile and work under the new names. The plugin checks from the plugins phase pass again.
 - [x] **M2. Vetted only.** With the switch off: search shows only fxbot's cards, and no request reaches GitHub's registry, the official one, or skills.sh; preview and add refuse an address, a repository, and a public registry's entry, with 400. With it on, all of them work.
-- [ ] **M3. The page.** Plugins has Installed and Browse. Each row and card says what it carries. A package's servers show in its settings, not as rows, and follow its switch and bots. Settings has the switch. `/addons` opens Plugins. Phone width fits.
+- [x] **M3. The page.** Plugins has Installed and Browse. Each row and card says what it carries. A package's servers show in its settings, not as rows, and follow its switch and bots. Settings has the switch. `/addons` opens Plugins. Phone width fits.
 - [ ] **M4. Docs.** The site, the README, AGENTS.md, and CONVENTIONS say plugin, the SDK's pages name the new calls and routes, and the changelog names every breaking change. `npm run typecheck`, `npm run build`, `npm run build-site`, and `git diff --check` pass.

@@ -1,14 +1,13 @@
 import { useEffect, useState, type FormEvent, type ReactNode } from "react";
 import { LoaderCircleIcon } from "lucide-react";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
-import type { Plugin, PackagePlugin, PackageCard, PackagePreview, PackageSearch } from "@fxbot/sdk/client";
-import { Details, heading, hint, Initial } from "./addon-add.tsx";
+import type { McpPlugin, Plugin, PackagePlugin, PackagePreview, PackageSearch } from "@fxbot/sdk/client";
+import { Details, heading, hint, Initial } from "./mcp-add.tsx";
 import { client } from "./client.ts";
 
-// What the Plugins tab opens: a card from fxbot's list, or a repository the owner typed.
+// What Browse opens for a package: a card from fxbot's list, or a repository the owner typed.
 export type PluginTarget = { ref: string; from: "fxbot" | "github"; name?: string; description?: string };
 
 const size = (n: number) => (n < 1024 ? `${n} B` : `${(n / 1024).toFixed(1)} KB`);
@@ -22,8 +21,8 @@ const repoLink = (repo: string, path: string, commit: string) => (
 // A file's text as plain text: nothing in it renders or runs on the page.
 const Text = ({ text }: { text: string }) => <pre className="max-h-80 overflow-auto rounded-lg border bg-muted/40 p-3 text-xs break-all whitespace-pre-wrap">{text}</pre>;
 
-// fxbot's plugins list, filtered by the page's words.
-export function usePluginSearch(query: string) {
+// fxbot's packages list, filtered by the page's words.
+export function usePackageSearch(query: string) {
   const [result, setResult] = useState<PackageSearch | null>(null);
   const [error, setError] = useState("");
   useEffect(() => {
@@ -34,48 +33,17 @@ export function usePluginSearch(query: string) {
   return { result, error };
 }
 
-// The Plugins tab: fxbot's list, and any plugin on GitHub by its repository and folder.
-export function PluginResults({ search, added, onOpen }: { search: ReturnType<typeof usePluginSearch>; added: Set<string>; onOpen: (target: PluginTarget) => void }) {
+// Any package on GitHub, by its repository and folder: for unvetted plugins.
+export function RepoForm({ onOpen }: { onOpen: (target: PluginTarget) => void }) {
   const [repo, setRepo] = useState("");
   const open = (event: FormEvent) => (event.preventDefault(), repo.trim() && onOpen({ ref: repo.trim(), from: "github" }));
   return (
-    <div className="grid gap-2">
-      <p className="text-sm text-muted-foreground">A plugin changes fxbot itself: it runs inside fxbot, and can add screens, tools, and more.</p>
-      {search.error && <p role="alert" className="text-sm text-destructive">{search.error}</p>}
-      {search.result?.cards.map((card: PackageCard) => (
-        <button
-          key={card.ref}
-          type="button"
-          onClick={() => onOpen({ ref: card.ref, from: "fxbot", name: card.name, description: card.description })}
-          className="flex w-full min-w-0 gap-3 rounded-lg border p-3 text-left transition-colors outline-none hover:bg-muted/50 focus-visible:ring-3 focus-visible:ring-ring/50"
-        >
-          <Initial title={card.name} />
-          <span className="grid min-w-0 flex-1 gap-0.5">
-            <span className="flex min-w-0 items-baseline gap-2">
-              <span className="shrink-0 truncate font-medium">{card.name}</span>
-              <span className="min-w-0 truncate font-mono text-xs text-muted-foreground">{card.ref}</span>
-            </span>
-            <span className="line-clamp-2 text-sm text-muted-foreground">{card.description}</span>
-            <span className="mt-0.5 flex items-center gap-2 text-xs text-muted-foreground">
-              <Badge>fxbot</Badge>
-              {added.has(card.ref) && <span className="text-foreground">Added</span>}
-            </span>
-          </span>
-        </button>
-      ))}
-      {search.result && !search.result.cards.length && <p className="text-sm text-muted-foreground">No plugin in fxbot's list matches.</p>}
-      <form onSubmit={open} className="mt-2 grid gap-1.5">
-        <label htmlFor="plugin-repo" className="text-sm font-medium">
-          From GitHub
-        </label>
-        <div className="flex gap-2">
-          <Input id="plugin-repo" placeholder="owner/repo or owner/repo/folder" value={repo} onChange={(e) => setRepo(e.target.value)} autoCapitalize="off" autoCorrect="off" spellCheck={false} />
-          <Button type="submit" variant="outline" disabled={!repo.trim()}>
-            Look
-          </Button>
-        </div>
-      </form>
-    </div>
+    <form onSubmit={open} className="flex gap-2">
+      <Input aria-label="A repository on GitHub" placeholder="owner/repo or owner/repo/folder" value={repo} onChange={(e) => setRepo(e.target.value)} autoCapitalize="off" autoCorrect="off" spellCheck={false} />
+      <Button type="submit" variant="outline" disabled={!repo.trim()}>
+        Look
+      </Button>
+    </form>
   );
 }
 
@@ -230,7 +198,23 @@ export function PluginDialog({ target, onAdded, onClose }: { target: PluginTarge
 
 // An installed plugin: which bots it reaches, its settings, what it added to fxbot, its log, and its source, with
 // Update when its files changed there, which shows what changed and needs the owner's Update before anything moves.
-export function PluginSettings({ addon, bots, onChange, onRemoved, onClose }: { addon: PackagePlugin; bots: ReactNode; onChange: (addon: Plugin) => void; onRemoved: () => void; onClose: () => void }) {
+export function PluginSettings({
+  addon,
+  bots,
+  servers,
+  onOpenServer,
+  onChange,
+  onRemoved,
+  onClose,
+}: {
+  addon: PackagePlugin;
+  bots: ReactNode;
+  servers: McpPlugin[];
+  onOpenServer: (id: string) => void;
+  onChange: (addon: Plugin) => void;
+  onRemoved: () => void;
+  onClose: () => void;
+}) {
   const [values, setValues] = useState<Record<string, string>>({});
   const [log, setLog] = useState<string[] | null>(null);
   const [next, setNext] = useState<PackagePreview | null>(null);
@@ -306,8 +290,23 @@ export function PluginSettings({ addon, bots, onChange, onRemoved, onClose }: { 
             ) : (
               <p className="text-sm text-muted-foreground">Nothing while it's off.</p>
             )}
-            {addon.servers.length > 0 && <p className="text-sm text-muted-foreground">It added {addon.servers.length} MCP server{addon.servers.length === 1 ? "" : "s"}, which go when it does.</p>}
           </section>
+          {servers.length > 0 && (
+            <section className="grid gap-2">
+              <h3 className={heading}>Its MCP servers</h3>
+              <p className={`text-xs ${hint}`}>They follow this plugin's switch and bots, and go when it does.</p>
+              {servers.map((server) => (
+                <div key={server.id} className="flex min-w-0 items-center gap-3 text-sm">
+                  <span className="min-w-0 flex-1 truncate">
+                    {server.name} <span className="text-muted-foreground">· {server.status || "Off"}</span>
+                  </span>
+                  <Button size="xs" variant="outline" onClick={() => onOpenServer(server.id)}>
+                    Settings
+                  </Button>
+                </div>
+              ))}
+            </section>
+          )}
           <section className="grid gap-2">
             <h3 className={heading}>Log</h3>
             {log === null ? (

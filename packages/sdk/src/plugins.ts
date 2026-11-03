@@ -135,8 +135,11 @@ export type PluginHost = {
     send(plugin: string, bot: string, message: Parameters<PluginApi["chats"]["send"]>[1]): Promise<{ messageId: string; sessionId: string }>;
     stream(plugin: string, bot: string, session: string, cursor?: number): Promise<ReadableStream<Uint8Array>>;
   };
-  // A plugin's remote MCP server, added as an MCP plugin of its own, and removed with it.
+  // A package's remote MCP server, added as an MCP plugin of its own, which follows the package's switch and bots, and
+  // is removed with it.
   addServer(server: { url: string; headers: string[]; transport?: "sse"; allowLocal: boolean }): Promise<string>;
+  changeServer(id: string, input: { enabled?: boolean; bots?: "all" | "each" }): Promise<unknown>;
+  serverForBot(profileId: string, id: string, enabled: boolean): Promise<unknown>;
   removeServer(id: string): Promise<void>;
 };
 
@@ -541,6 +544,8 @@ export async function createPlugins(options: {
       description: record.config.description,
       files: record.config.files ?? [],
       servers: record.config.servers ?? [],
+      code: Boolean(record.config.server || record.config.page),
+      skills: plugin.skills.map((row) => row.name),
       settings: record.config.settings.map((setting) => ({
         ...setting,
         set: setting.name in plugin.saved,
@@ -645,7 +650,9 @@ export async function createPlugins(options: {
       if (input.enabled !== undefined && typeof input.enabled !== "boolean") fail(400, "enabled must be true or false");
       if (input.bots !== undefined && input.bots !== "all" && input.bots !== "each") fail(400, 'bots must be "all" or "each"');
       const enabled = input.enabled as boolean | undefined;
-      await save(plugin, { ...(enabled === undefined ? {} : { enabled }), ...(input.bots ? { bots: input.bots as "all" | "each" } : {}) });
+      const fields = { ...(enabled === undefined ? {} : { enabled }), ...(input.bots ? { bots: input.bots as "all" | "each" } : {}) };
+      await save(plugin, fields);
+      for (const server of plugin.record.config.servers ?? []) await host.changeServer(server, fields).catch((error) => report(plugin, "Changing its MCP server", error));
       if (enabled === false) await unload(plugin);
       if (enabled === true && !plugin.loaded) await load(plugin);
       onChange();
@@ -659,6 +666,7 @@ export async function createPlugins(options: {
       if (enabled) bots.add(profileId);
       else bots.delete(profileId);
       on.set(pluginId, bots);
+      for (const server of plugin.record.config.servers ?? []) await host.serverForBot(profileId, server, enabled as boolean).catch((error) => report(plugin, "Choosing bots for its MCP server", error));
       return view(plugin);
     },
     // Its cleanup runs, then its schema, its sessions, its settings, its switches, its servers, and its files go.
