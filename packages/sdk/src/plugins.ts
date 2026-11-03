@@ -283,7 +283,7 @@ export async function createPlugins(options: {
   async function look(ref: RepoRef, commit?: string) {
     const text = typeof ref?.repo === "string" ? ref.repo.trim().replace(/^https:\/\/github\.com\//, "").replace(/\/+$/, "") : "";
     const [, repo, path = ""] = refOf.exec(text) ?? fail(400, "plugin must be <owner>/<repo>, or <owner>/<repo>/<folder>");
-    if (path.split("/").some((part) => !part || part === "." || part === "..")) fail(400, "The plugin's folder must be a path inside the repository.");
+    if (path && path.split("/").some((part) => !part || part === "." || part === "..")) fail(400, "The plugin's folder must be a path inside the repository.");
     const at = commit ?? (await archives.head(repo).catch((error: Error) => fail(502, error.message)));
     const all = await archives.files(repo, at, maxFile).catch((error: Error) => fail(502, error.message));
     const inside = (p: string) => !path || p.startsWith(`${path}/`);
