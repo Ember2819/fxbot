@@ -27,7 +27,7 @@ releases=${FXBOT_RELEASES_URL:-https://api.github.com/repos/iammrduncan/fxbot/re
 wait=${FXBOT_UPDATE_TIMEOUT:-300}
 
 # The compose files and profile: the embedder's profile unless FXBOT_EMBEDDER is off, the GPU file for this engine when
-# it's gpu, and compose.override.yaml when an add-on wrote one.
+# it's gpu, and compose.override.yaml when a plugin wrote one.
 compose() {
   local files=compose.yaml
   [ "${FXBOT_EMBEDDER:-cpu}" != gpu ] || files+=":compose.gpu.${FXBOT_ENGINE:-podman}.yaml"
