@@ -1,14 +1,17 @@
-import { readdir, readFile, stat } from "node:fs/promises";
-import { join, resolve } from "node:path";
+import { createHash } from "node:crypto";
+import { mkdir, readdir, readFile, rm, stat, writeFile } from "node:fs/promises";
+import { dirname, join, resolve } from "node:path";
 import { pathToFileURL } from "node:url";
 import type { FxAgentHostTool, FxAgentTool } from "libfx";
 import postgres, { type Sql } from "postgres";
 import type { Hook, HookEvents, PluginApi, PluginRoute, PluginTool } from "./plugin-api.ts";
+import type { RepoFiles } from "./archive.ts";
 import { createSecrets } from "./secrets.ts";
+import { parseSkill, type CarriedSkill, type Row } from "./skills.ts";
 import { newId, type AddonRecord, type Store } from "./store.ts";
-import type { PluginAddon, PluginPage, PluginSetting, PluginSource } from "./types.ts";
+import type { AddonMark, PluginAddon, PluginPage, PluginPreview, PluginRef, PluginSetting, PluginSource, SkillFile } from "./types.ts";
 
-const fail = (status: 400 | 404, message: string): never => {
+const fail = (status: 400 | 404 | 409 | 502, message: string): never => {
   throw Object.assign(new Error(message), { status });
 };
 const said = (error: unknown) => (error instanceof Error ? error.message : String(error));
@@ -20,14 +23,42 @@ const pluginName = /^[a-z0-9]+(-[a-z0-9]+)*$/;
 const reserved = ["chat", "memory", "library", "skill"];
 // A message, instructions, or tool hook gets this long before it counts as failed; setup gets twice as long.
 const limit = 5000;
+// From GitHub: up to 2 MiB a file, text only, and 20 MB in all.
+const maxFile = 2 * 1024 * 1024;
+const maxPlugin = 20 * 1000 * 1000;
+const hour = 60 * 60 * 1000;
+const refOf = /^([A-Za-z0-9-]{1,39}\/[A-Za-z0-9._-]{1,100})(?:\/(.+))?$/;
+const sha = (text: string) => createHash("sha256").update(text).digest("hex");
 
 // What fxbot reads from a plugin's plugin.json.
 export type Manifest = { name: string; version: string; description: string; server?: string; page?: string; css?: string; migrations?: string; settings: PluginSetting[] };
-type PluginRecord = AddonRecord<Manifest> & { kind: "plugin"; source: PluginSource };
+// A plugin from GitHub keeps its files' list, for what an update changes, and the MCP servers it added.
+type Config = Manifest & { files?: SkillFile[]; servers?: string[] };
+type PluginRecord = AddonRecord<Config> & { kind: "plugin"; source: PluginSource };
 type Route = { method: string; path: string; parts: string[]; handler: PluginRoute };
 type Loaded = { hooks: Map<keyof HookEvents, Hook<keyof HookEvents>[]>; tools: PluginTool[]; routes: Route[]; sql?: Sql; cleanup?: () => unknown; controller: AbortController };
 // `saved` holds the owner's settings, and `settings` those with the defaults, which the plugin reads.
-type Plugin = { record: PluginRecord; loaded?: Loaded; error?: string; log: string[]; saved: Record<string, string>; settings: Record<string, string> };
+// `skills` are the ones it carries, read when it loads.
+type Plugin = { record: PluginRecord; loaded?: Loaded; error?: string; log: string[]; saved: Record<string, string>; settings: Record<string, string>; skills: Row[] };
+type Archives = { head(repo: string): Promise<string>; files(repo: string, commit: string, fileLimit?: number): Promise<RepoFiles> };
+type Server = { name: string; url?: string; headers: string[]; transport?: "sse" };
+
+// mcp.json's servers, in the shape Claude Code and Agent Plugins write: a remote one has a `url`; one with a `command`
+// runs on this machine, which plugins don't do yet.
+function serversIn(text?: string): Server[] {
+  if (!text) return [];
+  try {
+    const json = JSON.parse(text);
+    return Object.entries((json.mcpServers ?? json.servers ?? {}) as Record<string, Record<string, unknown>>).map(([name, server]) => ({
+      name,
+      ...(typeof server?.url === "string" ? { url: server.url } : {}),
+      headers: server?.headers && typeof server.headers === "object" ? Object.keys(server.headers) : [],
+      ...(server?.type === "sse" ? { transport: "sse" as const } : {}),
+    }));
+  } catch {
+    return [];
+  }
+}
 
 // A plugin's schema: plugin_<name>, with _ for -.
 export const schemaOf = (name: string) => `plugin_${name.replace(/-/g, "_")}`;
@@ -99,23 +130,40 @@ export type PluginHost = {
     send(plugin: string, bot: string, message: Parameters<PluginApi["chats"]["send"]>[1]): Promise<{ messageId: string; sessionId: string }>;
     stream(plugin: string, bot: string, session: string, cursor?: number): Promise<ReadableStream<Uint8Array>>;
   };
+  // A plugin's remote MCP server, added as an MCP add-on of its own, and removed with it.
+  addServer(server: { url: string; headers: string[]; transport?: "sse"; allowLocal: boolean }): Promise<string>;
+  removeServer(id: string): Promise<void>;
 };
 
 // Plugins: code that changes fxbot itself, run in its process. Each is an add-on of kind "plugin". In a checkout,
 // FXBOT_PLUGIN_DIRS names folders that load at start. Hooks run in the order the plugins were added, and each sees
 // what the one before it changed. A plugin's hooks and tools apply to its bots: all, or each one chosen.
-export async function createPlugins(options: { store: Store; databaseUrl: string; secretKey: Buffer; dirs: string[]; taken: () => string[]; onChange: () => void; host: PluginHost }) {
-  const { store, databaseUrl, secretKey, dirs, taken, onChange, host } = options;
+export async function createPlugins(options: {
+  store: Store;
+  databaseUrl: string;
+  secretKey: Buffer;
+  dataDir: string;
+  archives: Archives;
+  dirs: string[];
+  taken: () => string[];
+  onChange: () => void;
+  host: PluginHost;
+}) {
+  const { store, databaseUrl, secretKey, dataDir, archives, dirs, taken, onChange, host } = options;
   // Settings, secret or not, are sealed together, as an MCP server's header values are.
   const secrets = createSecrets(store.sql, secretKey, "addon_secrets");
   const plugins = new Map<string, Plugin>();
-  const add = (record: PluginRecord) => plugins.set(record.id, { record, log: [], saved: {}, settings: {} });
+  const add = (record: PluginRecord) => plugins.set(record.id, { record, log: [], saved: {}, settings: {}, skills: [] }).get(record.id)!;
   for (const record of await store.addons.list()) if (record.kind === "plugin") add(record as PluginRecord);
   const on = new Map<string, Set<string>>();
   for (const { profileId, addonId } of await store.addons.on()) if (plugins.has(addonId)) on.set(addonId, (on.get(addonId) ?? new Set()).add(profileId));
   const get = (id: string) => plugins.get(id) ?? fail(404, "add-on not found");
   const folders = new Set(dirs.map((dir) => resolve(dir)));
-  const folderOf = (record: PluginRecord) => ("local" in record.source ? record.source.local : "");
+  // A local plugin runs from its folder; one from GitHub from its commit's files, in FXBOT_DATA/plugins/<name>/.
+  const folderOf = (record: PluginRecord) => ("local" in record.source ? record.source.local : resolve(dataDir, "plugins", record.name, record.source.commit));
+  const marks = new Map<string, AddonMark>();
+  // A commit the hourly check found the plugin unchanged at, so it isn't read again.
+  const same = new Map<string, string>();
 
   function write(plugin: Plugin, line: string) {
     plugin.log.push(`${new Date().toISOString()} ${line}`);
@@ -128,7 +176,9 @@ export async function createPlugins(options: { store: Store; databaseUrl: string
   const applies = (plugin: Plugin, bot: string) => Boolean(plugin.loaded && plugin.record.enabled && (plugin.record.bots === "all" || on.get(plugin.record.id)?.has(bot)));
   const hooked = (event: keyof HookEvents) => [...plugins.values()].some((p) => p.loaded?.hooks.get(event)?.length);
 
-  // A folder of FXBOT_PLUGIN_DIRS is added on first sight, and its manifest read again at every start.
+  // A folder of FXBOT_PLUGIN_DIRS is added on first sight, and its manifest read again at every start. A new one's
+  // servers are added when the plugins start.
+  const fresh: { plugin: Plugin; servers: Server[] }[] = [];
   for (const folder of folders) {
     try {
       const manifest = parseManifest(await readFile(resolve(folder, "plugin.json"), "utf8"));
@@ -141,11 +191,137 @@ export async function createPlugins(options: { store: Store; databaseUrl: string
       }
       const record: PluginRecord = { id: newId(), kind: "plugin", name: manifest.name, source: { local: folder }, config: manifest, approvedHash: "", enabled: true, bots: "all", allowed: null, status: null };
       await store.addons.create(record);
-      add(record);
+      fresh.push({ plugin: add(record), servers: serversIn(await readFile(resolve(folder, "mcp.json"), "utf8").catch(() => undefined)) });
     } catch (error) {
       console.error(`fxbot could not add the plugin in ${folder}: ${said(error)}`);
     }
   }
+
+  // Each remote server its mcp.json names, added as an MCP add-on. One that can't be added is logged.
+  async function addServers(plugin: Plugin, servers: Server[], allowLocal: boolean) {
+    const ids: string[] = [];
+    for (const { name, url, headers, transport } of servers) {
+      if (!url) continue;
+      try {
+        ids.push(await host.addServer({ url, headers, ...(transport ? { transport } : {}), allowLocal }));
+        write(plugin, `added its MCP server ${name}`);
+      } catch (error) {
+        report(plugin, `Adding its MCP server ${name}`, error);
+      }
+    }
+    if (!ids.length) return;
+    plugin.record = { ...plugin.record, config: { ...plugin.record.config, servers: ids } };
+    await store.addons.update(plugin.record.id, { config: plugin.record.config });
+  }
+
+  // The skills in its skills/ folder, as the skills.sh layout has them: skills/<name>/SKILL.md, with its other files.
+  async function skillsIn(plugin: Plugin, folder: string): Promise<Row[]> {
+    const root = join(folder, "skills");
+    const files: string[] = [];
+    for (const entry of await readdir(root, { recursive: true }).catch(() => [] as string[]))
+      if ((await stat(join(root, String(entry)))).isFile()) files.push(String(entry).replaceAll("\\", "/"));
+    const rows: Row[] = [];
+    for (const file of files.filter((f) => /^[^/]+\/SKILL\.md$/.test(f))) {
+      const dir = file.split("/")[0];
+      const parsed = parseSkill(await readFile(join(root, file), "utf8"));
+      if ("error" in parsed) {
+        write(plugin, `Its skill ${dir} can't be read: ${parsed.error}`);
+        continue;
+      }
+      const resources = [];
+      for (const other of files.filter((f) => f.startsWith(`${dir}/`) && f !== file))
+        resources.push({ uri: `skill://${parsed.name}/${other.slice(dir.length + 1)}`, text: await readFile(join(root, other), "utf8") });
+      rows.push({ addonId: plugin.record.id, name: parsed.name, description: parsed.description, instructions: parsed.body, resources, manual: parsed.manual });
+    }
+    return rows;
+  }
+
+  // A plugin's page at its repository's current commit, or at `commit`, and the files Add would write.
+  async function look(ref: PluginRef, commit?: string) {
+    const text = typeof ref?.plugin === "string" ? ref.plugin.trim().replace(/^https:\/\/github\.com\//, "").replace(/\/+$/, "") : "";
+    const [, repo, path = ""] = refOf.exec(text) ?? fail(400, "plugin must be <owner>/<repo>, or <owner>/<repo>/<folder>");
+    if (path.split("/").some((part) => !part || part === "." || part === "..")) fail(400, "The plugin's folder must be a path inside the repository.");
+    const at = commit ?? (await archives.head(repo).catch((error: Error) => fail(502, error.message)));
+    const all = await archives.files(repo, at, maxFile).catch((error: Error) => fail(502, error.message));
+    const inside = (p: string) => !path || p.startsWith(`${path}/`);
+    const relative = (p: string) => (path ? p.slice(path.length + 1) : p);
+    const files = [...all.text].filter(([p]) => inside(p)).map(([p, t]) => [relative(p), t] as [string, string]).sort(([a], [b]) => (a < b ? -1 : 1));
+    const page: PluginPreview = {
+      hash: "",
+      name: "",
+      version: "",
+      description: "",
+      source: { repo, path, commit: at, from: ref.from === "fxbot" ? "fxbot" : "github" },
+      files: files.map(([p, t]) => ({ path: p, size: Buffer.byteLength(t), hash: sha(t).slice(0, 12) })),
+      skipped: [...all.skipped].filter(([p]) => inside(p)).map(([p, why]) => ({ path: relative(p), why })),
+      code: [],
+      texts: {},
+      settings: [],
+      migrations: [],
+      skills: [],
+      servers: [],
+    };
+    const byPath = new Map(files);
+    const where = `${repo}${path ? `/${path}` : ""}`;
+    if (!byPath.has("plugin.json")) return { page: { ...page, error: `${where} has no plugin.json at ${at.slice(0, 7)}.` }, files };
+    page.texts["plugin.json"] = byPath.get("plugin.json")!;
+    let manifest: Manifest;
+    try {
+      manifest = parseManifest(byPath.get("plugin.json")!);
+    } catch (error) {
+      return { page: { ...page, error: said(error) }, files };
+    }
+    Object.assign(page, { name: manifest.name, version: manifest.version, description: manifest.description, settings: manifest.settings });
+    page.code = [manifest.server, manifest.page].filter((p): p is string => Boolean(p));
+    const missing = [...page.code, manifest.css].filter((p) => p && !byPath.has(p));
+    if (missing.length) return { page: { ...page, error: `plugin.json names ${missing.join(" and ")}, which ${where} doesn't have.` }, files };
+    page.migrations = manifest.migrations ? files.map(([p]) => p).filter((p) => p.startsWith(`${manifest.migrations}/`) && p.endsWith(".sql")) : [];
+    for (const p of [...page.code, ...(manifest.css ? [manifest.css] : []), ...page.migrations]) page.texts[p] = byPath.get(p)!;
+    page.skills = files.flatMap(([p, t]) => (/^skills\/[^/]+\/SKILL\.md$/.test(p) ? [((parsed) => ("error" in parsed ? `${p.split("/")[1]} (${parsed.error})` : parsed.name))(parseSkill(t))] : []));
+    page.servers = serversIn(byPath.get("mcp.json")).map(({ name, url }) => ({ name, ...(url ? { url } : {}), used: Boolean(url) }));
+    if (page.files.reduce((n, f) => n + f.size, 0) > maxPlugin) return { page: { ...page, error: `It is over ${maxPlugin / 1000 / 1000} MB.` }, files };
+    page.hash = sha(JSON.stringify(files));
+    // An installed plugin's page says what an update changes.
+    const installed = [...plugins.values()].find(({ record: r }) => "repo" in r.source && r.source.repo === repo && r.source.path === path);
+    if (installed?.record.config.files) {
+      const before = new Map(installed.record.config.files.map((f) => [f.path, f.hash]));
+      const after = new Map(page.files.map((f) => [f.path, f.hash]));
+      page.changed = [
+        ...page.files.filter((f) => before.has(f.path) && before.get(f.path) !== f.hash).map((f) => ({ path: f.path, change: "changed" as const })),
+        ...page.files.filter((f) => !before.has(f.path)).map((f) => ({ path: f.path, change: "added" as const })),
+        ...[...before.keys()].filter((p) => !after.has(p)).map((p) => ({ path: p, change: "removed" as const })),
+      ];
+    }
+    return { page, files, manifest };
+  }
+
+  async function writeFiles(folder: string, files: [string, string][]) {
+    await rm(folder, { recursive: true, force: true });
+    for (const [path, text] of files) {
+      await mkdir(dirname(join(folder, path)), { recursive: true });
+      await writeFile(join(folder, path), text);
+    }
+  }
+
+  // Every hour: each plugin's repository HEAD. When it moved, the plugin is read again there, and marked only when its
+  // files changed, or it is gone.
+  async function check() {
+    for (const plugin of plugins.values()) {
+      const { source, approvedHash, id } = plugin.record;
+      if (!("repo" in source)) continue;
+      const head = await archives.head(source.repo).catch(() => null);
+      if (!head || head === source.commit || same.get(id) === head) continue;
+      const looked = await look({ plugin: `${source.repo}${source.path ? `/${source.path}` : ""}`, from: source.from }, head).catch(() => null);
+      if (!looked) continue;
+      if (looked.page.error?.includes("has no plugin.json")) marks.set(id, { kind: "removed" });
+      else if (looked.page.hash && looked.page.hash !== approvedHash) marks.set(id, { kind: "update", version: head.slice(0, 7) });
+      else (marks.delete(id), same.set(id, head));
+    }
+  }
+  const timer = setInterval(() => void check().catch(() => {}), hour);
+  timer.unref();
+  const first = setTimeout(() => void check().catch(() => {}), 60_000);
+  first.unref();
 
   // The defaults, then what the owner set, kept in the same object, which the plugin holds.
   function settle(plugin: Plugin) {
@@ -210,13 +386,13 @@ export async function createPlugins(options: { store: Store; databaseUrl: string
       signal: loaded.controller.signal,
     };
     try {
-      if (!("local" in record.source)) throw new Error("Plugins from GitHub come in a later milestone.");
-      if (!folders.has(folderOf(record))) throw new Error("Its folder isn't in FXBOT_PLUGIN_DIRS any more.");
+      if ("local" in record.source && !folders.has(folderOf(record))) throw new Error("Its folder isn't in FXBOT_PLUGIN_DIRS any more.");
       if ([...reserved, ...taken()].includes(record.name)) throw new Error(`Its name, ${record.name}, is a prefix another add-on's tools use.`);
       // Its own Postgres: two connections at most, in its schema.
       loaded.sql = api.sql = postgres(databaseUrl, { max: 2, onnotice: () => {}, connection: { search_path: schemaOf(record.name) } });
       await migrate(plugin, loaded.sql, folderOf(record));
       settle(plugin);
+      plugin.skills = await skillsIn(plugin, folderOf(record));
       const { server } = record.config;
       if (server) {
         // A new URL each load, so an update or a reload reads the files again.
@@ -241,6 +417,7 @@ export async function createPlugins(options: { store: Store; databaseUrl: string
     const loaded = plugin.loaded;
     if (!loaded) return;
     plugin.loaded = undefined;
+    plugin.skills = [];
     loaded.controller.abort();
     await within(() => loaded.cleanup?.(), limit, "Its cleanup").catch((error) => report(plugin, "Cleanup", error));
     await loaded.sql?.end({ timeout: 5 });
@@ -327,6 +504,8 @@ export async function createPlugins(options: { store: Store; databaseUrl: string
       source: record.source,
       version: record.config.version,
       description: record.config.description,
+      files: record.config.files ?? [],
+      servers: record.config.servers ?? [],
       settings: record.config.settings.map((setting) => ({
         ...setting,
         set: setting.name in plugin.saved,
@@ -339,6 +518,7 @@ export async function createPlugins(options: { store: Store; databaseUrl: string
         page: Boolean(record.config.page),
       },
       ...(plugin.error ? { error: plugin.error } : {}),
+      ...(marks.has(record.id) ? { mark: marks.get(record.id) } : {}),
     };
   }
 
@@ -350,8 +530,10 @@ export async function createPlugins(options: { store: Store; databaseUrl: string
   return {
     has: (id: string) => plugins.has(id),
     names: () => [...plugins.values()].map((p) => p.record.name),
-    // Loads every plugin that's on, in the order they were added.
+    // Loads every plugin that's on, in the order they were added. A local plugin being written may point at servers on
+    // this machine.
     async start() {
+      for (const { plugin, servers } of fresh) await addServers(plugin, servers, true);
       for (const plugin of plugins.values()) {
         plugin.saved = (await secrets.get<{ values: Record<string, string> }>(plugin.record.id).catch(() => undefined))?.values ?? {};
         if (plugin.record.enabled) await load(plugin);
@@ -443,19 +625,87 @@ export async function createPlugins(options: { store: Store; databaseUrl: string
       on.set(addonId, bots);
       return view(plugin);
     },
-    // Its cleanup runs, then its schema, its sessions, its settings, and its switches go.
+    // Its cleanup runs, then its schema, its sessions, its settings, its switches, its servers, and its files go.
     async remove(id: string) {
       const plugin = get(id);
       await unload(plugin);
       plugins.delete(id);
       on.delete(id);
+      marks.delete(id);
       await store.sql.unsafe(`drop schema if exists "${schemaOf(plugin.record.name)}" cascade`);
       await store.sql`delete from plugin_sessions where plugin = ${plugin.record.name}`;
       await store.addons.remove(id);
       secrets.forget(id);
+      for (const server of plugin.record.config.servers ?? []) await host.removeServer(server).catch(() => {});
+      if (!("local" in plugin.record.source)) await rm(resolve(dataDir, "plugins", plugin.record.name), { recursive: true, force: true });
       onChange();
     },
+
+    // The skills running plugins carry, for the bots each is on for.
+    carried: (): CarriedSkill[] =>
+      [...plugins.values()].flatMap((plugin) => plugin.skills.map((row) => ({ id: `${plugin.record.name}/${row.name}`, row, applies: (bot: string) => applies(plugin, bot) }))),
+
+    preview: async (ref: PluginRef) => (await look(ref)).page,
+    // Writes the files the page showed, makes its schema, adds its remote servers, and loads it.
+    async add(ref: PluginRef, hash: unknown) {
+      const { page, files, manifest } = await look(ref);
+      if (page.error || !manifest) return fail(400, page.error ?? "This plugin can't be added.");
+      if (page.hash !== hash) fail(409, "The plugin changed since its page was shown. Look at it again.");
+      if ([...plugins.values()].some((p) => p.record.name === manifest.name)) fail(409, `A plugin named ${manifest.name} is added already.`);
+      if ([...reserved, ...taken()].includes(manifest.name)) fail(400, `Its name, ${manifest.name}, is a prefix another add-on's tools use.`);
+      const record: PluginRecord = {
+        id: newId(),
+        kind: "plugin",
+        name: manifest.name,
+        source: page.source,
+        config: { ...manifest, files: page.files },
+        approvedHash: page.hash,
+        enabled: true,
+        bots: "all",
+        allowed: null,
+        status: null,
+      };
+      await writeFiles(folderOf(record), files);
+      await store.addons.create(record);
+      const plugin = add(record);
+      await addServers(plugin, serversIn(new Map(files).get("mcp.json")), false);
+      await load(plugin);
+      onChange();
+      return view(plugin);
+    },
+    // Moves it to its repository's current commit, the one its page showed. A version that doesn't load leaves the old
+    // one running.
+    async update(id: string, hash: unknown) {
+      const plugin = get(id);
+      const before = plugin.record;
+      if (!("repo" in before.source)) return fail(400, "A local plugin runs from its folder. Restart fxbot to load it again.");
+      const { page, files, manifest } = await look({ plugin: `${before.source.repo}${before.source.path ? `/${before.source.path}` : ""}`, from: before.source.from });
+      if (page.error || !manifest) return fail(400, page.error ?? "This version can't be added.");
+      if (page.hash !== hash) fail(409, "The plugin changed since its page was shown. Look at it again.");
+      if (manifest.name !== before.name) fail(400, `This version is named ${manifest.name}. Remove ${before.name} and add it instead.`);
+      const next: PluginRecord = { ...before, source: page.source, config: { ...manifest, files: page.files, servers: before.config.servers }, approvedHash: page.hash };
+      if (folderOf(next) !== folderOf(before)) await writeFiles(folderOf(next), files);
+      await unload(plugin);
+      plugin.record = next;
+      await load(plugin);
+      if (!plugin.loaded) {
+        const error = plugin.error;
+        plugin.record = before;
+        await load(plugin);
+        if (folderOf(next) !== folderOf(before)) await rm(folderOf(next), { recursive: true, force: true });
+        return fail(400, `${page.source.commit.slice(0, 7)} didn't load, so ${before.name} stays at ${before.source.commit.slice(0, 7)}: ${error}`);
+      }
+      await store.addons.update(id, { source: next.source, config: next.config, approvedHash: next.approvedHash });
+      if (folderOf(next) !== folderOf(before)) await rm(folderOf(before), { recursive: true, force: true });
+      marks.delete(id);
+      onChange();
+      return view(plugin);
+    },
+    check,
+
     async close() {
+      clearInterval(timer);
+      clearTimeout(first);
       for (const plugin of plugins.values()) await unload(plugin);
     },
   };

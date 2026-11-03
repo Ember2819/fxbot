@@ -24,7 +24,7 @@ import { lookup } from "node:dns/promises";
 import { BlockList, isIP } from "node:net";
 import { createSecrets } from "./secrets.ts";
 import { newId, type AddonRecord, type Store } from "./store.ts";
-import type { AddonFrom, AddonPreview, AddonRef, AddonSecrets, McpAddon as Addon, OAuthAttempt, OAuthStatus, SkillRef, Transport } from "./types.ts";
+import type { AddonFrom, AddonPreview, AddonRef, AddonSecrets, McpAddon as Addon, OAuthAttempt, OAuthStatus, PluginRef, SkillRef, Transport } from "./types.ts";
 
 const fail = (status: number, message: string): never => {
   throw Object.assign(new Error(message), { status });
@@ -33,7 +33,7 @@ const fail = (status: number, message: string): never => {
 // A server's record. `tools` is its last listing, so its tools stay with the bots while it is away, and `prefix`
 // starts each tool's name, unique among add-ons.
 // A server by its address, or a registry entry.
-type McpRef = Exclude<AddonRef, SkillRef>;
+type McpRef = Exclude<AddonRef, SkillRef | PluginRef>;
 type Config = { url: string; transport: Transport; headers: string[]; auth: Addon["auth"]; allowLocal: boolean; prefix: string; tools: Tool[] };
 type McpRecord = AddonRecord<Config>;
 // Sealed per add-on: header values, the person's own OAuth client, clients registered by issuer and redirect URI,

@@ -20,7 +20,7 @@ type Archives = { head(repo: string): Promise<string>; files(repo: string, commi
 type Config = { files: SkillFile[]; license?: string };
 type SkillRecord = AddonRecord<Config> & { source: SkillSource };
 // libfx's SkillRecord, as kept in Postgres, with `manual` for a skill only a person calls by name.
-type Row = { addonId: string; name: string; description: string; instructions: string; resources: { uri: string; text: string }[]; manual: boolean };
+export type Row = { addonId: string; name: string; description: string; instructions: string; resources: { uri: string; text: string }[]; manual: boolean };
 
 const sha = (text: string) => createHash("sha256").update(text).digest("hex");
 const bytes = (text: string) => Buffer.byteLength(text);
@@ -70,7 +70,11 @@ function findSkill(files: RepoFiles, repo: string, skillId: string) {
 // Skills as add-ons: one skill each, from a GitHub repository at a pinned commit. Each bot's catalog lists the skills
 // it has, and the `skill` tool reads one when a task needs it. A change that adds the first skill or removes the last
 // rebuilds the agents, since only then does the tool come or go.
-export async function createSkills({ store, archives, fromOf, onChange }: { store: Store; archives: Archives; fromOf: (skill: string) => SkillSource["from"]; onChange: () => void }) {
+// Skills plugins carry: each with an id to tell it apart, and whether it is on for a bot.
+export type CarriedSkill = { id: string; row: Row; applies: (bot: string) => boolean };
+
+export async function createSkills(options: { store: Store; archives: Archives; fromOf: (skill: string) => SkillSource["from"]; onChange: () => void; carried?: () => CarriedSkill[] }) {
+  const { store, archives, fromOf, onChange, carried = () => [] } = options;
   const { sql } = store;
   const records = new Map((await store.addons.list()).filter((r) => r.kind === "skill").map((r) => [r.id, r as SkillRecord]));
   const rows = new Map((await sql<Row[]>`select addon_id, name, description, instructions, resources, manual from skills`).map((r) => [r.addonId, r]));
@@ -80,7 +84,7 @@ export async function createSkills({ store, archives, fromOf, onChange }: { stor
   // A commit the hourly check found the skill unchanged at, so it isn't read again.
   const same = new Map<string, string>();
   const get = (id: string) => records.get(id) ?? fail(404, "add-on not found");
-  const any = () => [...records.values()].some((r) => r.enabled);
+  const any = () => [...records.values()].some((r) => r.enabled) || carried().length > 0;
 
   function view(record: SkillRecord): SkillAddon {
     const row = rows.get(record.id);
@@ -163,16 +167,21 @@ export async function createSkills({ store, archives, fromOf, onChange }: { stor
   first.unref();
 
   // A bot's skills, in the order they were added. A name two skills share is shown as the later one's id.
+  // Plugins' skills come after the add-ons'.
   function forBot(bot: string) {
     const seen = new Set<string>();
-    const all = [...records.values()].flatMap((r) => {
-      const row = rows.get(r.id);
-      if (!row) return [];
-      const name = seen.has(row.name) ? r.source.skill : row.name;
-      seen.add(row.name);
-      return [{ record: r, row, name }];
+    const all = [
+      ...[...records.values()].flatMap((r) => {
+        const row = rows.get(r.id);
+        return row ? [{ row, id: r.source.skill, on: r.enabled && (r.bots === "all" || Boolean(on.get(r.id)?.has(bot))) }] : [];
+      }),
+      ...carried().map(({ id, row, applies }) => ({ row, id, on: applies(bot) })),
+    ].map((skill) => {
+      const name = seen.has(skill.row.name) ? skill.id : skill.row.name;
+      seen.add(skill.row.name);
+      return { ...skill, name };
     });
-    return all.filter(({ record }) => record.enabled && (record.bots === "all" || on.get(record.id)?.has(bot)));
+    return all.filter((skill) => skill.on);
   }
 
   const tool: FxAgentTool = {

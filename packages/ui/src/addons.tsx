@@ -12,6 +12,7 @@ import type { Addon, AddonCard, AddonMark, AddonPreview, McpAddon, OAuthAttempt,
 import { AddressDialog, bearer, EntryDialog, heading, hint, hostOf, Information, label, Results, signsIn, useSearch } from "./addon-add.tsx";
 import { Blob } from "./blob.tsx";
 import { client } from "./client.ts";
+import { PluginDialog, PluginResults, PluginSettings, usePluginSearch, type PluginTarget } from "./plugin-addons.tsx";
 import { loadPlugins } from "./plugins.tsx";
 import { SkillDialog, SkillResults, SkillSettings, useSkillSearch } from "./skills.tsx";
 
@@ -36,9 +37,10 @@ const markText: Record<Addon["kind"], Record<AddonMark["kind"], string>> = {
 
 type Tab = "installed" | "skills" | "mcp" | "plugins";
 
-// One search over every kind of add-on, with a tab for what is installed and one per kind. Installed lists servers
-// and skills, one row each with a switch and an edit button that opens its settings. The Skills tab searches fxbot's
-// skills list and skills.sh, and the MCP tab the MCP registries; plugins aren't built yet.
+// One search over every kind of add-on, with a tab for what is installed and one per kind. Installed lists servers,
+// skills, and plugins, one row each with a switch and an edit button that opens its settings. The Skills tab searches
+// fxbot's skills list and skills.sh, the MCP tab the MCP registries, and the Plugins tab fxbot's plugins list, beside
+// any plugin on GitHub.
 export function AddonsPage({ profiles }: { profiles: Profile[] | null }) {
   const [addons, setAddons] = useState<Addon[] | null>(null);
   const [error, setError] = useState("");
@@ -47,11 +49,13 @@ export function AddonsPage({ profiles }: { profiles: Profile[] | null }) {
   const [chosen, setChosen] = useState<Tab | null>(null);
   const [entry, setEntry] = useState<AddonCard | null>(null);
   const [skill, setSkill] = useState<SkillCard | null>(null);
+  const [plugin, setPlugin] = useState<PluginTarget | null>(null);
   const [byAddress, setByAddress] = useState(false);
   const [openId, setOpenId] = useState<string | null>(null);
   const [signingIn, setSigningIn] = useState<McpAddon | null>(null);
   const search = useSearch(query, everything);
   const skillSearch = useSkillSearch(query);
+  const pluginSearch = usePluginSearch(query);
   const load = () => client.addons.list().then((list) => (setAddons(list), setError("")), (e: Error) => setError(e.message));
   useEffect(() => void load(), []);
   // A server's status changes by itself while it connects.
@@ -84,9 +88,11 @@ export function AddonsPage({ profiles }: { profiles: Profile[] | null }) {
   const count = (n: number) => <span className="text-muted-foreground tabular-nums">{n >= 20 ? "20+" : n}</span>;
   const added = new Set(servers.flatMap((a) => [a.url, ...(a.source ? [a.source.registry] : [])]));
   const skillsAdded = new Set((addons ?? []).flatMap((a) => (a.kind === "skill" ? [a.source.skill] : [])));
+  const pluginsAdded = new Set((addons ?? []).flatMap((a) => (a.kind === "plugin" && "repo" in a.source ? [`${a.source.repo}${a.source.path ? `/${a.source.path}` : ""}`] : [])));
   const onAdded = (addon: Addon) => {
     setEntry(null);
     setSkill(null);
+    setPlugin(null);
     setByAddress(false);
     setAddons((all) => [...(all ?? []), addon]);
     setQuery("");
@@ -175,12 +181,13 @@ export function AddonsPage({ profiles }: { profiles: Profile[] | null }) {
           )}
           {tab === "mcp" && <Results search={search} everything={everything} onEverything={setEverything} added={added} onOpen={setEntry} onAddress={() => setByAddress(true)} />}
           {tab === "skills" && <SkillResults search={skillSearch} words={words} added={skillsAdded} onOpen={setSkill} />}
-          {tab === "plugins" && <p className="py-6 text-center text-sm text-muted-foreground">Plugins aren't in fxbot yet. For now, add-ons are skills and MCP servers.</p>}
+          {tab === "plugins" && <PluginResults search={pluginSearch} added={pluginsAdded} onOpen={setPlugin} />}
         </div>
       </main>
       {entry && <EntryDialog card={entry} onAdded={onAdded} onClose={() => setEntry(null)} />}
       {skill && <SkillDialog card={skill} onAdded={onAdded} onClose={() => setSkill(null)} />}
       {byAddress && <AddressDialog onAdded={onAdded} onClose={() => setByAddress(false)} />}
+      {plugin && <PluginDialog target={plugin} onAdded={onAdded} onClose={() => setPlugin(null)} />}
       {open?.kind === "mcp" && (
         <AddonSettings
           addon={open}
@@ -193,6 +200,15 @@ export function AddonsPage({ profiles }: { profiles: Profile[] | null }) {
       )}
       {open?.kind === "skill" && (
         <SkillSettings
+          addon={open}
+          bots={<BotsChoice addon={open} profiles={profiles} onChange={replace} />}
+          onChange={replace}
+          onRemoved={() => (setOpenId(null), setAddons((all) => all?.filter((a) => a.id !== open.id) ?? null))}
+          onClose={() => setOpenId(null)}
+        />
+      )}
+      {open?.kind === "plugin" && (
+        <PluginSettings
           addon={open}
           bots={<BotsChoice addon={open} profiles={profiles} onChange={replace} />}
           onChange={replace}

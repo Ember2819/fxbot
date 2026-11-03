@@ -12,7 +12,7 @@ const utf8 = new TextDecoder("utf-8", { fatal: true });
 
 // A repository on GitHub, read without GitHub's API and its hourly limit: `info/refs` names the commit HEAD points at,
 // as `git ls-remote` asks it, and codeload serves that commit's files as a tar.gz, read in memory. Nothing is written
-// to disk. Only regular files are kept, inside the repository, as text up to 256 KiB each.
+// to disk. Only regular files are kept, inside the repository, as text up to 256 KiB each, or the caller's limit.
 export function createArchives({ fetch, github = "https://github.com", codeload = "https://codeload.github.com" }: { fetch: Fetch; github?: string; codeload?: string }) {
   const read = new Map<string, { at: number; files: Promise<RepoFiles> }>();
 
@@ -27,7 +27,7 @@ export function createArchives({ fetch, github = "https://github.com", codeload 
     return found[1];
   }
 
-  async function download(repo: string, commit: string): Promise<RepoFiles> {
+  async function download(repo: string, commit: string, fileLimit: number): Promise<RepoFiles> {
     const res = await fetch(`${codeload}/${repo}/tar.gz/${commit}`, { signal: AbortSignal.timeout(120_000) });
     if (!res.ok || !res.body) throw new Error(`GitHub answered HTTP ${res.status} for ${repo}'s files.`);
     const chunks: Buffer[] = [];
@@ -37,18 +37,18 @@ export function createArchives({ fetch, github = "https://github.com", codeload 
       if (size > limits.download) throw new Error(`${repo} is over ${limits.download / 1024 / 1024} MB.`);
       chunks.push(chunk as Buffer);
     }
-    return untar(Buffer.concat(chunks));
+    return untar(Buffer.concat(chunks), fileLimit);
   }
 
   return {
     head,
     // A commit's files, kept for 5 minutes, so a page and its Add read the repository once.
-    files(repo: string, commit: string) {
+    files(repo: string, commit: string, fileLimit = limits.file) {
       if (!repoName.test(repo) || !/^[0-9a-f]{40}$/.test(commit)) return Promise.reject(new Error(`${repo} ${commit} isn't a GitHub commit.`));
-      const key = `${repo}@${commit}`;
+      const key = `${repo}@${commit}:${fileLimit}`;
       const hit = read.get(key);
       if (hit && Date.now() - hit.at < cacheMs) return hit.files;
-      const files = download(repo, commit);
+      const files = download(repo, commit, fileLimit);
       read.set(key, { at: Date.now(), files });
       files.catch(() => read.delete(key));
       return files;
@@ -58,7 +58,7 @@ export function createArchives({ fetch, github = "https://github.com", codeload 
 
 // A tar's regular files, by their path below the archive's top folder (GitHub's `<repo>-<commit>/`). pax and GNU long
 // names are read; links, devices, and any path that would leave the repository are skipped.
-export function untar(tar: Buffer): RepoFiles {
+export function untar(tar: Buffer, fileLimit = limits.file): RepoFiles {
   const out: RepoFiles = { text: new Map(), skipped: new Map() };
   let at = 0;
   let pax: Record<string, string> = {};
@@ -90,7 +90,7 @@ export function untar(tar: Buffer): RepoFiles {
     if (path.split("/").some((part) => part === ".." || part === "") || path.startsWith("/")) continue;
     if (type === "1" || type === "2") out.skipped.set(path, "a link");
     else if (type !== "0") continue;
-    else if (size > limits.file) out.skipped.set(path, `over ${limits.file / 1024} KiB`);
+    else if (size > fileLimit) out.skipped.set(path, `over ${fileLimit / 1024} KiB`);
     else {
       const text = textOf(body);
       if (text === undefined) out.skipped.set(path, "not text");

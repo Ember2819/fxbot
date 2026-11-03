@@ -12,7 +12,7 @@ import { createReleases } from "./releases.ts";
 import { readKey } from "./secrets.ts";
 import { createSkills } from "./skills.ts";
 import { createStore, isId, type StoredProfile } from "./store.ts";
-import { colors, maxPinned, shapes, type Addon, type AddonRef, type AddonSecrets, type Fields, type Kind, type LibraryQuery, type Message, type NewProvider, type Profile, type ProfileUpdate, type ProviderUpdate, type Settings, type StreamLine, embeddingKinds, type SkillRef, type Upload } from "./types.ts";
+import { colors, maxPinned, shapes, type Addon, type AddonRef, type PluginRef, type AddonSecrets, type Fields, type Kind, type LibraryQuery, type Message, type NewProvider, type Profile, type ProfileUpdate, type ProviderUpdate, type Settings, type StreamLine, embeddingKinds, type SkillRef, type Upload } from "./types.ts";
 
 export type * from "./types.ts";
 export type * from "./plugin-api.ts";
@@ -61,6 +61,8 @@ const fail = (status: 400 | 404 | 409 | 502, message: string): never => {
 };
 // A skill is named by its skills.sh id; a server by its address or its registry entry.
 const isSkill = (ref: AddonRef): ref is SkillRef => typeof (ref as SkillRef | undefined)?.skill === "string";
+// A plugin by its GitHub repository and folder.
+const isPlugin = (ref: AddonRef): ref is PluginRef => typeof (ref as PluginRef | undefined)?.plugin === "string";
 
 // libfx's limits for one prompt's images.
 const maxImage = 3.75 * 2 ** 20;
@@ -112,6 +114,7 @@ export async function createFxbot(options: FxbotOptions) {
     everythingUrl,
     fxbotUrl: `${lists}/mcp-registry.json`,
     fxbotSkillsUrl: `${lists}/skills-registry.json`,
+    fxbotPluginsUrl: `${lists}/plugins-registry.json`,
   });
   if (options.syncRegistry !== false) void registry.sync();
   const mcp = await createMcp({
@@ -124,11 +127,13 @@ export async function createFxbot(options: FxbotOptions) {
     onChange: () => void retool(),
     reserved: () => plugins.names(),
   });
+  const archives = createArchives({ fetch });
   const skills = await createSkills({
     store,
-    archives: createArchives({ fetch }),
+    archives,
     fromOf: (skill) => (registry.ourSkill(skill) ? "fxbot" : "skills.sh"),
     onChange: () => void retool(),
+    carried: () => plugins.carried(),
   });
   // Plugins load before the agents, so their tools are there from the start. Every tool passes through their hooks.
   // A plugin that starts turns from its setup is told to wait: the agents come after it.
@@ -138,6 +143,8 @@ export async function createFxbot(options: FxbotOptions) {
     store,
     databaseUrl,
     secretKey: key,
+    dataDir,
+    archives,
     dirs: options.pluginDirs ?? [],
     taken: () => mcp.prefixes(),
     onChange: () => void retool(),
@@ -162,6 +169,11 @@ export async function createFxbot(options: FxbotOptions) {
           return (await lines(profile, session, cursor)).pipeThrough(new TextEncoderStream());
         },
       },
+      async addServer({ url, headers, transport, allowLocal }) {
+        const ref = { url, headers, allowLocal, ...(transport ? { transport } : {}) };
+        return (await mcp.add(ref, (await mcp.preview(ref)).hash)).id;
+      },
+      removeServer: (id) => mcp.remove(id),
     },
   });
   await plugins.start();
@@ -171,7 +183,9 @@ export async function createFxbot(options: FxbotOptions) {
   // Vectors that rows lack, from where Settings says, in the background.
   embeddings.nudge();
   let retooling = Promise.resolve();
+  // Before the agents start, their tools are read when they're made.
   function retool() {
+    if (!ready) return Promise.resolve();
     retooling = retooling.then(async () => providers.retool(await toolsNow())).catch((error) => console.error("Could not give the agents their new tools:", error));
     return retooling;
   }
@@ -505,10 +519,11 @@ export async function createFxbot(options: FxbotOptions) {
       list: async (): Promise<Addon[]> => [...(await registry.decorate(await mcp.list())), ...skills.list(), ...plugins.list()],
       // fxbot's list and GitHub's registry, and with `everything`, the official one's own search too. Skills: fxbot's
       // skills list, then skills.sh's.
-      search: (q: unknown, options: { kind?: unknown; everything?: boolean }) => (options.kind === "skill" ? registry.searchSkills(q) : registry.search(q, options)),
-      preview: (ref: AddonRef) => (isSkill(ref) ? skills.preview(ref) : mcp.preview(ref)),
-      add: (ref: AddonRef, hash: string) => (isSkill(ref) ? skills.add(ref, hash) : mcp.add(ref, hash)),
-      update: (id: string, hash: unknown) => (skills.has(id) ? skills.update(id, hash) : mcp.update(id, hash)),
+      search: (q: unknown, options: { kind?: unknown; everything?: boolean }) =>
+        options.kind === "skill" ? registry.searchSkills(q) : options.kind === "plugin" ? registry.searchPlugins(q) : registry.search(q, options),
+      preview: (ref: AddonRef) => (isPlugin(ref) ? plugins.preview(ref) : isSkill(ref) ? skills.preview(ref) : mcp.preview(ref)),
+      add: (ref: AddonRef, hash: string) => (isPlugin(ref) ? plugins.add(ref, hash) : isSkill(ref) ? skills.add(ref, hash) : mcp.add(ref, hash)),
+      update: (id: string, hash: unknown) => (plugins.has(id) ? plugins.update(id, hash) : skills.has(id) ? skills.update(id, hash) : mcp.update(id, hash)),
       change: (id: string, input: { enabled?: boolean; bots?: "all" | "each"; allowed?: string[] }) =>
         plugins.has(id) ? plugins.change(id, input) : skills.has(id) ? skills.change(id, input) : mcp.change(id, input),
       remove: (id: string) => (plugins.has(id) ? plugins.remove(id) : skills.has(id) ? skills.remove(id) : mcp.remove(id)),
@@ -524,8 +539,8 @@ export async function createFxbot(options: FxbotOptions) {
       configure: (id: string, settings: Record<string, unknown>) => plugins.configure(id, settings),
       // One of an installed skill's files, to read on its page.
       readSkill: (id: string, file: unknown) => skills.read(id, file),
-      // Checks the skills' repositories now, as the hourly check does, and marks what changed there.
-      check: () => skills.check(),
+      // Checks the skills' and plugins' repositories now, as the hourly check does, and marks what changed there.
+      check: async () => (await skills.check(), await plugins.check()),
     },
 
     // OAuth sign-in to an MCP server: start with the page's origin, then poll. The browser comes back to that origin's

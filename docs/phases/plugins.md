@@ -277,6 +277,7 @@ module.exports = function setup(app) {
   3. saves the add-on and its secrets
   4. imports the server module, calls `setup`, and remakes the agents if it added tools
 - **The row** then shows what the plugin registered: its tools, hooks, routes, and page places.
+- **What it carries.** Its skills, `skills/<name>/SKILL.md` as skills.sh lays them out, join the catalog and the `skill` tool of the bots the plugin is on for. Each remote server in its `mcp.json` is added as an MCP add-on of its own, under the usual rules for addresses, and goes when the plugin does; an update leaves them as they are. A local plugin's servers may be on this machine.
 - **Updates.** The hourly check of skills' repositories covers plugins too. A newer commit that changes the plugin's files marks **Update available**. Its page shows what changed, and **Update** cleans up the old code, runs the new migrations, and loads the new commit. A failed load keeps the old one running.
 - **Removing a plugin:** cleanup, then its hooks, tools, and routes go. fxbot drops its schema, and deletes its files, its secrets, and its bot switches.
 
@@ -399,15 +400,15 @@ Checks use a sample plugin in the scratchpad that uses every hook and place, dis
 - [x] Phone width: the sidebar group, the footer button, and a route fit.
 
 **M4. Installing**
-- [ ] Mock GitHub (the skills checks' mocks) serves a plugin repository with a folder.
-- [ ] The add-on page:
+- [x] Mock GitHub (the skills checks' mocks) serves a plugin repository with a folder.
+- [x] The add-on page:
   - Its preview pins the commit, says the plugin runs code inside fxbot, and lists its files, settings, migrations, and skills.
   - It counts a stdio server as not used.
-- [ ] Add, the row's parts, and a per-bot switch work. The plugin's skills join the catalog, and its remote server connects.
-- [ ] The check marks an update when the plugin's files change, and its page lists the changed files.
-- [ ] A failed load during an update keeps the old version running.
-- [ ] Remove cleans up: the schema, the files, the secrets, and the switches are gone, and its cleanup ran.
-- [ ] fxbot's list serves `plugins-registry.json` in the mock site, and its plugins are tagged **fxbot** on the Plugins tab.
+- [x] Add, the row's parts, and a per-bot switch work. The plugin's skills join the catalog, and its remote server connects.
+- [x] The check marks an update when the plugin's files change, and its page lists the changed files.
+- [x] A failed load during an update keeps the old version running.
+- [x] Remove cleans up: the schema, the files, the secrets, and the switches are gone, and its cleanup ran.
+- [x] fxbot's list serves `plugins-registry.json` in the mock site, and its plugins are tagged **fxbot** on the Plugins tab.
 
 **M5. The first plugins, docs, and checks**
 - [ ] Chat rooms against the mock model:

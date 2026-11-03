@@ -1,6 +1,6 @@
 import { readFileSync } from "node:fs";
 import type { Sql } from "./store.ts";
-import type { AddonCard, AddonFrom, AddonInfo, AddonMark, AddonSearch, SkillCard, SkillSearch } from "./types.ts";
+import type { AddonCard, AddonFrom, AddonInfo, AddonMark, AddonSearch, PluginCard, PluginSearch, SkillCard, SkillSearch } from "./types.ts";
 
 type Fetch = typeof fetch;
 const hour = 60 * 60 * 1000;
@@ -90,13 +90,19 @@ const skillCard = (e: SkillEntry, from: SkillCard["from"]): SkillCard => ({
   ...(typeof e.installs === "number" ? { installs: e.installs } : {}),
 });
 
+// A plugin in fxbot's plugins list: its GitHub repository, and the folder it is in, if it isn't the repository's root.
+export type PluginEntry = { name: string; description: string; repo: string; path?: string };
+const pluginEntry = (e: PluginEntry) =>
+  typeof e?.name === "string" && typeof e.description === "string" && typeof e.repo === "string" && /^[A-Za-z0-9-]{1,39}\/[A-Za-z0-9._-]{1,100}$/.test(e.repo) && (e.path === undefined || typeof e.path === "string");
+const shippedPlugins = () => (JSON.parse(readFileSync(new URL("./plugins-registry.json", import.meta.url), "utf8")) as { plugins: PluginEntry[] }).plugins.filter(pluginEntry);
+
 // Three sources of MCP servers. fxbot's own list ships with each release, and with `fxbotUrl`, its published copy
 // replaces it every hour. GitHub's registry is mirrored into Postgres every hour, so that search stays on this
 // machine: every page the first time, then what changed since the last sync began. A rate limit or a 429 waits until
 // the registry says. A failed sync keeps what it had. The official registry is searched only when asked, once per
 // search, for 5 minutes. A server in more than one shows once, from fxbot's list first.
 // Skills come from fxbot's skills list, kept in memory and read again every hour when it is published, and from
-// skills.sh's search, asked once per search.
+// skills.sh's search, asked once per search. Plugins come from fxbot's plugins list, kept the same way.
 export function createRegistry({
   sql,
   fetch,
@@ -107,6 +113,8 @@ export function createRegistry({
   skillsUrl = "https://skills.sh",
   fxbotSkillsUrl,
   fxbotSkills = shippedSkills(),
+  fxbotPluginsUrl,
+  fxbotPlugins = shippedPlugins(),
 }: {
   sql: Sql;
   fetch: Fetch;
@@ -117,8 +125,11 @@ export function createRegistry({
   skillsUrl?: string;
   fxbotSkillsUrl?: string;
   fxbotSkills?: SkillEntry[];
+  fxbotPluginsUrl?: string;
+  fxbotPlugins?: PluginEntry[];
 }) {
   let ourSkills = fxbotSkills;
+  let ourPlugins = fxbotPlugins;
   const skillSearches = new Map<string, { at: number; entries: SkillEntry[] }>();
   let notBefore = 0;
   let running: Promise<void> | undefined;
@@ -210,7 +221,15 @@ export function createRegistry({
       await sql`insert into registry_syncs (source, error) values (${mirrorUrl}, ${message}) on conflict (source) do update set error = excluded.error`;
     }
   }
-  const sync = () => (running ??= Promise.all([syncList(), syncSkills(), syncMirror()]).then(() => {}).finally(() => (running = undefined)));
+  // The published plugins list replaces the one in memory; a failed fetch keeps it.
+  async function syncPlugins() {
+    if (!fxbotPluginsUrl) return;
+    const res = await get(fxbotPluginsUrl).catch(() => null);
+    const page = res?.ok ? ((await res.json().catch(() => null)) as { plugins?: unknown } | null) : null;
+    if (Array.isArray(page?.plugins)) ourPlugins = (page.plugins as PluginEntry[]).filter(pluginEntry);
+    else console.error(`fxbot's plugins list didn't answer${res ? ` (HTTP ${res.status})` : ""}; keeping the one it had.`);
+  }
+  const sync = () => (running ??= Promise.all([syncList(), syncSkills(), syncPlugins(), syncMirror()]).then(() => {}).finally(() => (running = undefined)));
 
   // The official registry's own search: a name's substring, at least 3 characters.
   async function everythingFor(text: string) {
@@ -357,6 +376,14 @@ export function createRegistry({
     },
     // A skill in fxbot's list, for its page.
     ourSkill: (id: string) => ourSkills.find((e) => e.id === id),
+    // fxbot's plugins that match, all of them with no words.
+    searchPlugins(q: unknown): PluginSearch {
+      const words = typeof q === "string" ? q.trim().toLowerCase().slice(0, 100) : "";
+      const cards = ourPlugins
+        .filter((e) => !words || [e.name, e.repo, e.description].some((t) => t.toLowerCase().includes(words)))
+        .map((e): PluginCard => ({ kind: "plugin", name: e.name.slice(0, 64), description: e.description.slice(0, 1024), ref: `${e.repo}${e.path ? `/${e.path}` : ""}`, from: "fxbot" }));
+      return { cards };
+    },
     close: () => clearInterval(timer),
   };
 }

@@ -17,6 +17,9 @@ import type {
   OAuthStatus,
   PluginAddon,
   PluginPage,
+  PluginPreview,
+  PluginRef,
+  PluginSearch,
   Profile,
   ProfileUpdate,
   Provider,
@@ -173,13 +176,15 @@ export function createClient({ baseUrl = "", onVersion }: ClientOptions = {}) {
     // client go to the server once and never come back.
     addons: {
       list: () => call<Addon[]>("/addons"),
-      preview: <R extends AddonRef>(ref: R) => call<R extends SkillRef ? SkillPreview : AddonPreview>("/addons/preview", "POST", { ref }),
+      preview: <R extends AddonRef>(ref: R) => call<R extends SkillRef ? SkillPreview : R extends PluginRef ? PluginPreview : AddonPreview>("/addons/preview", "POST", { ref }),
       add: (ref: AddonRef, hash: string) => call<Addon>("/addons", "POST", { ref, hash }),
       // The registry's entries; `everything` also asks the official registry, unmoderated.
       search: (q: string, { kind, everything }: { kind?: string; everything?: boolean } = {}) =>
         call<AddonSearch>(`/addons/search?${new URLSearchParams({ q, ...(kind ? { kind } : {}), ...(everything ? { everything: "1" } : {}) })}`),
       // fxbot's skills list, then skills.sh's results for 2 characters or more.
       searchSkills: (q: string) => call<SkillSearch>(`/addons/search?${new URLSearchParams({ q, kind: "skill" })}`),
+      // fxbot's plugins list.
+      searchPlugins: (q: string) => call<PluginSearch>(`/addons/search?${new URLSearchParams({ q, kind: "plugin" })}`),
       // One of an installed skill's files; SKILL.md by default.
       readSkill: (id: string, file?: string) => call<{ text: string }>(`/addons/${id}/skills?${new URLSearchParams(file ? { file } : {})}`).then((r) => r.text),
       // Moves an add-on to the newer definition its page showed, with that page's hash.

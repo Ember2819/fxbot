@@ -175,12 +175,45 @@ export type PluginAddon = AddonCommon & {
   source: PluginSource;
   version: string;
   description: string;
+  /** Its files when it was added or updated, to show what an update changes. A local plugin's aren't kept. */
+  files: SkillFile[];
+  /** The MCP servers it added, which go when it does. */
+  servers: string[];
   /** Its settings, with each value but a secret's, which says only whether it is set. */
   settings: (PluginSetting & { value?: string; set: boolean })[];
   parts: PluginParts;
   error?: string;
 };
 export type Addon = McpAddon | SkillAddon | PluginAddon;
+// A plugin by its GitHub repository and the folder it's in: `<owner>/<repo>`, or `<owner>/<repo>/<folder>`.
+export type PluginRef = { plugin: string; from?: "fxbot" | "github" };
+// A plugin's page, from its repository's current commit: what it is, the files that run inside fxbot, and the rest of
+// what it carries, with the text of each file the page can show. Add sends `hash` back, and fails if the plugin
+// changed since. One that can't be added has an `error`. For an installed plugin, `changed` lists what an update
+// changes.
+export type PluginPreview = {
+  hash: string;
+  name: string;
+  version: string;
+  description: string;
+  source: { repo: string; path: string; commit: string; from: "fxbot" | "github" };
+  files: SkillFile[];
+  skipped: { path: string; why: string }[];
+  /** The files that run inside fxbot: its server and page code. */
+  code: string[];
+  /** The text of plugin.json, its code, its CSS, and its migrations, by path. */
+  texts: Record<string, string>;
+  settings: PluginSetting[];
+  migrations: string[];
+  skills: string[];
+  /** Its MCP servers. Remote ones are added with it; one that runs a command isn't used yet. */
+  servers: { name: string; url?: string; used: boolean }[];
+  changed?: { path: string; change: "changed" | "added" | "removed" }[];
+  error?: string;
+};
+// A plugin in fxbot's own list.
+export type PluginCard = { kind: "plugin"; name: string; description: string; ref: string; from: "fxbot" };
+export type PluginSearch = { cards: PluginCard[] };
 // What the page loads for a running plugin: its page code and its CSS, by URL.
 export type PluginPage = { name: string; version: string; page?: string; css?: string };
 // Where a registry entry comes from: fxbot's own list, GitHub's registry, or the official one, unmoderated.
@@ -190,7 +223,8 @@ export type AddonFrom = "fxbot" | "github" | "official";
 export type AddonRef =
   | { url: string; transport?: Transport; headers?: string[]; allowLocal?: boolean }
   | { registry: string; version?: string; allowLocal?: boolean; from?: AddonFrom }
-  | SkillRef;
+  | SkillRef
+  | PluginRef;
 // A skill by its skills.sh id, `<owner>/<repo>/<skillId>`, as found in fxbot's list or on skills.sh.
 export type SkillRef = { skill: string; from?: SkillSource["from"] };
 // The add-on page: what probing the server found, and for a registry entry, what the registry says about it. Add sends
