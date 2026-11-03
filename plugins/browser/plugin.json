@@ -1,0 +1,18 @@
+{
+  "name": "browser",
+  "version": "0.1.0",
+  "description": "A web browser on each bot's computer, driven with agent-browser.",
+  "license": "Apache-2.0",
+  "extensions": {
+    "sh.fxbot": {
+      "needs": {
+        "computer": {
+          "setup": [
+            "case $(dpkg --print-architecture) in amd64) f=x64 s=2a89295b62ddd497986a9a80b52e1dbe4c1f6bd68ffde67eaae82eec2206af61 ;; arm64) f=arm64 s=f0b3bdaa40abf2a5111ec08e6d242110aaf56045ef5108cbc633bacc8e53ca17 ;; *) exit 1 ;; esac && curl -fsSL -o /usr/local/bin/agent-browser https://github.com/vercel-labs/agent-browser/releases/download/v0.41.1/agent-browser-linux-$f && echo \"$s  /usr/local/bin/agent-browser\" | sha256sum -c && chmod +x /usr/local/bin/agent-browser",
+            "apt-get update && apt-get install -y --no-install-recommends chromium fonts-dejavu-core && rm -rf /var/lib/apt/lists/*"
+          ]
+        }
+      }
+    }
+  }
+}
