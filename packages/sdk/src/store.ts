@@ -67,11 +67,16 @@ export async function createStore({ databaseUrl, dataDir, backupsDir }: MigrateO
     },
     // The default provider. Memory search's fields are embeddings.ts's.
     settings: {
-      get: async (): Promise<Pick<Settings, "defaultProvider">> => ({ defaultProvider: one(await sql`select default_provider from settings`)?.defaultProvider ?? "" }),
-      save: async ({ defaultProvider }: Pick<Settings, "defaultProvider">) => {
-        await sql`insert into settings (id, default_provider) values (1, ${defaultProvider || null})
-          on conflict (id) do update set default_provider = excluded.default_provider`;
-        return { defaultProvider };
+      get: async (): Promise<Pick<Settings, "defaultProvider" | "unvetted">> => {
+        const row = one(await sql<{ defaultProvider: string | null; unvetted: boolean }[]>`select default_provider, unvetted from settings`);
+        return { defaultProvider: row?.defaultProvider ?? "", unvetted: row?.unvetted ?? false };
+      },
+      save: async (fields: Partial<Pick<Settings, "defaultProvider" | "unvetted">>) => {
+        const values = {
+          ...(fields.defaultProvider !== undefined ? { defaultProvider: fields.defaultProvider || null } : {}),
+          ...(fields.unvetted !== undefined ? { unvetted: fields.unvetted } : {}),
+        };
+        await sql`insert into settings ${sql({ id: 1, ...values })} on conflict (id) do update set ${sql(values)}`;
       },
     },
     providers: {

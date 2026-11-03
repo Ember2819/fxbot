@@ -30,7 +30,8 @@ export const maxPinned = 3;
 // provider's /embeddings (`embeddingProvider` and `embeddingModel`), or none. `messageVectors` is how many characters of
 // each message are embedded, and 0 embeds none.
 export type Embedder = "local" | "remote" | "off";
-export type Settings = { defaultProvider: string; embedder: Embedder; embeddingProvider: string; embeddingModel: string; messageVectors: number };
+// `unvetted` shows plugins fxbot doesn't vet: the public registries, and adding by address or repository.
+export type Settings = { defaultProvider: string; unvetted: boolean; embedder: Embedder; embeddingProvider: string; embeddingModel: string; messageVectors: number };
 // What the machine runs as its local embedder, in an install made by setup.sh.
 export type LocalEmbedder = "cpu" | "gpu" | "off";
 // How far memory search's vectors have got: the model in use, or null when it's off or not answering, the counts, and

@@ -115,6 +115,7 @@ export function createRegistry({
   fxbotSkills = shippedSkills(),
   fxbotPluginsUrl,
   fxbotPlugins = shippedPlugins(),
+  mirrorWanted = async () => true,
 }: {
   sql: Sql;
   fetch: Fetch;
@@ -127,6 +128,8 @@ export function createRegistry({
   fxbotSkills?: SkillEntry[];
   fxbotPluginsUrl?: string;
   fxbotPlugins?: PluginEntry[];
+  /** Whether GitHub's registry should be mirrored: while unvetted plugins show, or a server from it is installed. */
+  mirrorWanted?: () => Promise<boolean>;
 }) {
   let ourSkills = fxbotSkills;
   let ourPlugins = fxbotPlugins;
@@ -195,7 +198,7 @@ export function createRegistry({
   }
 
   async function syncMirror() {
-    if (Date.now() < notBefore) return;
+    if (Date.now() < notBefore || !(await mirrorWanted())) return;
     const [state] = await sql<{ syncedAt: Date | null; startedAt: Date | null }[]>`select synced_at, started_at from registry_syncs where source = ${mirrorUrl}`;
     const started = new Date();
     let cursor = "";
@@ -301,7 +304,8 @@ export function createRegistry({
     // fxbot's list and the mirror, one card per server, fxbot's when both have it. Ranked by the server's own name,
     // then its title, then its namespace, then its description, and within each, fxbot's first, then by stars. No
     // words lists fxbot's, then the most-starred.
-    async search(q: unknown, { kind, everything }: { kind?: unknown; everything?: boolean } = {}): Promise<McpSearch> {
+    // `vetted` keeps to fxbot's list, and asks no registry.
+    async search(q: unknown, { kind, everything, vetted = false }: { kind?: unknown; everything?: boolean; vetted?: boolean } = {}): Promise<McpSearch> {
       const [state] = await sql<{ syncedAt: Date | null; error: string | null }[]>`select synced_at, error from registry_syncs where source = ${mirrorUrl}`;
       const result: McpSearch = { cards: [], syncedAt: state?.syncedAt?.toISOString() ?? null, ...(state?.error ? { error: state.error } : {}) };
       if (kind !== undefined && kind !== "" && kind !== "mcp") return result;
@@ -315,7 +319,7 @@ export function createRegistry({
               coalesce(entry->'server'->>'description', '') as description,
               (entry->'server'->'_meta'->'io.modelcontextprotocol.registry/publisher-provided'->'github'->>'stargazerCount')::int as stars
             from registry_entries
-            where source in (${mirrorUrl}, ${ours}) and coalesce(entry->'_meta'->'io.modelcontextprotocol.registry/official'->>'status', 'active') <> 'deleted'
+            where source in ${sql(vetted ? [ours] : [mirrorUrl, ours])} and coalesce(entry->'_meta'->'io.modelcontextprotocol.registry/official'->>'status', 'active') <> 'deleted'
           ) a
           order by name, source = ${ours} desc
         ) e
@@ -323,7 +327,7 @@ export function createRegistry({
         order by case when ${text} = '' or own ilike ${like} then 0 when title ilike ${like} then 1 when name ilike ${like} then 2 else 3 end, source = ${ours} desc, stars desc nulls last, name
         limit 20`;
       result.cards = rows.map((r) => cardOf(r.entry, r.source === ours ? "fxbot" : "github"));
-      if (everything && text.length >= 3) {
+      if (everything && !vetted && text.length >= 3) {
         try {
           const have = new Set(result.cards.map((c) => c.name));
           result.cards.push(...(await everythingFor(text)).filter((c) => !have.has(c.name)));
@@ -360,12 +364,12 @@ export function createRegistry({
     },
     // fxbot's skills that match first, all of them with no words, then skills.sh's for 2 characters or more. A skill on
     // both shows once, as fxbot's.
-    async searchSkills(q: unknown): Promise<SkillSearch> {
+    async searchSkills(q: unknown, vetted = false): Promise<SkillSearch> {
       const text = typeof q === "string" ? q.trim().slice(0, 100) : "";
       const words = text.toLowerCase();
       const ours = ourSkills.filter((e) => !words || [e.name, e.id, e.description ?? ""].some((t) => t.toLowerCase().includes(words)));
       const result: SkillSearch = { cards: ours.map((e) => skillCard(e, "fxbot")) };
-      if (text.length < 2) return result;
+      if (vetted || text.length < 2) return result;
       try {
         const have = new Set(ours.map((e) => e.id));
         result.cards.push(...(await skillsFor(text)).filter((e) => !have.has(e.id)).map((e) => skillCard(e, "skills.sh")));
@@ -376,6 +380,8 @@ export function createRegistry({
     },
     // A skill in fxbot's list, for its page.
     ourSkill: (id: string) => ourSkills.find((e) => e.id === id),
+    // A package in fxbot's list, by its repository and folder.
+    ourPackage: (ref: string) => ourPlugins.find((e) => `${e.repo}${e.path ? `/${e.path}` : ""}`.toLowerCase() === ref.trim().replace(/^https:\/\/github\.com\//, "").replace(/\/+$/, "").toLowerCase()),
     // fxbot's plugins that match, all of them with no words.
     searchPackages(q: unknown): PackageSearch {
       const words = typeof q === "string" ? q.trim().toLowerCase().slice(0, 100) : "";

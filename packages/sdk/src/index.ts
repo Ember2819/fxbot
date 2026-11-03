@@ -115,6 +115,10 @@ export async function createFxbot(options: FxbotOptions) {
     fxbotUrl: `${lists}/mcp-registry.json`,
     fxbotSkillsUrl: `${lists}/skills-registry.json`,
     fxbotPluginsUrl: `${lists}/plugins-registry.json`,
+    // GitHub's registry is mirrored while unvetted plugins show, or while a server from it is installed, for its marks.
+    mirrorWanted: async () =>
+      (await store.settings.get()).unvetted ||
+      (await store.plugins.list()).some((p) => p.kind === "mcp" && typeof (p.source as { registry?: unknown })?.registry === "string" && ((p.source as { from?: string }).from ?? "github") === "github"),
   });
   if (options.syncRegistry !== false) void registry.sync();
   const mcp = await createMcp({
@@ -387,6 +391,19 @@ export async function createFxbot(options: FxbotOptions) {
     }
   }
 
+  // Until the owner turns on unvetted plugins, only the ones in fxbot's lists can be looked at and added. Ones already
+  // installed keep working and updating.
+  const vetted = async () => !(await store.settings.get()).unvetted;
+  async function allowed(ref: PluginRef) {
+    if (!(await vetted())) return;
+    const listed = isRepo(ref)
+      ? registry.ourPackage(String(ref.repo))
+      : isSkill(ref)
+        ? registry.ourSkill(ref.skill)
+        : "registry" in ref && ref.from === "fxbot" && (await registry.lookup(String(ref.registry), "fxbot"));
+    if (!listed) fail(400, "fxbot doesn't vet this plugin. To add it, turn on unvetted plugins in Settings.");
+  }
+
   // A turn left open by a process that died waits for the session's next prompt unless resumed.
   for (const profile of await store.profiles.list()) {
     if (!profile.sessionId || !providers.has(profile.provider)) continue;
@@ -445,6 +462,12 @@ export async function createFxbot(options: FxbotOptions) {
         if (input.defaultProvider !== undefined) {
           if (typeof input.defaultProvider !== "string") fail(400, "defaultProvider must be a string");
           await store.settings.save({ defaultProvider: await provider(input.defaultProvider.trim()) });
+        }
+        // Showing unvetted plugins fills the mirror of GitHub's registry for search.
+        if (input.unvetted !== undefined) {
+          if (typeof input.unvetted !== "boolean") fail(400, "unvetted must be true or false");
+          await store.settings.save({ unvetted: input.unvetted });
+          if (input.unvetted) void registry.sync();
         }
         const now = await embeddings.settings();
         const next: EmbeddingSettings = { ...now };
@@ -519,10 +542,15 @@ export async function createFxbot(options: FxbotOptions) {
       list: async (): Promise<Plugin[]> => [...(await registry.decorate(await mcp.list())), ...skills.list(), ...packages.list()],
       // fxbot's list and GitHub's registry, and with `everything`, the official one's own search too. Skills: fxbot's
       // skills list, then skills.sh's.
-      search: (q: unknown, options: { kind?: unknown; everything?: boolean }) =>
-        options.kind === "skill" ? registry.searchSkills(q) : options.kind === "package" ? registry.searchPackages(q) : registry.search(q, options),
-      preview: (ref: PluginRef) => (isRepo(ref) ? packages.preview(ref) : isSkill(ref) ? skills.preview(ref) : mcp.preview(ref)),
-      add: (ref: PluginRef, hash: string) => (isRepo(ref) ? packages.add(ref, hash) : isSkill(ref) ? skills.add(ref, hash) : mcp.add(ref, hash)),
+      // Until unvetted plugins show, only fxbot's lists, and no registry is asked.
+      async search(q: unknown, options: { kind?: unknown; everything?: boolean }) {
+        const only = await vetted();
+        if (options.kind === "skill") return registry.searchSkills(q, only);
+        if (options.kind === "package") return registry.searchPackages(q);
+        return registry.search(q, { ...options, vetted: only });
+      },
+      preview: async (ref: PluginRef) => (await allowed(ref), isRepo(ref) ? packages.preview(ref) : isSkill(ref) ? skills.preview(ref) : mcp.preview(ref)),
+      add: async (ref: PluginRef, hash: string) => (await allowed(ref), isRepo(ref) ? packages.add(ref, hash) : isSkill(ref) ? skills.add(ref, hash) : mcp.add(ref, hash)),
       update: (id: string, hash: unknown) => (packages.has(id) ? packages.update(id, hash) : skills.has(id) ? skills.update(id, hash) : mcp.update(id, hash)),
       change: (id: string, input: { enabled?: boolean; bots?: "all" | "each"; allowed?: string[] }) =>
         packages.has(id) ? packages.change(id, input) : skills.has(id) ? skills.change(id, input) : mcp.change(id, input),
