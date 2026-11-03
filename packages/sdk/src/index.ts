@@ -56,7 +56,7 @@ export type FxbotOptions = {
 };
 
 // Bad input fails with `status` 400 and a missing bot with 404, so a server can answer with the same status.
-const fail = (status: 400 | 404 | 502, message: string): never => {
+const fail = (status: 400 | 404 | 409 | 502, message: string): never => {
   throw Object.assign(new Error(message), { status });
 };
 // A skill is named by its skills.sh id; a server by its address or its registry entry.
@@ -131,12 +131,38 @@ export async function createFxbot(options: FxbotOptions) {
     onChange: () => void retool(),
   });
   // Plugins load before the agents, so their tools are there from the start. Every tool passes through their hooks.
+  // A plugin that starts turns from its setup is told to wait: the agents come after it.
+  let ready = false;
+  const started = () => ready || fail(400, "fxbot is still starting. Start turns after setup.");
   const plugins = await createPlugins({
     store,
+    databaseUrl,
+    secretKey: key,
     dirs: options.pluginDirs ?? [],
     taken: () => mcp.prefixes(),
     onChange: () => void retool(),
-    host: { bots: { list: async () => (await store.profiles.list()).map(withBusy), get: async (id) => withBusy(await get(id)) } },
+    host: {
+      bots: { list: async () => (await store.profiles.list()).map(withBusy), get: async (id) => withBusy(await get(id)) },
+      chats: {
+        async newSession(plugin, bot) {
+          started();
+          const profile = await get(bot);
+          if (!profile.provider) fail(400, "This bot has no provider.");
+          const id = await (await providers.agentFor(profile.provider, "")).newSessionId();
+          await store.sql`insert into plugin_sessions (id, profile_id, provider, plugin) values (${id}, ${bot}, ${profile.provider}, ${plugin})`;
+          return id;
+        },
+        send: async (plugin, bot, { text, files, session, messageId = crypto.randomUUID() }) =>
+          (started(), deliver(bot, { text, files, messageId }, { session, from: plugin })),
+        async stream(plugin, bot, session, cursor = 0) {
+          started();
+          const profile = await get(bot);
+          await pluginSession(plugin, profile, session);
+          if (!Number.isInteger(cursor) || cursor < 0) fail(400, "cursor must be a whole number");
+          return (await lines(profile, session, cursor)).pipeThrough(new TextEncoderStream());
+        },
+      },
+    },
   });
   await plugins.start();
   const toolsNow = async () =>
@@ -150,6 +176,7 @@ export async function createFxbot(options: FxbotOptions) {
     return retooling;
   }
   mcp.connect();
+  ready = true;
 
   // A switch's summary follows the bot's own instructions in every open of the chat it started.
   const instructionsFor = (profile: StoredProfile) =>
@@ -198,7 +225,7 @@ export async function createFxbot(options: FxbotOptions) {
   // bot and its chat. The record is saved before the prompt, so the stream finds it when the turn starts.
   // A message with files or named skills is blocks: its text, each skill's instructions, then each file. What it sent
   // is kept, since libfx's stream shows only a plain-text prompt.
-  async function attach(profile: StoredProfile, text: string, messageId: string, files: Upload[], skilled: ReturnType<typeof skills.invoked>): Promise<FxSessionPromptInput> {
+  async function attach(profile: StoredProfile, sessionId: string, text: string, messageId: string, files: Upload[], skilled: ReturnType<typeof skills.invoked>, from?: string): Promise<FxSessionPromptInput> {
     const checked = files.map(({ name, type, data }) => {
       if (typeof name !== "string" || typeof type !== "string" || typeof data !== "string") return fail(400, "each file needs a name, a type, and base64 data");
       const bytes = Buffer.from(data, "base64");
@@ -210,11 +237,11 @@ export async function createFxbot(options: FxbotOptions) {
     const blocks: Exclude<FxSessionPromptInput, string>[number][] = [...(text.trim() ? [{ type: "text" as const, text }] : []), ...skilled];
     const sent: Upload[] = [];
     for (const { name, type, bytes, kind, text: content } of checked) {
-      const item = await library.save({ profileId: profile.id, sessionId: profile.sessionId!, origin: "uploaded", name, type, bytes });
+      const item = await library.save({ profileId: profile.id, sessionId, origin: "uploaded", name, type, bytes });
       blocks.push(kind === "image" ? { type: "image", mimeType: type, data: bytes.toString("base64"), sourceRef: `library:${item.id}` } : { type: "text", text: `File: ${name}\n${content}` });
       sent.push({ name, type, url: item.url });
     }
-    await store.sent.save(profile.id, messageId, { input: text, files: sent });
+    await store.sent.save(profile.id, messageId, { input: text, files: sent, plugin: from });
     return blocks;
   }
 
@@ -242,16 +269,21 @@ export async function createFxbot(options: FxbotOptions) {
     if (turn.messageId) plugins.observe("turn.end", { bot: id, session: sessionId, messageId: turn.messageId, ...sent, reply });
     if (!reply.trim() || !turn.messageId) return;
     await history.record(id, sessionId, turn.messageId, "assistant", reply);
-    await store.profiles.update(id, { preview: reply.trim().replace(/\s+/g, " ").slice(0, 160) });
+    // A reply in a plugin's session isn't the bot's own chat's.
+    if ((await store.profiles.get(id))?.sessionId === sessionId) await store.profiles.update(id, { preview: reply.trim().replace(/\s+/g, " ").slice(0, 160) });
   }
 
-  // libfx's turn_start carries a prompt only when it was plain text, so the saved one goes back in.
+  // libfx's turn_start carries a prompt only when it was plain text, so the saved one goes back in, with the plugin
+  // that sent it, if one did.
+  const byPlugin = new Set((await store.sent.byPlugins()).map((row) => `${row.profileId}:${row.messageId}`));
   function withSent(id: string) {
     let rest = "";
     const fill = async (part: string) => {
       const line: StreamLine | null = part.includes('"turn_start"') ? JSON.parse(part) : null;
-      const sent = line?.type === "turn_start" && line.input === undefined && (await store.sent.get(id, line.messageId!));
-      return (sent ? JSON.stringify({ ...line, ...sent }) : part) + "\n";
+      const sent = line?.type === "turn_start" && (line.input === undefined || byPlugin.has(`${id}:${line.messageId}`)) && (await store.sent.get(id, line.messageId!));
+      if (!sent) return part + "\n";
+      const { plugin, ...saved } = sent;
+      return JSON.stringify({ ...line, ...saved, ...(plugin ? { from: plugin } : {}) }) + "\n";
     };
     return new TransformStream<string, string>({
       async transform(chunk, out) {
@@ -263,8 +295,8 @@ export async function createFxbot(options: FxbotOptions) {
     });
   }
 
-  async function lines(profile: StoredProfile, cursor: number) {
-    return (await open(profile, profile.sessionId!))
+  async function lines(profile: StoredProfile, sessionId: string, cursor: number) {
+    return (await open(profile, sessionId))
       .stream(cursor)
       .pipeThrough(new TextDecoderStream() as TransformStream<Uint8Array, string>)
       .pipeThrough(withSent(profile.id));
@@ -291,6 +323,54 @@ export async function createFxbot(options: FxbotOptions) {
     const handoff = `Earlier conversation, summarized when this bot moved from ${from?.name ?? "a removed provider"} to ${to.name}:\n\n${summary}`;
     const sessionId = await (await providers.agentFor(to.id, "")).newSessionId();
     return (await store.profiles.update(profile.id, { provider: next, model, sessionId, handoff }))!;
+  }
+
+  // A plugin's session, which must be its own, for this bot, on the bot's provider now.
+  async function pluginSession(plugin: string, profile: StoredProfile, session: string) {
+    const [row] = await store.sql<{ provider: string; plugin: string }[]>`select provider, plugin from plugin_sessions where id = ${session} and profile_id = ${profile.id}`;
+    if (row?.plugin !== plugin) fail(404, "session not found");
+    if (row.provider !== profile.provider) fail(409, "This session started on the bot's earlier provider. Make a new one.");
+  }
+
+  // A message to a bot's own chat, or to a plugin's session for it. Resolves once libfx has stored the prompt; the reply
+  // arrives on the stream. libfx takes at most 8 images, 3.75 MiB each and 6 MiB together. A plugin's message names it.
+  async function deliver(id: string, { text, messageId, files = [] }: Message, { session, from }: { session?: string; from?: string } = {}) {
+    let profile = await get(id);
+    if (!Array.isArray(files) || files.length > 8) fail(400, "files must be a list of at most 8");
+    if (typeof text !== "string" || (!text.trim() && !files.length)) fail(400, "text is required");
+    if (typeof messageId !== "string" || !/^[\w.-]{1,128}$/.test(messageId)) fail(400, "messageId must be 1 to 128 letters, digits, '.', '_', or '-'");
+    if (!(await modelFor(profile))) fail(400, "No model. Pick a default model for this bot's provider in Settings, or give the bot one.");
+    if (session) await pluginSession(from!, profile, session);
+    // Saved before the prompt, so a restart still finds the session and every upload knows its chat. A concurrent
+    // first send keeps the id already saved.
+    else if (!profile.sessionId) profile = (await store.profiles.claimSession(id, await (await providers.agentFor(profile.provider, "")).newSessionId())) ?? fail(404, "profile not found");
+    const sessionId = session ?? profile.sessionId!;
+    const by = from ? { from } : {};
+    // Plugins may change the message, or handle it themselves, and then no turn runs.
+    if (plugins.hooked("message")) {
+      const event = { bot: id, session: sessionId, text, files, ...by };
+      if ((await plugins.run("message", event))?.handled) return { messageId, sessionId, handled: true as const };
+      ({ text, files } = event);
+      if (typeof text !== "string" || !Array.isArray(files)) fail(400, "A plugin left this message without text or files.");
+    }
+    // A skill named as $name, or /name at the start, goes with the message, so the bot has it without asking.
+    const skilled = skills.invoked(id, text);
+    const input = files.length || skilled.length ? await attach(profile, sessionId, text, messageId, files, skilled, from) : text;
+    if (from && input === text) await store.sent.save(id, messageId, { input: text, files: [], plugin: from });
+    if (from) byPlugin.add(`${id}:${messageId}`);
+    try {
+      // A messageId the session already accepted runs nothing new and resolves to the same ids.
+      const turn = (await open(profile, sessionId)).prompt(input, { messageId });
+      const accepted = await turn.accepted;
+      const names = files.length ? `\n[files: ${files.map((f) => f.name).join(", ")}]` : "";
+      await history.record(id, accepted.sessionId, messageId, "user", text + names);
+      plugins.observe("turn.start", { bot: id, session: accepted.sessionId, messageId, text, ...by });
+      finish(id, accepted.sessionId, turn, { text, ...by });
+      return accepted;
+    } catch (error) {
+      // libfx throws a TypeError or RangeError for a prompt it refuses, such as an image whose bytes are not its type.
+      throw error instanceof TypeError || error instanceof RangeError ? Object.assign(error, { status: 400 }) : error;
+    }
   }
 
   // A turn left open by a process that died waits for the session's next prompt unless resumed.
@@ -395,42 +475,8 @@ export async function createFxbot(options: FxbotOptions) {
       cancel: (id: string) => providers.signIns.cancel(id),
     },
 
-    // Resolves once libfx has stored the prompt; the reply arrives on the stream. libfx takes at most 8 images,
-    // 3.75 MiB each and 6 MiB together.
-    async send(id: string, { text, messageId, files = [] }: Message) {
-      let profile = await get(id);
-      if (!Array.isArray(files) || files.length > 8) fail(400, "files must be a list of at most 8");
-      if (typeof text !== "string" || (!text.trim() && !files.length)) fail(400, "text is required");
-      if (typeof messageId !== "string" || !/^[\w.-]{1,128}$/.test(messageId))
-        fail(400, "messageId must be 1 to 128 letters, digits, '.', '_', or '-'");
-      if (!(await modelFor(profile))) fail(400, "No model. Pick a default model for this bot's provider in Settings, or give the bot one.");
-      // Saved before the prompt, so a restart still finds the session and every upload knows its chat. A concurrent
-      // first send keeps the id already saved.
-      if (!profile.sessionId) profile = (await store.profiles.claimSession(id, await (await providers.agentFor(profile.provider, "")).newSessionId())) ?? fail(404, "profile not found");
-      // Plugins may change the message, or handle it themselves, and then no turn runs.
-      if (plugins.hooked("message")) {
-        const event = { bot: id, session: profile.sessionId!, text, files };
-        if ((await plugins.run("message", event))?.handled) return { messageId, sessionId: profile.sessionId!, handled: true as const };
-        ({ text, files } = event);
-        if (typeof text !== "string" || !Array.isArray(files)) fail(400, "A plugin left this message without text or files.");
-      }
-      // A skill named as $name, or /name at the start, goes with the message, so the bot has it without asking.
-      const skilled = skills.invoked(id, text);
-      const input = files.length || skilled.length ? await attach(profile, text, messageId, files, skilled) : text;
-      try {
-        // A messageId the session already accepted runs nothing new and resolves to the same ids.
-        const turn = (await open(profile, profile.sessionId!)).prompt(input, { messageId });
-        const accepted = await turn.accepted;
-        const names = files.length ? `\n[files: ${files.map((f) => f.name).join(", ")}]` : "";
-        await history.record(id, accepted.sessionId, messageId, "user", text + names);
-        plugins.observe("turn.start", { bot: id, session: accepted.sessionId, messageId, text });
-        finish(id, accepted.sessionId, turn, { text });
-        return accepted;
-      } catch (error) {
-        // libfx throws a TypeError or RangeError for a prompt it refuses, such as an image whose bytes are not its type.
-        throw error instanceof TypeError || error instanceof RangeError ? Object.assign(error, { status: 400 }) : error;
-      }
-    },
+    // Resolves once libfx has stored the prompt; the reply arrives on the stream.
+    send: (id: string, message: Message) => deliver(id, message),
 
     // Every line of the bot's chat from `cursor` on as NDJSON, staying open for new ones. Cancel it to stop.
     // A bot with no session yet, or whose provider is gone, has nothing to replay, so its stream ends at once.
@@ -438,7 +484,7 @@ export async function createFxbot(options: FxbotOptions) {
       const profile = await get(id);
       if (!Number.isInteger(cursor) || cursor < 0) fail(400, "cursor must be a whole number");
       if (!profile.sessionId || !providers.has(profile.provider)) return new ReadableStream({ start: (controller) => controller.close() });
-      return (await lines(profile, cursor)).pipeThrough(new TextEncoderStream());
+      return (await lines(profile, profile.sessionId, cursor)).pipeThrough(new TextEncoderStream());
     },
 
     // Every bot's files in one place. `file` and `upload` (an image's URL from before the library) return the bytes,
@@ -474,6 +520,8 @@ export async function createFxbot(options: FxbotOptions) {
       },
       // A plugin's recent log lines and errors.
       log: (id: string) => plugins.log(id),
+      // A plugin's settings. Secrets are write-only.
+      configure: (id: string, settings: Record<string, unknown>) => plugins.configure(id, settings),
       // One of an installed skill's files, to read on its page.
       readSkill: (id: string, file: unknown) => skills.read(id, file),
       // Checks the skills' repositories now, as the hourly check does, and marks what changed there.
@@ -483,6 +531,11 @@ export async function createFxbot(options: FxbotOptions) {
     // OAuth sign-in to an MCP server: start with the page's origin, then poll. The browser comes back to that origin's
     // `/api/oauth/callback`, or the person pastes the address of the page a loopback redirect could not load.
     oauth: mcp.oauth,
+
+    // Plugins: what the page loads, and their own routes, under `/api/plugins/<name>/`.
+    plugins: {
+      handle: (name: string, request: Request, path: string) => plugins.handle(name, request, path),
+    },
 
     // The running version, and the newest stable release when it is newer.
     release: releases.get,

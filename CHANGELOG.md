@@ -4,6 +4,8 @@ Each release of fxbot, newest first. A release that adds migrations, bumps libfx
 
 ## Unreleased
 
+**Before upgrading.** Migration `0006_plugins` adds a `plugin` column to `sent` and a `plugin_sessions` table, for plugins.
+
 - The SDK's `close()` waits for the save of a reply that just finished, so a script can close right after a turn. A reply that can't be saved, such as one whose bot was just deleted, is logged instead of stopping the process.
 
 ## 0.3.0 (2026-11-02)

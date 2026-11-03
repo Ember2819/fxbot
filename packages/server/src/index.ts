@@ -106,11 +106,32 @@ async function signedIn(res: ServerResponse, query: URLSearchParams) {
     .end(`<!doctype html><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>fxbot</title><p style="font:16px system-ui;margin:2rem">${text}</p>`);
 }
 
+// A plugin's own route: the request as a web Request, and its Response streamed back. A closed connection aborts the
+// request's signal and cancels the response's body.
+async function pluginRoute(req: IncomingMessage, res: ServerResponse, url: URL, name: string) {
+  const method = req.method ?? "GET";
+  if (Number(req.headers["content-length"]) > 12 << 20) fail(413, "body is over 12 MiB");
+  const closed = new AbortController();
+  res.once("close", () => closed.abort());
+  const headers = Object.entries(req.headers).flatMap(([key, value]) => (value === undefined ? [] : [value].flat().map((one) => [key, one] as [string, string])));
+  const request = new Request(new URL(url.pathname + url.search, "http://localhost"), {
+    method,
+    headers,
+    signal: closed.signal,
+    ...(method === "GET" || method === "HEAD" ? {} : { body: Readable.toWeb(req) as unknown as BodyInit, duplex: "half" }),
+  } as RequestInit);
+  const response = await fxbot.plugins.handle(name, request, url.pathname.split("/").slice(4).join("/"));
+  res.writeHead(response.status, Object.fromEntries(response.headers));
+  if (!response.body || method === "HEAD") return void res.end();
+  return pipeline(Readable.fromWeb(response.body as ReadableStream<Uint8Array>), res).catch(() => {});
+}
+
 async function api(req: IncomingMessage, res: ServerResponse, url: URL) {
   const [, , resource, id, action, extra] = url.pathname.split("/");
   const method = req.method;
   const ok = { ok: true };
   if (resource === "health" && !id && method === "GET") return json(res, 200, { ok: true, version });
+  if (resource === "plugins" && id) return pluginRoute(req, res, url, id);
   if (resource === "update" && !id) {
     if (method === "GET") return json(res, 200, updateStatus());
     // To the newest release the check found, never one the page names.
@@ -132,6 +153,7 @@ async function api(req: IncomingMessage, res: ServerResponse, url: URL) {
     if (id && action === "secrets" && method === "PUT") return json(res, 200, await fxbot.addons.setSecrets(id, await body(req)));
     if (id && action === "skills" && method === "GET") return json(res, 200, { text: fxbot.addons.readSkill(id, url.searchParams.get("file") ?? undefined) });
     if (id && action === "log" && method === "GET") return json(res, 200, { lines: fxbot.addons.log(id) });
+    if (id && action === "settings" && method === "PUT") return json(res, 200, await fxbot.addons.configure(id, await body(req)));
     // The checked origin is where the sign-in comes back to.
     if (id && action === "sign-in" && method === "POST") return json(res, 201, await fxbot.oauth.start(id, req.headers.origin));
     return fail(404, "not found");

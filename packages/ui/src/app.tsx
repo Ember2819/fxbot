@@ -748,6 +748,7 @@ function TurnView({ turn, color, skills, retry }: { turn: Turn; color?: Color; s
         <MessageScrollerItem messageId={`${turn.messageId}-user`} scrollAnchor>
           <Message align="end">
             <MessageContent>
+              {turn.from && <p className="text-right text-xs text-muted-foreground">From {turn.from}</p>}
               {named.skills.length ? <SkillChips className="flex-wrap justify-end" names={named.skills} /> : null}
               {turn.files?.length ? <Files className="flex-wrap justify-end" files={turn.files} /> : null}
               {named.rest && (

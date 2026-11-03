@@ -68,7 +68,7 @@ export type Upload = { name: string; type: string; url?: string; data?: string }
 // What a message sends. The same `messageId` again reaches the same turn and runs nothing new.
 export type Message = { text: string; messageId: string; files?: Upload[] };
 // libfx's stream leaves out a prompt that is not plain text, so fxbot keeps what such a message sent.
-export type Sent = { input: string; files: Upload[] };
+export type Sent = { input: string; files: Upload[]; plugin?: string | null };
 
 // The library keeps one copy of each file, by the SHA-256 of its bytes, tagged with every bot and chat that saved it.
 // `uploaded` came from the person, `generated` from a bot. Later phases add more kinds.

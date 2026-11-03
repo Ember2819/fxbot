@@ -184,7 +184,7 @@ export default async function setup(fx: PluginApi) {
 
 **The rest of `fx`:**
 - **`fx.tool(def)`** adds a tool, named `<plugin>_<name>`. Adding the plugin remakes the agents once (`retool`).
-- **`fx.route(method, path, handler)`** answers under `/api/plugins/<name>/`, with web `Request` and `Response`. A streamed `Response` body streams to the page.
+- **`fx.route(method, path, handler)`** answers under `/api/plugins/<name>/`, with web `Request` and `Response`. A streamed `Response` body streams to the page. `:name` parts are passed as `params`. The server's own checks come first: a write from another site gets 403, and a body over 12 MiB 413. A handler that throws answers 500 with its message.
 - **`fx.sql`** is a `postgres` client whose `search_path` is the plugin's schema, with two connections at most.
 - **`fx.settings`** holds its settings, with secrets opened. `fx.on("settings", …)` hears a change.
 - **`fx.bots.list()` and `fx.bots.get(id)`** read bots.
@@ -207,9 +207,10 @@ export default async function setup(fx: PluginApi) {
 - **Updates** run only the new files. A plugin never changes a file that has shipped, as fxbot's own migrations don't.
 - **Removing a plugin** drops its schema (`drop schema … cascade`).
 - **Core table changes** (core migration `0006_plugins`):
-  - add-ons take `kind` `plugin`, with the plugin's files and parts in `config`
-  - `sent` gains `from`
-  - Plugin secrets use `addon_secrets`, as MCP servers' do
+  - add-ons take `kind` `plugin`, with its manifest in `config`
+  - `sent` gains `plugin`, the plugin that sent a message, which its `turn_start` line carries as `from`
+  - `plugin_sessions` keeps each session a plugin made: its bot, its plugin, and the provider it started on. These sessions stay out of the bot's earlier chats, and a reply in one doesn't change the bot's preview.
+  - Plugin settings, secret or not, are sealed together in `addon_secrets`, as MCP servers' header values are
 
 ### Settings
 
@@ -375,11 +376,11 @@ Checks use a sample plugin in the scratchpad that uses every hook and place, dis
 - [x] A `setup` that throws leaves the plugin off with its error, and fxbot starts.
 
 **M2. Data, settings, routes, and turns**
-- [ ] The migrations make tables in `plugin_<name>`, and `fx.sql` reaches them unqualified. An update runs only new files.
-- [ ] Removing the plugin drops the schema.
-- [ ] A secret setting reaches `fx.settings`, is never in any response, and is sealed in Postgres.
-- [ ] `GET /api/plugins/<name>/…` reaches its route, and a streamed response streams.
-- [ ] Turns from a plugin:
+- [x] The migrations make tables in `plugin_<name>`, and `fx.sql` reaches them unqualified. An update runs only new files.
+- [x] Removing the plugin drops the schema.
+- [x] A secret setting reaches `fx.settings`, is never in any response, and is sealed in Postgres.
+- [x] `GET /api/plugins/<name>/…` reaches its route, and a streamed response streams.
+- [x] Turns from a plugin:
   - `fx.chats.send` without a session shows in the bot's chat with "From <plugin>".
   - With a session from `newSession`, it stays out of that chat, and `chat_history` finds it.
   - After a provider switch, `send` to the old session answers 409.

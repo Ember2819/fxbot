@@ -109,9 +109,12 @@ export async function createStore({ databaseUrl, dataDir, backupsDir }: MigrateO
     },
     sent: {
       get: async (id: string, messageId: string): Promise<Sent | null> =>
-        one(await sql<Sent[]>`select input, files from sent where profile_id = ${id} and message_id = ${messageId}`),
-      save: async (id: string, messageId: string, { input, files }: Sent) =>
-        void (await sql`insert into sent values (${id}, ${messageId}, ${input}, ${sql.json(files)}) on conflict do nothing`),
+        one(await sql<Sent[]>`select input, files, plugin from sent where profile_id = ${id} and message_id = ${messageId}`),
+      save: async (id: string, messageId: string, { input, files, plugin = null }: Sent) =>
+        void (await sql`insert into sent (profile_id, message_id, input, files, plugin) values (${id}, ${messageId}, ${input}, ${sql.json(files)}, ${plugin})
+          on conflict do nothing`),
+      // The messages plugins sent, whose turn_start lines name them.
+      byPlugins: async () => sql<{ profileId: string; messageId: string }[]>`select profile_id, message_id from sent where plugin is not null`,
     },
     close: () => sql.end({ timeout: 5 }),
   };

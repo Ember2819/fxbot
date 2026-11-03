@@ -210,7 +210,8 @@ export type Part =
 
 // One message and its reply. `parts` is the reply step by step; `reply` is its text alone, the parts' text joined, and
 // all a turn from an earlier chat has. `unsent` marks a message the server never took, which can be sent again.
-export type Turn = { messageId: string; text: string; files?: Upload[]; reply: string; parts?: Part[]; done: boolean; note?: string; unsent?: boolean };
+// `from` names the plugin that sent the message, when one did.
+export type Turn = { messageId: string; text: string; files?: Upload[]; reply: string; parts?: Part[]; done: boolean; note?: string; unsent?: boolean; from?: string };
 
 // Folds one stream line into a thread. Lines without a messageId, such as `idle`, change nothing.
 export function applyLine(turns: Turn[], line: StreamLine): Turn[] {
@@ -221,7 +222,17 @@ export function applyLine(turns: Turn[], line: StreamLine): Turn[] {
   if (line.type === "turn_start" || line.type === "turn_resume") {
     // Turns show in the order they start, so a message sent during the replay lands after it.
     // A turn that runs again after a crash sends its reply again from the start.
-    const started = { ...turn, text: typeof line.input === "string" ? line.input : turn.text, files: line.files ?? turn.files, reply: "", parts: [], done: false, note: undefined, unsent: undefined };
+    const started = {
+      ...turn,
+      text: typeof line.input === "string" ? line.input : turn.text,
+      files: line.files ?? turn.files,
+      ...(line.from ? { from: line.from } : {}),
+      reply: "",
+      parts: [],
+      done: false,
+      note: undefined,
+      unsent: undefined,
+    };
     return [...(i < 0 ? turns : turns.toSpliced(i, 1)), started];
   }
   const parts = turn.parts ?? [];
