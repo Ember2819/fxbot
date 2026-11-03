@@ -1,7 +1,7 @@
 import { createFxbot, releasesUrlFor, type AddonRef, type ItemKind, type LocalEmbedder, type Settings, type UpdateStatus } from "@fxbot/sdk";
 import { readFileSync, statSync } from "node:fs";
 import { createServer, type IncomingMessage, type ServerResponse } from "node:http";
-import { extname, join, normalize } from "node:path";
+import { delimiter, extname, join, normalize } from "node:path";
 import { Readable } from "node:stream";
 import { pipeline } from "node:stream/promises";
 import type { ReadableStream } from "node:stream/web";
@@ -32,6 +32,8 @@ const fxbot = await createFxbot({
   everythingUrl: process.env.FXBOT_MCP_EVERYTHING || undefined,
   listsUrl: process.env.FXBOT_LISTS_URL || undefined,
   embedUrl: process.env.FXBOT_EMBED_URL || undefined,
+  // Plugin folders, for writing a plugin in a checkout, separated as PATH is.
+  pluginDirs: process.env.FXBOT_PLUGIN_DIRS?.split(delimiter).filter(Boolean),
 });
 
 // The ui package's build, served beside the API.
@@ -129,6 +131,7 @@ async function api(req: IncomingMessage, res: ServerResponse, url: URL) {
     if (id && !action && method === "DELETE") return json(res, 200, (await fxbot.addons.remove(id), ok));
     if (id && action === "secrets" && method === "PUT") return json(res, 200, await fxbot.addons.setSecrets(id, await body(req)));
     if (id && action === "skills" && method === "GET") return json(res, 200, { text: fxbot.addons.readSkill(id, url.searchParams.get("file") ?? undefined) });
+    if (id && action === "log" && method === "GET") return json(res, 200, { lines: fxbot.addons.log(id) });
     // The checked origin is where the sign-in comes back to.
     if (id && action === "sign-in" && method === "POST") return json(res, 201, await fxbot.oauth.start(id, req.headers.origin));
     return fail(404, "not found");

@@ -279,7 +279,8 @@ module.exports = function setup(app) {
 ### Failures and speed
 
 - **A hook that throws is logged and skipped,** except `tool.before`, where it blocks the call, as in Pi. The add-on's row shows its last error.
-- **Time limits.** A `message`, `instructions`, or `tool.before` handler gets 5 seconds, and is then treated as if it threw. `turn.*` and `tool.after` handlers don't hold up the stream.
+- **Time limits.** A `message`, `instructions`, `tool.before`, or `tool.after` handler gets 5 seconds, and is then treated as if it threw. `setup` gets 10. `turn.*` handlers run beside the turn and never hold it up.
+- **A handled message** answers `send` with `{ messageId, sessionId, handled: true }`, and nothing reaches the chat.
 - **A plugin whose `setup` throws, or whose migrations fail,** stays added but off, with the error on its row. The rest of fxbot starts.
 - **No plugins, no cost.** Hook lists are empty arrays, the page loads no plugin code, and there are no timers.
 
@@ -359,19 +360,19 @@ The plugins themselves add about 350 lines for chat rooms and about 120 for herd
 Checks use a sample plugin in the scratchpad that uses every hook and place, disposable Postgres, the mock model, and Playwright. Nothing reaches the real herdr except the human's check.
 
 **M1. Loading and hooks**
-- [ ] A plugin in `FXBOT_PLUGIN_DIRS` loads at start. Its tool reaches its bots and no others, named `<plugin>_<tool>`.
-- [ ] `message` hooks:
+- [x] A plugin in `FXBOT_PLUGIN_DIRS` loads at start. Its tool reaches its bots and no others, named `<plugin>_<tool>`.
+- [x] `message` hooks:
   - A change to the text reaches the model; checked in the mock model's request.
   - `{ handled: true }` runs no turn.
   - Two plugins' changes chain in the order they were added.
-- [ ] `instructions` adds a line that the mock model sees, for the session the hook picked and no other.
-- [ ] Tool hooks:
+- [x] `instructions` adds a line that the mock model sees, for the session the hook picked and no other.
+- [x] Tool hooks:
   - `tool.before` changes a core tool's input, and blocks an MCP tool's call with its reason.
   - A `tool.before` that throws blocks.
   - `tool.after` changes a result.
-- [ ] `turn.start` and `turn.end` fire with the bot, the session, and the reply, without holding up the stream.
-- [ ] A hook that throws, or takes over 5 seconds, is logged on the row, and the turn goes on.
-- [ ] A `setup` that throws leaves the plugin off with its error, and fxbot starts.
+- [x] `turn.start` and `turn.end` fire with the bot, the session, and the reply, without holding up the stream.
+- [x] A hook that throws, or takes over 5 seconds, is logged on the row, and the turn goes on.
+- [x] A `setup` that throws leaves the plugin off with its error, and fxbot starts.
 
 **M2. Data, settings, routes, and turns**
 - [ ] The migrations make tables in `plugin_<name>`, and `fx.sql` reaches them unqualified. An update runs only new files.

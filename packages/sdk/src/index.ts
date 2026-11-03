@@ -5,6 +5,7 @@ import { createHistory, summarize } from "./history.ts";
 import { createLibrary } from "./library.ts";
 import { createMcp } from "./mcp.ts";
 import { createMemories } from "./memories.ts";
+import { createPlugins } from "./plugins.ts";
 import { createProviders } from "./providers.ts";
 import { createRegistry } from "./registry.ts";
 import { createReleases } from "./releases.ts";
@@ -14,6 +15,7 @@ import { createStore, isId, type StoredProfile } from "./store.ts";
 import { colors, maxPinned, shapes, type Addon, type AddonRef, type AddonSecrets, type Fields, type Kind, type LibraryQuery, type Message, type NewProvider, type Profile, type ProfileUpdate, type ProviderUpdate, type Settings, type StreamLine, embeddingKinds, type SkillRef, type Upload } from "./types.ts";
 
 export type * from "./types.ts";
+export type * from "./plugin-api.ts";
 export { colors, embeddingKinds, itemKinds, kinds, maxPinned, shapes } from "./types.ts";
 export { readKey, rotateSecrets } from "./secrets.ts";
 export { compareVersions, isStable, isVersion, releasesUrlFor } from "./releases.ts";
@@ -49,6 +51,8 @@ export type FxbotOptions = {
   syncRegistry?: boolean;
   /** The machine's local embedder, an OpenAI-style API such as `http://embed:8080/v1`, for memory search. None: no local embedder. */
   embedUrl?: string;
+  /** Plugin folders to load at start, unpinned, for writing a plugin in a checkout. */
+  pluginDirs?: string[];
 };
 
 // Bad input fails with `status` 400 and a missing bot with 404, so a server can answer with the same status.
@@ -86,6 +90,10 @@ export async function createFxbot(options: FxbotOptions) {
   const { databaseUrl, secretKey, vercelClientId, dataDir = "data", backupsDir = "backups", version = "0.0.0", fetch = globalThis.fetch } = options;
   const key = typeof secretKey === "string" ? readKey(secretKey) : secretKey;
   const store = await createStore({ databaseUrl, dataDir, backupsDir });
+  // How many turns each bot has running in this process, for `busy`.
+  const running = new Map<string, number>();
+  const count = (id: string, by: number) => running.set(id, (running.get(id) ?? 0) + by);
+  const withBusy = (profile: StoredProfile): Profile => ({ ...profile, busy: (running.get(profile.id) ?? 0) > 0 });
   const releases = createReleases({ version, url: options.releasesUrl, fetch });
   // Memory search's vectors: from the machine's local embedder, a provider's /embeddings, or none.
   const embeddings = createEmbeddings({ sql: store.sql, fetch, localUrl: options.embedUrl?.replace(/\/+$/, ""), target: (id) => providers.embeddingsTarget(id) });
@@ -114,6 +122,7 @@ export async function createFxbot(options: FxbotOptions) {
     clientMetadataUrl: options.clientMetadataUrl,
     findEntry: registry.lookup,
     onChange: () => void retool(),
+    reserved: () => plugins.names(),
   });
   const skills = await createSkills({
     store,
@@ -121,7 +130,17 @@ export async function createFxbot(options: FxbotOptions) {
     fromOf: (skill) => (registry.ourSkill(skill) ? "fxbot" : "skills.sh"),
     onChange: () => void retool(),
   });
-  const toolsNow = async () => [history.tool, ...memories.tools, ...library.tools, ...(skills.any() ? [skills.tool] : []), ...(await mcp.tools())];
+  // Plugins load before the agents, so their tools are there from the start. Every tool passes through their hooks.
+  const plugins = await createPlugins({
+    store,
+    dirs: options.pluginDirs ?? [],
+    taken: () => mcp.prefixes(),
+    onChange: () => void retool(),
+    host: { bots: { list: async () => (await store.profiles.list()).map(withBusy), get: async (id) => withBusy(await get(id)) } },
+  });
+  await plugins.start();
+  const toolsNow = async () =>
+    [history.tool, ...memories.tools, ...library.tools, ...(skills.any() ? [skills.tool] : []), ...(await mcp.tools()), ...plugins.tools()].map(plugins.wrap);
   const providers = await createProviders({ store, secretKey: key, dataDir, vercelClientId, fetch, tools: await toolsNow() });
   // Vectors that rows lack, from where Settings says, in the background.
   embeddings.nudge();
@@ -131,11 +150,6 @@ export async function createFxbot(options: FxbotOptions) {
     return retooling;
   }
   mcp.connect();
-
-  // How many turns each bot has running in this process, for `busy`.
-  const running = new Map<string, number>();
-  const count = (id: string, by: number) => running.set(id, (running.get(id) ?? 0) + by);
-  const withBusy = (profile: StoredProfile): Profile => ({ ...profile, busy: (running.get(profile.id) ?? 0) > 0 });
 
   // A switch's summary follows the bot's own instructions in every open of the chat it started.
   const instructionsFor = (profile: StoredProfile) =>
@@ -150,6 +164,7 @@ export async function createFxbot(options: FxbotOptions) {
   // bot's own instructions come its memories, in 2% of the model's context window, and its skills, in 1%, at 4
   // characters a token, or 8,000 characters each when the window is unknown. libfx takes at most 64 KiB in all, so the
   // memories get no more than what the rest leaves. They change only when a memory does, so the prompt cache holds.
+  // Plugins' instructions hooks change the list last.
   async function open(profile: StoredProfile, sessionId: string) {
     const model = await modelFor(profile);
     const agent = await providers.agentFor(profile.provider, model);
@@ -158,7 +173,13 @@ export async function createFxbot(options: FxbotOptions) {
     const catalog = skills.catalog(profile.id, share(0.01));
     const room = 64 * 1024 - 1024 - Buffer.byteLength([...instructionsFor(profile), catalog].join("\n\n"));
     const memory = await memories.section(profile.id, Math.min(share(0.02), room));
-    return agent.session(sessionId, { model: model || undefined, instructions: [...instructionsFor(profile), memory, catalog].filter(Boolean), context: { bot: profile.id } });
+    let instructions = [...instructionsFor(profile), memory, catalog].filter(Boolean);
+    if (plugins.hooked("instructions")) {
+      const event = { bot: profile.id, session: sessionId, instructions };
+      await plugins.run("instructions", event);
+      instructions = (Array.isArray(event.instructions) ? event.instructions : []).filter((entry) => typeof entry === "string" && entry);
+    }
+    return agent.session(sessionId, { model: model || undefined, instructions, context: { bot: profile.id } });
   }
 
   async function get(id: string) {
@@ -199,24 +220,26 @@ export async function createFxbot(options: FxbotOptions) {
 
   // Each turn's reply is saved after the turn ends, and close waits for the saves.
   const saving = new Set<Promise<void>>();
-  function finish(id: string, sessionId: string, turn: FxTurn | FxResumeTurn) {
-    const done = saveReply(id, sessionId, turn).catch((error) => console.error("Could not save a reply:", error));
+  function finish(id: string, sessionId: string, turn: FxTurn | FxResumeTurn, sent: { text: string; from?: string } = { text: "" }) {
+    const done = saveReply(id, sessionId, turn, sent).catch((error) => console.error("Could not save a reply:", error));
     saving.add(done);
     void done.finally(() => saving.delete(done));
   }
 
   // Reading a turn's events waits for its end; a repeated messageId yields no text and saves nothing. A resumed turn
-  // learns its messageId from its events, and one with nothing left open has none.
-  async function saveReply(id: string, sessionId: string, turn: FxTurn | FxResumeTurn) {
+  // learns its messageId from its events, and one with nothing left open has none. Plugins hear the end either way.
+  async function saveReply(id: string, sessionId: string, turn: FxTurn | FxResumeTurn, sent: { text: string; from?: string }) {
     let reply = "";
     count(id, 1);
     try {
       for await (const event of turn) if (event.type === "text_delta") reply += event.delta;
-    } catch {
+    } catch (error) {
+      if (turn.messageId) plugins.observe("turn.end", { bot: id, session: sessionId, messageId: turn.messageId, ...sent, reply, error: (error as Error).message });
       return;
     } finally {
       count(id, -1);
     }
+    if (turn.messageId) plugins.observe("turn.end", { bot: id, session: sessionId, messageId: turn.messageId, ...sent, reply });
     if (!reply.trim() || !turn.messageId) return;
     await history.record(id, sessionId, turn.messageId, "assistant", reply);
     await store.profiles.update(id, { preview: reply.trim().replace(/\s+/g, " ").slice(0, 160) });
@@ -384,6 +407,13 @@ export async function createFxbot(options: FxbotOptions) {
       // Saved before the prompt, so a restart still finds the session and every upload knows its chat. A concurrent
       // first send keeps the id already saved.
       if (!profile.sessionId) profile = (await store.profiles.claimSession(id, await (await providers.agentFor(profile.provider, "")).newSessionId())) ?? fail(404, "profile not found");
+      // Plugins may change the message, or handle it themselves, and then no turn runs.
+      if (plugins.hooked("message")) {
+        const event = { bot: id, session: profile.sessionId!, text, files };
+        if ((await plugins.run("message", event))?.handled) return { messageId, sessionId: profile.sessionId!, handled: true as const };
+        ({ text, files } = event);
+        if (typeof text !== "string" || !Array.isArray(files)) fail(400, "A plugin left this message without text or files.");
+      }
       // A skill named as $name, or /name at the start, goes with the message, so the bot has it without asking.
       const skilled = skills.invoked(id, text);
       const input = files.length || skilled.length ? await attach(profile, text, messageId, files, skilled) : text;
@@ -393,7 +423,8 @@ export async function createFxbot(options: FxbotOptions) {
         const accepted = await turn.accepted;
         const names = files.length ? `\n[files: ${files.map((f) => f.name).join(", ")}]` : "";
         await history.record(id, accepted.sessionId, messageId, "user", text + names);
-        finish(id, accepted.sessionId, turn);
+        plugins.observe("turn.start", { bot: id, session: accepted.sessionId, messageId, text });
+        finish(id, accepted.sessionId, turn, { text });
         return accepted;
       } catch (error) {
         // libfx throws a TypeError or RangeError for a prompt it refuses, such as an image whose bytes are not its type.
@@ -425,21 +456,24 @@ export async function createFxbot(options: FxbotOptions) {
     addons: {
       // With what the registry says about each server now: its details, and a mark when it has a newer version, or is
       // deprecated or gone. Skills carry their marks from the hourly check of their repositories.
-      list: async (): Promise<Addon[]> => [...(await registry.decorate(await mcp.list())), ...skills.list()],
+      list: async (): Promise<Addon[]> => [...(await registry.decorate(await mcp.list())), ...skills.list(), ...plugins.list()],
       // fxbot's list and GitHub's registry, and with `everything`, the official one's own search too. Skills: fxbot's
       // skills list, then skills.sh's.
       search: (q: unknown, options: { kind?: unknown; everything?: boolean }) => (options.kind === "skill" ? registry.searchSkills(q) : registry.search(q, options)),
       preview: (ref: AddonRef) => (isSkill(ref) ? skills.preview(ref) : mcp.preview(ref)),
       add: (ref: AddonRef, hash: string) => (isSkill(ref) ? skills.add(ref, hash) : mcp.add(ref, hash)),
       update: (id: string, hash: unknown) => (skills.has(id) ? skills.update(id, hash) : mcp.update(id, hash)),
-      change: (id: string, input: { enabled?: boolean; bots?: "all" | "each"; allowed?: string[] }) => (skills.has(id) ? skills.change(id, input) : mcp.change(id, input)),
-      remove: (id: string) => (skills.has(id) ? skills.remove(id) : mcp.remove(id)),
+      change: (id: string, input: { enabled?: boolean; bots?: "all" | "each"; allowed?: string[] }) =>
+        plugins.has(id) ? plugins.change(id, input) : skills.has(id) ? skills.change(id, input) : mcp.change(id, input),
+      remove: (id: string) => (plugins.has(id) ? plugins.remove(id) : skills.has(id) ? skills.remove(id) : mcp.remove(id)),
       setSecrets: (id: string, input: AddonSecrets) => mcp.setSecrets(id, input),
       // A bot's switch, read when the add-on is chosen bot by bot.
       async forBot(profileId: string, addonId: string, enabled: boolean) {
         await get(profileId);
-        return skills.has(addonId) ? skills.forBot(profileId, addonId, enabled) : mcp.forBot(profileId, addonId, enabled);
+        return plugins.has(addonId) ? plugins.forBot(profileId, addonId, enabled) : skills.has(addonId) ? skills.forBot(profileId, addonId, enabled) : mcp.forBot(profileId, addonId, enabled);
       },
+      // A plugin's recent log lines and errors.
+      log: (id: string) => plugins.log(id),
       // One of an installed skill's files, to read on its page.
       readSkill: (id: string, file: unknown) => skills.read(id, file),
       // Checks the skills' repositories now, as the hourly check does, and marks what changed there.
@@ -455,6 +489,7 @@ export async function createFxbot(options: FxbotOptions) {
 
     // Waits for the turns this process started and the saves of their replies, then lets Postgres go.
     async close() {
+      await plugins.close();
       embeddings.close();
       releases.close();
       registry.close();

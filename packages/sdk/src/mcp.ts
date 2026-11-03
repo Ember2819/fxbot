@@ -72,6 +72,8 @@ export type McpOptions = {
   findEntry: (name: string, from: AddonFrom, version: string) => Promise<Entry | null>;
   /** The tools bots can use have changed. */
   onChange: () => void;
+  /** Names other add-ons' tools start with, which a server's prefix must not take. */
+  reserved?: () => string[];
 };
 
 // Addresses a server's URL must not reach unless its add-on allows local addresses: this machine, private networks,
@@ -155,7 +157,7 @@ const registered = (source: unknown): source is NonNullable<Addon["source"]> =>
 const headerName = (name: unknown) => (typeof name === "string" && /^[A-Za-z0-9!#$%&'*+.^_`|~-]{1,100}$/.test(name) ? name : fail(400, "Each header needs a name of letters, digits, and dashes."));
 
 // Remote MCP servers as add-ons: their records, connections, sign-ins, and the tools bots get from them.
-export async function createMcp({ store, secretKey, fetch, localUrl, clientMetadataUrl, findEntry, onChange }: McpOptions) {
+export async function createMcp({ store, secretKey, fetch, localUrl, clientMetadataUrl, findEntry, onChange, reserved = () => [] }: McpOptions) {
   const secrets = createSecrets(store.sql, secretKey, "addon_secrets");
   const records = new Map((await store.addons.list()).filter((r) => r.kind === "mcp").map((r) => [r.id, r as McpRecord] as [string, McpRecord]));
   const on = new Map<string, Set<string>>();
@@ -451,7 +453,7 @@ export async function createMcp({ store, secretKey, fetch, localUrl, clientMetad
   }
 
   function prefixFor(name: string) {
-    const taken = new Set([...records.values()].map((r) => r.config.prefix).concat("chat", "library"));
+    const taken = new Set([...records.values()].map((r) => r.config.prefix).concat("chat", "library", ...reserved()));
     const base = slug(name);
     let prefix = base;
     for (let n = 2; taken.has(prefix); n++) prefix = `${base}_${n}`;
@@ -576,6 +578,8 @@ export async function createMcp({ store, secretKey, fetch, localUrl, clientMetad
 
   return {
     tools,
+    // The prefixes servers' tools take, which a plugin's name must not.
+    prefixes: () => [...records.values()].map((r) => r.config.prefix),
     // Connects every enabled server, in the background.
     connect: () => void Promise.all([...records.values()].map(start)),
 

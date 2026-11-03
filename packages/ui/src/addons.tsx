@@ -23,12 +23,14 @@ function summary(addon: Addon, profiles: Profile[] | null) {
   const chosen = profiles?.filter((p) => addon.on.includes(p.id)).length ?? addon.on.length;
   const bots = addon.bots === "all" ? "All bots" : `${chosen} bot${chosen === 1 ? "" : "s"}`;
   if (addon.kind === "skill") return `Skill · ${bots}`;
+  if (addon.kind === "plugin") return addon.error ? `Plugin · Off: ${addon.error}` : `Plugin · ${bots}`;
   const allowed = addon.tools.filter((t) => addon.allowed.includes(t.name)).length;
   return [addon.status, addon.tools.length ? `${allowed} of ${addon.tools.length} tools` : "", bots].filter(Boolean).join(" · ");
 }
 const markText: Record<Addon["kind"], Record<AddonMark["kind"], string>> = {
   mcp: { update: "Update available", deprecated: "Deprecated", removed: "Removed from the registry" },
   skill: { update: "Update available", deprecated: "Deprecated", removed: "Removed from its repository" },
+  plugin: { update: "Update available", deprecated: "Deprecated", removed: "Removed from its repository" },
 };
 
 type Tab = "installed" | "skills" | "mcp" | "plugins";
@@ -66,7 +68,11 @@ export function AddonsPage({ profiles }: { profiles: Profile[] | null }) {
   const tab = chosen ?? (addons?.length ? "installed" : "mcp");
   const words = query.trim().toLowerCase();
   const mine = (addons ?? []).filter(
-    (a) => !words || (a.kind === "mcp" ? [a.name, a.source?.registry ?? "", hostOf(a.url)] : [a.name, a.source.skill, a.description]).some((text) => text.toLowerCase().includes(words)),
+    (a) =>
+      !words ||
+      (a.kind === "mcp" ? [a.name, a.source?.registry ?? "", hostOf(a.url)] : a.kind === "skill" ? [a.name, a.source.skill, a.description] : [a.name, a.description]).some((text) =>
+        text.toLowerCase().includes(words),
+      ),
   );
   const found = words && search.result ? search.result.cards.length : undefined;
   const skillsFound = words && skillSearch.result ? skillSearch.result.cards.length : undefined;

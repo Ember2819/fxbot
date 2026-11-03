@@ -165,7 +165,22 @@ export type SkillSource = { skill: string; commit: string; from: "fxbot" | "skil
 export type SkillFile = { path: string; size: number; hash: string };
 // A skill as installed. `manual` is one only a person calls by name, which bots don't see in their list.
 export type SkillAddon = AddonCommon & { kind: "skill"; source: SkillSource; description: string; files: SkillFile[]; license?: string; manual?: boolean };
-export type Addon = McpAddon | SkillAddon;
+// A plugin: code that changes fxbot itself, from a GitHub repository's folder at a pinned commit, or in a checkout from
+// a folder of FXBOT_PLUGIN_DIRS. `parts` is what it registered when it loaded; `error` is why it is off.
+export type PluginSource = { local: string } | { repo: string; path: string; commit: string; from: "fxbot" | "github" };
+export type PluginSetting = { name: string; description: string; default?: string; isRequired?: boolean; isSecret?: boolean };
+export type PluginParts = { tools: string[]; hooks: string[]; routes: string[]; page: boolean };
+export type PluginAddon = AddonCommon & {
+  kind: "plugin";
+  source: PluginSource;
+  version: string;
+  description: string;
+  /** Its settings, with each value but a secret's, which says only whether it is set. */
+  settings: (PluginSetting & { value?: string; set: boolean })[];
+  parts: PluginParts;
+  error?: string;
+};
+export type Addon = McpAddon | SkillAddon | PluginAddon;
 // Where a registry entry comes from: fxbot's own list, GitHub's registry, or the official one, unmoderated.
 export type AddonFrom = "fxbot" | "github" | "official";
 // What the page asks to add: a server by its URL, with the names of any headers it needs, or a registry entry, from
@@ -254,4 +269,6 @@ export type StreamLine = {
   error?: { message: string };
   cursor?: number;
   epoch?: number;
+  /** On `turn_start`: the plugin that sent the message, when one did. */
+  from?: string;
 };
