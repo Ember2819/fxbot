@@ -1,0 +1,13 @@
+---
+// The environment table, taken from the README so the two never differ.
+import { marked } from "marked";
+import readme from "../../../../README.md?raw";
+
+const lines = readme.split("\n");
+const start = lines.findIndex((line) => line.startsWith("| Variable |"));
+const end = lines.findIndex((line, i) => i > start && !line.startsWith("|"));
+if (start < 0) throw new Error("README.md has no | Variable | table for the Configuration page");
+const html = await marked.parse(lines.slice(start, end < 0 ? undefined : end).join("\n"));
+---
+
+<Fragment set:html={html} />

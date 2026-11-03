@@ -1,0 +1,26 @@
+---
+// A set's overview lists its four kinds, each with its pages, from the same list as its sidebar.
+import { topics } from "../sidebar.ts";
+
+const { topic } = Astro.props as { topic: "docs" | "sdk" };
+const base = import.meta.env.BASE_URL;
+const groups = topics.find((t) => t.id === topic)!.groups;
+---
+
+<div class="fxbot-kinds not-content">
+  {
+    groups.map((group) => (
+      <section>
+        <h2>{group.title}</h2>
+        <p>{group.about}</p>
+        <ul>
+          {group.pages.map((page) => (
+            <li>
+              <a href={`${base}${topic}/${page.slug}/`}>{page.label}</a>
+            </li>
+          ))}
+        </ul>
+      </section>
+    ))
+  }
+</div>

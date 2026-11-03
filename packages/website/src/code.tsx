@@ -1,5 +1,4 @@
 import { Check, Copy } from "lucide-react";
-import { renderToStaticMarkup } from "react-dom/server";
 
 // A copy button for a code block. It stays hidden without JavaScript, which client.ts shows and runs.
 export function CopyButton() {
@@ -10,9 +9,8 @@ export function CopyButton() {
     </button>
   );
 }
-export const copyButton = renderToStaticMarkup(<CopyButton />);
 
-// A command or code to copy, as Markdown's code blocks render it.
+// A command or code to copy.
 export function Command({ children }: { children: string }) {
   return (
     <div className="code" data-code>

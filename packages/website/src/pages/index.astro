@@ -1,0 +1,52 @@
+---
+// The home page: React, rendered here with no script of its own but client.ts, beside the docs in Starlight.
+import "../site.css";
+import { Home } from "../home.tsx";
+import { url } from "../site.ts";
+
+const title = "fxbot: your bot, built how you want it";
+const description = "fxbot is your bot, built and configured how you want it: a lean, local-first core that works with local models and grows with the plugins you pick.";
+const base = import.meta.env.BASE_URL;
+const address = url("/");
+---
+
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="color-scheme" content="light dark" />
+    <meta name="theme-color" media="(prefers-color-scheme: light)" content="#ffffff" />
+    <meta name="theme-color" media="(prefers-color-scheme: dark)" content="#0a0a0a" />
+    <title>{title}</title>
+    <meta name="description" content={description} />
+    <link rel="canonical" href={address} />
+    <link rel="sitemap" href={`${base}sitemap-index.xml`} />
+    <meta property="og:type" content="website" />
+    <meta property="og:site_name" content="fxbot" />
+    <meta property="og:url" content={address} />
+    <meta property="og:title" content={title} />
+    <meta property="og:description" content={description} />
+    <meta property="og:image" content={url("/card.png")} />
+    <meta property="og:image:width" content="1200" />
+    <meta property="og:image:height" content="630" />
+    <meta property="og:image:alt" content="fxbot: Your bot, built and configured how you want it. A lean core. Local first. Grows with the plugins you pick." />
+    <meta name="twitter:card" content="summary_large_image" />
+    <link rel="icon" type="image/png" href={`${base}icon-192.png`} />
+    <link rel="apple-touch-icon" href={`${base}icon-192.png`} />
+    <!-- A theme chosen here or in the docs, before the page paints. Without one, the system's. -->
+    <script is:inline>
+      try {
+        const theme = localStorage.getItem("starlight-theme");
+        if (theme === "light" || theme === "dark") document.documentElement.dataset.theme = theme;
+      } catch {}
+    </script>
+    <!-- Fathom: cookieless page views, counted on fxbot.sh only (not on pages.dev or a local preview). -->
+    <script is:inline src="https://cdn.usefathom.com/script.js" data-site="WZDAIRJP" data-included-domains="fxbot.sh" defer></script>
+  </head>
+  <body>
+    <Home />
+    <script>
+      import "../client.ts";
+    </script>
+  </body>
+</html>

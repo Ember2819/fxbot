@@ -19,7 +19,7 @@ A TypeScript monorepo with four npm workspaces under `packages/`, laid out after
 | [`@fxbot/sdk`](packages/sdk/README.md) | The agent system: providers and their sign-ins, one libfx agent per provider, bot profiles, settings, uploads, each bot's durable chat, and its searchable history. `@fxbot/sdk/client` is a typed client for the server's HTTP API, with the stream reader and the turn reducer a UI needs. To build your own app on it, see [the SDK's pages](https://fxbot.sh/sdk/). |
 | `@fxbot/server` | The backend: `node:http` routes over the SDK, and the built UI. Keys and tokens stay here, sealed in Postgres. |
 | `@fxbot/ui` | The PWA: Vite, React, and shadcn/ui, with the chat built from shadcn's AI Elements patterns, on `@fxbot/sdk/client`. |
-| `@fxbot/website` | The public site and its docs, pre-rendered with Vite, React, and Tailwind into static pages in `out/` by `npm run build-site`. `FXBOT_SITE_BASE` sets the path it is served under. |
+| `@fxbot/website` | The public site and its docs, static pages in `out/` built by `npm run build-site`: the home page in React and Tailwind, and the docs in Astro's [Starlight](https://starlight.astro.build), with search. `FXBOT_SITE_BASE` sets the path it is served under. |
 
 Records live in Postgres; libfx keeps each chat's session in files. No Next.js, and no Vercel AI SDK. The packages run as TypeScript source on Node 22.18 or newer, with no build step but the UI's and the site's.
 

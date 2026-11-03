@@ -1,0 +1,49 @@
+---
+title: "fxbot SDK"
+description: "@fxbot/sdk is the agent system that fxbot is built on, for building bot applications of your own: a chat in a terminal, a bot on a messaging service, a page of your own design, or a backend that gives your product bots that remember. fxbot's own server and page are one app built on it."
+---
+
+import Kinds from "../../../components/Kinds.astro";
+
+`@fxbot/sdk` is the agent system that fxbot is built on, for building bot applications of your own: a chat in a terminal, a bot on a messaging service, a page of your own design, or a backend that gives your product bots that remember. fxbot's own server and page are one app built on it.
+
+New to it? Start with the tutorial, [Build a terminal chat](/sdk/tutorials/terminal-chat/). The SDK's pages are in four parts, each for a different need.
+
+## What it gives your app
+
+- **Bots with lasting chats.** Each bot is a profile with a name, instructions, a provider, and a model, and one durable chat that survives restarts. A turn runs on [libfx](https://fx.sh/docs/lib), the agent from fx.
+- **Providers.** ChatGPT, Grok, and Vercel accounts signed in with a device code, API keys for OpenAI, AI Gateway, OpenRouter, and OpenCode, and local model servers such as Ollama and LM Studio.
+- **Replies as they're written.** Each chat is a stream of lines: text, thinking, and tool calls, in the order they happen, which a small function folds into turns.
+- **Tools.** Every bot searches its own past chats, keeps [memories](/sdk/how-to/memories/), and reads and saves files in the library. Remote MCP servers and skills add more.
+- **Plugins.** Code that changes fxbot itself, with hooks into each turn and tool call, tools, routes, tables, settings, and screens of its own. See [Write a plugin](/sdk/how-to/write-a-plugin/).
+- **Records in Postgres.** Bots, chats, files, memories, and settings live in Postgres, with every key and token sealed under a key your app holds. The database moves forward through numbered migrations when your app starts.
+
+## Two entries
+
+| Entry | Runs in | What it is |
+| --- | --- | --- |
+| `@fxbot/sdk` | Your backend, on Node 22.18 or newer | `createFxbot()`: the bots, their chats, providers, tools, and records, over your Postgres. It holds the key that seals secrets. |
+| `@fxbot/sdk/client` | A page or a script | A typed client for an fxbot server's HTTP API, with the stream reader and the function that folds stream lines into turns. It carries no credentials. |
+
+## A look
+
+```ts
+import { readFileSync } from "node:fs";
+import { createFxbot } from "@fxbot/sdk";
+
+const fxbot = await createFxbot({ databaseUrl: process.env.FXBOT_DATABASE_URL!, secretKey: readFileSync("secret.key", "utf8") });
+const provider = await fxbot.providers.add({ kind: "ollama", model: "qwen3:8b" });
+const bot = await fxbot.profiles.create({ name: "Scout", provider: provider.id });
+await fxbot.send(bot.id, { text: "Hello!", messageId: crypto.randomUUID() });
+// The reply streams in on fxbot.stream(bot.id).
+```
+
+## What you need
+
+- Node 22.18 or newer, which runs the SDK's TypeScript as it is.
+- Postgres with the pgvector extension. fxbot's own compose file runs one, with the local embedder for memory search, under podman or docker.
+- A model: a local server such as Ollama, an API key, or an account.
+
+The SDK isn't on npm yet. It's TypeScript source in fxbot's repository, and an app uses it through an npm workspace: see [Use the SDK in a project](/sdk/how-to/set-up/).
+
+<Kinds topic="sdk" />

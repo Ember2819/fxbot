@@ -2,8 +2,7 @@ import { Moon, Sun } from "lucide-react";
 import type { ReactNode } from "react";
 import { Blob } from "./blob.tsx";
 import { buttonVariants } from "./components/ui/button.tsx";
-import { changelogPath } from "./content.ts";
-import { discord, href, repo } from "./site.ts";
+import { changelogPath, discord, href, repo } from "./site.ts";
 
 // GitHub's mark, which Lucide no longer ships.
 function GitHubMark() {
@@ -23,10 +22,8 @@ function DiscordMark() {
   );
 }
 
-type Section = "docs" | "sdk" | "changelog";
-
-function Header({ section }: { section?: Section }) {
-  const link = (active: boolean) => `rounded-md px-2.5 py-1.5 transition-colors hover:text-foreground ${active ? "text-foreground" : "text-muted-foreground"}`;
+function Header() {
+  const link = "rounded-md px-2.5 py-1.5 text-muted-foreground transition-colors hover:text-foreground";
   return (
     <header className="sticky top-0 z-30 border-b border-border/70 bg-background/85 backdrop-blur supports-[backdrop-filter]:bg-background/70">
       <div className="mx-auto flex h-14 max-w-6xl items-center gap-3 px-4 sm:gap-6 sm:px-6">
@@ -35,14 +32,14 @@ function Header({ section }: { section?: Section }) {
           fxbot
         </a>
         <nav aria-label="Site" className="flex items-center text-sm">
-          <a href={href("/docs/")} className={link(section === "docs")} aria-current={section === "docs" ? "page" : undefined}>
+          <a href={href("/docs/")} className={link}>
             Docs
           </a>
-          <a href={href("/sdk/")} className={link(section === "sdk")} aria-current={section === "sdk" ? "page" : undefined}>
+          <a href={href("/sdk/")} className={link}>
             SDK
           </a>
           {/* Below 420px wide, the footer's link is the one that fits. */}
-          <a href={href(changelogPath)} className={`${link(section === "changelog")} max-[420px]:hidden`} aria-current={section === "changelog" ? "page" : undefined}>
+          <a href={href(changelogPath)} className={`${link} max-[420px]:hidden`}>
             Changelog
           </a>
         </nav>
@@ -96,14 +93,14 @@ function Footer() {
   );
 }
 
-// Every page: the header, its content, and the footer.
-export function Shell({ section, children }: { section?: Section; children: ReactNode }) {
+// The home page's frame: the header, its content, and the footer. The docs have Starlight's (components/SiteTitle.astro).
+export function Shell({ children }: { children: ReactNode }) {
   return (
     <div className="flex min-h-dvh flex-col">
       <a href="#content" className="sr-only focus:not-sr-only focus:absolute focus:top-2 focus:left-2 focus:z-50 focus:rounded-md focus:bg-background focus:px-3 focus:py-2">
         Skip to content
       </a>
-      <Header section={section} />
+      <Header />
       <div id="content" className="flex-1">
         {children}
       </div>

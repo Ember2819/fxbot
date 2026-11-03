@@ -31,6 +31,9 @@ function problem(url: string, from: string) {
 const problems: string[] = [];
 let count = 0;
 const check = (url: string, from: string) => {
+  // Starlight gives its 404 page a canonical address, /404/, that no page has; the host serves 404.html for any missing
+  // path instead.
+  if (from === "404.html" && url === `${origin}${base}404/`) return;
   count++;
   const found = problem(url, from);
   if (found) problems.push(`${from}: ${found}`);
@@ -40,7 +43,7 @@ for (const [name, html] of pages) {
   // og:url and og:image.
   for (const [, url] of html.matchAll(/\scontent="([^"]*)"/g)) if (url.startsWith(`${origin}/`)) check(url, name);
 }
-for (const [, url] of (await readFile(join(out, "sitemap.xml"), "utf8")).matchAll(/<loc>([^<]*)<\/loc>/g)) check(url, "sitemap.xml");
+for (const name of files) if (/^sitemap-.*\.xml$/.test(name)) for (const [, url] of (await readFile(join(out, name), "utf8")).matchAll(/<loc>([^<]*)<\/loc>/g)) check(url, name);
 for (const name of files) {
   if (!name.endsWith(".css")) continue;
   const css = await readFile(join(out, name), "utf8");

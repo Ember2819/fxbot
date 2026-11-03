@@ -1,0 +1,16 @@
+---
+// The header's start, as on the home page: fxbot, then the site's three places.
+import { Blob } from "../blob.tsx";
+import { changelogPath } from "../site.ts";
+
+const base = import.meta.env.BASE_URL;
+const path = Astro.url.pathname;
+const section = path.startsWith(`${base}${changelogPath}`) ? "changelog" : path.startsWith(`${base}sdk/`) ? "sdk" : path.startsWith(`${base}docs/`) ? "docs" : undefined;
+---
+
+<a href={base} class="fxbot-title"><Blob shape="circle" color="black" size={26} />fxbot</a>
+<nav class="fxbot-nav" aria-label="Site">
+  <a href={`${base}docs/`} aria-current={section === "docs" ? "page" : undefined}>Docs</a>
+  <a href={`${base}sdk/`} aria-current={section === "sdk" ? "page" : undefined}>SDK</a>
+  <a href={`${base}${changelogPath}`} aria-current={section === "changelog" ? "page" : undefined}>Changelog</a>
+</nav>

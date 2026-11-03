@@ -5,9 +5,9 @@ import screenshot from "../../../docs/screenshot.png";
 import { Blob, colorCount, shapeCount, type Color, type Shape } from "./blob.tsx";
 import { Command } from "./code.tsx";
 import { buttonVariants } from "./components/ui/button.tsx";
-import { changelogPath, latest } from "./content.ts";
+import { latest } from "./release.ts";
 import { Shell } from "./layout.tsx";
-import { href, installCommand, repo } from "./site.ts";
+import { changelogPath, href, installCommand, repo } from "./site.ts";
 
 // Bob, Fernando, and Securely from the screenshot, and a few friends. One is busy, as a bot is during a turn.
 const crowd: { shape: Shape; color: Color; size: number; busy?: boolean }[] = [
@@ -168,7 +168,7 @@ export function Home() {
                 <span className="mx-auto truncate rounded-md bg-background px-3 py-0.5 font-mono text-xs text-muted-foreground">https://bot.&lt;tailnet&gt;.ts.net</span>
                 <span aria-hidden="true" className="w-[42px]" />
               </div>
-              <img src={screenshot} width={2530} height={1700} alt="fxbot in a desktop browser: Bob's chat open, with Fernando and Securely in the sidebar" className="block h-auto w-full" />
+              <img src={screenshot.src} width={2530} height={1700} alt="fxbot in a desktop browser: Bob's chat open, with Fernando and Securely in the sidebar" className="block h-auto w-full" />
             </div>
             <figcaption className="mt-3 text-sm text-muted-foreground">Bob's chat in a desktop browser, with Fernando and Securely in the sidebar.</figcaption>
           </figure>

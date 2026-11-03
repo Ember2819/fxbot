@@ -1,0 +1,7 @@
+# Written by astro.config.mjs before each build, from the rest of the repository.
+/public/*.json
+/public/setup.sh
+/public/icon-192.png
+/public/robots.txt
+/src/content/docs/docs/reference/changelog.md
+/.astro/

@@ -1,23 +1,19 @@
 // The site's only script. Every page reads fine without it: it adds the theme toggle, the copy buttons, and blobs
 // whose eyes follow the pointer.
-import "./site.css";
-
 const root = document.documentElement;
 const dark = matchMedia("(prefers-color-scheme: dark)");
 
-// The toggle flips the theme the page shows. A choice that matches the system's is forgotten, so the page follows
-// the system again.
+// The toggle flips the theme the page shows, kept where the docs' theme menu keeps it (Starlight's
+// starlight-theme), so the choice carries across the site. A choice that matches the system's is forgotten, so the
+// page follows the system again.
 for (const button of document.querySelectorAll<HTMLButtonElement>("[data-theme-toggle]")) {
   button.hidden = false;
   button.addEventListener("click", () => {
     const shown = root.dataset.theme ?? (dark.matches ? "dark" : "light");
     const next = shown === "dark" ? "light" : "dark";
-    const system = dark.matches ? "dark" : "light";
-    if (next === system) delete root.dataset.theme;
-    else root.dataset.theme = next;
+    root.dataset.theme = next;
     try {
-      if (next === system) localStorage.removeItem("theme");
-      else localStorage.setItem("theme", next);
+      localStorage.setItem("starlight-theme", next === (dark.matches ? "dark" : "light") ? "" : next);
     } catch {}
   });
 }
