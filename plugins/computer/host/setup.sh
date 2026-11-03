@@ -65,7 +65,7 @@ if [ -n "$remove" ]; then
     "$install/fxbot" up
     removed=", and $override"
   fi
-  echo "Removed $name: its computers and files, and its firewall$removed. The packages stay."
+  echo "Removed $name: its computers and files, its firewall$removed. The packages stay."
   exit 0
 fi
 

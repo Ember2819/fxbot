@@ -1,6 +1,18 @@
 {
   "plugins": [
     {
+      "name": "computer",
+      "description": "A Linux computer for each bot: a shell, files, and the programs other plugins install.",
+      "repo": "iammrduncan/fxbot",
+      "path": "plugins/computer"
+    },
+    {
+      "name": "browser",
+      "description": "A web browser on each bot's computer, driven with agent-browser.",
+      "repo": "iammrduncan/fxbot",
+      "path": "plugins/browser"
+    },
+    {
       "name": "chat-rooms",
       "description": "Rooms where several of your bots talk with you, each answering in turn.",
       "repo": "iammrduncan/fxbot",

@@ -1,0 +1,75 @@
+---
+title: "The computer"
+description: "The computer plugin's tools, settings, setup command, and image, and what a computer reaches."
+---
+
+The computer plugin's tools, settings, setup command, and image, and what a computer reaches. To add it, see [Give bots a computer](/docs/how-to/give-bots-a-computer/).
+
+## Tools
+
+Bots the plugin is on for get four tools. A relative path starts at `/root`.
+
+| Tool | Input | What it does |
+| --- | --- | --- |
+| `computer_shell` | `command`, and `timeout` in seconds: 120 unless given, 600 at most | Runs one bash command in a new shell in `/root`, and answers `exit <code>` and its output. A command still running at its timeout is stopped, with its process group, and the output says so. |
+| `computer_read_file` | `path`, `offset` (the first line, from 1), `limit` (lines, up to 2,000) | Text, 2,000 lines or 60 KB at a time, saying where the next part starts. An image (PNG, JPEG, GIF, or WebP, up to 3.75 MiB) comes back as an image, which the bot sees. |
+| `computer_write_file` | `path`, and `text` (up to 1 MiB) or `library` (a `library:<id>`) | Writes the text, or the library item's bytes, making the folders it needs |
+| `computer_to_library` | `path`, and `name` | Saves an image (up to 3.75 MiB) or a text file (up to 1 MiB) to the bot's library, tagged for the chat, and answers its `library:<id>` |
+
+- **Long output.** Output over 60 KiB comes back as its first 4 KiB and last 56 KiB, with a line saying how much was cut, and where the whole of it is, in `/tmp/fxbot/`. A tool's result can be at most 64 KiB.
+- **Servers.** A command started with `setsid cmd > log 2>&1 &` keeps running after its call, until the computer stops.
+- **Calls at once.** Shell commands run one at a time. Reads and writes in one reply run together.
+- **Skills.** When a bot reads a skill with files besides `SKILL.md`, its files are copied to `/skills/<name>/` on the bot's computer before its next call, and the skill's text says so.
+
+## Settings
+
+In the plugin's settings in **Plugins**:
+
+| Setting | Default | What it is |
+| --- | --- | --- |
+| `engine` | `/run/fxbot-computer/engine.sock`, then `/var/lib/fxbot-computer/run/engine.sock` | The engine's socket |
+| `memoryMiB` | 2048 | Memory for each computer, in MiB |
+| `cpus` | 2 | CPUs for each computer |
+| `idleMinutes` | 15 | Minutes without a call before a computer stops |
+
+Each computer also has at most 512 processes, and 512 MiB of shared memory for browsers. A computer made with other sizes is made again with the new ones when it next starts; its home stays.
+
+## The setup command
+
+`host/setup.sh`, in the plugin's files, run once as root. The plugin's section in **Settings** shows the command, with the script's path.
+
+| Option | What it does |
+| --- | --- |
+| none | A release install in `/opt/fxbot`: the engine it uses, and `compose.override.yaml`, which gives fxbot's container the socket's folder and the user's group |
+| `--user <login>` | A checkout: `<login>` joins the user's group, to reach the socket |
+| `--engine podman` or `--engine docker` | A checkout's engine. Otherwise podman when it's installed, or docker when only docker is |
+| `--name <user>` | Another user than `fxbot-computer` |
+| `--install <folder>` | Another release install than `/opt/fxbot` |
+| `--remove` | Takes it all away: the user, its computers and files, the firewall, and the override. The packages stay. |
+
+What it sets up:
+
+| Thing | Where |
+| --- | --- |
+| Packages | `uidmap`, `dbus-user-session`, `nftables`, and `curl`; with podman, `podman` and `passt`; with docker, `rootlesskit` beside Debian's or Ubuntu's `docker.io`, or `docker-ce-rootless-extras` beside Docker's `docker-ce`, and `slirp4netns` |
+| The user | `fxbot-computer`, home `/var/lib/fxbot-computer`, 65,536 subordinate ids, lingering on |
+| Limits | `/etc/systemd/system/user@<uid>.service.d/fxbot-computer.conf` delegates cpu, memory, and pids to it |
+| The engine | Its socket at `/var/lib/fxbot-computer/run/engine.sock`. Podman starts when called and stops 5 seconds after; Docker's rootless daemon runs all the time, and holds about 180 MB. |
+| The firewall | `/etc/fxbot/fxbot-computer.nft`, loaded at boot by `fxbot-computer-firewall.service` |
+
+## What a computer reaches
+
+The firewall matches the connections of the user `fxbot-computer`, which are every connection its computers make.
+
+| Reached | Refused |
+| --- | --- |
+| The internet | This machine, at any of its addresses |
+| DNS, through the machine's resolvers | Its tailnet, `100.64.0.0/10` and `fc00::/7` |
+| | Private networks: `10.0.0.0/8`, `172.16.0.0/12`, `192.168.0.0/16`, `169.254.0.0/16`, and `fe80::/10` |
+| | Loopback, multicast, and fxbot's containers |
+
+A refused connection fails at once. To let a computer reach one address on your network, add a rule before the others in the `computers` chain of `/etc/fxbot/fxbot-computer.nft`, such as `ip daddr 192.168.1.20 tcp dport 8080 accept`, then run `sudo systemctl restart fxbot-computer-firewall`.
+
+## The image
+
+Every computer runs from one image, `localhost/fxbot-computer:<hash>`, made from Debian 13 slim with `ca-certificates curl git python3 procps ripgrep jq unzip xz-utils`, about 230 MB. A plugin that needs the computer adds setup steps, which run as root with the network, in name order. The image is made again in the background when such a plugin is added, updated, or removed; a running computer moves to it the next time it starts. An image no computer uses is removed.

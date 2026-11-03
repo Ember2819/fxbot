@@ -16,6 +16,10 @@ By default, fxbot shows only the plugins it vets, tagged **fxbot**.
 4. To change its settings, choose the pencil button on its row. A secret setting is sealed, and the page never shows it again. A plugin's MCP servers are listed there too, each with its own sign-in or key and tools.
 5. To give it to some bots only, choose **Choose** under **Bots**, and switch it on for each bot that should have it. Its servers follow, and its screens are for everyone.
 
+## A plugin that needs another
+
+Some plugins build on another: the browser needs the computer. Its page says **Needs computer**, and **Add** waits until the computer is added. While the browser is added, the computer can't be removed. A bot that has the browser on and the computer off says **Needs computer on this bot** in its settings: switch the computer on for it too.
+
 ## Show unvetted plugins
 
 fxbot's picks are the plugins it vets. To see the rest, open **Settings**, and under **Plugins**, turn on **Show unvetted plugins**. **Browse** then adds:
@@ -28,6 +32,8 @@ fxbot doesn't vet any of these. Read what each one does before you add it. While
 ## fxbot's plugins
 
 - **chat-rooms**: rooms where several of your bots talk with you. Choose **+** beside **Rooms** in the sidebar, name the room, and pick its bots in the order they answer. Each of your messages gets one answer from each bot, in turn, and each bot sees what the others said.
+- **computer**: a Linux computer for each bot, where it runs commands and keeps files. Its engine is set up once on the machine: see [Give bots a computer](/docs/how-to/give-bots-a-computer/).
+- **browser**: a web browser on each bot's computer. It needs the computer.
 - **herdr**: bots see the coding agents [herdr](https://herdr.dev) runs, and read what their panes show. Its **socket** setting says where herdr's socket is. In a release, fxbot's container can't reach that socket by itself: its [README](https://github.com/iammrduncan/fxbot/tree/main/plugins/herdr#reach-herdrs-socket) shows how to let it.
 
 ## When it goes differently

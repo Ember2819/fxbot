@@ -152,7 +152,20 @@ Each file runs once, in name order, in a transaction. Add a new file for each ch
 
 The owner sets them in the plugin's settings in **Plugins**. A secret one is sealed, and the page never gets it back.
 
-## 6. Publish it
+## 6. Need another plugin
+
+A plugin can build on another. The browser plugin has no code: it gives the computer setup steps, which install a browser on every bot's computer.
+
+1. Name the plugin you need under `sh.fxbot`'s `needs`, with an object for it. What the object holds is up to that plugin: the computer takes `setup`, a list of shell steps for its image.
+
+   ```json
+   "needs": { "computer": { "setup": ["apt-get update && apt-get install -y --no-install-recommends chromium"] } }
+   ```
+
+2. The owner adds the plugin you need first: your plugin's page says what it needs, and **Add** waits for it. Yours loads after it, and while yours is added, it can't be removed.
+3. The plugin you need reads every plugin's object with `fx.dependents()`, and hears a change with `fx.on("dependents", …)`.
+
+## 7. Publish it
 
 1. Push the plugin's folder to a public GitHub repository, at its root or in a folder of it.
 2. Anyone can add it from **Plugins**, on **Browse**, under **From GitHub**: `owner/repo`, or `owner/repo/folder`. That's there once they turn on unvetted plugins in Settings, since fxbot doesn't vet it. fxbot pins it to the commit that its page showed.

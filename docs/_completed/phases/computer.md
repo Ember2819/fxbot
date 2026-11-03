@@ -2,11 +2,11 @@
 
 Each bot gets a Linux computer of its own to use during its turns: a shell, files that last, and the programs other plugins install. The computer is a plugin. A bot with it on runs commands, reads and writes files, and shares what it makes to its library. Other plugins add programs to every computer through setup steps, the way the browser plugin in this phase adds a web browser. Computers start on a bot's first call and stop when they sit idle. They run in the machine's own container engine, podman or docker, whichever fxbot runs on, started rootless for a user of their own on the machine, so they stay apart from fxbot's own files and from each other. From [issue #6](https://github.com/iammrduncan/fxbot/issues/6).
 
-Status: planned, not built. Research and plan only, written on 2026-11-02. On 2026-11-03 it was checked against the code after [one kind of plugin](../_completed/phases/one-kind-of-plugin.md) (the `sh.fxbot` namespace, Plugins, vetted lists) and the docs' move to Starlight, and brought up to date. The same day, at the owner's word, the engine became the machine's own, podman or docker, where it had been podman everywhere. It builds on the [plugin API](../_completed/phases/plugins.md), and on the [containers](../_completed/phases/containers.md) install for the app's side of the engine. A checkout runs it as well. The issue asked for computers before plugins. Since then the stub made the computer a plugin, so this phase comes after plugins. Build it on the open release branch, a milestone to a commit.
+Status: built on 2026-11-03, on the release/0.4.0 branch, as `plugins/computer` and `plugins/browser`, with the plugin API pieces in the SDK. Checked on this machine on podman 5.4.2, and on Debian's docker.io 26.1.5 with rootlesskit, installed for the check and removed after. Written as a plan on 2026-11-02, and checked against the code on 2026-11-03 after [one kind of plugin](one-kind-of-plugin.md) and the docs' move to Starlight; the same day, at the owner's word, the engine became the machine's own, podman or docker. Where the build found the plan wrong, the plan below says what was built, and [What the build changed](#what-the-build-changed) lists it.
 
 ## 0. Core or plugin
 
-**Plugin: a plugin that other plugins build on** ([Core or plugin](../../CONVENTIONS.md#core-or-plugin)). Many bots need no computer: chat, the library, MCP servers, and skills work without one. The core's own tools reach only its own data. A shell, a machine's files, and a browser are plugins. A bot gets a computer only while the plugin is on for it: like any plugin, it is on for every bot once added, and its **Bots** setting narrows that. An owner who never adds the plugin runs no engine, no timer, and no image.
+**Plugin: a plugin that other plugins build on** ([Core or plugin](../../../CONVENTIONS.md#core-or-plugin)). Many bots need no computer: chat, the library, MCP servers, and skills work without one. The core's own tools reach only its own data. A shell, a machine's files, and a browser are plugins. A bot gets a computer only while the plugin is on for it: like any plugin, it is on for every bot once added, and its **Bots** setting narrows that. An owner who never adds the plugin runs no engine, no timer, and no image.
 
 The core never names the computer. The plugin API gains the smallest pieces the computer and its first dependent need:
 - **`needs` in a plugin's manifest:** the plugins a plugin needs, each with a block of settings for that plugin. The browser plugin uses it to give the computer its setup steps.
@@ -130,10 +130,10 @@ fxbot has no login of its own, so a computer that reaches the tailnet address ca
 
 ### Docker, rootless
 
-fxbot's own `setup.sh` runs the app on podman, or on docker when only docker is installed, so the computer has to run on either. Docker wasn't run here: this machine has podman only, and starting Docker's downloaded binaries as a daemon needs the owner's go-ahead. What follows is from Docker's docs, moby's source, and Debian's packages.
+fxbot's own `setup.sh` runs the app on podman, or on docker when only docker is installed, so the computer has to run on either. This machine had podman only. What follows is from Docker's docs, moby's source, and Debian's packages, and was then checked in the build with Debian's `docker.io` 26.1.5 and `rootlesskit`, installed with the owner's go-ahead.
 - **Packages.** Docker runs rootless through RootlessKit and `dockerd-rootless.sh`. Docker's own packages put them in `/usr/bin`, in `docker-ce-rootless-extras`. Debian 13's `docker.io` (26.1.5) ships the script in `/usr/share/docker.io/contrib/`, and only suggests the `rootlesskit` package (2.0.2) it needs (`dpkg -c` on both). The user also needs `uidmap` and 65,536 subordinate ids ([rootless mode](https://docs.docker.com/engine/security/rootless/)).
-- **Its unit.** `dockerd-rootless-setuptool.sh install`, run as the user, writes `~/.config/systemd/user/docker.service`. The daemon reads `~/.config/docker/daemon.json`. Rootless Docker has no socket activation, so its daemon (dockerd, containerd, and RootlessKit) runs all the time, unlike podman's, which starts on a call. Its memory isn't measured here.
-- **The socket.** By default it is `$XDG_RUNTIME_DIR/docker.sock`, and `hosts` in `daemon.json` moves it. With no socket group set, dockerd falls back to its own gid (`daemon/listeners/listeners_linux.go`), which rootless is the engine user's group. So `"group": ""` gives the app the same access as podman's socket: the engine user's group, mode 0660.
+- **Its unit.** `dockerd-rootless-setuptool.sh install`, run as the user, writes `~/.config/systemd/user/docker.service`. The daemon reads `~/.config/docker/daemon.json`. Rootless Docker has no socket activation, so its daemon (dockerd, containerd, and RootlessKit) runs all the time, unlike podman's, which starts on a call. At rest it held 183 MB here: dockerd 89 MB, containerd 47 MB, RootlessKit 26 MB, slirp4netns 3.5 MB, and the user's systemd.
+- **The socket.** By default it is `$XDG_RUNTIME_DIR/docker.sock`, and `hosts` in `daemon.json` moves it. With no socket group set, dockerd falls back to its own gid (`daemon/listeners/listeners_linux.go`), which rootless is the engine user's group. `"group": ""` in `daemon.json` counts as unset, though: the build found dockerd chowning the socket to its default `docker` group, which inside RootlessKit's namespace lands on a subordinate gid. An empty `--group=` on dockerd's command line gives the app the same access as podman's socket: the engine user's group, mode 0660.
 - **Its network.** `dockerd-rootless.sh` picks slirp4netns 0.4 or newer, then pasta, then vpnkit, and passes `--disable-host-loopback` unless told otherwise. slirp4netns and pasta run as the engine user and open its connections, so the firewall by uid below covers Docker as it covers podman.
 - **Limits** "are supported only when running with cgroup v2 and systemd", and on some systems "only the memory and pids controllers are delegated" ([tips](https://docs.docker.com/engine/security/rootless/tips/)). This machine delegates cpu, memory, and pids to a user's manager, and the script makes sure of all three for the engine user, whichever the engine.
 - **Building.** The Engine API's `POST /build` without BuildKit uses the legacy builder, deprecated since Docker 23 and not yet removed ([deprecated features](https://docs.docker.com/engine/deprecated/)). BuildKit's build needs a session protocol over the API. Running steps in a container and committing it (`POST /commit`) works the same on both engines, with nothing deprecated.
@@ -144,7 +144,7 @@ fxbot's own `setup.sh` runs the app on podman, or on docker when only docker is 
 
 1. **One computer per bot.** It costs about 2 MB while running idle and nothing when stopped. It starts in about 0.1 s, and keeps bots apart without loosening the container. Grok bot and OpenBot share a computer per person and say plainly that it isn't a boundary between bots. fxbot's bots are of one owner too, but separate computers cost nothing more here.
 2. **No daemon in the computer.** The plugin uses the engine's own API for commands, files, and builds, so a computer is `sleep` under an init. That is what keeps it at 150 kB.
-3. **The machine's engine, rootless, for a user of its own.** A `fxbot-computer` user runs the engine fxbot itself runs on, podman or docker, rootless. Its socket is mounted into the app with that user's group. A container escape lands in an unprivileged user that can't read fxbot's files. The app never holds a root socket, as [containers](../_completed/phases/containers.md) requires, and the plugin refuses an engine that isn't rootless. The plugin speaks the Docker API, which both engines answer, so its code doesn't change with the engine.
+3. **The machine's engine, rootless, for a user of its own.** A `fxbot-computer` user runs the engine fxbot itself runs on, podman or docker, rootless. Its socket is mounted into the app with that user's group. A container escape lands in an unprivileged user that can't read fxbot's files. The app never holds a root socket, as [containers](containers.md) requires, and the plugin refuses an engine that isn't rootless. The plugin speaks the Docker API, which both engines answer, so its code doesn't change with the engine.
 4. **The engine user's own systemd,** with lingering, its D-Bus session, and the cpu, memory, and pids controllers delegated, or limits are silently dropped.
 5. **The internet only, by uid.** An nftables table refuses the engine user's connections to the machine, its tailnet, the LAN, and the container networks, except DNS to the machine's resolvers. It is one rule set on the host, and it covers every computer whichever way a process connects.
 6. **Plugins install programs as setup steps in one image.** Each plugin that needs the computer names setup steps, as eve's extensions and Grok bot's setup scripts do. The computer runs them in a container and commits it, which both engines do the same way, into one image that every bot's computer shares, so Chromium is on disk once. A bot's own `apt-get` lasts until the image changes. Its home lasts until it is reset.
@@ -155,7 +155,7 @@ fxbot's own `setup.sh` runs the app on podman, or on docker when only docker is 
 
 ### The plugins
 
-Both live in this repository, outside the workspaces, as [plugins](../_completed/phases/plugins.md#5-open-questions) question 1 has it, and are added from fxbot's list like anyone's.
+Both live in this repository, outside the workspaces, as [plugins](plugins.md#5-open-questions) question 1 has it, and are added from fxbot's list like anyone's.
 
 ```text
 plugins/computer/
@@ -189,7 +189,7 @@ fxbot writes every text file of a plugin from GitHub to `<FXBOT_DATA>/plugins/<n
       "server": "./fxbot/server.ts",
       "page": "./fxbot/page.js",
       "settings": [
-        { "name": "engine", "description": "The rootless engine's socket", "default": "/run/fxbot-computer/engine.sock" },
+        { "name": "engine", "description": "The engine's socket, when it isn't where the setup script puts it" },
         { "name": "memoryMiB", "description": "Memory for each computer", "default": "2048" },
         { "name": "cpus", "description": "CPUs for each computer", "default": "2" },
         { "name": "idleMinutes", "description": "Minutes without a call before a computer stops", "default": "15" }
@@ -224,15 +224,15 @@ The owner runs it once, as root. The plugin's Settings section shows the exact c
 4. **The user:** `fxbot-computer`, a system user with its home at `/var/lib/fxbot-computer` (mode 0750), a subordinate uid and gid range of 65,536 that doesn't overlap another, and lingering on. `/etc/systemd/system/user@<its uid>.service.d/delegate.conf` delegates `cpu memory pids` to its manager, for that user only.
 5. **Its engine and socket,** at `/var/lib/fxbot-computer/run/engine.sock`, mode 0660, in a folder of its own:
    - podman: a drop-in for the user's `podman.socket` listens there, enabled through the user's manager (`runuser -u fxbot-computer -- systemctl --user enable --now podman.socket`). podman starts when the socket is used, and exits 5 s after the last call.
-   - docker: `dockerd-rootless-setuptool.sh install`, run as the user the same way, writes and starts its `docker.service`. `~/.config/docker/daemon.json` holds `{"hosts": ["unix:///var/lib/fxbot-computer/run/engine.sock"], "group": ""}`. The daemon runs all the time.
+   - docker: the script writes the user's `docker.service` as `dockerd-rootless-setuptool.sh install` would, running `dockerd-rootless.sh --group=`, and starts it through the user's manager. `~/.config/docker/daemon.json` holds `{"hosts": ["unix:///var/lib/fxbot-computer/run/engine.sock"]}`. The daemon runs all the time.
 6. **The firewall,** the same for both engines:
-   - `/etc/fxbot/computer.nft` holds a table `inet fxbot_computer`. Its output chain matches `meta skuid fxbot-computer`.
-   - It accepts DNS (53, udp and tcp) to the nameservers in `/etc/resolv.conf`.
-   - It rejects 127.0.0.0/8, 10.0.0.0/8, 172.16.0.0/12, 192.168.0.0/16, 100.64.0.0/10, 169.254.0.0/16, and multicast, and `::1`, `fc00::/7`, `fe80::/10`, and `ff00::/8` for IPv6.
+   - `/etc/fxbot/fxbot-computer.nft` holds a table `inet fxbot_computer`. Its output chain sends the user's own packets, `meta skuid <uid>`, to a chain `computers`. A reset or an ICMP error the kernel sends back has no socket, so it passes.
+   - `computers` accepts DNS (53, udp and tcp) to the nameservers in `/etc/resolv.conf` and in systemd-resolved's `/run/systemd/resolve/resolv.conf`, which rootless Docker hands its containers.
+   - It refuses the machine's own addresses (`fib daddr type local`), 127.0.0.0/8, 10.0.0.0/8, 172.16.0.0/12, 192.168.0.0/16, 100.64.0.0/10, 169.254.0.0/16, 0.0.0.0/8, and 224.0.0.0/3, and `::1`, `fc00::/7`, `fe80::/10`, and `ff00::/8` for IPv6, through a chain `refuse`: a TCP reset, so the connection fails at once, or an ICMP error.
    - `fxbot-computer-firewall.service` (oneshot, `nft -f`) loads it at boot.
 7. **The app's access:**
-   - **A containers install:** the script writes `/opt/fxbot/compose.override.yaml`, which mounts `/var/lib/fxbot-computer/run` at `/run/fxbot-computer` with the user's gid in `group_add`, then runs `fxbot up`. The [containers](../_completed/phases/containers.md) phase's `fxbot` command already adds that file to `COMPOSE_FILE` when it exists, and its updates and `setup.sh` leave it alone.
-   - **A checkout:** `--user <login>` adds that user to the `fxbot-computer` group. The plugin's `engine` setting is then `/var/lib/fxbot-computer/run/engine.sock`.
+   - **A containers install:** the script writes `/opt/fxbot/compose.override.yaml`, which mounts `/var/lib/fxbot-computer/run` at `/run/fxbot-computer` with the user's gid in `group_add`, then runs `fxbot up`. The [containers](containers.md) phase's `fxbot` command already adds that file to `COMPOSE_FILE` when it exists, and its updates and `setup.sh` leave it alone.
+   - **A checkout:** `--user <login>` adds that user to the `fxbot-computer` group. The plugin finds the socket at `/var/lib/fxbot-computer/run/engine.sock` when `/run/fxbot-computer/engine.sock` isn't there, so its `engine` setting stays empty.
 8. **It prints** the engine, the socket path, and what it changed.
 
 `--name <user>` picks another user name, for checks beside a real install. `setup.sh --remove` takes it all away: it stops the user's engine and turns lingering off, then removes the user and its home (as root, which removes the computers, images, and files the subordinate ids own), the delegation drop-in, the firewall and its unit, and the override. It then runs `fxbot up`. The packages stay, since the app's engine may use them.
@@ -264,7 +264,7 @@ run   apt-get update && apt-get install -y --no-install-recommends chromium font
 - **When it builds.** On a bot's first call, if the image for the current hash is missing. Again when `dependents` changes, in the background. Build lines go to the plugin's log. A failed build keeps the old image, and the error shows on the plugin's row.
 - **Old images** are removed once no computer uses them.
 
-`fxbot-run <id> <seconds> <command>` is 12 lines of bash, where `<id>` is a random id the plugin makes for the call. It runs the command with `setsid timeout -s KILL <seconds> bash -c`, writes the output to `/tmp/fxbot/<id>.log` and the process group to `/tmp/fxbot/<id>.pid`, and waits. Then it prints the whole output if it is 64 KiB or less. Otherwise it prints the first 4 KiB, a line saying how much was cut and where the rest is, and the last 60 KiB. It exits with the command's code.
+`fxbot-run <id> <seconds> <command>` is 12 lines of bash, where `<id>` is a random id the plugin makes for the call. It runs the command with `setsid timeout -s KILL <seconds> bash -c`, writes the output to `/tmp/fxbot/<id>.log` and the process group to `/tmp/fxbot/<id>.pid`, and waits. Then it prints the whole output if it is 60 KiB or less. Otherwise it prints the first 4 KiB, a line saying how much was cut and where the rest is, and the last 56 KiB: libfx refuses a tool's result over 64 KiB as a whole, so the output stays under it. It exits with the command's code.
 
 ### Computers (`fxbot/server.ts`)
 
@@ -295,7 +295,7 @@ The plugin's tools reach only the bots it is on for, named `computer_<tool>`:
 | Tool | Input | Does |
 | --- | --- | --- |
 | `computer_shell` | `command`, `timeout` (seconds, default 120, at most 600) | Runs `fxbot-run` with an id it makes for the call. Returns `exit <code>` and the output, or "Stopped after <n> s". When the call's `signal` aborts (the turn is cancelled), a second exec kills the process group. |
-| `computer_read_file` | `path`, `offset`, `limit` (lines) | Text: up to 2,000 lines or 256 KiB from `offset`, saying where it stopped. An image (PNG, JPEG, GIF, or WebP, up to 3.75 MiB) comes back as an image, so the bot sees it: a libfx `FxToolResult`, as `library_read` returns one. |
+| `computer_read_file` | `path`, `offset`, `limit` (lines) | Text: up to 2,000 lines or 60 KB from `offset`, as `library_read` reads, saying where it stopped. An image (PNG, JPEG, GIF, or WebP, up to 3.75 MiB) comes back as an image, so the bot sees it: a libfx `FxToolResult`, as `library_read` returns one. |
 | `computer_write_file` | `path`, and `text` or `library` (a `library:<id>`) | Writes the text, or the library item's bytes, making folders as needed. Text up to 1 MiB. |
 | `computer_to_library` | `path`, `name` (optional) | Saves an image (up to 3.75 MiB) or a text file (up to 1 MiB) from the computer to the bot's library, tagged for the chat, and returns its `library:<id>`. Other files are refused, since the library keeps only images and text. |
 
@@ -366,7 +366,7 @@ The generic tool steps show the computer's calls in replies, so this phase adds 
 
 - **Loading the page, sending, and streaming:** unchanged. The plugin's page code loads only when it is added.
 - **A bot's first call** waits for the image: the base built in 17 s here, and the browser's steps in 18 s more, measured with podman's builder; running the steps and committing should take about as long. After that, starting a computer takes about 0.1 s, and each command about 0.1 s more than the command itself.
-- **Memory:** about 2 MB for each running computer at idle on podman, measured, and 193 MB with a browser page open. Each computer is held to `memoryMiB`. On docker, the rootless daemon runs all the time, and each running computer has a containerd shim; neither is measured here, and M2 notes both.
+- **Memory:** about 2 MB for each running computer at idle on podman, measured, and about 230 MB with a browser page open, measured in the build on both engines. Each computer is held to `memoryMiB`. On docker, the rootless daemon holds about 183 MB all the time, measured; each running computer's containerd shim wasn't measured apart.
 - **Disk:**
   - 230 MB for the base image, or 961 MB with the browser, once for all bots
   - each bot's home
@@ -399,88 +399,76 @@ About 810 lines in all, plus the two READMEs and the docs:
 
 ## 4. Checklist
 
-Checks use disposable Postgres, the mock model, Playwright, and fxbot's list served by the mock site, as the [plugins](../_completed/phases/plugins.md#4-checklist) checks do.
-
-**About this machine.** Making a user, its lingering, an nftables table, and a systemd unit here needs the owner's go-ahead, and so does installing or running Docker. This machine has podman and no docker.
-- **With it:** `setup.sh` runs with another user name (`--name fxbot-computer-check`), the checks run against that engine, and `setup.sh --remove` takes it away after. For docker, Debian's `docker.io` and `rootlesskit` are installed for the check, and removed after with the check's user.
-- **Without it:** the checks run against an engine started by hand for an existing unprivileged user, as this research did with podman, and the script and the docker path become human checks.
-- **Each engine.** M2 to M6 run on podman, and on docker where the go-ahead covers it.
+Checks used a disposable Postgres, a mock model that makes tool calls (one, several in one reply, or a script of them), Playwright, and a mock GitHub and fxbot site, as the [plugins](plugins.md#4-checklist) checks do. With the owner's go-ahead, `setup.sh` ran here as `--name fxbot-computer-check`, first on podman, then on rootless Docker from Debian's `docker.io` and `rootlesskit`, installed with the system daemon kept off; `--remove` and `apt-get purge` took it all away after. The release install on this machine was left alone.
 
 **M1. The plugin API pieces**
-- [ ] A scratch plugin that needs another: its plugin page says "Needs <name>", Add is off until that one is added, and the API refuses it with "Add <name> first." Removing the needed plugin is refused, naming the dependent.
-- [ ] With both added, a bot that has the dependent on and the needed one off shows "Needs <name> on this bot" in its switches.
-- [ ] `fx.dependents()` returns the dependent's block, and `fx.on("dependents")` fires when it is added, updated, and removed.
-- [ ] `fx.library.read` refuses an item that isn't tagged for the bot. `fx.library.save` puts an image in the bot's library, tagged for the chat.
-- [ ] `fx.skills.files(bot, name)` returns the files of the skill the bot sees by that name. The browser plugin, with no code parts, adds, and its skill joins the catalog.
+- [x] A plugin that needs another: its page says "Needs base, which isn't added yet", **Add** is off, and the API refuses it with "Add base first." Removing the needed plugin is refused with "user needs base. Remove it first."
+- [x] A bot that has the dependent on and the needed one off shows "Needs base on this bot" in its switches, and doesn't once it's on.
+- [x] `fx.dependents()` returns the dependent's block, and `fx.on("dependents")` fires on add, update, and removal. Local plugins listed dependent first still load the needed one first.
+- [x] `fx.library.read` refuses an item that isn't tagged for the bot. `fx.library.save` puts an image in the bot's library, tagged for the chat, and refuses bytes that aren't the image they claim.
+- [x] `fx.skills.files(bot, name)` returns the skill's files. A plugin with no code parts adds, and its skill joins the catalog.
 
-**M2. The engine**
-- [ ] `setup.sh` picks the engine as fxbot's own does: `FXBOT_ENGINE` in a release install, else podman, else docker, else it installs podman. `--engine` overrides it, and a docker that isn't `docker.io` or `docker-ce` stops it with what to install.
-- [ ] `setup.sh`, for each engine:
-  - makes the user, its subordinate range, lingering, the delegation drop-in, the socket at its path with mode 0660 and the user's group, the firewall table, and its unit
-  - writes the override when `/opt/fxbot` exists, or adds `--user` to the group
-  - leaves everything as it is when run again
-  - `--remove` takes it all away
-- [ ] The containers stack merges the override: after `fxbot up` and after an update, the app has the socket folder and the group.
-- [ ] From the app's container (the containers stack) and from a checkout, the plugin reaches the engine. A rootful socket in the setting is refused with its message.
-- [ ] The Settings section shows the host command with the right path, for a release install and for a checkout, and **Read the script** shows `setup.sh`'s text.
-- [ ] A computer's `memory.max`, `pids.max`, and `cpu.max` match the settings, on each engine.
-- [ ] On docker, the rootless daemon's memory at rest and a running computer's shim are noted, for Speed and cost.
+**M2. The engine**, on podman and on docker
+- [x] `setup.sh` takes podman when it's installed and `--engine docker` when asked. Not run here: a machine with neither engine, or with a docker that isn't `docker.io` or `docker-ce`.
+- [x] It makes the user, its subordinate range, lingering, the delegation drop-in, the socket with mode 0660 and the user's group, the firewall, and its unit; a second run writes the same files; `--remove` takes them all away, the user's group included.
+- [x] A check release install, under its own `FXBOT_ROOT`, project, and port, running an image built from this branch: the script wrote its `compose.override.yaml` and ran `fxbot up`, and the app's container had the socket folder and group 986. After `fxbot down` and `fxbot up` it still had them, and `--remove` took them away. An update wasn't run: it replaces `compose.yaml`, `fxbot`, the GPU file, and `.env`, never the override, and every start passes through `compose()`, which adds it.
+- [x] From that container, the plugin reached rootless Docker and built the image; from a checkout, both engines. Root's podman socket in the setting is refused: "This engine runs as root. Run the computer's setup script."
+- [x] Settings shows the command, `sudo bash /var/lib/fxbot/data/local/computer/host/setup.sh` in the container and `… --user root` in the checkout, and **Read the script** shows `setup.sh`.
+- [x] `memory.max`, `pids.max`, and `cpu.max` are 2147483648, 512, and 200000 100000, on each engine.
+- [x] Docker's daemon at rest: 183 MB. A computer's containerd shim wasn't measured apart.
 
-**M3. Computers**
-- [ ] A bot's first `computer_shell`:
-  - builds the image by steps and a commit, shows the build in the Settings section, and answers. A failing step stops the build and shows on the plugin's row, and the old image stays.
-  - a second bot's computer is separate: neither sees the other's files or processes
-- [ ] After `idleMinutes` (set to 1 for the check), the computer stops. Its next call starts it, and `/root` is kept.
-- [ ] Adding the browser rebuilds the image. A running computer moves to it on its next start, keeping `/root` and losing an `apt-get` the bot ran.
-- [ ] Two images at once: the old one is removed when no computer uses it.
-- [ ] After fxbot restarts, running computers are counted and stopped on time.
-- [ ] Deleting a bot removes its computer and home.
-- [ ] Stop, Reset, and Delete all computers work from the page.
-- [ ] With the plugin added and no bot calling, no timer runs and no engine call is made after the load check.
-- [ ] Three `computer_read_file` calls in one mock-model response, to a stopped computer, start it once.
+**M3. Computers**, on podman and on docker
+- [x] A bot's first `computer_shell` builds the image, shows the build in Settings, and answers: 17 s for the base on podman, 55 s with the browser on docker. A second bot's computer doesn't see the first's files or processes.
+- [x] After `idleMinutes` (1), a computer stops, 80 to 85 s on; its next call starts the same container, with `/root` and a file outside it.
+- [x] A plugin that needs the computer, added or removed, makes the image again in the background; a running computer stays on its image until it stops, then moves, keeping `/root` and losing a file outside it.
+- [x] The old image is removed once no computer uses it.
+- [x] After fxbot restarts, running computers count as just used, and stop on time. A deleted bot's computer and home go when the plugin loads.
+- [x] **Stop**, **Reset**, and **Delete all computers** work from the page.
+- [x] With no computer running, no timer runs and no call reaches the engine: podman's service goes inactive. (Docker's daemon runs anyway.)
+- [x] Three `computer_read_file` calls in one reply, to a stopped computer, start it once.
 
-**M4. Tools**, through the mock model:
-- [ ] `computer_shell`:
-  - returns the exit code and output for `echo hi; echo err >&2; exit 3`
-  - stops a `sleep 999` with `timeout: 2` after 2 s
-  - cancelling the turn kills a running `sleep`, with no process left (checked with `ps`)
-  - for 2 MB of output, returns the first 4 KiB, the line naming the log, and the last 60 KiB, and the log holds it all
-- [ ] A `setsid` server started by one call answers a `curl` in the next.
-- [ ] `computer_read_file`:
-  - pages a 5,000-line file by `offset`
-  - returns a PNG as an image, which reaches the mock model's request as an image
-- [ ] `computer_write_file` writes text into a new folder, and writes a library image's bytes.
-- [ ] `computer_to_library` puts a PNG in the library panel.
-- [ ] A bot with no computer yet reads a skill with a `scripts/` file: the hook returns at once, the file is in `/skills/<name>/` by its first computer call, and the bot runs it.
+**M4. Tools**, through the mock model, on podman and on docker
+- [x] `computer_shell` returns `exit 3`, `hi`, and `err` for `echo hi; echo err >&2; exit 3`, and stops `sleep 999` with `timeout: 2` after 2 s.
+- [x] For 2 MB of output, the model gets the first 4 KiB, the line naming the log, and the last 56 KiB, 61,549 bytes in all, and the log holds the 2,000,000. The first build kept 60 KiB of the end, and libfx refused the result as over its 64 KiB.
+- [x] The cancel path: killing a command's process group from its pid file leaves no process. fxbot has no way to cancel a running turn, so the tool's `signal` was checked by this path, not by a cancelled turn.
+- [x] A `setsid` server started by one call answers a `curl` in the next.
+- [x] `computer_read_file` pages a 5,000-line file 2,000 lines at a time and by `offset`, and returns a PNG as an image, which reaches the model's request.
+- [x] `computer_write_file` writes text into a new folder, and a library image's bytes.
+- [x] `computer_to_library` puts a PNG in the bot's library, and refuses a binary.
+- [x] A bot with no computer reads a skill with a script: the hook returns in 20 ms, the script is in `/skills/runner/` by its first call, executable, and runs.
 
-**M5. What a computer reaches**
-- [ ] From a computer:
-  - reached: the internet (HTTPS to a public host) and DNS
-  - refused: fxbot's port, the machine's tailnet address, the database container, the LAN's router, `host.containers.internal`, and 169.254.169.254
-- [ ] The rules hold after `systemctl restart fxbot-computer-firewall`.
-- [ ] On docker, the same addresses give the same answers, through slirp4netns.
+**M5. What a computer reaches**, on podman and on docker
+- [x] The internet (HTTPS to example.com) and DNS work.
+- [x] Refused at once: fxbot's port, the machine's tailnet address on 443 and 4173, the database container, the LAN's router, the machine's LAN address, `host.containers.internal`, and 169.254.169.254. With the firewall stopped, the tailnet address, the database container, and the host's SSH answered.
+- [x] The rules hold after `systemctl restart fxbot-computer-check-firewall`.
 
 **M6. The browser**
-- [ ] The browser's setup steps build on amd64. The arm64 build is checked with `--platform linux/arm64` where emulation is installed, or else left to the human.
-- [ ] Rootless, a scripted mock-model turn runs:
-  - `agent-browser open https://example.com`
-  - `snapshot -i` and `screenshot`
-  - `computer_read_file` on the screenshot, which comes back as an image
-- [ ] Memory with the page open is noted.
+- [x] The steps build on amd64, in 44 s on podman, into a 959 MB image. arm64 wasn't built: this machine has no emulation for it.
+- [x] On each engine, a scripted turn opened example.com, read its refs, took a screenshot, and saw it as an image. The computer held about 230 MB with the page open, and 11 to 16 MB after closing it.
 
 **M7. Docs and checks**
-- [ ] The docs gain a how-to, `packages/website/src/content/docs/docs/how-to/give-bots-a-computer.md` ("Give bots a computer": add it, run the host command, and choose its bots), and a reference page, `docs/reference/computer.md` beside it (the tools, the settings, and what a computer reaches), each listed in `src/sidebar.ts`.
-- [ ] The "Add a plugin" how-to shows a plugin that needs another. The SDK's Plugin API reference (`sdk/reference/plugin-api.md`) and its "Write a plugin" how-to cover `needs`, `fx.dependents()`, the `dependents` event, `fx.library`, and `fx.skills.files`.
-- [ ] fxbot's `plugins-registry.json` lists the computer and the browser, tagged **fxbot**.
-- [ ] `CHANGELOG.md` gains Unreleased lines for the computer, the browser, and the plugin API pieces.
-- [ ] The computer's `page.js` is built from its `page.jsx` by its README's command, and both are committed.
-- [ ] `npm run typecheck`, `npm run build`, `npm run build-site`, and `git diff --check` pass. `bash -n` and `shellcheck` pass on `setup.sh` and `fxbot-run`, where shellcheck is installed.
+- [x] The docs have [Give bots a computer](https://fxbot.sh/docs/how-to/give-bots-a-computer/) and [The computer](https://fxbot.sh/docs/reference/computer/), and "Add a plugin" has a plugin that needs another. The SDK's Plugin API reference and "Write a plugin" cover `needs`, `fx.dependents()`, the `dependents` event, `fx.library`, `fx.skills.files`, image results, and the 64 KiB limit.
+- [x] fxbot's `plugins-registry.json` lists the computer and the browser.
+- [x] `CHANGELOG.md` has the computer, the browser, and plugins that need others.
+- [x] The computer's `page.js` is built from `page.jsx`.
+- [x] `npm run typecheck`, `npm run build`, `npm run build-site`, `git diff --check`, and `bash -n` pass. `shellcheck` isn't installed here.
 
 **The human runs these:**
-- On their own install: add the computer, run the command it shows, and narrow its **Bots** to one bot. The Settings section names the engine their install uses.
-- Where they have one, on a docker machine, best on Ubuntu 24.04 with Docker's packages: run the script and ask a bot for `uname -a`. Ask the bot to make a chart with Python and share it, then check it in the library.
+- On their own install: add the computer, run the command it shows, and narrow its **Bots** to one bot. Ask the bot to make a chart with Python and share it, then check it in the library.
 - Add the browser, and ask the bot to look something up on a site and send a screenshot.
 - From a computer, check that fxbot's tailnet address doesn't answer.
+- On a docker machine, best Ubuntu 24.04 with Docker's own packages, run the script and ask a bot for `uname -a`.
+- On an arm64 machine, add the browser and open a page.
+
+## What the build changed
+
+- **libfx's 64 KiB.** libfx refuses a tool's result over 64 KiB, as a whole. Long output keeps 4 KiB and 56 KiB, not 60, and text is read 60 KB at a time, not 256 KiB.
+- **Docker's socket group** is set with `--group=` on the command line, since an empty one in `daemon.json` counts as unset; the script writes the user's unit itself.
+- **The firewall** matches the user's own packets and jumps to its rules, which refuse with a TCP reset: matched as "not the user", a reset the kernel sends back has no socket and was caught too, and every refused connection waited out its timeout. Its DNS exception covers systemd-resolved's upstream resolvers, which rootless Docker's containers ask.
+- **The socket** has no default in the setting: the plugin looks in the container's path, then the checkout's.
+- **A plugin at a repository's root** couldn't be added: an empty folder was read as a path outside it. Fixed in the SDK.
+- **Cancelling a turn** isn't something fxbot does, so the shell's cancel path is there for when it does.
+- **The log** gets each computer's start and each build step.
 
 ## 5. Open questions
 

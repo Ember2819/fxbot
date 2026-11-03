@@ -33,6 +33,7 @@ Only `plugin.json` is required, and only the paths it names count.
 | `extensions["sh.fxbot"].css` | Its CSS |
 | `extensions["sh.fxbot"].migrations` | A folder of `.sql` files |
 | `extensions["sh.fxbot"].settings` | A list of settings, each with `name`, `description`, and optionally `default`, `isRequired`, and `isSecret` |
+| `extensions["sh.fxbot"].needs` | The plugins it needs, each name mapped to an object for that plugin, up to 16 KiB in all. See [Plugins that need others](#plugins-that-need-others). |
 
 ## Server code
 
@@ -57,6 +58,10 @@ export default async function setup(fx: PluginApi) {
 | `fx.settings` | Its settings, with defaults, and secrets opened. The same object, kept up to date. |
 | `fx.bots.list()`, `fx.bots.get(id)` | The bots, as [the fxbot object](/sdk/reference/server-api/) lists them |
 | `fx.chats` | Sessions and turns of its own. See [Turns](#turns). |
+| `fx.dependents()` | The added plugins that need this one: `{ name, version, needs }` each, where `needs` is its object for this plugin |
+| `fx.library.read(bot, id)` | A library item's `name`, `type`, and `bytes`, if it's tagged for the bot; otherwise it throws |
+| `fx.library.save({ bot, session, name, type, bytes })` | Saves an image, or UTF-8 text, to the bot's library, tagged for the chat, through the library's checks. It answers the item. |
+| `fx.skills.files(bot, name)` | The files besides `SKILL.md` of the skill the bot sees by that name, as `{ path, text }`. None when it has no such skill. |
 | `fx.log(...parts)` | A line in its log, which its settings in **Plugins** show |
 | `fx.signal` | An `AbortSignal` that aborts when the plugin unloads |
 
@@ -75,6 +80,7 @@ Handlers run in the order the plugins were added, and change the event's fields 
 | `turn.start` | Once libfx stores the prompt | `bot`, `session`, `messageId`, `text`, `from` | Observe |
 | `turn.end` | When the turn ends | the same, with `reply`, and `error` when it failed | Observe |
 | `settings` | The owner changed its settings | `settings` | Observe |
+| `dependents` | A plugin that needs this one was added, updated, or removed | `dependents`, as `fx.dependents()` gives them | Observe |
 
 - `message`, `instructions`, `tool.before`, and `tool.after` handlers get 5 seconds each. One that throws or runs late is logged and skipped, except `tool.before`, where it blocks the call.
 - `turn.start` and `turn.end` run beside the turn, and never hold it up.
@@ -99,9 +105,9 @@ fx.tool({
 | `description` | What the model reads |
 | `inputSchema` | A JSON Schema object for the input |
 | `idempotent` | Whether running a call twice is harmless, so a call cut off by a crash runs again |
-| `execute(input, call)` | Runs one call. `call` has the `bot` and `session` of the chat, and a `signal` that aborts with the turn. A string goes to the model as it is, and anything else as JSON. |
+| `execute(input, call)` | Runs one call. `call` has the `bot` and `session` of the chat, and a `signal` that aborts with the turn. A string goes to the model as it is, and anything else as JSON, but for `{ type: "libfx.tool-result", text, images }`, whose images, up to 8, the model sees. |
 
-Adding a tool makes fxbot's agents again. A call from a bot the plugin isn't on for fails.
+Adding a tool makes fxbot's agents again. A call from a bot the plugin isn't on for fails, and so does a result over 64 KiB.
 
 ## Routes
 
@@ -139,6 +145,19 @@ A plugin's turns run as the owner's do, with the same hooks, history, library, a
 | `fx.chats.stream(bot, session, cursor?)` | That session's lines, as NDJSON, from `cursor` on, then each new one. The same lines as [`fxbot.stream`](/sdk/how-to/stream-replies/). |
 
 A session belongs to the provider it started on. After the bot moves to another provider, `send` and `stream` for it fail with `status` 409: make a new one.
+
+## Plugins that need others
+
+A plugin names the plugins it needs, and what it asks of each, under `needs`:
+
+```json
+"needs": { "computer": { "setup": ["apt-get update && apt-get install -y --no-install-recommends chromium"] } }
+```
+
+- Its page says what it needs. Adding it is refused until those are added, and they can't be removed while it is.
+- It loads after the plugins it needs.
+- What each object holds is up to the plugin it names, which reads them with `fx.dependents()` and hears a change with the `dependents` event.
+- A plugin with no code, only `needs` and skills, is a plugin too.
 
 ## Page code
 

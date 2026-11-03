@@ -88,7 +88,7 @@ Read from source, docs, and the installed libfx, as of November 2026.
 
 **Containers** (since 0.3.0, [containers](containers.md))
 - **A release runs in fxbot's container,** as the `fxbot` user. Its data folder, `/var/lib/fxbot/data` on the machine, is a mount that survives updates and goes into the backup before migrations. The image's Node is 22, which runs TypeScript as it is.
-- **The container sees no other folder or socket of the machine.** `/opt/fxbot/compose.override.yaml`, which compose merges and fxbot never writes, can mount more. The [agent computer](../../phases/computer.md) plans to use it the same way.
+- **The container sees no other folder or socket of the machine.** `/opt/fxbot/compose.override.yaml`, which compose merges and fxbot never writes, can mount more. The [agent computer](computer.md) uses it the same way.
 - **A checkout runs natively,** as its user, with the database and embedder from `deploy/compose.dev.yaml`.
 
 **fxbot.sh** (live since 0.2.1)
@@ -340,7 +340,7 @@ A plugin runs with everything fxbot can reach, as Pi, opencode, and eve plugins 
 
 ### Not in this phase
 
-- Local MCP servers (stdio), setup steps that install tooling, and npm dependencies ([question 4](#5-open-questions)). A plugin can start a process from its own server code. Installed programs belong on the [agent computer](../../phases/computer.md), a plugin that other plugins build on.
+- Local MCP servers (stdio), setup steps that install tooling, and npm dependencies ([question 4](#5-open-questions)). A plugin can start a process from its own server code. Installed programs belong on the [agent computer](computer.md), a plugin that other plugins build on.
 - Claude-format plugins and marketplaces. A plugin's own skills and remote servers already use the shared format.
 - Hooks inside a model request, which libfx doesn't offer.
 - Hooks for compaction. [Context management](../../phases/context-management.md) adds one when it builds compaction.
@@ -435,7 +435,7 @@ Each has a default.
 1. **Where fxbot's own plugins live.** *Default:* `plugins/<name>/` in this repository, outside the workspaces and never imported by the core, added from GitHub like anyone's. The alternative is a repository of their own.
 2. **The namespace.** *Settled:* `sh.fxbot`, from fxbot.sh, which is live.
 3. **Dependencies.** *Default:* none installed. A plugin bundles what it needs. Pi installs `dependencies`, which brings install scripts and a slower add.
-4. **Local MCP servers and setup steps.** *Default:* the [agent computer](../../phases/computer.md) phase. A plugin that needs a process starts it from its own code, as herdr's talks to a socket instead of running herdr-mcp.
+4. **Local MCP servers and setup steps.** *Default:* the [agent computer](computer.md) phase. A plugin that needs a process starts it from its own code, as herdr's talks to a socket instead of running herdr-mcp.
 5. **How page code loads.** *Default:* a CommonJS bundle run with the app's `require`, as opencode does. The alternative is ES modules with an import map, which needs files that re-export the app's React, made at build time.
 6. **Who answers in a room.** *Default:* each member bot answers each of the owner's messages once, in turn, and bots never start rounds. Later choices could be only the bot that's named, or bots answering each other with a cap on rounds.
 7. **Turns a plugin starts in a bot's own chat.** *Default:* shown with "From <plugin>" on the message.
