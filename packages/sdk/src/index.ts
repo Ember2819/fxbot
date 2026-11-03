@@ -92,7 +92,7 @@ export async function createFxbot(options: FxbotOptions) {
   const { databaseUrl, secretKey, vercelClientId, dataDir = "data", backupsDir = "backups", version = "0.0.0", fetch = globalThis.fetch } = options;
   const key = typeof secretKey === "string" ? readKey(secretKey) : secretKey;
   const store = await createStore({ databaseUrl, dataDir, backupsDir });
-  const sessions = await openSessions(store.sql, { databaseUrl, dataDir, backupsDir }).catch(async (error) => {
+  const sessions = await openSessions(store.sql, { databaseUrl, dataDir, backupsDir, backedUp: store.backedUp }).catch(async (error) => {
     await store.close();
     throw error;
   });

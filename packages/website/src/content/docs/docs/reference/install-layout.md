@@ -27,7 +27,7 @@ An install made by [`setup.sh`](/docs/reference/commands/#setupsh), on Debian or
 
 The app sees the three folders in `/var/lib/fxbot` at the same paths.
 
-Each backup is a folder named `<date>-before-<migration>`, holding `database.dump`, in pg_dump's custom format, and `data.tar.gz`, the data folder. The backup taken before 0.4.0 moved the chats is named `<date>-before-world-postgres-<version>`, and its `data.tar.gz` holds the chats' old files. A 0.2 install that `setup.sh` moved into containers also has `<date>-move-to-containers`, with the 0.2 database.
+Each backup is a folder named `<date>-before-<migration>`, holding `database.dump`, in pg_dump's custom format, and `data.tar.gz`, the data folder. A start backs up once, before its first change. When only the tables that hold the chats change, the folder is named `<date>-before-world-postgres-<version>`. The update to 0.4.0 took `<date>-before-0006_plugins`, whose `data.tar.gz` holds the chats' old files. A 0.2 install that `setup.sh` moved into containers also has `<date>-move-to-containers`, with the 0.2 database.
 
 ## The containers
 

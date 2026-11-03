@@ -28,7 +28,7 @@ export type StoredProfile = Omit<Profile, "busy">;
 export async function createStore({ databaseUrl, dataDir, backupsDir }: MigrateOptions) {
   // Column names convert between snake_case and camelCase. Values do not, so stored JSON comes back as it went in.
   const sql = postgres(databaseUrl, { onnotice: () => {}, transform: { column: { from: postgres.toCamel, to: postgres.fromCamel } } });
-  await migrate(sql, { databaseUrl, dataDir, backupsDir }).catch(async (error) => {
+  const backedUp = await migrate(sql, { databaseUrl, dataDir, backupsDir }).catch(async (error) => {
     await sql.end();
     throw error;
   });
@@ -38,6 +38,8 @@ export async function createStore({ databaseUrl, dataDir, backupsDir }: MigrateO
 
   return {
     sql,
+    // Whether this start backed up before migrating.
+    backedUp,
     profiles: {
       // Pinned bots first, in the order they were pinned, then the rest by name.
       list: async (): Promise<StoredProfile[]> => sql<StoredProfile[]>`select ${columns} from profiles order by pinned_at nulls last, lower(name), id`,

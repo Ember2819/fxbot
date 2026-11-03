@@ -34,7 +34,7 @@ The older release refuses a database that a newer one migrated. Restore the back
 
    `fxbot restore` stops the app first, puts the backup in place of the database, and unpacks its data folder.
 
-   Going back from 0.4.0 or later to 0.3, restore the backup named `<date>-before-world-postgres-<version>`. It was taken before 0.4.0 moved the chats into the database, and holds their old files.
+   Going back from 0.4.0 or later to 0.3, restore the backup named `<date>-before-0006_plugins`. The update to 0.4.0 took it before its migrations and before it moved the chats into the database, so it holds their old files.
 
 Anything said or saved after the backup is lost with the restore.
 

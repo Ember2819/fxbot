@@ -15,7 +15,7 @@ const home = dirname(dirname(fileURLToPath(import.meta.resolve("@workflow/world-
 
 // libfx's sessions, in fxbot's Postgres through Workflow's Postgres World. Its tables are the package's, in schemas of
 // its own (workflow, workflow_drizzle, and graphile_worker), and its bootstrap migrates them, not migrations/.
-export async function openSessions(sql: postgres.Sql, options: MigrateOptions) {
+export async function openSessions(sql: postgres.Sql, options: MigrateOptions & { backedUp: boolean }) {
   await bootstrap(sql, options);
   // At its defaults the queue polls 100 times a second while idle. LISTEN wakes it for each new message, so a turn
   // doesn't wait on the poll. Its start() isn't called: it would queue every session again for an agent named
@@ -47,15 +47,16 @@ export async function openSessions(sql: postgres.Sql, options: MigrateOptions) {
   };
 }
 
-// The package's migrations run, after a backup, when the schema was last set up by another version of it. The version
-// is the workflow schema's comment. Its bootstrap ends its process, so it runs in one of its own.
-async function bootstrap(sql: postgres.Sql, options: MigrateOptions) {
+// The package's migrations run when the schema was last set up by another version of it, after a backup unless fxbot's
+// own migrations took one this start. The version is the workflow schema's comment. Its bootstrap ends its process, so
+// it runs in one of its own.
+async function bootstrap(sql: postgres.Sql, options: MigrateOptions & { backedUp: boolean }) {
   const { version } = JSON.parse(await readFile(join(home, "package.json"), "utf8")) as { version: string };
   const by = `world-postgres ${version}`;
   const [{ was }] = await sql<{ was: string | null }[]>`select obj_description(to_regnamespace('workflow'), 'pg_namespace') as was`;
   if (was === by) return;
   const [{ used }] = await sql<{ used: boolean }[]>`select exists (select 1 from profiles) as used`;
-  if (used) await backup(options, `world-postgres-${version}`);
+  if (used && !options.backedUp) await backup(options, `world-postgres-${version}`);
   await run(process.execPath, [join(home, "bin", "setup.js")], { cwd: home, env: { PATH: process.env.PATH, WORKFLOW_POSTGRES_URL: options.databaseUrl } }).catch(
     (error: { stderr?: string; message: string }) => {
       throw new Error(`Cannot set up the tables for chats: ${error.stderr?.trim() || error.message}`);

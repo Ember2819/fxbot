@@ -118,7 +118,7 @@ There is no export or import tool, so a prototype copied sessions through the Wo
   return { durability: world(sessions, { name: "postgres", store: "fxbot" }), close: async () => sessions.close?.() };
   ```
   The World's `start()` is never called: it would queue every session again, for an agent named `default` (vercel-labs/fx#1253). The queue starts on its first message, and `index.ts` resumes open turns itself.
-- **Its setup.** The `workflow` schema's comment names the world-postgres version that set it up. When it isn't the installed one, `sessions.ts` takes the backup fxbot takes before its own migrations, if the database has a bot. Then it runs the package's `bootstrap` as a child process, from the package's own folder, with `WORKFLOW_POSTGRES_URL` in its environment. The child keeps `.env` out of it, and `bootstrap` ends its own process when it's done.
+- **Its setup.** The `workflow` schema's comment names the world-postgres version that set it up. When it isn't the installed one, `sessions.ts` takes the backup fxbot takes before its own migrations, if the database has a bot and fxbot's migrations didn't already take one this start. A start backs up once, before its first change: an update that doesn't start goes back to the newest backup, which must be one the release before can open. Then it runs the package's `bootstrap` as a child process, from the package's own folder, with `WORKFLOW_POSTGRES_URL` in its environment. The child keeps `.env` out of it, and `bootstrap` ends its own process when it's done.
 - **`providers.ts`.** Each provider's agent takes that durability instead of `local({ dir })`. Agent names stay `p-<provider id>`.
 - **`index.ts`.** It opens the store after fxbot's migrations and before the providers, and closes it after the agents and the replies' saves.
 - **`migrate.ts`.** Exports `backup()`, which the store's setup uses too.
@@ -137,7 +137,7 @@ A run that can't be moved stops the start, with its id and the error. Its files 
 ### Backups and settings
 
 - The backup is `pg_dump`, which now holds the chats, and `data.tar.gz` of `FXBOT_DATA`, which holds plugins' files, and `sessions.moved` until the owner deletes it.
-- `fxbot restore` unpacks `data.tar.gz` over the data folder, so going back to 0.3 on the backup from before the move brings `sessions/` back. 0.3 reads it as before. Updating again moves it again.
+- `fxbot restore` unpacks `data.tar.gz` over the data folder, so going back to 0.3 on the backup the update took, `before-0006_plugins`, brings `sessions/` back. 0.3 reads it as before. Updating again moves it again. A first build took a second backup before the chats' setup; a rollback would have restored that one, whose database 0.3 refuses. A check before release found it, by updating a real 0.3.0 install and rolling it back.
 - `CHANGELOG.md`'s **Before upgrading**, the README, and the docs' pages on backups, going back, the install's layout, and the SDK's `dataDir` say where chats live now.
 
 ### Not in this phase

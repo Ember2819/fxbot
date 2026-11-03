@@ -10,12 +10,16 @@ const dir = join(import.meta.dirname, "migrations");
 const kept = 5;
 
 export type MigrateOptions = { databaseUrl: string; dataDir: string; backupsDir: string };
+// A start backs up once, before its first change: an update that doesn't start goes back to the newest backup, which
+// must be one the release before can open.
 
 // The schema is the numbered SQL files in migrations/, each run once, in order of their names, and recorded in
 // fxbot_migrations. A file that has shipped never changes; a fix is a new file. One transaction holds a lock, so two
-// servers starting at once take turns, and runs every pending file, so a failure keeps none of them.
+// servers starting at once take turns, and runs every pending file, so a failure keeps none of them. True when it
+// took a backup.
 export async function migrate(sql: postgres.Sql, options: MigrateOptions) {
   const known = (await readdir(dir)).filter((name) => name.endsWith(".sql")).map((name) => name.slice(0, -4)).sort();
+  let backedUp = false;
   await sql.begin(async (tx) => {
     await tx`select pg_advisory_xact_lock(hashtext('fxbot:migrate'))`;
     await tx`create table if not exists fxbot_migrations (id text primary key, applied_at timestamptz not null default now())`;
@@ -28,7 +32,10 @@ export async function migrate(sql: postgres.Sql, options: MigrateOptions) {
     if (!pending.length) return;
     // A database that already holds fxbot's records is backed up before anything changes it.
     const [{ used }] = await tx<{ used: boolean }[]>`select to_regclass('profiles') is not null as used`;
-    if (used) await backup(options, pending[0]);
+    if (used) {
+      await backup(options, pending[0]);
+      backedUp = true;
+    }
     for (const id of pending) {
       await tx.unsafe(await readFile(join(dir, `${id}.sql`), "utf8")).catch((error: Error) => {
         throw new Error(`Migration ${id} failed, and none of this start's migrations were kept: ${error.message}`);
@@ -37,6 +44,7 @@ export async function migrate(sql: postgres.Sql, options: MigrateOptions) {
     }
     console.log(`fxbot migrated the database: ${pending.join(", ")}`);
   });
+  return backedUp;
 }
 
 // The database as pg_dump's custom format, and FXBOT_DATA's files, in a folder of their own that only fxbot's user
