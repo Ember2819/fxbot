@@ -32,7 +32,7 @@ Run these from the repository root after `npm install`, with Node 22.18 or newer
 
 - `npm run typecheck` runs `tsc --noEmit` in each package, with that package's own `tsconfig.json`.
 - `npm run build` builds the page and service worker into `packages/ui/dist/`. It does not typecheck.
-- `npm run build-site` builds the website into `out/` and checks its links. Its docs are Markdown in `packages/website/docs/`, one [Diátaxis](https://diataxis.fr) kind per page. The changelog page and the variables table come from `CHANGELOG.md` and the README.
+- `npm run build-site` builds the website into `out/` and checks its links. Its docs are Markdown in `packages/website/docs/`, and the SDK's pages, for people who build their own apps on `@fxbot/sdk`, in `packages/website/sdk/`: one [Diátaxis](https://diataxis.fr) kind per page, each listed in `src/content.ts`. The changelog page and the variables table come from `CHANGELOG.md` and the README.
 - Add shadcn components from `packages/ui`: `npx shadcn@latest add <name>`.
 - `podman build .` (or `docker build .`) builds fxbot's image from the `Dockerfile`. `bash -n setup.sh deploy/fxbot` checks the shell scripts' syntax.
 - `git diff --check` checks whitespace on tracked changes. New files need a separate look; untracked files are outside that diff.

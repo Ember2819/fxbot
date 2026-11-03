@@ -88,6 +88,25 @@ const steps: { title: string; command?: string; body: ReactNode }[] = [
   { title: "Add a provider and a bot", body: <>In Settings, sign in to an account, add a key, or point at a local model server. Then make a bot and start a chat.</> },
 ];
 
+// A first look at the SDK, as on its overview page.
+const sdkSample = `import { createFxbot } from "@fxbot/sdk";
+
+const fxbot = await createFxbot({ databaseUrl, secretKey });
+const ollama = await fxbot.providers.add({
+  kind: "ollama",
+  model: "qwen3:8b",
+});
+const bot = await fxbot.profiles.create({
+  name: "Scout",
+  provider: ollama.id,
+});
+
+// The reply streams in on fxbot.stream(bot.id).
+await fxbot.send(bot.id, {
+  text: "Hello!",
+  messageId: crypto.randomUUID(),
+});`;
+
 function SectionTitle({ eyebrow, title, children }: { eyebrow: string; title: string; children?: ReactNode }) {
   return (
     <div className="max-w-2xl">
@@ -226,6 +245,24 @@ export function Home() {
               All the docs
             </a>
           </div>
+        </section>
+
+        <section className="mx-auto grid max-w-6xl gap-10 px-4 pb-20 sm:px-6 sm:pb-28 lg:grid-cols-[minmax(0,5fr)_minmax(0,7fr)] lg:items-center">
+          <div>
+            <SectionTitle eyebrow="Build your own" title="Your app, on fxbot's SDK">
+              fxbot runs on <code className="rounded-md bg-muted px-1.5 py-0.5 text-[0.85em]">@fxbot/sdk</code>, and your app can too: a chat in a terminal, a bot on a messaging service, or a page of your own design, with the same bots, providers, tools, and memories.
+            </SectionTitle>
+            <div className="mt-8 flex flex-wrap gap-2">
+              <a href={href("/sdk/tutorials/terminal-chat/")} className={cn(buttonVariants({ size: "lg" }), "px-4")}>
+                The tutorial: a terminal chat
+                <ArrowRight aria-hidden="true" data-icon="inline-end" />
+              </a>
+              <a href={href("/sdk/")} className={cn(buttonVariants({ variant: "outline", size: "lg" }), "px-4")}>
+                The SDK
+              </a>
+            </div>
+          </div>
+          <Command>{sdkSample}</Command>
         </section>
       </main>
     </Shell>

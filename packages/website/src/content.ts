@@ -2,10 +2,12 @@ import changelog from "../../../CHANGELOG.md?raw";
 import readme from "../../../README.md?raw";
 import { markdown } from "./markdown.ts";
 
-// The docs, in the order the sidebar lists them, in Diátaxis's four kinds (https://diataxis.fr): each page is one
-// kind only. A page is docs/<slug>.md, or docs/index.md for the docs' own home, except the changelog, which is the
-// repository's own CHANGELOG.md.
-export const groups = [
+// Two sets of pages, each in Diátaxis's four kinds (https://diataxis.fr), in the order its sidebar lists them: the
+// docs, for running fxbot, and the SDK's, for building on it. Each page is one kind only. A page is <root>/<slug>.md,
+// or <root>/index.md for the set's own home, except the changelog, which is the repository's own CHANGELOG.md.
+type Group = { title: string; about: string; pages: { slug: string; label: string }[] };
+
+export const groups: Group[] = [
   {
     title: "Tutorials",
     about: "A guided first run, from a fresh machine to a chat.",
@@ -53,10 +55,43 @@ export const groups = [
 ];
 const changelogSlug = "reference/changelog";
 
-const files = import.meta.glob<string>("../docs/**/*.md", { query: "?raw", import: "default", eager: true });
-const file = (slug: string) => `../docs/${slug || "index"}.md`;
-const listed = [{ slug: "", label: "Overview" }, ...groups.flatMap((group) => group.pages)];
-for (const name of Object.keys(files)) if (!listed.some((page) => file(page.slug) === name)) throw new Error(`${name} is not in the docs sidebar (src/content.ts)`);
+export const sdkGroups: Group[] = [
+  {
+    title: "Tutorials",
+    about: "A first app on the SDK, from an empty folder to a chat with your bot.",
+    pages: [{ slug: "tutorials/terminal-chat", label: "Build a terminal chat" }],
+  },
+  {
+    title: "How-to guides",
+    about: "Steps for one task in your own app.",
+    pages: [
+      { slug: "how-to/set-up", label: "Use the SDK in a project" },
+      { slug: "how-to/stream-replies", label: "Stream replies" },
+      { slug: "how-to/providers", label: "Connect providers" },
+      { slug: "how-to/tools", label: "Give bots tools" },
+      { slug: "how-to/memories", label: "Work with memories" },
+      { slug: "how-to/web-page", label: "Build a page on the client" },
+    ],
+  },
+  {
+    title: "Reference",
+    about: "The SDK's calls, options, and types, and the server's HTTP API.",
+    pages: [
+      { slug: "reference/create-fxbot", label: "createFxbot" },
+      { slug: "reference/server-api", label: "The fxbot object" },
+      { slug: "reference/client", label: "The client" },
+      { slug: "reference/http-api", label: "HTTP API" },
+    ],
+  },
+  {
+    title: "Explanation",
+    about: "How the SDK works under an app, and why.",
+    pages: [{ slug: "explanation/how-it-works", label: "How the SDK works" }],
+  },
+];
+
+const docFiles = import.meta.glob<string>("../docs/**/*.md", { query: "?raw", import: "default", eager: true });
+const sdkFiles = import.meta.glob<string>("../sdk/**/*.md", { query: "?raw", import: "default", eager: true });
 
 // The environment table, taken from the README so the two never differ. The Configuration page marks its place.
 const variablesMark = "<!-- the variables table from README.md -->";
@@ -66,14 +101,22 @@ const end = lines.findIndex((line, i) => i > start && !line.startsWith("|"));
 if (start < 0) throw new Error("README.md has no | Variable | table for the Configuration page");
 const variables = lines.slice(start, end < 0 ? undefined : end).join("\n");
 
-function source(slug: string) {
-  if (slug === changelogSlug) return changelog;
-  const text = files[file(slug)];
-  if (text === undefined) throw new Error(`The docs sidebar lists ${file(slug)}, which does not exist`);
-  return text.replace(variablesMark, () => variables);
+// One set's pages, with their addresses and rendered text. Every Markdown file in the set must be in its sidebar.
+function collection(root: "docs" | "sdk", groups: Group[], files: Record<string, string>) {
+  const file = (slug: string) => `../${root}/${slug || "index"}.md`;
+  const listed = [{ slug: "", label: "Overview" }, ...groups.flatMap((group) => group.pages)];
+  for (const name of Object.keys(files)) if (!listed.some((page) => file(page.slug) === name)) throw new Error(`${name} is not in the ${root} sidebar (src/content.ts)`);
+  const source = (slug: string) => {
+    if (root === "docs" && slug === changelogSlug) return changelog;
+    const text = files[file(slug)];
+    if (text === undefined) throw new Error(`The ${root} sidebar lists ${file(slug)}, which does not exist`);
+    return text.replace(variablesMark, () => variables);
+  };
+  return listed.map((page) => ({ ...page, root, path: page.slug ? `${root}/${page.slug}/` : `${root}/`, ...markdown(source(page.slug)) }));
 }
 
-export const docs = listed.map((page) => ({ ...page, path: page.slug ? `docs/${page.slug}/` : "docs/", ...markdown(source(page.slug)) }));
+export const docs = collection("docs", groups, docFiles);
+export const sdk = collection("sdk", sdkGroups, sdkFiles);
 export type Doc = (typeof docs)[number];
 
 export const changelogPath = `docs/${changelogSlug}/`;
