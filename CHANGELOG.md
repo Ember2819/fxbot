@@ -2,6 +2,10 @@
 
 Each release of fxbot, newest first. A release that adds migrations, bumps libfx, or needs a step by hand opens with **Before upgrading**. Lines for the next release collect under Unreleased, and the release workflow publishes a version's section as its notes.
 
+## Unreleased
+
+- The SDK's `close()` waits for the save of a reply that just finished, so a script can close right after a turn. A reply that can't be saved, such as one whose bot was just deleted, is logged instead of stopping the process.
+
 ## 0.3.0 (2026-11-02)
 
 **Before upgrading.** fxbot now runs as containers, and Settings' Update in 0.1 or 0.2 can't make that move. Run `setup.sh` again instead, the command under Install: it stops the old service, copies its database into the database container, and starts the containers on the same chats, key, and settings. The old files and database stay until you remove them, and `sudo fxbot status` says how, or how to go back. Migration `0005_memories` adds memories and vectors, and needs pgvector, which the database container has: on the machine's own Postgres, it stops and says to run `setup.sh`. The local embedder downloads its 310 MB model on its first start, holds about 380 MB, and fills in vectors for existing messages in the background. A checkout moves its database too: see the README's Run from a checkout.

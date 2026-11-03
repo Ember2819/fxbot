@@ -103,6 +103,6 @@ An `Error` without a `status` is unexpected. fxbot's server answers it with 500.
 
 ## Stopping
 
-`close()` stops the timers, closes the MCP connections, and closes each provider's agent, which waits for the turns this process started. Then it ends the Postgres connection.
+`close()` stops the timers, closes the MCP connections, and closes each provider's agent, which waits for the turns this process started. It waits for their replies to be saved, then ends the Postgres connection.
 
-In 0.3.0, `close()` doesn't wait for the save of a reply that just finished. The reply and the bot's `preview` are written after the turn ends, so a script that calls `close()` right after a turn can reach a closed database. Keep the app running between turns. A fix is planned.
+Before 0.4.0, `close()` didn't wait for the save of a reply that just finished, so a script that called it right after a turn could crash with `CONNECTION_ENDED`.

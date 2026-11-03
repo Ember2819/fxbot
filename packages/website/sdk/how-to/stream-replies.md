@@ -116,5 +116,5 @@ await pipeline(Readable.fromWeb(body as ReadableStream<Uint8Array>), res).catch(
 
 - **The stream ends at once, with no lines.** The bot has no chat yet, or its provider is gone. Send the first message before you open the stream.
 - **`send` fails with status 400.** The message has no text, its id breaks the rules in step 2, or the bot has no provider or model. The error says which.
-- **The script crashes with `CONNECTION_ENDED` right after a reply.** In 0.3.0, `close()` doesn't wait for the SDK to save a reply that just finished. Keep the app running between turns, as a chat loop or a server does, and call `close()` when it shuts down. A fix is planned.
+- **The script crashes with `CONNECTION_ENDED` right after a reply.** Before 0.4.0, `close()` didn't wait for the SDK to save a reply that just finished. Update the SDK, or keep the app running between turns and call `close()` when it shuts down.
 - **The reply shows twice.** A turn ran again after a restart: its `turn_resume` line starts the reply over. Fold lines with `applyLine` rather than adding up `text_delta`s yourself.

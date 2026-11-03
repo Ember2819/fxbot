@@ -197,9 +197,17 @@ export async function createFxbot(options: FxbotOptions) {
     return blocks;
   }
 
+  // Each turn's reply is saved after the turn ends, and close waits for the saves.
+  const saving = new Set<Promise<void>>();
+  function finish(id: string, sessionId: string, turn: FxTurn | FxResumeTurn) {
+    const done = saveReply(id, sessionId, turn).catch((error) => console.error("Could not save a reply:", error));
+    saving.add(done);
+    void done.finally(() => saving.delete(done));
+  }
+
   // Reading a turn's events waits for its end; a repeated messageId yields no text and saves nothing. A resumed turn
   // learns its messageId from its events, and one with nothing left open has none.
-  async function finish(id: string, sessionId: string, turn: FxTurn | FxResumeTurn) {
+  async function saveReply(id: string, sessionId: string, turn: FxTurn | FxResumeTurn) {
     let reply = "";
     count(id, 1);
     try {
@@ -266,7 +274,7 @@ export async function createFxbot(options: FxbotOptions) {
   for (const profile of await store.profiles.list()) {
     if (!profile.sessionId || !providers.has(profile.provider)) continue;
     const session = await open(profile, profile.sessionId).catch(() => null);
-    if (session) void finish(profile.id, profile.sessionId, session.resume());
+    if (session) finish(profile.id, profile.sessionId, session.resume());
   }
 
   return {
@@ -385,7 +393,7 @@ export async function createFxbot(options: FxbotOptions) {
         const accepted = await turn.accepted;
         const names = files.length ? `\n[files: ${files.map((f) => f.name).join(", ")}]` : "";
         await history.record(id, accepted.sessionId, messageId, "user", text + names);
-        void finish(id, accepted.sessionId, turn);
+        finish(id, accepted.sessionId, turn);
         return accepted;
       } catch (error) {
         // libfx throws a TypeError or RangeError for a prompt it refuses, such as an image whose bytes are not its type.
@@ -445,7 +453,7 @@ export async function createFxbot(options: FxbotOptions) {
     // The running version, and the newest stable release when it is newer.
     release: releases.get,
 
-    // Waits for the turns this process started, then lets Postgres go.
+    // Waits for the turns this process started and the saves of their replies, then lets Postgres go.
     async close() {
       embeddings.close();
       releases.close();
@@ -453,6 +461,7 @@ export async function createFxbot(options: FxbotOptions) {
       skills.close();
       await mcp.close();
       await providers.close();
+      await Promise.all(saving);
       await store.close();
     },
   };
