@@ -40,8 +40,25 @@ compose() {
     COMPOSE_FILE=$files COMPOSE_PROFILES=$profiles PODMAN_COMPOSE_WARNING_LOGS=false podman compose --project-directory "$here" "$@"
   fi
 }
+# A wait for health with the checks running beside it. podman runs a container's check once each interval (30 s) and
+# ignores compose's start_interval, so while a command here waits, the checks run every 2 seconds instead. Docker
+# honors start_interval.
+checking() {
+  while sleep 2; do
+    for id in $(compose ps -q 2>/dev/null); do podman healthcheck run "$id" >/dev/null 2>&1 || true; done
+  done
+}
+checked() {
+  [ "${FXBOT_ENGINE:-podman}" = podman ] || { "$@"; return; }
+  checking &
+  local checks=$! code=0
+  "$@" || code=$?
+  kill "$checks" 2>/dev/null || true
+  wait "$checks" 2>/dev/null || true
+  return "$code"
+}
 # Every container started, then a wait for the app alone: the embedder may still be downloading its model.
-start() { compose up -d --remove-orphans >/dev/null 2>&1 && compose up -d --wait --wait-timeout "$wait" fxbot; }
+start() { checked compose up -d --remove-orphans >/dev/null 2>&1 && checked compose up -d --wait --wait-timeout "$wait" fxbot; }
 die() {
   echo "fxbot: $*" >&2
   exit 1
@@ -97,7 +114,7 @@ restore() {
   [[ $folder == /* ]] || folder=$from_here/$folder
   [ -f "$folder/database.dump" ] || die "$folder has no database.dump"
   compose stop fxbot >/dev/null 2>&1 || true
-  compose up -d --wait db >/dev/null 2>&1 || die "the database didn't start. See: fxbot logs db"
+  checked compose up -d --wait db >/dev/null 2>&1 || die "the database didn't start. See: fxbot logs db"
   compose exec -T db psql -U fxbot -d postgres -q -c 'drop database if exists fxbot with (force)' -c 'create database fxbot'
   compose exec -T db pg_restore -U fxbot -d fxbot --no-owner --exit-on-error <"$folder/database.dump"
   if [ -f "$folder/data.tar.gz" ]; then
@@ -116,11 +133,11 @@ rotate_key() {
   compose stop fxbot >/dev/null 2>&1 || true
   if ! compose run --rm --no-deps -v "$new:/run/fxbot/new.key:ro" fxbot node packages/server/src/rotate-key.ts /run/fxbot/new.key >/dev/null; then
     rm -f "$new"
-    compose up -d --wait fxbot >/dev/null 2>&1 || true
+    checked compose up -d --wait fxbot >/dev/null 2>&1 || true
     die "nothing was sealed again, and the old key still works"
   fi
   cp -p "$key" "$key.old" && mv "$new" "$key"
-  compose up -d --wait fxbot >/dev/null 2>&1
+  checked compose up -d --wait fxbot >/dev/null 2>&1
   echo "fxbot runs on the new key. The old one is $key.old: remove it once you're sure."
 }
 

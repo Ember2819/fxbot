@@ -25,7 +25,10 @@ services:
     ports: [ "127.0.0.1:${FXBOT_PORT:-8787}:8787" ]
     depends_on:
       db: { condition: service_healthy }
-    healthcheck: { test: [ CMD, fxbot-health ], interval: 3s, timeout: 2s, retries: 3 }
+    # Every 30 seconds, and every 2 while it starts. Each check costs podman about 30 ms of CPU, so a check every few
+    # seconds kept an idle machine busy. podman ignores start_interval: the fxbot command runs the checks itself while
+    # it waits.
+    healthcheck: { test: [ CMD, fxbot-health ], interval: 30s, timeout: 2s, retries: 3, start_period: 2m, start_interval: 2s }
     # Running chats finish before it stops, as they did under systemd.
     stop_grace_period: 90s
     restart: unless-stopped
@@ -38,7 +41,7 @@ services:
       POSTGRES_PASSWORD: ${FXBOT_DB_PASSWORD:?set FXBOT_DB_PASSWORD}
     volumes: [ pgdata:/var/lib/postgresql/data ]
     # Over TCP: during its first start the database answers on its socket before it's ready.
-    healthcheck: { test: [ CMD, pg_isready, -h, 127.0.0.1, -U, fxbot, -d, fxbot ], interval: 3s }
+    healthcheck: { test: [ CMD, pg_isready, -h, 127.0.0.1, -U, fxbot, -d, fxbot ], interval: 30s, start_period: 2m, start_interval: 2s }
     stop_grace_period: 1m
     restart: unless-stopped
   # Vectors for memory search: llama.cpp's server with EmbeddingGemma 2 on the CPU, which it downloads into `models` on
@@ -51,7 +54,7 @@ services:
       LLAMA_CACHE: /models
     volumes: [ models:/models ]
     cpu_shares: 256
-    healthcheck: { test: [ CMD, curl, -fs, "http://localhost:8080/health" ], interval: 10s, start_period: 10m }
+    healthcheck: { test: [ CMD, curl, -fs, "http://localhost:8080/health" ], interval: 30s, start_period: 10m }
     restart: unless-stopped
 secrets:
   fxbot_key: { file: "${FXBOT_ROOT:-}/etc/fxbot/secret.key" }

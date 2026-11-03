@@ -14,7 +14,7 @@ services:
       POSTGRES_PASSWORD: ${FXBOT_DB_PASSWORD:?set FXBOT_DB_PASSWORD in .env}
     ports: [ "127.0.0.1:${FXBOT_DB_PORT:-5433}:5432" ]
     volumes: [ pgdata:/var/lib/postgresql/data ]
-    healthcheck: { test: [ CMD, pg_isready, -h, 127.0.0.1, -U, fxbot, -d, fxbot_dev ], interval: 3s }
+    healthcheck: { test: [ CMD, pg_isready, -h, 127.0.0.1, -U, fxbot, -d, fxbot_dev ], interval: 30s, start_period: 2m, start_interval: 2s }
     restart: unless-stopped
   # EmbeddingGemma 2 on the CPU, as a release install's; it downloads its model on its first start.
   embed:
