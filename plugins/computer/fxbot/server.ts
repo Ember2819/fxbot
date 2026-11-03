@@ -14,8 +14,10 @@ const base = "docker.io/library/debian:trixie-slim";
 const packages = "ca-certificates curl git python3 procps ripgrep jq unzip xz-utils";
 const env = ["HOME=/root", "PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin", "DEBIAN_FRONTEND=noninteractive"];
 const mib = 1024 * 1024;
-// libfx takes images up to 3.75 MiB; the library keeps text up to 1 MiB; a file over 32 MiB is read with the shell.
+// libfx takes images up to 3.75 MiB, and a tool's result up to 64 KiB, so text is read 60 KB at a time; the library
+// keeps text up to 1 MiB; a file over 32 MiB is read with the shell.
 const maxImage = 3.75 * mib;
+const page = 60_000;
 const maxText = mib;
 const maxRead = 32 * mib;
 // The socket in a release install's app container, then where setup.sh makes it, for a checkout.
@@ -36,6 +38,8 @@ const magic: [string, (b: Buffer) => boolean][] = [
 ];
 const imageType = (bytes: Buffer) => magic.find(([, is]) => is(bytes))?.[0];
 const textTypes: Record<string, string> = { md: "text/markdown", csv: "text/csv", json: "application/json", html: "text/html" };
+// A text cut to at most `bytes` of UTF-8, at a whole character.
+const cutTo = (text: string, bytes: number) => new TextDecoder().decode(Buffer.from(text).subarray(0, bytes)).replace(/\uFFFD$/, "");
 const sizeOf = (n: number) => (n >= mib ? `${(n / mib).toFixed(1)} MiB` : `${Math.ceil(n / 1024)} KiB`);
 // A path on the computer: a relative one starts at /root.
 const where = (path: unknown) => posix.resolve("/root", String(path ?? "").trim() || ".");
@@ -352,7 +356,7 @@ export default function setup(fx: PluginApi) {
     description:
       "Run one bash command on your own computer: a Debian machine where you are root. Your home, /root, is kept; programs you install last " +
       "until the computer is rebuilt. Each call is a new shell in /root, stopped after timeout seconds (120 unless you give one, 600 at most). " +
-      "Output over 64 KiB keeps its first 4 KiB and last 60 KiB, and says where the whole of it is. A server keeps running when started with " +
+      "Output over 60 KiB keeps its first 4 KiB and last 56 KiB, and says where the whole of it is. A server keeps running when started with " +
       "`setsid cmd > log 2>&1 &`, until the computer stops after sitting idle. The computer reaches the internet, but not this machine or its network.",
     inputSchema: {
       type: "object",
@@ -383,7 +387,7 @@ export default function setup(fx: PluginApi) {
   fx.tool({
     name: "read_file",
     description:
-      "Read a file on your computer. Text comes 2,000 lines or 256 KiB at a time from offset, saying where the next part starts. An image " +
+      "Read a file on your computer. Text comes 2,000 lines or 60 KB at a time from offset, saying where the next part starts. An image " +
       "(PNG, JPEG, GIF, or WebP, up to 3.75 MiB) comes back as an image, which you see. A relative path starts at /root.",
     inputSchema: {
       type: "object",
@@ -410,9 +414,10 @@ export default function setup(fx: PluginApi) {
       const from = Math.max(Math.trunc(Number(input.offset) || 1), 1) - 1;
       const most = Math.min(Math.max(Math.trunc(Number(input.limit) || 2000), 1), 2000);
       let to = from;
-      for (let kept = 0; to < lines.length && to - from < most && kept + Buffer.byteLength(lines[to]) + 1 <= 256 * 1024; to++) kept += Buffer.byteLength(lines[to]) + 1;
-      const page = lines.slice(from, to).join("\n");
-      return to < lines.length || from > 0 ? `${page}\n\n[lines ${from + 1} to ${to} of ${lines.length}${to < lines.length ? `; the next part starts at offset ${to + 1}` : ""}]` : page;
+      for (let kept = 0; to < lines.length && to - from < most && kept + Buffer.byteLength(lines[to]) + 1 <= page; to++) kept += Buffer.byteLength(lines[to]) + 1;
+      // A line longer than a page is cut to it.
+      const part = to === from && from < lines.length ? (to++, cutTo(lines[from], page)) : lines.slice(from, to).join("\n");
+      return to < lines.length || from > 0 ? `${part}\n\n[lines ${from + 1} to ${to} of ${lines.length}${to < lines.length ? `; the next part starts at offset ${to + 1}` : ""}]` : part;
     },
   });
 

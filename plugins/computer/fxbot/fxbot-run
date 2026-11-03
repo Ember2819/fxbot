@@ -1,13 +1,14 @@
 #!/bin/bash
 # Runs one command for the computer plugin: fxbot-run <id> <seconds> <command>. The output goes to /tmp/fxbot/<id>.log
 # and the process group's id to /tmp/fxbot/<id>.pid, which the plugin kills when the turn is cancelled. Then it prints
-# the output, its first 4 KiB and last 60 KiB when it is over 64 KiB, and exits with the command's code.
+# the output, its first 4 KiB and last 56 KiB when it is over 60 KiB, under libfx's 64 KiB for a tool's result, and
+# exits with the command's code.
 id=$1 seconds=$2 command=$3 log=/tmp/fxbot/$1.log
 mkdir -p /tmp/fxbot
 setsid timeout -s KILL "$seconds" bash -c "$command" </dev/null >"$log" 2>&1 &
 echo $! >"/tmp/fxbot/$id.pid"
-wait $!
+{ wait $!; } 2>/dev/null
 code=$? size=$(stat -c %s "$log")
-if [ "$size" -le 65536 ]; then cat "$log"; else head -c 4096 "$log" && printf '\n[%s bytes cut here: the whole output is in %s]\n' "$((size - 65536))" "$log" && tail -c 61440 "$log"; fi
+if [ "$size" -le 61440 ]; then cat "$log"; else head -c 4096 "$log" && printf '\n[%s bytes cut here: the whole output is in %s]\n' "$((size - 61440))" "$log" && tail -c 57344 "$log"; fi
 if [ "$code" = 137 ] && [ "$SECONDS" -ge "$seconds" ]; then printf '\n[stopped after %s s]\n' "$seconds"; fi
 exit "$code"
