@@ -7,7 +7,7 @@ A plugin for [fxbot](https://fxbot.sh): rooms where several of your bots talk wi
 - Each bot answers in a session of its own for the room, so a room stays out of the bot's own chat. Its `chat_history` tool still finds what was said there.
 - **Edit**, on a room, changes its bots or deletes it.
 
-Add it from **Add-ons**, on the **Plugins** tab, where fxbot's list has it. It runs inside fxbot: read its code there before you add it.
+Add it from **Plugins**, where fxbot's list has it. It runs inside fxbot: read its code there before you add it.
 
 ## Files
 

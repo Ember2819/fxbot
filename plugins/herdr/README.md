@@ -8,11 +8,11 @@ A plugin for [fxbot](https://fxbot.sh): bots see the coding agents [herdr](https
 
 Both tools only read. Neither types into a pane.
 
-Add it from **Add-ons**, on the **Plugins** tab, where fxbot's list has it. It runs inside fxbot: read its code there before you add it.
+Add it from **Plugins**, where fxbot's list has it. It runs inside fxbot: read its code there before you add it.
 
 ## Reach herdr's socket
 
-The plugin talks to herdr through herdr's socket, `~/.config/herdr/herdr.sock` for herdr's user. Its **socket** setting, in the plugin's settings in **Add-ons**, says where fxbot finds it.
+The plugin talks to herdr through herdr's socket, `~/.config/herdr/herdr.sock` for herdr's user. Its **socket** setting, in the plugin's settings in **Plugins**, says where fxbot finds it.
 
 **In a checkout** that runs as herdr's own user, the default works.
 
