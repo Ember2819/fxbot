@@ -41,6 +41,7 @@ In order of execution priority. Checked phases are built. Each is marked **core*
 - [x] [One kind of plugin](docs/_completed/phases/one-kind-of-plugin.md) (core seam): one name and one list. A plugin carries any mix of code, MCP servers, and skills, and only the ones fxbot vets show until a switch in Settings
 - [x] [Agent computer](docs/_completed/phases/computer.md) (plugin, one others build on): a Linux computer for each bot, in the machine's own podman or docker, run rootless; the [computer](plugins/computer/README.md) and the [browser](plugins/browser/README.md), which needs it, are in `plugins/`
 - [ ] [Computer v2](docs/phases/computer-v2.md) (plugin, with one core hook): a whole computer in one plugin: a desktop the owner watches and takes over, a shared terminal, a browser on the desktop, and the tools to drive them by pixels, accessibility trees, and text
+- [ ] [Streams](docs/phases/streams.md) (core): chats in the Postgres fxbot already runs, so an open chat costs nothing while idle and a long one is as quick to send to as a new one; a hidden page already closes its stream
 - [ ] [Permissions](docs/phases/permissions.md) (plugin, on a core hook): ask, auto, and yolo modes for tool calls
 - [ ] [Cross-bot messaging](docs/phases/cross-bot-messaging.md) (plugin): bots message each other
 - [ ] [Routines](docs/phases/routines.md) (plugin): saved tasks a bot runs on a schedule
