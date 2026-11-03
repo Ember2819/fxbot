@@ -23,7 +23,7 @@ export type PluginRecord<Config = unknown> = {
 // A profile as stored. Whether its bot is busy is known only to the running process.
 export type StoredProfile = Omit<Profile, "busy">;
 
-// Every record fxbot owns, in tables its migrations make (migrate.ts). libfx keeps its sessions in files beside them.
+// Every record fxbot owns, in tables its migrations make (migrate.ts). libfx's sessions are beside them (sessions.ts).
 // Each change is one statement or one transaction, so concurrent requests cannot interleave a read-modify-write.
 export async function createStore({ databaseUrl, dataDir, backupsDir }: MigrateOptions) {
   // Column names convert between snake_case and camelCase. Values do not, so stored JSON comes back as it went in.

@@ -15,7 +15,7 @@ Every call returns a promise, unless its row says it is synchronous. A call that
 | `profiles.get(id)` | One bot | `Profile` |
 | `profiles.create(fields)` | A new bot. Only `name` is required. `provider` defaults to Settings' `defaultProvider`. The first bot starts pinned. | `Profile` |
 | `profiles.update(id, update)` | Changes any of the fields, and `pinned` | `Profile` |
-| `profiles.remove(id)` | Removes the bot, its messages, and its memories. Its library items stay, with `null` for the bot. libfx's session files stay in `dataDir`. | nothing |
+| `profiles.remove(id)` | Removes the bot, its messages, and its memories. Its library items stay, with `null` for the bot. Its libfx session stays in the database. | nothing |
 | `profiles.earlier(id)` | The bot's chats before its current one, which a provider switch leaves behind, as finished turns, oldest first: the newest 400 messages of them. `Turn` is the client's type. | `Turn[]` |
 | `profiles.skills(id)` | The skills the bot has, for a `$` and `/` picker | `BotSkill[]` |
 

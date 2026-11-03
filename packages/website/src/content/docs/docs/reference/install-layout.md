@@ -19,7 +19,7 @@ An install made by [`setup.sh`](/docs/reference/commands/#setupsh), on Debian or
 | `/etc/fxbot/secret.key` | 32 random bytes in base64, which seal every stored secret. Compose mounts it into the app, read-only, as the secret `fxbot_key`. | `fxbot`, 400 |
 | `/etc/fxbot/fxbot.env` | The app's optional [settings](/docs/reference/configuration/), such as `FXBOT_LISTS_URL` | `root` |
 | `/var/lib/fxbot/` | The `fxbot` user's home | `fxbot`, 700 |
-| `/var/lib/fxbot/data/` | libfx's session files for each chat (`FXBOT_DATA`) | `fxbot`, 700 |
+| `/var/lib/fxbot/data/` | Plugins' files (`FXBOT_DATA`). An install from before 0.4.0 also has `sessions.moved`, its chats' old files, which the first start of 0.4.0 moved into the database. Delete it once you're sure of the move. | `fxbot`, 700 |
 | `/var/lib/fxbot/backups/` | Backups taken before migrations change a database in use, the last five (`FXBOT_BACKUPS`) | `fxbot`, 700 |
 | `/var/lib/fxbot/control/` | The app's requests, in `requests/`, for an update or a new place for the local embedder. The machine's answers: `status.json`, which Settings shows during an update, and `embedder-status.json`, for a switch of the embedder (`FXBOT_CONTROL`) | `fxbot`, 755 |
 | `/etc/systemd/system/fxbot.service` | Starts the containers at boot | `root` |
@@ -27,7 +27,7 @@ An install made by [`setup.sh`](/docs/reference/commands/#setupsh), on Debian or
 
 The app sees the three folders in `/var/lib/fxbot` at the same paths.
 
-Each backup is a folder named `<date>-before-<migration>`, holding `database.dump`, in pg_dump's custom format, and `data.tar.gz`, the chat files. A 0.2 install that `setup.sh` moved into containers also has `<date>-move-to-containers`, with the 0.2 database.
+Each backup is a folder named `<date>-before-<migration>`, holding `database.dump`, in pg_dump's custom format, and `data.tar.gz`, the data folder. The backup taken before 0.4.0 moved the chats is named `<date>-before-world-postgres-<version>`, and its `data.tar.gz` holds the chats' old files. A 0.2 install that `setup.sh` moved into containers also has `<date>-move-to-containers`, with the 0.2 database.
 
 ## The containers
 

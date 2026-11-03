@@ -1,8 +1,7 @@
 import { createFxAgent, type FxAgent, type FxAgentTool, type FxCustomProviderModel, type FxProviderCredentials } from "libfx";
 import * as chatgpt from "libfx/chatgpt";
-import { local } from "libfx/durable-local";
+import type { Durability } from "libfx/durable-world";
 import * as grok from "libfx/grok";
-import { join } from "node:path";
 import { createModels, type Access } from "./models.ts";
 import { createSecrets, withoutSecrets } from "./secrets.ts";
 import { newId, type ProviderRecord, type Sql, type Store } from "./store.ts";
@@ -57,7 +56,8 @@ const contextField = (value: unknown) =>
 export type ProvidersOptions = {
   store: Store;
   secretKey: Buffer;
-  dataDir: string;
+  /** Where every agent keeps its sessions (sessions.ts). */
+  durability: Durability;
   vercelClientId?: string;
   fetch: Fetch;
   tools: FxAgentTool[];
@@ -65,7 +65,7 @@ export type ProvidersOptions = {
 
 // Every provider runs as its own libfx agent, because libfx gives an agent one provider and a session runs only on
 // the agent that started it. Keys and tokens live sealed in Postgres and reach libfx only through its callbacks.
-export async function createProviders({ store, secretKey, dataDir, vercelClientId, fetch, tools }: ProvidersOptions) {
+export async function createProviders({ store, secretKey, durability, vercelClientId, fetch, tools }: ProvidersOptions) {
   const secrets = createSecrets(store.sql, secretKey);
   const models = createModels(store.sql, fetch);
   const agents = new Map<string, { agent: FxAgent; models: Record<string, FxCustomProviderModel> | null }>();
@@ -138,7 +138,7 @@ export async function createProviders({ store, secretKey, dataDir, vercelClientI
         // A durable session's checkpoint opens with the agent's own options, and a custom provider needs a model
         // there. Sessions always pass their own, so this one never reaches a request.
         model: "fxbot-unset",
-        durability: local({ dir: join(dataDir, "sessions") }),
+        durability,
         tools,
         ...provider,
       } as Parameters<typeof createFxAgent>[0]);

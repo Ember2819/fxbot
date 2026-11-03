@@ -27,12 +27,12 @@ Nothing changes until the new release has downloaded, so a failed download leave
 
 ## Migrations
 
-Each release's database changes are numbered SQL files, which ship with the release and never change after it. A starting server runs the ones its database hasn't, in one transaction, under a lock: all of them or none.
+Each release's database changes are numbered SQL files, which ship with the release and never change after it. A starting server runs the ones its database hasn't, in one transaction, under a lock: all of them or none. The chats' tables are the exception: they belong to Workflow's Postgres World, which fxbot pins to one version, and its own setup migrates them when a release moves that version.
 
-They only move forward. Writing a way back for every change would double the work and rarely be tried, so fxbot takes a copy instead. Before any migration runs on a database in use, the server backs up the database and the chat files, whatever started it, and keeps the last five. In a release, `pg_dump` runs in the app's container, whose image carries Postgres 17's client. An older release refuses a database that a newer one migrated, so going back across a migration means restoring that copy.
+They only move forward. Writing a way back for every change would double the work and rarely be tried, so fxbot takes a copy instead. Before any migration runs on a database in use, the server backs up the database and the data folder, whatever started it, and keeps the last five. In a release, `pg_dump` runs in the app's container, whose image carries Postgres 17's client. An older release refuses a database that a newer one migrated, so going back across a migration means restoring that copy.
 
 ## Built from the tag
 
 A release's image is built by the release workflow from the commit its tag points at, with the packages in the lockfile. Compose names the exact version of each image, such as `0.3.0`, not `latest`. `setup.sh` and `fxbot update` take the compose file and the `fxbot` command from the release's tag.
 
-Chats live in libfx's session files, so a release that bumps libfx says so under **Before upgrading**.
+Chats are libfx's sessions, so a release that bumps libfx, or the Postgres World that keeps them, says so under **Before upgrading**.

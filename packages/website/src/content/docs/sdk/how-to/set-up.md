@@ -84,7 +84,7 @@ You need Node 22.18 or newer, git, and podman or docker.
 
    On the first start, `createFxbot` brings the empty database up to date and prints `fxbot migrated the database:`, with the migrations it ran. Then the script prints `[]`: there are no bots yet.
 
-The SDK keeps libfx's session files in `data/` and its backups in `backups/`, in the folder the app runs from. `dataDir` and `backupsDir` move them. Keep `.env`, `secret.key`, `data/`, `backups/`, and `node_modules/` out of git, and `fxbot/` too unless it's a submodule.
+The SDK keeps plugins' files in `data/` and its backups in `backups/`, in the folder the app runs from. Chats are in the database. `dataDir` and `backupsDir` move them. Keep `.env`, `secret.key`, `data/`, `backups/`, and `node_modules/` out of git, and `fxbot/` too unless it's a submodule.
 
 ## Type-check it
 

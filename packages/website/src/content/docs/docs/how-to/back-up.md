@@ -1,21 +1,21 @@
 ---
 title: "Back up fxbot"
-description: "fxbot backs itself up before a release's migrations run, into /var/lib/fxbot/backups, and keeps the last five. To keep a copy of your own, off the machine, back up three things: the database, the chat files, and the key."
+description: "fxbot backs itself up before a release's migrations run, into /var/lib/fxbot/backups, and keeps the last five. To keep a copy of your own, off the machine, back up three things: the database, the data folder, and the key."
 ---
 
-fxbot backs itself up before a release's migrations run, into `/var/lib/fxbot/backups`, and keeps the last five. To keep a copy of your own, off the machine, back up three things: the database, the chat files, and the key.
+fxbot backs itself up before a release's migrations run, into `/var/lib/fxbot/backups`, and keeps the last five. To keep a copy of your own, off the machine, back up three things: the database, which holds the chats, the data folder, and the key.
 
 These steps are for an install made by `setup.sh`. Run them in a folder only you can read, since the database holds every chat. They use podman. If `/opt/fxbot/.env` says `FXBOT_ENGINE=docker`, write `docker compose` in place of `podman compose`.
 
 ## Back up
 
-1. Stop the app, and leave its database running, so the database and the chat files match:
+1. Stop the app, and leave its database running, so the database and the data folder match:
 
    ```sh
    sudo podman compose --project-directory /opt/fxbot stop fxbot
    ```
 
-2. Copy the database, in pg_dump's custom format, and the chat files, into a folder of their own:
+2. Copy the database, in pg_dump's custom format, and the data folder, into a folder of their own:
 
    ```sh
    mkdir fxbot-backup
@@ -47,7 +47,7 @@ On a new machine, first install the same release with `setup.sh`, then put the k
 sudo install -o fxbot -g fxbot -m 400 fxbot-secret.key /etc/fxbot/secret.key
 ```
 
-Then restore the database and the chat files from the backup's folder, named by its full path, and start fxbot on them:
+Then restore the database and the data folder from the backup's folder, named by its full path, and start fxbot on them:
 
 ```sh
 sudo fxbot restore "$PWD/fxbot-backup"

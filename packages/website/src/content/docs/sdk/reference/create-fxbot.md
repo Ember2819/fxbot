@@ -35,7 +35,7 @@ To add the SDK to a project, see [Use the SDK in a project](/sdk/how-to/set-up/)
 | `databaseUrl` | `string` | | fxbot's Postgres. Every record lives there. Keys and tokens are stored only sealed. |
 | `secretKey` | `Buffer` or `string` | | The 32 bytes that seal keys and tokens: a `Buffer`, or the base64 text of the key file. A key of another length throws. |
 | `vercelClientId` | `string` | None | fxbot's Vercel OAuth app, for signing in with a Vercel account. Without it, a Vercel sign-in fails with 400. |
-| `dataDir` | `string` | `data` | Where libfx keeps each chat's session files, under `sessions/`. A relative path is taken from the working directory. |
+| `dataDir` | `string` | `data` | Plugins' files, under `plugins/`. Chats from before 0.4.0, under `sessions/`, move into the database on the first start, which renames the folder `sessions.moved`. A relative path is taken from the working directory. |
 | `backupsDir` | `string` | `backups` | Where a backup goes before migrations change a database in use. |
 | `version` | `string` | `0.0.0` | The running version, for `release()`. |
 | `releasesUrl` | `string` | None | Where the newest stable release is read, in the shape of GitHub's `releases/latest`. It is read at start and once a day. Without it, nothing is asked. |

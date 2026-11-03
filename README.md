@@ -21,7 +21,7 @@ A TypeScript monorepo with four npm workspaces under `packages/`, laid out after
 | `@fxbot/ui` | The PWA: Vite, React, and shadcn/ui, with the chat built from shadcn's AI Elements patterns, on `@fxbot/sdk/client`. |
 | `@fxbot/website` | The public site and its docs, static pages in `out/` built by `npm run build-site`: the home page in React and Tailwind, and the docs in Astro's [Starlight](https://starlight.astro.build), with search. `FXBOT_SITE_BASE` sets the path it is served under. |
 
-Records live in Postgres; libfx keeps each chat's session in files. No Next.js, and no Vercel AI SDK. The packages run as TypeScript source on Node 22.18 or newer, with no build step but the UI's and the site's.
+Records live in Postgres, and so do libfx's sessions, each chat's. No Next.js, and no Vercel AI SDK. The packages run as TypeScript source on Node 22.18 or newer, with no build step but the UI's and the site's.
 
 ## Phases
 
@@ -40,8 +40,8 @@ In order of execution priority. Checked phases are built. Each is marked **core*
 - [x] [Plugins](docs/_completed/phases/plugins.md) (core: the plugin API): plugins that change the app, with hooks, tools, data, and screens of their own; fxbot's first two, [chat rooms](plugins/chat-rooms/README.md) and [herdr](plugins/herdr/README.md), are in `plugins/`
 - [x] [One kind of plugin](docs/_completed/phases/one-kind-of-plugin.md) (core seam): one name and one list. A plugin carries any mix of code, MCP servers, and skills, and only the ones fxbot vets show until a switch in Settings
 - [x] [Agent computer](docs/_completed/phases/computer.md) (plugin, one others build on): a Linux computer for each bot, in the machine's own podman or docker, run rootless; the [computer](plugins/computer/README.md) and the [browser](plugins/browser/README.md), which needs it, are in `plugins/`
+- [x] [Streams](docs/_completed/phases/streams.md) (core): chats in the Postgres fxbot already runs, so an open chat costs nothing while idle and a long one is as quick to send to as a new one
 - [ ] [Computer v2](docs/phases/computer-v2.md) (plugin, with one core hook): a whole computer in one plugin: a desktop the owner watches and takes over, a shared terminal, a browser on the desktop, and the tools to drive them by pixels, accessibility trees, and text
-- [ ] [Streams](docs/phases/streams.md) (core): chats in the Postgres fxbot already runs, so an open chat costs nothing while idle and a long one is as quick to send to as a new one; a hidden page already closes its stream
 - [ ] [Permissions](docs/phases/permissions.md) (plugin, on a core hook): ask, auto, and yolo modes for tool calls
 - [ ] [Cross-bot messaging](docs/phases/cross-bot-messaging.md) (plugin): bots message each other
 - [ ] [Routines](docs/phases/routines.md) (plugin): saved tasks a bot runs on a schedule
@@ -74,7 +74,7 @@ curl -fsSL https://fxbot.sh/setup.sh | sudo bash -s -- v0.3.0
 fxbot runs as containers: the app, its database in pgvector's Postgres image, and the local embedder for memory search, from one compose file. `setup.sh` uses podman, or docker when only docker is installed. When neither is, it installs podman and Compose v2, on Debian 13 or Ubuntu 24.04 and newer; on older releases, install Docker from Docker's repository first. Then:
 - the `fxbot` user, and a key in `/etc/fxbot/secret.key` that only `fxbot` reads
 - `/opt/fxbot`: the release's `compose.yaml`, an `.env` with its version and a random database password, and the `fxbot` command, also at `/usr/local/bin/fxbot`
-- `/etc/fxbot/fxbot.env` for the app's settings, with chats in `/var/lib/fxbot/data`, backups in `/var/lib/fxbot/backups`, and the app's update requests in `/var/lib/fxbot/control`
+- `/etc/fxbot/fxbot.env` for the app's settings, with plugins' files in `/var/lib/fxbot/data`, backups in `/var/lib/fxbot/backups`, and the app's update requests in `/var/lib/fxbot/control`
 - `fxbot.service`, which starts the containers at boot, on 127.0.0.1:8787, and `fxbot-control.path`, which hands Settings' updates to the `fxbot` command
 
 Running it again finishes an install that stopped, and leaves a working one alone. It stops, and says why, if another program holds port 8787. A checkout's `npm run dev` stays clear of it ([Run from a checkout](#run-from-a-checkout)), so both can run on one machine.
@@ -85,7 +85,7 @@ Running it again finishes an install that stopped, and leaves a working one alon
 | `sudo fxbot logs [fxbot \| db]` | Their logs |
 | `sudo fxbot update [version]` | Moves to the newest release, or the one named. See [Update](#update) |
 | `sudo fxbot up` and `down` | Starts and stops the containers, as `fxbot.service` does |
-| `sudo fxbot restore <folder>` | Puts a backup in place of the database and the chat files |
+| `sudo fxbot restore <folder>` | Puts a backup in place of the database, and unpacks its data folder |
 | `sudo fxbot rotate-key` | Seals every stored key and token again under a new key, and keeps the old key as `secret.key.old` |
 | `sudo fxbot embedder cpu\|gpu\|off` | Runs memory search's local embedder on the CPU, on a GPU after a trial run reaches one, or not at all |
 
@@ -132,7 +132,7 @@ When a newer release is out, Settings shows its notes and an **Update** button. 
 sudo fxbot update            # the newest release, or name one: sudo fxbot update 0.3.1
 ```
 
-- **Migrations.** Each release's database changes are numbered files in `packages/sdk/src/migrations/`. A starting server runs the ones the database hasn't, all or none. It first backs up the database and the chat files into `FXBOT_BACKUPS`, and keeps the last five.
+- **Migrations.** Each release's database changes are numbered files in `packages/sdk/src/migrations/`. A starting server runs the ones the database hasn't, all or none. It first backs up the database and `FXBOT_DATA` into `FXBOT_BACKUPS`, and keeps the last five. The tables that hold the chats are Workflow's Postgres World's, in schemas of their own, and its own setup migrates them, after the same backup.
 - **A release that doesn't start** is replaced by the one before, on the backup taken before its migrations if it ran any. Settings shows why.
 - **Prereleases,** such as `0.3.0-rc.1`, install only by name.
 - **Going back.** After a migration, the older release refuses the database. Restore the backup taken before it, then name the older version:
@@ -164,12 +164,12 @@ The server reads these from the environment, or from an uncommitted `.env` in th
 | `FXBOT_HOST` | The address the API listens on. Default 127.0.0.1. fxbot's image sets 0.0.0.0, and compose publishes the port on the machine's 127.0.0.1 |
 | `FXBOT_SECRET_KEY_FILE` | Required. A file outside the repo with 32 random bytes in base64. It seals every key and token fxbot stores |
 | `FXBOT_VERCEL_CLIENT_ID` | Optional. fxbot's own Vercel OAuth app, for signing in with a Vercel account |
-| `FXBOT_DATA` | Where libfx keeps each chat's session files. Default `./data` |
+| `FXBOT_DATA` | Plugins' files. Chats from before 0.4.0, in its `sessions/`, move into the database on the first start, which renames the folder `sessions.moved`. Default `./data` |
 | `FXBOT_CLIENT_METADATA_URL` | Optional. The project's published OAuth client document, for MCP servers that sign in with one. Without it, fxbot registers itself with each server |
 | `FXBOT_MCP_REGISTRY` | Optional. The MCP registry that fxbot mirrors hourly for search, and that registry entries come from. Default GitHub's, `https://api.mcp.github.com` |
 | `FXBOT_MCP_EVERYTHING` | Optional. The registry that Search everything asks, once per search. Default the official one, `https://registry.modelcontextprotocol.io` |
 | `FXBOT_LISTS_URL` | Optional. The site that publishes fxbot's own lists of the plugins it vets: MCP servers, skills, and packages. fxbot reads its `mcp-registry.json`, `skills-registry.json`, and `plugins-registry.json` hourly, and keeps the lists the release shipped with until a read succeeds. Default fxbot's site, `https://fxbot.sh` |
-| `FXBOT_BACKUPS` | Where the database and chat files are backed up before migrations run. Default `./backups`. The backup uses `pg_dump`, which must be Postgres 17's |
+| `FXBOT_BACKUPS` | Where the database and `FXBOT_DATA` are backed up before migrations run. Default `./backups`. The backup uses `pg_dump`, which must be Postgres 17's |
 | `FXBOT_CONTROL` | Set by a release install's compose file: the folder where the app asks the machine for updates. Without it, Settings doesn't update |
 | `FXBOT_EMBED_URL` | Optional. The local embedder for memory search, an OpenAI-style address such as `http://127.0.0.1:8081/v1` from `deploy/compose.dev.yaml`. A release install's compose file sets it. Without it, there is no local embedder |
 | `FXBOT_PLUGIN_DIRS` | Optional, for writing a plugin in a checkout. Plugin folders, separated by `:`, that fxbot adds on first sight and loads at start, unpinned. It loads one again a moment after its files change |

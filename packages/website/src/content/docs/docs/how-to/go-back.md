@@ -25,14 +25,16 @@ The older release refuses a database that a newer one migrated. Restore the back
    sudo ls /var/lib/fxbot/backups
    ```
 
-2. Restore the database and the chat files from that folder, then name the older version and start it:
+2. Restore the database and the data folder from that folder, then name the older version and start it:
 
    ```sh
    sudo fxbot restore /var/lib/fxbot/backups/<date>-before-<migration>
    sudo sed -i 's/^FXBOT_VERSION=.*/FXBOT_VERSION=0.3.0/' /opt/fxbot/.env && sudo fxbot up
    ```
 
-   `fxbot restore` stops the app first, and puts the backup in place of the database and the chat files.
+   `fxbot restore` stops the app first, puts the backup in place of the database, and unpacks its data folder.
+
+   Going back from 0.4.0 or later to 0.3, restore the backup named `<date>-before-world-postgres-<version>`. It was taken before 0.4.0 moved the chats into the database, and holds their old files.
 
 Anything said or saved after the backup is lost with the restore.
 

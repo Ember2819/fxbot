@@ -39,10 +39,10 @@ export async function migrate(sql: postgres.Sql, options: MigrateOptions) {
   });
 }
 
-// The database as pg_dump's custom format, and libfx's session files, in a folder of their own that only fxbot's user
+// The database as pg_dump's custom format, and FXBOT_DATA's files, in a folder of their own that only fxbot's user
 // reads. The newest five are kept. Restore with pg_restore --clean --if-exists, and by unpacking the tarball.
-async function backup({ databaseUrl, dataDir, backupsDir }: MigrateOptions, first: string) {
-  const folder = join(backupsDir, `${new Date().toISOString().replace(/[:.]/g, "-")}-before-${first}`);
+export async function backup({ databaseUrl, dataDir, backupsDir }: MigrateOptions, before: string) {
+  const folder = join(backupsDir, `${new Date().toISOString().replace(/[:.]/g, "-")}-before-${before}`);
   try {
     await mkdir(folder, { recursive: true, mode: 0o700 });
     await run("pg_dump", ["--format=custom", `--file=${join(folder, "database.dump")}`, databaseUrl]);

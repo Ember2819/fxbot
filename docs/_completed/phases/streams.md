@@ -1,12 +1,12 @@
 # Streams: chats in Postgres
 
-An open chat should cost the server nothing while nothing happens, and a long chat should be as quick to send to as a new one. Today neither is true: libfx's default store, `local()`, keeps each chat as files and re-reads them. This phase moves libfx's sessions into the Postgres fxbot already runs, through libfx's `world()` and Workflow's Postgres World. The first step, closing a chat page's stream while the page is hidden, is already built.
+An open chat should cost the server nothing while nothing happens, and a long chat should be as quick to send to as a new one. Today neither is true: libfx's default store, `local()`, keeps each chat as files and re-reads them. This phase moved libfx's sessions into the Postgres fxbot already runs, through libfx's `world()` and Workflow's Postgres World, and moves each install's existing chats there on its first start. A chat page also closes its stream while the page is hidden.
 
-Status: research, prototypes, and plan written on 2026-11-03. The hidden-page step is built (in 0.4.0, commit ab2b539). The move to Postgres is planned, not built.
+Status: built in 0.4.0, on 2026-11-03. Research, prototypes, and plan came first the same day. The owner asked to build it then, before the libfx maintainers answered.
 
 ## 0. Core or plugin
 
-**Core** ([Core or plugin](../../CONVENTIONS.md#core-or-plugin)). Every bot needs a chat that lasts, and where libfx keeps it is part of what fxbot needs to run. No plugin can change the store under the core's own agents. The plugin API doesn't change: a plugin that reads a chat with `fx.chats.stream`, as chat rooms does, gets the new store without a change.
+**Core** ([Core or plugin](../../../CONVENTIONS.md#core-or-plugin)). Every bot needs a chat that lasts, and where libfx keeps it is part of what fxbot needs to run. No plugin can change the store under the core's own agents. The plugin API doesn't change: a plugin that reads a chat with `fx.chats.stream`, as chat rooms does, gets the new store without a change.
 
 ## 1. Research
 
@@ -79,6 +79,17 @@ There is no export or import tool, so a prototype copied sessions through the Wo
 - The next prompt ran on Postgres and sent the model the whole conversation: 25 messages.
 - The stream went on from the old cursors, so a page that held cursor 6,024 would carry on.
 
+### What the build found
+
+- **world-postgres refuses an old run id.** `events.create` checks that a `run_created`'s run id was made within the last 24 hours (`validateUlidTimestamp` in `@workflow/world`, for Workflow's delayed starts), and nothing configures it. The prototype moved chats a few minutes old. A copy of real chats, 3 days old, was refused. A chat must keep its id, which fxbot's bots and plugins' rows hold. The check runs before `create`'s first `await`, and reads the clock with `new Date()`. So for that synchronous step alone, the move sets the clock to the time the chat began, and nothing else can run meanwhile. An import path in Workflow would be better, and is asked upstream.
+- **libfx reads a session's log before it stores an image.** A first image prompt on a chat that looks 3 days old, in a fresh agent, works. It was checked with the process's clock moved ahead. So libfx's `run_created` for a session it hasn't seen, the same refusal, doesn't happen in use.
+- **world-local reads a stream again for each page.** At pages of 1,000 lines, reading a 25,000-line chat took 16.6 s. At pages of 100,000 it took 1.5 s. The move reads pages of 50,000, and writes them 1,000 at a time.
+- **A write to the page was answered.** fxbot's server sent `index.html`, with a 200, for any path outside `/api/`, whatever the method. If the queue ever fell back to HTTP, its delivery would have been taken as done. Writes outside `/api/` now get 405.
+- **Each start adds a line to every bot's chat.** That's the `idle` answer to the resume fxbot sends each session at startup. It did the same on `local()`.
+- **A killed server leaves its delivery's job locked.** world-postgres releases a dead worker's job after 4 hours, unless `jobLockStaleSeconds` is set. The job is then delivered again and does nothing, since fxbot's resume at the next start already ran the turn. That was checked by releasing one with graphile-worker's `force_unlock_workers`.
+- **A queued message for a removed provider fails for days.** Its agent is gone, so the queue retries it 73 times over about 6 days, with an error in the log each time. On `local()` the queue was in memory, and such a message went at the next restart. fxbot refuses to remove a provider that bots use, so it takes a message for an old session queued just as its provider goes.
+- fxbot has no API to cancel a turn, so the plan's cancel check had nothing to call.
+
 ### Options weighed
 
 - **`world()` on world-postgres**, the plan. Everything in the database fxbot already backs up, and the references' path for a self-hosted server. Two of its problems (the queue's poll and startup recovery) are settings, measured above. The `NOTIFY` per line and the weight remain.
@@ -99,100 +110,100 @@ There is no export or import tool, so a prototype copied sessions through the Wo
 
 ### The store (`packages/sdk`)
 
-- **The dependency.** `@workflow/world-postgres`, pinned to the exact version M1 checks: 5.1.0 unless a question below changes it. Nothing else is added: libfx already has `world()`.
+- **The dependencies.** `@workflow/world-postgres` 5.1.0 and `@workflow/world-local` 5.2.0, pinned exactly. The second is the one world-postgres brings, and only the move reads with it, so it adds nothing to install. libfx already has `world()`.
 - **`sessions.ts`, new.** It creates the one World for the process and the durability every agent uses:
   ```ts
-  // libfx's sessions, in fxbot's Postgres. The World's start() isn't called: it would queue every session again
-  // (vercel-labs/fx#1253), and the queue starts on its first message. Open turns resume from index.ts instead.
-  const sessions = createWorld({ connectionString: databaseUrl, jobPrefix: "fxbot_", namespace: "fxbot",
+  const sessions = createWorld({ connectionString: options.databaseUrl, jobPrefix: "fxbot_", namespace: "fxbot",
     queueConcurrency: 4, pollInterval: 5000, maxPoolSize: 6, applicationManagedShutdown: true });
-  export const durability = world(sessions, { name: "postgres", store: "fxbot" });
+  return { durability: world(sessions, { name: "postgres", store: "fxbot" }), close: async () => sessions.close?.() };
   ```
-  Before creating it, `sessions.ts` compares the package's migration files with the rows in `workflow_drizzle.workflow_migrations`. When the package has more, it takes the backup fxbot takes before its own migrations, then runs the package's `bootstrap` as a child process, with `WORKFLOW_POSTGRES_URL` in its environment, not its arguments. `close()` closes the World after the agents.
+  The World's `start()` is never called: it would queue every session again, for an agent named `default` (vercel-labs/fx#1253). The queue starts on its first message, and `index.ts` resumes open turns itself.
+- **Its setup.** The `workflow` schema's comment names the world-postgres version that set it up. When it isn't the installed one, `sessions.ts` takes the backup fxbot takes before its own migrations, if the database has a bot. Then it runs the package's `bootstrap` as a child process, from the package's own folder, with `WORKFLOW_POSTGRES_URL` in its environment. The child keeps `.env` out of it, and `bootstrap` ends its own process when it's done.
 - **`providers.ts`.** Each provider's agent takes that durability instead of `local({ dir })`. Agent names stay `p-<provider id>`.
-- **`index.ts`.** It creates the store before the providers, and closes it last. The startup loop that resumes open turns stays as it is. It's also what first registers libfx's handler.
-- **What it adds to the owner's waits:** a prompt is accepted about 1 s sooner on a long chat. Each streamed line costs an insert, batched, plus a `NOTIFY` and a read of that line, a few milliseconds on a local database. Loading a chat reads its rows in one query instead of its files.
+- **`index.ts`.** It opens the store after fxbot's migrations and before the providers, and closes it after the agents and the replies' saves.
+- **`migrate.ts`.** Exports `backup()`, which the store's setup uses too.
+- **The server.** A write outside `/api/` gets 405 instead of the page.
 
 ### The move (`packages/sdk/src/move-sessions.ts`, new)
 
-At startup, before the agents start, if `FXBOT_DATA/sessions/runs` exists:
-- for each run, in order: its events through `events.list` and `events.create`, then each stream through `getChunks` and `writeMulti`
-- check that each event lands at the slot it had, and that each stream has as many chunks as the files
-- log one line per run, and one at the end with the count and the time
+At startup, after the World's setup and before the agents, if `FXBOT_DATA/sessions/runs` exists:
+- Each run moves its streams, through world-local's `getChunks` and world-postgres's `writeMulti`, then its events, through `events.list` and `events.create`.
+- Each event must land at the slot it had, and each stream must hold as many lines as its files. A run whose events are all in the database is skipped. Any other run is first removed by run id from every World table that has one, so a move a stopped start left partway starts that run again cleanly.
+- `run_created` goes through the clock step above.
+- Once every run is in, the folder is renamed `sessions.moved`, or `sessions.moved-<date>` if that's taken, and one line logs the count, the lines, and the time.
 
-A run already fully in Postgres is skipped. A run found partly moved (fewer events than its files) is deleted by run id from the World's tables and moved again. Once every run is in, the folder is renamed `sessions.moved`, and the server starts. The owner deletes it once they're sure: the README says how. A run that won't move stops the start, with the run's id and the error. The old folder is untouched, so the earlier release still runs on its backup.
-
-It reads the old files with `@workflow/world-local`, pinned to the version world-postgres brings (5.2.0), so it adds nothing to install. In the prototype, 5.2.0 read files that libfx's bundled 5.1.1 wrote. The move is the one place that reads them.
+A run that can't be moved stops the start, with its id and the error. Its files stay untouched. On a release install, the update then goes back to the release before, on the backup taken before the setup.
 
 ### Backups and settings
 
-- The backup before migrations is `pg_dump`, which now includes the sessions. `data.tar.gz` holds only plugins' files, so it shrinks.
-- `FXBOT_DATA` keeps plugins' files. The README's variables table stops saying it holds chats.
-- `CHANGELOG.md`'s **Before upgrading** says that chats move into the database on the first start, how long that took in M3, where the old files go, and how to go back.
+- The backup is `pg_dump`, which now holds the chats, and `data.tar.gz` of `FXBOT_DATA`, which holds plugins' files, and `sessions.moved` until the owner deletes it.
+- `fxbot restore` unpacks `data.tar.gz` over the data folder, so going back to 0.3 on the backup from before the move brings `sessions/` back. 0.3 reads it as before. Updating again moves it again.
+- `CHANGELOG.md`'s **Before upgrading**, the README, and the docs' pages on backups, going back, the install's layout, and the SDK's `dataDir` say where chats live now.
 
 ### Not in this phase
 
-- Reading a long chat from its newest turns instead of from the start, as pi-durable does. That belongs with [past sessions](past-sessions.md) and [context management](context-management.md).
-- Deleting old sessions. Neither store does today.
+- Reading a long chat from its newest turns instead of from the start, as pi-durable does. That belongs with [past sessions](../../phases/past-sessions.md) and [context management](../../phases/context-management.md).
+- Deleting old sessions. Neither store does.
 - Fewer lines per reply. That's libfx's choice, and it's asked upstream.
 
 ### Size
 
-About 330 lines:
+About 260 lines:
 
 | Part | Lines |
 | --- | --- |
-| `sessions.ts`: the World, bootstrap, close | about 60 |
-| `providers.ts` and `index.ts` | about 15 changed |
-| `move-sessions.ts` | about 120 |
-| README, CHANGELOG, docs pages | about 60 |
-| The hidden page (built) | 24 |
+| `sessions.ts`: the World, its setup, close | 55 |
+| `move-sessions.ts` | 102 |
+| `index.ts`, `providers.ts`, `migrate.ts`, `store.ts`, and the server | 22 added, 14 removed |
+| README, CHANGELOG, docs pages | 39 added, 30 removed |
+| The hidden page | 24 |
 
 ## 4. Checklist
 
-Checks run on a disposable Postgres 17 from `deploy/compose.dev.yaml`, under another `COMPOSE_PROJECT_NAME`, with the mock model writing 500 lines a turn, the check server on another port, and Playwright's Chromium. Measure each process's own CPU over 20 s or more, and Postgres's from its container's cgroup.
+Checks ran on a disposable Postgres 17 from `deploy/compose.dev.yaml`, under another `COMPOSE_PROJECT_NAME`, with a mock model, the check server on another port, and Playwright's Chromium. They ran from a git worktree, so the owner's `npm run dev` never restarted on half-built code. Each process's CPU was measured from `/proc`, and Postgres's from its container's cgroup.
 
-**M0. The hidden page** (built)
-- [x] Hiding the page closes its stream; the server's CPU drops to its idle cost.
-- [x] Showing it reopens the stream from the last cursor; a reply written while hidden shows once, and so does a turn hidden partway through.
+**M0. The hidden page**
+- [x] Hiding the page closes its stream; the server went from 3.4% of a core to 0% on a 6,024-line chat.
+- [x] Showing it reopens the stream from the last cursor. A reply written while hidden shows once, and so does a turn hidden partway through.
 
 **M1. New chats on Postgres**
-- [ ] A fresh install bootstraps the World's schemas. A second start runs no bootstrap and takes no backup.
-- [ ] A new bot's first message, a reply, a steer sent while a reply runs, a cancel, and images all work. A tool call, the library, and memories work too.
-- [ ] A chat-rooms round runs, and its replies read through `fx.chats.stream`.
-- [ ] The runner starts in the server, which listens on `FXBOT_PORT`, with no `PORT` set: messages arrive in-process, and nothing posts to `/.well-known/workflow/`.
-- [ ] After three restarts, `graphile_worker.jobs` holds no job with an error.
-- [ ] A turn cut off by killing the server resumes at the next start.
-- [ ] On SIGTERM, the server closes its agents and then the World, and graphile-worker doesn't end the process first.
+- [x] A fresh install sets up the World's schemas, and starts in about 1 s. A second start runs no setup and takes no backup.
+- [x] A new bot's first message, a reply, an image, `library_search`, `memory_save`, and `memory_search` work. A message sent while a reply runs waits its turn, and both finish in order. The stream's cursors run from 1 with no gap. There's no cancel to check: see above.
+- [x] A chat-rooms round runs, and both bots' replies arrive through `fx.chats.stream`.
+- [x] The runner starts in the server with no `PORT` set. No queue job ever had an error, and the page now answers a write outside `/api/` with 405, so no delivery went over HTTP.
+- [x] Three restarts add no job, and no job has an error.
+- [x] A turn cut off by `SIGKILL` ends after the next start.
+- [x] On SIGTERM during a turn, the server exits in 1.6 s with nothing in its log, and the turn ends.
 
-**M2. Cost**
-- [ ] Idle with no page open: the server's and Postgres's CPU, and transactions a second, over 60 s.
-- [ ] On a 25,000-line chat: two visible idle pages cost the same as none; a prompt is accepted in under 100 ms; the page loads the chat in under 1 s.
-- [ ] Connections to the database, from fxbot's client and the World together.
-- [ ] Bytes on disk for that chat, against `local()`.
-- [ ] The image's size, against 0.4.0.
+**M2. Cost**, measured through fxbot, on the same 25,100-line chat in each store
+- [x] Idle with no page open, over 60 s: 0.17% of a core in the server and 0.21% in Postgres, at 1 transaction a second. `local()`: 0.07% in the server.
+- [x] Two visible idle pages: 0.02% in the server and 0.13% in Postgres, no more than none. `local()`: 27.5%.
+- [x] A message is accepted after 21–33 ms. `local()`: 1,158–1,211 ms.
+- [x] The page shows the whole chat 0.86–0.91 s after it starts loading. `local()`: 2.8–3.0 s.
+- [x] 11 connections to the database, from fxbot's client and the World together. `local()`: 3.
+- [x] The chat's rows: 5.5 MB of stream and 1.3 MB of events and steps, in a 9.2 MB stream table with its index. `local()`: 103 MB on disk, in 25,799 files.
+- [x] The image: 399 MB, against 340 MB built from the same commit without this phase. world-postgres's packages add 59 MB.
 
 **M3. The move**
-- [ ] A copy of a real `FXBOT_DATA/sessions`, with several bots, a provider switch, chat-rooms sessions, and images, moves. Each bot's next reply sends the model its whole conversation, and the page carries on without doubled lines.
-- [ ] Killed partway through, the next start finishes the move, with no run doubled.
-- [ ] A run that can't be read stops the start with its id, and leaves the folder in place.
-- [ ] The time for the copy, in lines a second, is noted for the changelog.
+- [x] Chats made on `local()` by the old code, with a 25,000-line chat, an image, a provider switch, and a chat room, moved in 3.9 s, about 6,400 lines a second. Every line came back the same, with the same cursor. Each bot's next reply sent the model its whole conversation: 54 messages, 3 with the image, and 2 since the switch. The room's bots answered again, from their plugin sessions. The open page showed each reply once.
+- [x] Killed with 5,000 lines in, the next start finished the move. Every run's events and lines matched the files, in order and byte for byte, with none doubled.
+- [x] A run with a damaged event file stopped the start, named the run, and left `sessions/` in place. With the file repaired, the next start moved the rest, and everything matched.
+- [x] A copy of the owner's real chats, 3 days old, moved: 5 chats and 5,398 lines in 1.9 s, matching the files byte for byte. One of them, prompted through the mock model in a fresh agent, sent the model its earlier messages. Nothing reached the owner's providers.
 
 **M4. Docs and checks**
-- [ ] README (variables, backups, chats), CHANGELOG with **Before upgrading**, and the docs' pages that mention where chats live.
-- [ ] `npm run typecheck`, `npm run build`, `npm run build-site`, `podman build .`, and `git diff --check` pass.
+- [x] README, CHANGELOG with **Before upgrading**, and the docs' pages on backups, going back, the install's layout, releases, and the SDK.
+- [x] `npm run typecheck`, `npm run build`, `npm run build-site`, `podman build .`, and `git diff --check` pass. The image, run on a fresh database, sets up the store and answers a message.
 
 **The human runs these:**
-- Update their own install, and see the move's log lines and time.
+- Update their own install, and see the move's log line and time.
 - Leave the app open on a long chat for an hour, and check `fxbot` stays near idle in `top`.
 
 ## 5. Open questions
 
-Each has a default that the build follows unless the owner changes it.
-
-1. **Ask libfx first.** *Default:* file the issue on vercel-labs/fx, now leaning to `world()` on Postgres, and start building after the maintainers answer or in a week. The questions: is world-postgres the store they'd recommend for a Node server, and which version do they test; recovery and fx#1253; registering the handler when an agent is made; fewer `NOTIFY`s or fewer lines per reply; and whether replaying events is a supported way to move sessions.
-2. **The version.** *Default:* world-postgres 5.1.0, pinned exactly, since it's what the prototypes ran. 5.0.4 matches libfx's own build.
-3. **The World's schema outside the numbered migrations.** *Default:* yes. The World's tables are the package's, and its `bootstrap` migrates them, as graphile-worker migrates its own. fxbot's numbered migrations stay fxbot's tables. A backup is taken before bootstrap runs, the same as before fxbot's own.
-4. **Which release.** *Default:* the one after 0.4.0. A new dependency and a move of every chat deserve a release of their own, and 0.4.0 already ships plugins and the computer.
-5. **The old files.** *Default:* kept as `sessions.moved` until the owner deletes them. The release after this one could delete them.
-6. **The queue.** *Default:* 4 workers, polling every 5 s. Turns don't wait on the poll. Only a backstop after a crash does.
+Answered while building:
+1. **Ask libfx first.** The owner asked to build it now. The issue for vercel-labs/fx still asks the maintainers the open points: the store they'd recommend for a Node server, and the version they test; recovery and #1253; registering the handler when an agent is made; fewer `NOTIFY`s or fewer lines per reply; and moving sessions, now with the 24-hour check.
+2. **The version.** world-postgres 5.1.0, pinned exactly, as checked. 5.0.4 matches libfx's own build.
+3. **The World's schema outside the numbered migrations.** Yes. The World's tables are the package's, and its `bootstrap` migrates them, after a backup, as graphile-worker migrates its own.
+4. **Which release.** 0.4.0, at the owner's word.
+5. **The old files.** Kept as `sessions.moved` until the owner deletes them. A later release could delete them.
+6. **The queue.** 4 workers, polling every 5 s.

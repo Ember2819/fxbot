@@ -9,6 +9,7 @@ import { createPlugins } from "./plugins.ts";
 import { createProviders } from "./providers.ts";
 import { createRegistry } from "./registry.ts";
 import { createReleases } from "./releases.ts";
+import { openSessions } from "./sessions.ts";
 import { readKey } from "./secrets.ts";
 import { createSkills } from "./skills.ts";
 import { createStore, isId, type StoredProfile } from "./store.ts";
@@ -27,7 +28,7 @@ export type FxbotOptions = {
   secretKey: Buffer | string;
   /** fxbot's Vercel OAuth app, for signing in with a Vercel account. */
   vercelClientId?: string;
-  /** libfx's sessions. Default `data`. */
+  /** Plugins' files, and libfx's sessions from before 0.4.0, which move into Postgres on the first start. Default `data`. */
   dataDir?: string;
   /** Where a backup goes before migrations run: the database and `dataDir`. Default `backups`. */
   backupsDir?: string;
@@ -86,12 +87,15 @@ function fields(input: Partial<Fields>, create: boolean): Partial<Fields> {
   return out;
 }
 
-// Postgres for the records, one libfx agent per provider over a shared sessions directory, and a durable chat with
-// each bot. Turns a stopped process left open run again at once.
+// Postgres for the records and libfx's sessions, one libfx agent per provider, and a durable chat with each bot. Turns a stopped process left open run again at once.
 export async function createFxbot(options: FxbotOptions) {
   const { databaseUrl, secretKey, vercelClientId, dataDir = "data", backupsDir = "backups", version = "0.0.0", fetch = globalThis.fetch } = options;
   const key = typeof secretKey === "string" ? readKey(secretKey) : secretKey;
   const store = await createStore({ databaseUrl, dataDir, backupsDir });
+  const sessions = await openSessions(store.sql, { databaseUrl, dataDir, backupsDir }).catch(async (error) => {
+    await store.close();
+    throw error;
+  });
   // How many turns each bot has running in this process, for `busy`.
   const running = new Map<string, number>();
   const count = (id: string, by: number) => running.set(id, (running.get(id) ?? 0) + by);
@@ -190,7 +194,7 @@ export async function createFxbot(options: FxbotOptions) {
   await packages.start();
   const toolsNow = async () =>
     [history.tool, ...memories.tools, ...library.tools, ...(skills.any() ? [skills.tool] : []), ...(await mcp.tools()), ...packages.tools()].map(packages.wrap);
-  const providers = await createProviders({ store, secretKey: key, dataDir, vercelClientId, fetch, tools: await toolsNow() });
+  const providers = await createProviders({ store, secretKey: key, durability: sessions.durability, vercelClientId, fetch, tools: await toolsNow() });
   // Vectors that rows lack, from where Settings says, in the background.
   embeddings.nudge();
   let retooling = Promise.resolve();
@@ -599,6 +603,7 @@ export async function createFxbot(options: FxbotOptions) {
       await mcp.close();
       await providers.close();
       await Promise.all(saving);
+      await sessions.close();
       await store.close();
     },
   };

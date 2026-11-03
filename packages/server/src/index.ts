@@ -293,7 +293,10 @@ const server = createServer(async (req, res) => {
     if (url.pathname === "/api" || url.pathname.startsWith("/api/")) await api(req, res, url);
     // A loopback redirect from an MCP sign-in, when the browser runs on this machine.
     else if (url.pathname === "/callback" && req.method === "GET") await signedIn(res, url.searchParams);
-    else page(res, url.pathname);
+    // Only reads get the page, so a write elsewhere, such as the sessions queue's delivery over HTTP if it ever fell back
+    // to one, is refused instead of answered and taken as done.
+    else if (req.method === "GET" || req.method === "HEAD") page(res, url.pathname);
+    else json(res, 405, { error: "method not allowed" });
   } catch (error) {
     const status = (error as { status?: number }).status ?? 500;
     if (status === 500) console.error(error);

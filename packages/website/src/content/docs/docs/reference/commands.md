@@ -38,7 +38,7 @@ The command for an install made by `setup.sh`: `/opt/fxbot/fxbot`, linked as `/u
 | `sudo fxbot up` | Starts the containers, and waits up to 5 minutes until the app is healthy. The embedder may still be downloading its model. `fxbot.service` runs it at boot. |
 | `sudo fxbot down` | Stops and removes the containers. The database's volume stays. |
 | `sudo fxbot apply` | Carries out the app's requests in `/var/lib/fxbot/control/requests`. `fxbot-control.service` runs it. |
-| `sudo fxbot restore <folder>` | Puts a backup in place of the database and the chat files. See below. |
+| `sudo fxbot restore <folder>` | Puts a backup in place of the database, and unpacks its data folder. See below. |
 | `sudo fxbot rotate-key` | Seals every stored secret again under a new key. See below. |
 | `sudo fxbot embedder cpu\|gpu\|off` | Runs memory search's local embedder on the CPU, on a GPU, or not at all. See below. |
 
