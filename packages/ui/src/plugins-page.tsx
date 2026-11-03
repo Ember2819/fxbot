@@ -581,29 +581,30 @@ function SignIn({ addon, onClose }: { addon: McpPlugin; onClose: () => void }) {
 }
 
 // A bot's settings list the plugins that are on: those for every bot, and a switch for each one chosen bot by bot. A
-// package's servers follow the package, so they aren't listed.
+// package's servers follow the package, so they aren't listed. A plugin that reaches the bot while one it needs
+// doesn't says so.
 export function BotPlugins({ profileId }: { profileId: string }) {
-  const [addons, setAddons] = useState<Plugin[]>([]);
+  const [all, setAll] = useState<Plugin[]>([]);
   const [error, setError] = useState("");
-  useEffect(
-    () =>
-      void client.plugins.list().then((all) => {
-        const owned = new Set(all.flatMap((a) => (a.kind === "package" ? a.servers : [])));
-        setAddons(all.filter((a) => a.enabled && !owned.has(a.id)));
-      }, () => {}),
-    [],
-  );
+  useEffect(() => void client.plugins.list().then(setAll, () => {}), []);
+  const owned = new Set(all.flatMap((a) => (a.kind === "package" ? a.servers : [])));
+  const addons = all.filter((a) => a.enabled && !owned.has(a.id));
   if (!addons.length) return null;
+  const reaches = (addon?: Plugin) => Boolean(addon?.enabled && (addon.bots === "all" || addon.on.includes(profileId)));
+  const missing = (addon: Plugin) => (addon.kind === "package" && reaches(addon) ? addon.needs.filter((name) => !reaches(all.find((a) => a.name === name))) : []);
   const set = (addon: Plugin, on: boolean) =>
-    client.plugins.forBot(profileId, addon.id, on).then((next) => setAddons((all) => all.map((a) => (a.id === next.id ? next : a))), (e: Error) => setError(e.message));
+    client.plugins.forBot(profileId, addon.id, on).then((next) => setAll((list) => list.map((a) => (a.id === next.id ? next : a))), (e: Error) => setError(e.message));
   return (
     <fieldset className="grid gap-2">
       <legend className="mb-1.5 text-sm font-medium">Plugins</legend>
       {addons.map((addon) => (
-        <label key={addon.id} className="flex items-center justify-between gap-3 text-sm">
-          {addon.name}
-          {addon.bots === "all" ? <span className="text-muted-foreground">All bots</span> : <Switch checked={addon.on.includes(profileId)} onCheckedChange={(on) => set(addon, on)} />}
-        </label>
+        <div key={addon.id} className="grid gap-0.5">
+          <label className="flex items-center justify-between gap-3 text-sm">
+            {addon.name}
+            {addon.bots === "all" ? <span className="text-muted-foreground">All bots</span> : <Switch checked={addon.on.includes(profileId)} onCheckedChange={(on) => set(addon, on)} />}
+          </label>
+          {missing(addon).length > 0 && <p className="text-xs text-muted-foreground">Needs {missing(addon).join(" and ")} on this bot</p>}
+        </div>
       ))}
       {error && <p className="text-sm text-destructive">{error}</p>}
     </fieldset>

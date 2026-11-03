@@ -1,5 +1,5 @@
 import type { Sql } from "postgres";
-import type { Profile, Upload } from "./types.ts";
+import type { LibraryItem, Profile, Upload } from "./types.ts";
 
 // What a plugin's server code gets. A plugin's `server` module exports one function, which fxbot calls with this API
 // when the plugin loads, and which may return a cleanup for when it unloads. Plugin authors import these types from
@@ -21,6 +21,8 @@ export type HookEvents = {
   "turn.end": { bot: string; session: string; messageId: string; text: string; reply: string; error?: string; from?: string };
   /** The plugin's settings changed. */
   settings: { settings: Record<string, string> };
+  /** A plugin that needs this one was added, updated, or removed: the ones that need it now. */
+  dependents: { dependents: Dependent[] };
 };
 export type HookAnswers = { message: { handled: true }; "tool.before": { block: string } };
 export type Hook<E extends keyof HookEvents> = (event: HookEvents[E]) => unknown;
@@ -34,6 +36,9 @@ export type PluginTool = {
   idempotent: boolean;
   execute: (input: any, call: { bot: string; session: string; signal: AbortSignal }) => unknown;
 };
+
+// A plugin that needs this one, with what it asked of it: its block under `needs` in its plugin.json.
+export type Dependent = { name: string; version: string; needs: Record<string, unknown> };
 
 // A route under `/api/plugins/<plugin>/`, such as `/rooms/:id`. `params` holds the named parts.
 export type PluginRoute = (request: Request, params: Record<string, string>) => Response | Promise<Response>;
@@ -56,6 +61,18 @@ export type PluginApi = {
     send(bot: string, message: { text: string; files?: Upload[]; session?: string; messageId?: string }): Promise<{ messageId: string; sessionId: string }>;
     /** A session's lines as NDJSON, from `cursor` on, then each new one. */
     stream(bot: string, session: string, cursor?: number): Promise<ReadableStream<Uint8Array>>;
+  };
+  /** The added plugins that need this one, each with its block for this one. */
+  dependents(): Dependent[];
+  library: {
+    /** An item's bytes, if it is tagged for the bot. */
+    read(bot: string, id: string): Promise<{ name: string; type: string; bytes: Buffer }>;
+    /** Saves to the bot's library, tagged for the chat, through the library's checks: an image, or UTF-8 text. */
+    save(item: { bot: string; session: string; name: string; type: string; bytes: Buffer }): Promise<LibraryItem>;
+  };
+  skills: {
+    /** The files of the skill the bot sees by that name, besides SKILL.md. None when it has no such skill. */
+    files(bot: string, name: string): { path: string; text: string }[];
   };
   /** Writes to the plugin's log, which shows on its row in Plugins. */
   log(...parts: unknown[]): void;

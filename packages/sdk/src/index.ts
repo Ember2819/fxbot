@@ -154,6 +154,11 @@ export async function createFxbot(options: FxbotOptions) {
     onChange: () => void retool(),
     host: {
       bots: { list: async () => (await store.profiles.list()).map(withBusy), get: async (id) => withBusy(await get(id)) },
+      library: {
+        read: (bot, id) => library.readFor(bot, id),
+        save: ({ bot, session, name, type, bytes }) => library.save({ profileId: bot, sessionId: session, origin: "generated", name, type, bytes }),
+      },
+      skills: { files: (bot, name) => skills.files(bot, name) },
       chats: {
         async newSession(plugin, bot) {
           started();

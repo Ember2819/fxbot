@@ -196,9 +196,19 @@ export function createLibrary(sql: Sql) {
     },
   ];
 
+  // An item's bytes, if it is tagged for the bot, as library_read finds it.
+  async function readFor(bot: string, id: string) {
+    const [row] = isId(id)
+      ? await sql<{ name: string; type: string; data: Buffer }[]>`
+          select name, type, data from library l where id = ${id} and exists (select 1 from library_tags t where t.item_id = l.id and t.profile_id = ${bot})`
+      : [];
+    return row ? { name: row.name, type: row.type, bytes: row.data } : fail(404, `This bot's library has no item library:${id}.`);
+  }
+
   return {
     check,
     save,
+    readFor,
     list,
     get,
     file: (id: string, ifNoneMatch?: string) => (isId(id) ? fileWhere("id", id, ifNoneMatch) : fail(404, "not found")),

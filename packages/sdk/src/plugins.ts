@@ -5,7 +5,7 @@ import { dirname, join, resolve } from "node:path";
 import { pathToFileURL } from "node:url";
 import type { FxAgentHostTool, FxAgentTool } from "libfx";
 import postgres, { type Sql } from "postgres";
-import type { Hook, HookEvents, PluginApi, PluginRoute, PluginTool } from "./plugin-api.ts";
+import type { Dependent, Hook, HookEvents, PluginApi, PluginRoute, PluginTool } from "./plugin-api.ts";
 import type { RepoFiles } from "./archive.ts";
 import { createSecrets } from "./secrets.ts";
 import { parseSkill, type CarriedSkill, type Row } from "./skills.ts";
@@ -34,8 +34,18 @@ const hour = 60 * 60 * 1000;
 const refOf = /^([A-Za-z0-9-]{1,39}\/[A-Za-z0-9._-]{1,100})(?:\/(.+))?$/;
 const sha = (text: string) => createHash("sha256").update(text).digest("hex");
 
-// What fxbot reads from a plugin's plugin.json.
-export type Manifest = { name: string; version: string; description: string; server?: string; page?: string; css?: string; migrations?: string; settings: PluginSetting[] };
+// What fxbot reads from a plugin's plugin.json. `needs` maps each plugin it needs to what it asks of that one.
+export type Manifest = {
+  name: string;
+  version: string;
+  description: string;
+  server?: string;
+  page?: string;
+  css?: string;
+  migrations?: string;
+  settings: PluginSetting[];
+  needs: Record<string, Record<string, unknown>>;
+};
 // A plugin from GitHub keeps its files' list, for what an update changes, and the MCP servers it added.
 type Config = Manifest & { files?: SkillFile[]; servers?: string[] };
 type PackageRecord = PluginRecord<Config> & { kind: "package"; source: PackageSource };
@@ -102,6 +112,11 @@ export function parseManifest(text: string): Manifest {
   for (const setting of settings)
     if (typeof setting?.name !== "string" || !/^[A-Za-z][\w-]{0,63}$/.test(setting.name) || typeof (setting.description ?? "") !== "string")
       fail(400, "Each of plugin.json's settings needs a name and a description.");
+  const needs = own.needs ?? {};
+  const isObject = (value: unknown) => typeof value === "object" && value !== null && !Array.isArray(value);
+  if (!isObject(needs) || Object.entries(needs).some(([other, block]) => !pluginName.test(other) || other === name || !isObject(block)))
+    fail(400, "plugin.json's needs must map other plugins' names to an object each.");
+  if (Buffer.byteLength(JSON.stringify(needs)) > 16 * 1024) fail(400, "plugin.json's needs must be at most 16 KiB.");
   return {
     name: name as string,
     version: version as string,
@@ -117,6 +132,7 @@ export function parseManifest(text: string): Manifest {
       ...(isRequired === true ? { isRequired: true } : {}),
       ...(isSecret === true ? { isSecret: true } : {}),
     })),
+    needs: needs as Manifest["needs"],
   };
 }
 
@@ -130,6 +146,8 @@ function within<T>(run: () => T | Promise<T>, ms: number, what: string): Promise
 // What fxbot's core gives plugins: its bots, and turns marked as the plugin's.
 export type PluginHost = {
   bots: PluginApi["bots"];
+  library: PluginApi["library"];
+  skills: PluginApi["skills"];
   chats: {
     newSession(plugin: string, bot: string): Promise<string>;
     send(plugin: string, bot: string, message: Parameters<PluginApi["chats"]["send"]>[1]): Promise<{ messageId: string; sessionId: string }>;
@@ -183,6 +201,23 @@ export async function createPlugins(options: {
   // A plugin's hooks and tools reach a bot when it runs, is on, and is for that bot.
   const applies = (plugin: Package, bot: string) => Boolean(plugin.loaded && plugin.record.enabled && (plugin.record.bots === "all" || on.get(plugin.record.id)?.has(bot)));
   const hooked = (event: keyof HookEvents) => [...plugins.values()].some((p) => p.loaded?.hooks.get(event)?.length);
+  const named = (name: string) => [...plugins.values()].find((p) => p.record.name === name);
+  // A manifest stored before needs existed has none.
+  const needsOf = (record: PackageRecord) => Object.keys(record.config.needs ?? {});
+
+  // The added plugins that need `name`, each with its block for it. A copy, so a plugin can't change another's.
+  const dependentsOf = (name: string): Dependent[] =>
+    [...plugins.values()].flatMap(({ record }) =>
+      record.config.needs?.[name] ? [{ name: record.name, version: record.config.version, needs: structuredClone(record.config.needs[name]) }] : [],
+    );
+  // Tells each named plugin that runs who needs it now.
+  async function tell(names: Iterable<string>) {
+    for (const name of new Set(names)) {
+      const plugin = named(name);
+      for (const handler of plugin?.loaded?.hooks.get("dependents") ?? [])
+        await within(() => handler({ dependents: dependentsOf(name) }), limit, "A dependents hook").catch((error) => report(plugin!, "A dependents hook", error));
+    }
+  }
 
   // A folder of FXBOT_PLUGIN_DIRS is added on first sight, and its manifest read again at every start. A new one's
   // servers are added when the plugins start.
@@ -267,6 +302,7 @@ export async function createPlugins(options: {
       settings: [],
       migrations: [],
       skills: [],
+      needs: [],
       servers: [],
     };
     const byPath = new Map(files);
@@ -280,6 +316,7 @@ export async function createPlugins(options: {
       return { page: { ...page, error: said(error) }, files };
     }
     Object.assign(page, { name: manifest.name, version: manifest.version, description: manifest.description, settings: manifest.settings });
+    page.needs = Object.keys(manifest.needs).map((name) => ({ name, added: Boolean(named(name)) }));
     page.code = [manifest.server, manifest.page].filter((p): p is string => Boolean(p));
     const missing = [...page.code, manifest.css].filter((p) => p && !byPath.has(p));
     if (missing.length) return { page: { ...page, error: `plugin.json names ${missing.join(" and ")}, which ${where} doesn't have.` }, files };
@@ -335,6 +372,7 @@ export async function createPlugins(options: {
   const watchers: FSWatcher[] = [];
   async function reload(plugin: Package) {
     if (plugins.get(plugin.record.id) !== plugin || !plugin.record.enabled) return;
+    const before = needsOf(plugin.record);
     try {
       const manifest = parseManifest(await readFile(resolve(folderOf(plugin.record), "plugin.json"), "utf8"));
       if (manifest.name !== plugin.record.name) throw new Error(`plugin.json now names ${manifest.name}. Restart fxbot to add it.`);
@@ -345,6 +383,7 @@ export async function createPlugins(options: {
     }
     await unload(plugin);
     await load(plugin);
+    await tell([...before, ...needsOf(plugin.record)]);
     onChange();
   }
   function watchFolder(plugin: Package) {
@@ -415,6 +454,9 @@ export async function createPlugins(options: {
       sql: undefined as never,
       settings: plugin.settings,
       bots: host.bots,
+      dependents: () => dependentsOf(record.name),
+      library: host.library,
+      skills: host.skills,
       chats: {
         newSession: (bot) => host.chats.newSession(record.name, bot),
         send: (bot, message) => host.chats.send(record.name, bot, message),
@@ -426,6 +468,8 @@ export async function createPlugins(options: {
     try {
       if ("local" in record.source && !folders.has(folderOf(record))) throw new Error("Its folder isn't in FXBOT_PLUGIN_DIRS any more.");
       if ([...reserved, ...taken()].includes(record.name)) throw new Error(`Its name, ${record.name}, is a prefix another plugin's tools use.`);
+      const missing = needsOf(record).filter((name) => !named(name));
+      if (missing.length) throw new Error(`It needs ${missing.join(" and ")}. Add ${missing.length > 1 ? "them" : "it"} first.`);
       // Its own Postgres: two connections at most, in its schema.
       loaded.sql = api.sql = postgres(databaseUrl, { max: 2, onnotice: () => {}, connection: { search_path: schemaOf(record.name) } });
       await migrate(plugin, loaded.sql, folderOf(record));
@@ -546,6 +590,7 @@ export async function createPlugins(options: {
       servers: record.config.servers ?? [],
       code: Boolean(record.config.server || record.config.page),
       skills: plugin.skills.map((row) => row.name),
+      needs: needsOf(record),
       settings: record.config.settings.map((setting) => ({
         ...setting,
         set: setting.name in plugin.saved,
@@ -570,12 +615,20 @@ export async function createPlugins(options: {
   return {
     has: (id: string) => plugins.has(id),
     names: () => [...plugins.values()].map((p) => p.record.name),
-    // Loads every plugin that's on, in the order they were added. A local plugin being written may point at servers on
-    // this machine.
+    // Loads every plugin that's on, each after the ones it needs, and otherwise in the order they were added. A local
+    // plugin being written may point at servers on this machine.
     async start() {
       for (const { plugin, servers } of fresh) await addServers(plugin, servers, true);
       for (const plugin of plugins.values()) if ("local" in plugin.record.source && folders.has(folderOf(plugin.record))) watchFolder(plugin);
-      for (const plugin of plugins.values()) {
+      const order: Package[] = [];
+      const visit = (plugin: Package, path: Set<Package>) => {
+        if (order.includes(plugin) || path.has(plugin)) return;
+        path.add(plugin);
+        for (const name of needsOf(plugin.record)) if (named(name)) visit(named(name)!, path);
+        order.push(plugin);
+      };
+      for (const plugin of plugins.values()) visit(plugin, new Set());
+      for (const plugin of order) {
         plugin.saved = (await secrets.get<{ values: Record<string, string> }>(plugin.record.id).catch(() => undefined))?.values ?? {};
         if (plugin.record.enabled) await load(plugin);
       }
@@ -672,6 +725,8 @@ export async function createPlugins(options: {
     // Its cleanup runs, then its schema, its sessions, its settings, its switches, its servers, and its files go.
     async remove(id: string) {
       const plugin = get(id);
+      const needing = dependentsOf(plugin.record.name).map((d) => d.name);
+      if (needing.length) fail(409, `${needing.join(" and ")} ${needing.length > 1 ? "need" : "needs"} ${plugin.record.name}. Remove ${needing.length > 1 ? "them" : "it"} first.`);
       await unload(plugin);
       plugins.delete(id);
       on.delete(id);
@@ -682,6 +737,7 @@ export async function createPlugins(options: {
       secrets.forget(id);
       for (const server of plugin.record.config.servers ?? []) await host.removeServer(server).catch(() => {});
       if (!("local" in plugin.record.source)) await rm(resolve(dataDir, "plugins", plugin.record.name), { recursive: true, force: true });
+      await tell(needsOf(plugin.record));
       onChange();
     },
 
@@ -697,6 +753,8 @@ export async function createPlugins(options: {
       if (page.hash !== hash) fail(409, "The plugin changed since its page was shown. Look at it again.");
       if ([...plugins.values()].some((p) => p.record.name === manifest.name)) fail(409, `A plugin named ${manifest.name} is added already.`);
       if ([...reserved, ...taken()].includes(manifest.name)) fail(400, `Its name, ${manifest.name}, is a prefix another plugin's tools use.`);
+      const missing = page.needs.filter((need) => !named(need.name)).map((need) => need.name);
+      if (missing.length) fail(400, `Add ${missing.join(" and ")} first.`);
       const record: PackageRecord = {
         id: newId(),
         kind: "package",
@@ -714,6 +772,7 @@ export async function createPlugins(options: {
       const plugin = add(record);
       await addServers(plugin, serversIn(new Map(files).get("mcp.json")), false);
       await load(plugin);
+      await tell(needsOf(record));
       onChange();
       return view(plugin);
     },
@@ -727,6 +786,8 @@ export async function createPlugins(options: {
       if (page.error || !manifest) return fail(400, page.error ?? "This version can't be added.");
       if (page.hash !== hash) fail(409, "The plugin changed since its page was shown. Look at it again.");
       if (manifest.name !== before.name) fail(400, `This version is named ${manifest.name}. Remove ${before.name} and add it instead.`);
+      const missing = page.needs.filter((need) => !named(need.name)).map((need) => need.name);
+      if (missing.length) fail(400, `This version needs ${missing.join(" and ")}. Add ${missing.length > 1 ? "them" : "it"} first.`);
       const next: PackageRecord = { ...before, source: page.source, config: { ...manifest, files: page.files, servers: before.config.servers }, approvedHash: page.hash };
       if (folderOf(next) !== folderOf(before)) await writeFiles(folderOf(next), files);
       await unload(plugin);
@@ -742,6 +803,7 @@ export async function createPlugins(options: {
       await store.plugins.update(id, { source: next.source, config: next.config, approvedHash: next.approvedHash });
       if (folderOf(next) !== folderOf(before)) await rm(folderOf(before), { recursive: true, force: true });
       marks.delete(id);
+      await tell([...needsOf(before), ...needsOf(next)]);
       onChange();
       return view(plugin);
     },

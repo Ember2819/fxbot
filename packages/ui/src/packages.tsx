@@ -77,6 +77,17 @@ function Contents({ page }: { page: PackagePreview }) {
   const sizes = Object.fromEntries(page.files.map((f) => [f.path, f.size]));
   return (
     <>
+      {page.needs.length > 0 && (
+        <section className="grid gap-1.5">
+          <h3 className={heading}>Needs</h3>
+          {page.needs.map((need) => (
+            <p key={need.name} className="text-sm">
+              <span className="font-mono text-xs">{need.name}</span>
+              <span className="text-muted-foreground">{need.added ? ", added" : ", which isn't added yet. Add it first."}</span>
+            </p>
+          ))}
+        </section>
+      )}
       {page.code.length > 0 && (
         <section className="grid gap-2">
           <h3 className={heading}>Runs inside fxbot</h3>
@@ -185,7 +196,7 @@ export function PluginDialog({ target, onAdded, onClose }: { target: PluginTarge
         </div>
         {page?.hash && (
           <div className="border-t pt-3">
-            <Button onClick={add} disabled={busy}>
+            <Button onClick={add} disabled={busy || page.needs.some((need) => !need.added)}>
               {busy && <LoaderCircleIcon className="animate-spin" />}
               Add {page.name}
             </Button>
@@ -327,10 +338,12 @@ export function PluginSettings({
                       ["Repository", <span key="repo">{repoLink(source.repo, source.path, source.commit)}, at {source.commit.slice(0, 7)}</span>],
                       ["Version", addon.version],
                       ["Source", fromText[source.from]],
+                      ["Needs", addon.needs.join(", ") || undefined],
                     ]
                   : [
                       ["Folder", <span key="folder" className="font-mono text-xs break-all">{source.local}</span>],
                       ["Version", addon.version],
+                      ["Needs", addon.needs.join(", ") || undefined],
                     ]
               }
             />

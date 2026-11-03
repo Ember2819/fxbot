@@ -345,6 +345,9 @@ export async function createSkills(options: { store: Store; archives: Archives; 
       if (file === undefined || file === "" || file === "SKILL.md") return `---\nname: ${row.name}\ndescription: ${JSON.stringify(row.description)}\n---\n\n${row.instructions}\n`;
       return row.resources.find((r) => r.uri === `skill://${row.name}/${file}`)?.text ?? fail(404, `${row.name} has no file ${String(file)}.`);
     },
+    // The files besides SKILL.md of the skill a bot sees by that name, as the skill tool finds it, for a plugin.
+    files: (bot: string, name: string) =>
+      (forBot(bot).find((skill) => skill.name === name)?.row.resources ?? []).map((r) => ({ path: r.uri.split("/").slice(3).join("/"), text: r.text })),
     close: () => (clearInterval(timer), clearTimeout(first)),
   };
 }
