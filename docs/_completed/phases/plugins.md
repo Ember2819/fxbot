@@ -359,6 +359,8 @@ The plugin API is about 750 lines:
 
 The plugins themselves add about 350 lines for chat rooms and about 120 for herdr.
 
+**As built** (2026-11-03): about 1,700 lines in the core, over twice the estimate. `plugins.ts` is 750, with installing from GitHub, updates, and the skills and servers a plugin carries; `plugin-api.ts` 65; the page's loader 205; the Plugins tab, a plugin's page, and its settings 380; and about 320 more across the SDK, the server, and the app. Chat rooms is about 520 lines, and herdr about 125.
+
 ## 4. Checklist
 
 Checks use a sample plugin in the scratchpad that uses every hook and place, disposable Postgres, the mock model, and Playwright. Nothing reaches the real herdr except the human's check.
