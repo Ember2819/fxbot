@@ -1,0 +1,13 @@
+{
+  "private": true,
+  "type": "module",
+  "description": "What the chat-rooms plugin's page is built from: ProseMirror, for the message box's chips. See the README. fxbot reads only type, which makes its server code an ES module.",
+  "devDependencies": {
+    "prosemirror-commands": "1.7.2",
+    "prosemirror-history": "1.5.1",
+    "prosemirror-keymap": "1.2.3",
+    "prosemirror-model": "1.25.12",
+    "prosemirror-state": "1.4.4",
+    "prosemirror-view": "1.42.6"
+  }
+}

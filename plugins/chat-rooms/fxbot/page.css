@@ -1,0 +1,105 @@
+/* The chat-rooms plugin's page: the message box, chips, and stacked avatars, in classes of its own, since the app's
+   styles hold only the classes the app uses. Then the rules ProseMirror needs, from prosemirror-view/style. */
+
+.cr-box {
+  position: relative;
+  min-width: 0;
+  flex: 1;
+}
+.cr-editor {
+  min-height: 2.5rem;
+  max-height: 12rem;
+  overflow-y: auto;
+  border: 1px solid var(--input);
+  border-radius: 1rem;
+  padding: 0.5rem 0.75rem;
+  font-size: 1rem;
+  line-height: 1.5rem;
+  outline: none;
+}
+@media (min-width: 768px) {
+  .cr-editor {
+    font-size: 0.875rem;
+  }
+}
+.cr-editor:focus-visible,
+.cr-editor.ProseMirror-focused {
+  border-color: var(--ring);
+  box-shadow: 0 0 0 3px color-mix(in oklab, var(--ring) 50%, transparent);
+}
+.cr-editor[contenteditable="false"] {
+  opacity: 0.5;
+}
+.cr-editor p {
+  margin: 0;
+}
+.cr-placeholder {
+  position: absolute;
+  top: calc(0.5rem + 1px);
+  left: calc(0.75rem + 1px);
+  color: var(--muted-foreground);
+  pointer-events: none;
+  font-size: inherit;
+}
+.cr-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  padding: 0 0.4rem 0 0.15rem;
+  border-radius: 9999px;
+  background: var(--secondary);
+  color: var(--secondary-foreground);
+  font-weight: 500;
+  line-height: 1.4;
+  white-space: nowrap;
+  vertical-align: baseline;
+}
+.cr-chip-face {
+  display: inline-flex;
+}
+.cr-stack {
+  display: inline-flex;
+  align-items: center;
+  flex: none;
+}
+.cr-stack > span {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 9999px;
+  background: var(--sidebar, var(--background));
+  padding: 1px;
+}
+.cr-stack > span + span {
+  margin-left: calc(var(--cr-size) / -3);
+}
+.cr-more {
+  min-width: var(--cr-size);
+  height: var(--cr-size);
+  font-size: 0.625rem;
+  font-weight: 600;
+  color: var(--muted-foreground);
+}
+
+.ProseMirror {
+  position: relative;
+  word-wrap: break-word;
+  white-space: pre-wrap;
+  white-space: break-spaces;
+  font-variant-ligatures: none;
+  font-feature-settings: "liga" 0;
+}
+.ProseMirror-hideselection *::selection {
+  background: transparent;
+}
+.ProseMirror-hideselection {
+  caret-color: transparent;
+}
+.ProseMirror [draggable][contenteditable="false"] {
+  user-select: text;
+}
+img.ProseMirror-separator {
+  display: inline !important;
+  border: none !important;
+  margin: 0 !important;
+}
