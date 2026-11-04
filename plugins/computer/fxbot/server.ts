@@ -127,7 +127,10 @@ function untar(data: Buffer) {
   return null;
 }
 
-export default function setup(fx: PluginApi) {
+export default async function setup(fx: PluginApi) {
+  // This install's id, from the plugin's own table. It labels the computers, homes, and images this fxbot makes, so
+  // another fxbot that shares the engine, such as a checkout beside a release, leaves them be, and this one theirs.
+  const install = (await fx.sql<{ id: string }[]>`select id from install`)[0].id;
   let engine: Engine = { state: "unreachable", socket: "" };
   const socket = () => fx.settings.engine || sockets.find((path) => existsSync(path)) || sockets[0];
   const notReady = () =>
@@ -272,7 +275,7 @@ export default function setup(fx: PluginApi) {
     ];
   }
   const tagOf = (all: Step[]) =>
-    `localhost/fxbot-computer:${createHash("sha256")
+    `localhost/fxbot-computer:${install.slice(0, 8)}-${createHash("sha256")
       .update(JSON.stringify([base, ...files.map((f) => [f.path, f.bytes.toString("utf8")]), ...all.map((s) => s.run)]))
       .digest("hex")
       .slice(0, 12)}`;
@@ -310,7 +313,7 @@ export default function setup(fx: PluginApi) {
     if (pull.status >= 400 || failed) throw new Error(`Pulling ${base} failed: ${failed?.error ?? `HTTP ${pull.status}`}`);
     const builder = `fxbot-computer-build-${tag.split(":")[1]}`;
     await call("DELETE", `/containers/${builder}?force=true`);
-    await json("POST", `/containers/create?name=${builder}`, { Image: base, Cmd: ["sleep", "infinity"], Env: env, Labels: { "fxbot.image": tag }, HostConfig: { Init: true } });
+    await json("POST", `/containers/create?name=${builder}`, { Image: base, Cmd: ["sleep", "infinity"], Env: env, Labels: { "fxbot.image": tag, "fxbot.install": install }, HostConfig: { Init: true } });
     try {
       await json("POST", `/containers/${builder}/start`);
       for (const [i, step] of all.entries()) {
@@ -331,11 +334,12 @@ export default function setup(fx: PluginApi) {
     await prune(tag);
     return tag;
   }
-  // Images of earlier steps go once no computer uses them: the engine refuses one that a computer does.
+  // Images of earlier steps go once no computer uses them: the engine refuses one that a computer does. Only this
+  // install's, and those from before images were labelled with one.
   async function prune(keep: string) {
     const current = idOf((await json("GET", `/images/${keep}/json`)).Id);
-    for (const { Id } of await json<{ Id: string }[]>("GET", `/images/json?filters=${query({ label: ["fxbot.image"] })}`))
-      if (idOf(Id) !== current) await call("DELETE", `/images/${idOf(Id)}`).catch(() => {});
+    for (const { Id, Labels } of await json<{ Id: string; Labels?: Record<string, string> | null }[]>("GET", `/images/json?filters=${query({ label: ["fxbot.image"] })}`))
+      if (idOf(Id) !== current && (Labels?.["fxbot.install"] ?? install) === install) await call("DELETE", `/images/${idOf(Id)}`).catch(() => {});
   }
 
   // Computers, one for each bot, with its home in a volume of the same name.
@@ -348,9 +352,16 @@ export default function setup(fx: PluginApi) {
   // The screen's size: the setting, when it's a width and height Xvnc takes.
   const screen = () => (/^\d{3,4}x\d{3,4}$/.test(fx.settings.screen ?? "") ? fx.settings.screen : "1280x800");
 
+  // This install's computers: those labelled with it, and those from before computers were, for a bot of its own.
   async function computers() {
-    const list = await json<{ Labels: Record<string, string>; State: string }[]>("GET", `/containers/json?all=true&filters=${query({ label: ["fxbot.computer"] })}`);
-    return list.map((c) => ({ bot: c.Labels["fxbot.computer"], running: c.State === "running" }));
+    const [list, bots] = await Promise.all([
+      json<{ Labels: Record<string, string>; State: string }[]>("GET", `/containers/json?all=true&filters=${query({ label: ["fxbot.computer"] })}`),
+      fx.bots.list(),
+    ]);
+    const ours = new Set(bots.map((bot) => bot.id));
+    return list
+      .filter((c) => (c.Labels["fxbot.install"] ? c.Labels["fxbot.install"] === install : ours.has(c.Labels["fxbot.computer"])))
+      .map((c) => ({ bot: c.Labels["fxbot.computer"], running: c.State === "running" }));
   }
   const inspect = async (name: string) => {
     const { status, data } = await call("GET", `/containers/${name}/json`);
@@ -398,6 +409,8 @@ export default function setup(fx: PluginApi) {
     if (engine.state !== "ready") throw new Error(notReady());
     const name = nameOf(bot);
     const info = await inspect(name);
+    const whose = info?.Config?.Labels?.["fxbot.install"];
+    if (whose && whose !== install) throw new Error("Another fxbot on this machine has a computer for this bot, so this one leaves it be.");
     if (info?.State?.Running) return name;
     const tag = await image();
     const current = idOf((await json("GET", `/images/${tag}/json`)).Id);
@@ -405,17 +418,21 @@ export default function setup(fx: PluginApi) {
     const look = `SCREEN=${screen()}`;
     const stale =
       info &&
-      (idOf(info.Image) !== current || info.HostConfig?.Memory !== sizes.Memory || info.HostConfig?.NanoCpus !== sizes.NanoCpus || !info.Config?.Env?.includes(look));
+      (idOf(info.Image) !== current ||
+        info.HostConfig?.Memory !== sizes.Memory ||
+        info.HostConfig?.NanoCpus !== sizes.NanoCpus ||
+        !info.Config?.Env?.includes(look) ||
+        whose !== install);
     if (stale) await json("DELETE", `/containers/${name}?force=true`);
     if (!info || stale) {
-      if ((await call("GET", `/volumes/${name}`)).status === 404) await json("POST", "/volumes/create", { Name: name, Labels: { "fxbot.computer": bot } });
+      if ((await call("GET", `/volumes/${name}`)).status === 404) await json("POST", "/volumes/create", { Name: name, Labels: { "fxbot.computer": bot, "fxbot.install": install } });
       await json("POST", `/containers/create?name=${name}`, {
         Image: tag,
         Cmd: ["session"],
         Env: [...env, look],
         WorkingDir: "/root",
         Hostname: "computer",
-        Labels: { "fxbot.computer": bot },
+        Labels: { "fxbot.computer": bot, "fxbot.install": install },
         HostConfig: { Init: true, ...sizes, PidsLimit: 512, ShmSize: 512 * mib, Mounts: [{ Type: "volume", Source: name, Target: "/root" }] },
       });
       if (stale) void prune(tag).catch(() => {});

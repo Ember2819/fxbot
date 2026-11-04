@@ -55,6 +55,7 @@ A computer made before a change to its sizes or its screen is made again with th
 | `plugin.json` | Its name, version, parts, and settings |
 | `package.json` | What the page is built from, noVNC and xterm.js, and `"type": "module"` for the server code |
 | `fxbot/server.ts` | The engine client, the image, computers, the tools, the routes, the sockets, and the instructions entry |
+| `fxbot/migrations/` | Its table: this install's id, which labels its computers, homes, and images |
 | `fxbot/session` | Copied into the image: the computer's command, which starts its desktop |
 | `fxbot/fxbot-run` | Copied into the image: runs one command, with its deadline and process group |
 | `fxbot/fxbot-screen` | Copied into the image: one action on the desktop, then a screenshot |

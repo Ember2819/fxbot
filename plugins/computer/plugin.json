@@ -8,6 +8,7 @@
       "server": "./fxbot/server.ts",
       "page": "./fxbot/page.js",
       "css": "./fxbot/page.css",
+      "migrations": "./fxbot/migrations",
       "settings": [
         { "name": "engine", "description": "The engine's socket, when it isn't where the setup script puts it" },
         { "name": "memoryMiB", "description": "Memory for each computer, in MiB", "default": "2048" },

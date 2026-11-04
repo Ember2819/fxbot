@@ -125,7 +125,7 @@ A refused connection fails at once. To let a computer reach one address on your 
 
 ## The image
 
-Every computer runs from one image, `localhost/fxbot-computer:<hash>`, about 1.2 GB, made from Debian 13 slim with:
+Every computer runs from one image, `localhost/fxbot-computer:<install>-<hash>`, about 1.2 GB, made from Debian 13 slim with:
 
 - `ca-certificates curl git python3 procps ripgrep jq unzip xz-utils`
 - the desktop: TigerVNC's `Xvnc`, XFCE, Thunar, `xfce4-terminal`, `tmux`, `xdotool`, `scrot`, and the accessibility bus
@@ -133,5 +133,7 @@ Every computer runs from one image, `localhost/fxbot-computer:<hash>`, about 1.2
 - [agent-desktop](https://github.com/vercel-labs/agent-desktop) 1.1.0 and [agent-browser](https://github.com/vercel-labs/agent-browser) 0.41.1, each checked against its SHA-256
 
 A running computer holds about 120 MB at idle, and about 330 MB with a page open in Chromium.
+
+**Two fxbots on one machine,** such as a checkout beside a release, share the engine. Each labels the computers, homes, and images it makes with an id of its own, kept in the plugin's table, and lists, stops, deletes, and prunes only its own. A computer another fxbot made for a bot is left alone, and a call for it says so.
 
 A plugin that needs the computer adds setup steps, which run as root with the network, in name order, after the computer's own. The computer's files go in last, so a step can't replace them. The image is made again in the background when such a plugin is added, updated, or removed; a running computer moves to it the next time it starts. An image no computer uses is removed.
