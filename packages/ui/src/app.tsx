@@ -65,12 +65,19 @@ export function App() {
   const [offline, setOffline] = useState(false);
   const [version, setVersion] = useState(0);
   const refresh = () => setVersion((v) => v + 1);
+  // A launch at / opens the default bot's chat: a fresh load only, not a reload or Back, and only until the first list
+  // arrives, so / later in the visit is Home.
+  const launch = useRef(location.pathname === "/" && ["navigate", undefined].includes((performance.getEntriesByType("navigation")[0] as PerformanceNavigationTiming | undefined)?.type));
   useEffect(() => {
     let stopped = false;
     const load = () =>
       client.profiles.list().then(
         (list) => {
           if (stopped) return;
+          const start = launch.current && location.pathname === "/" && list.find((p) => p.isDefault);
+          launch.current = false;
+          // Replaced, so Back leaves the app, and set with the list, so Home never paints.
+          if (start) (history.replaceState(null, "", `/profiles/${start.id}`), setPath(location.pathname));
           setProfiles(list);
           setOffline(false);
         },
@@ -120,7 +127,7 @@ export function App() {
   }, []);
   let screen: ReactNode;
   if (path === "/") screen = <Home profiles={profiles} offline={offline} onNew={() => setCreating(true)} />;
-  else if (top === "settings") screen = <SettingsScreen tab={path.split("/").slice(2).join("/")} />;
+  else if (top === "settings") screen = <SettingsScreen tab={path.split("/").slice(2).join("/")} profiles={profiles} />;
   else if (path === "/library") screen = <LibraryPage profiles={profiles} />;
   // /addons is where it was before 0.4.0.
   else if (path === "/plugins" || path === "/addons") screen = <PluginsPage profiles={profiles} />;

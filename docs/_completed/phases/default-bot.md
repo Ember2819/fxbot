@@ -2,7 +2,7 @@
 
 The owner picks one bot as the default, in Settings › General. Launching fxbot then opens that bot's chat, where it left off, instead of "Pick a bot".
 
-Status: planned on 2026-11-04, for 0.5.0, at the owner's word; researched against the research directive's references. The owner's decisions:
+Status: built on 2026-11-04, for 0.5.0, as planned the same day at the owner's word, and researched against the research directive's references. Where the build differs from the plan, [What the build changed](#what-the-build-changed) says so. The owner's decisions:
 - **A cold launch at `/` opens the default bot's ongoing chat.** It does not start a new session.
 - **Links into other screens still open those screens.**
 
@@ -75,7 +75,7 @@ Status: planned on 2026-11-04, for 0.5.0, at the owner's word; researched agains
 - **Launch.** The app reads the bots once at launch (`client.profiles.list()`, `packages/ui/src/app.tsx:65-89`). It stays laid out but hidden until its first screen is whole: the bots, and on a chat its messages (`app.tsx:108-122`).
 - **`/` is Home,** "Pick a bot" (`app.tsx:124`, `Home` at `app.tsx:367`).
 - **The app goes to `/` itself** after a bot is deleted (`app.tsx:438`), and the chat-rooms plugin does after a room is deleted (`plugins/chat-rooms/fxbot/page.jsx:174`).
-- **Each bot has one lasting chat,** `profile.sessionId`. `/profiles/<id>` opens it at its end (`Chat`, `app.tsx:586`). A provider switch, and [/fresh](fresh.md), move a bot to a new session, and the chat follows.
+- **Each bot has one lasting chat,** `profile.sessionId`. `/profiles/<id>` opens it at its end (`Chat`, `app.tsx:586`). A provider switch, and [/fresh](../../phases/fresh.md), move a bot to a new session, and the chat follows.
 - **Pins are on the bot** (`profiles.pinned_at`, `packages/sdk/src/migrations/0001_baseline.sql:54-58`). The sidebar has no menu on a bot, only Pin and Unpin buttons (`app.tsx:211-279`).
 - **The settings table is one row:** `check (id = 1)`, with `default_provider` and `unvetted` (`0001_baseline.sql:1`, `0007_one_kind_of_plugin.sql:11`). Its store calls are `packages/sdk/src/store.ts:71-83`.
 - **`PATCH /api/settings`** passes its fields to the SDK as they are (`packages/server/src/index.ts:184-195`).
@@ -94,7 +94,7 @@ Status: planned on 2026-11-04, for 0.5.0, at the owner's word; researched agains
 
 ### Where the owner picks it
 
-**Settings › General** ([settings tabs](../_completed/phases/settings-tabs.md)) gets one row:
+**Settings › General** ([settings tabs](settings-tabs.md)) gets one row:
 - **Default bot,** a `NativeSelect` with **None**, then each bot by name, in the sidebar's order.
 - Under it: "fxbot opens to this bot's chat when it starts at its address."
 - **A change saves at once,** with `client.settings.update({ defaultProfile })`. A failure shows in General's error line.
@@ -191,43 +191,43 @@ Size: about 40 lines of code and one migration, plus about 15 lines of docs. It 
 
 ## 4. Checklist
 
-Checks run against a disposable Postgres and `FXBOT_DATA`, on another `FXBOT_PORT`, with the mock model. Playwright runs at 1280×800 and 375×667. Don't start a server on the owner's dev port. [Settings tabs](../_completed/phases/settings-tabs.md) is built first; if it isn't, the select goes at the top of `SettingsForm`.
+Checks run against a disposable Postgres and `FXBOT_DATA`, on another `FXBOT_PORT`, with the mock model. Playwright runs at 1280×800 and 375×667. Don't start a server on the owner's dev port. [Settings tabs](settings-tabs.md) is built first; if it isn't, the select goes at the top of `SettingsForm`.
 
 **M1. Store and API**
-- [ ] On a scratch database that 0.4.1 made, the server backs up, runs `0008_default_bot`, and starts. `\d settings` shows `default_profile` referencing `profiles(id)` `on delete set null`.
-- [ ] `PATCH /api/settings` with `{"defaultProfile":"<id>"}` answers with that id. `GET /api/profiles` shows `isDefault: true` on that bot only.
-- [ ] Making another bot the default moves `isDefault` to it.
-- [ ] `""` clears it. An unknown 12-hex id gets 404, `"x"` gets 400, and `5` gets 400.
-- [ ] `DELETE /api/profiles/<id>` of the default leaves `defaultProfile: ""`, and no bot has `isDefault`.
-- [ ] Creating, renaming, and pinning a bot each return `isDefault` correctly.
+- [x] On a scratch database that 0.4.1 made, the server backs up, runs `0008_default_bot`, and starts. `\d settings` shows `default_profile` referencing `profiles(id)` `on delete set null`.
+- [x] `PATCH /api/settings` with `{"defaultProfile":"<id>"}` answers with that id. `GET /api/profiles` shows `isDefault: true` on that bot only.
+- [x] Making another bot the default moves `isDefault` to it.
+- [x] `""` clears it. An unknown 12-hex id gets 404, `"x"` gets 400, and `5` gets 400.
+- [x] `DELETE /api/profiles/<id>` of the default leaves `defaultProfile: ""`, and no bot has `isDefault`.
+- [x] Creating, renaming, and pinning a bot each return `isDefault` correctly.
 
 **M2. Launch**
-- [ ] With a default, a new tab at `/` lands on `/profiles/<id>`, scrolled to the chat's end. Back from there leaves the app: `history.length` is 1.
-- [ ] "Pick a bot" is never visible on that load. An init script in Playwright watches for it from the start of the load and never sees it.
-- [ ] The `/api` requests on that load are the same as with no default: one `GET /api/profiles`, then the chat's own.
-- [ ] With no default, `/` shows Home as today.
-- [ ] `/settings`, `/library`, and `/profiles/<other>/edit`, each opened in a new tab, open that screen.
-- [ ] Deleting a bot goes to `/` and shows Home, not the default. A reload there stays on Home.
-- [ ] Offline at launch, then back: the app opens the default's chat once the list loads, if still on `/`.
-- [ ] The installed app (Playwright's Chromium with the app installed, or by hand) opens on the default's chat.
+- [x] With a default, a new tab at `/` lands on `/profiles/<id>`, scrolled to the chat's end. Back from there leaves the app: `history.length` is the same as when the chat is opened directly (2 in Playwright, whose new page starts with a blank entry), so the address was replaced, not pushed.
+- [x] "Pick a bot" is never visible on that load. An init script in Playwright watches for it from the start of the load and never sees it.
+- [x] The `/api` requests on that load are the same as opening the chat directly: the chat's own, and no settings read.
+- [x] With no default, `/` shows Home as today.
+- [x] `/settings`, `/library`, and `/profiles/<other>/edit`, each opened in a new tab, open that screen.
+- [x] Deleting a bot goes to `/` and shows Home, not the default. A reload there stays on Home.
+- [x] Offline at launch, then back: the app opens the default's chat once the list loads, if still on `/`.
+- [ ] The installed app (Playwright's Chromium with the app installed, or by hand) opens on the default's chat. Left for the owner: the phone checks below cover it.
 
 **M3. Settings › General**
-- [ ] **Default bot** lists **None** and every bot. A pick saves (`GET /api/settings` shows it) and survives a reload.
-- [ ] After the default bot is deleted, the select shows **None**.
-- [ ] At 375 px wide, the select fits the column.
+- [x] **Default bot** lists **None** and every bot. A pick saves (`GET /api/settings` shows it) and survives a reload.
+- [x] After the default bot is deleted, the select shows **None**.
+- [x] At 375 px wide, the select fits the column.
 
 **M4. Docs and checks**
-- [ ] `packages/website/src/content/docs/sdk/reference/server-api.md`:
+- [x] `packages/website/src/content/docs/sdk/reference/server-api.md`:
   - `Settings` has `defaultProfile`, and `Profile` has `isDefault`, the bot a launch at `/` opens.
   - A line says `defaultProfile` takes a bot's id or `""`, an unknown id fails with 404, and deleting the bot clears it.
-- [ ] `sdk/reference/http-api.md`: `PATCH /api/settings` lists `defaultProfile`.
-- [ ] `docs/explanation/bots-and-chats.md` gets a short section, "The default bot": picked in Settings › General; opening fxbot at its address opens that bot's chat where it left off; a link to another screen opens that screen, and a reload stays where it was.
-- [ ] `CHANGELOG.md`, under `## Unreleased`:
+- [x] `sdk/reference/http-api.md`: `PATCH /api/settings` lists `defaultProfile`.
+- [x] `docs/explanation/bots-and-chats.md` gets a short section, "The default bot": picked in Settings › General; opening fxbot at its address opens that bot's chat where it left off; a link to another screen opens that screen, and a reload stays where it was.
+- [x] `CHANGELOG.md`, under `## Unreleased`:
   - "**A default bot.** Pick one in Settings › General, and launching fxbot opens its chat, where it left off."
   - Under **Before upgrading**: "Migration `0008_default_bot` adds a `default_profile` column to `settings`."
-- [ ] `npm run typecheck`, `npm run build`, and `npm run build-site` pass.
-- [ ] `git diff --check` passes, and the new migration file has no trailing whitespace.
-- [ ] One commit on `release/0.5.0` says what changed. Don't push.
+- [x] `npm run typecheck`, `npm run build`, and `npm run build-site` pass.
+- [x] `git diff --check` passes, and the new migration file has no trailing whitespace.
+- [x] One commit on `release/0.5.0` says what changed. Not pushed.
 
 **Bounds.** About 40 lines of code and one migration. Stop and ask if it needs a server route, a new request at launch, a second migration, or more than 80 lines of code. Out of scope: [Not in this phase](#not-in-this-phase).
 
@@ -236,6 +236,13 @@ Checks run against a disposable Postgres and `FXBOT_DATA`, on another `FXBOT_POR
   - Set a default, close the app fully, and open it from its icon. It opens on that bot's chat, at its end, with no flash of Home.
   - Then reload from the sidebar's **New version** row while on Home, and see Home stay. iOS may reopen an installed app at the last address rather than at `/`, and whether its navigation timing reads `navigate` on a launch is unverified. If it doesn't, note what it does.
 - With a default set, open a link to another screen, such as `/settings`, from outside the app, and see that screen.
+
+## What the build changed
+
+- **The launch's checks compare with opening the chat directly.** In Playwright, a new page's history starts with a blank entry, so `history.length` is 2 either way. The launch at `/` and a direct open of the chat give the same length and the same `/api` requests, which is what the plan meant: the address is replaced, and the launch adds no request. Both read `GET /api/profiles` twice, since the list is read again when a chat's finished turns are counted.
+- **Where it's picked.** Only Settings › General, as planned. The select lists the bots in the sidebar's order, under **None**.
+- **Size:** the migration's 3 lines, and 36 more lines than before across the SDK and the page, under the 40 planned.
+- **Checks** ran against a disposable Postgres that 0.4.1's migrations made, which backed up and ran `0008_default_bot`, with bots on the echo mock model and Playwright at 1280×800 and 375×667. Offline at launch was a failed first `GET /api/profiles`.
 
 ## 5. Open questions
 

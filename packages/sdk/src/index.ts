@@ -484,6 +484,12 @@ export async function createFxbot(options: FxbotOptions) {
           if (typeof input.defaultProvider !== "string") fail(400, "defaultProvider must be a string");
           await store.settings.save({ defaultProvider: await provider(input.defaultProvider.trim()) });
         }
+        // The bot a launch at / opens: 400 for an id that isn't one, 404 for no such bot.
+        if (input.defaultProfile !== undefined) {
+          if (typeof input.defaultProfile !== "string") fail(400, "defaultProfile must be a string");
+          if (input.defaultProfile) await get(input.defaultProfile);
+          await store.settings.save({ defaultProfile: input.defaultProfile });
+        }
         // Showing unvetted plugins fills the mirror of GitHub's registry for search.
         if (input.unvetted !== undefined) {
           if (typeof input.unvetted !== "boolean") fail(400, "unvetted must be true or false");

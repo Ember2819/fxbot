@@ -2,7 +2,8 @@ import { useEffect, useRef, useState, type ComponentType, type ReactNode } from 
 import { BrainIcon, InfoIcon, KeyRoundIcon, PuzzleIcon, SlidersHorizontalIcon } from "lucide-react";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
-import type { Settings } from "@fxbot/sdk/client";
+import { NativeSelect, NativeSelectOption } from "@/components/ui/native-select";
+import type { Profile, Settings } from "@fxbot/sdk/client";
 import { client } from "./client.ts";
 import { Header } from "./header.tsx";
 import { MemorySearch } from "./memory-search.tsx";
@@ -34,7 +35,7 @@ const links = [
 // Settings, in tabs, each at its own address: /settings is General, a plugin's is /settings/plugins/<plugin>, and
 // About is last. `tab` is what follows /settings/. An address no tab has shows the tabs over an empty pane, as a
 // plugin's does until its page code loads.
-export function SettingsScreen({ tab }: { tab: string }) {
+export function SettingsScreen({ tab, profiles }: { tab: string; profiles: Profile[] | null }) {
   const [settings, setSettings] = useState<Settings | null>(null);
   const [error, setError] = useState("");
   useEffect(() => void client.settings.get().then(setSettings, (e: Error) => setError(e.message)), []);
@@ -49,7 +50,26 @@ export function SettingsScreen({ tab }: { tab: string }) {
 
   const plugin = plugins.find(({ name }) => tab === `plugins/${name}`);
   let content: ReactNode = null;
-  if (tab === "") content = <General />;
+  if (tab === "")
+    content = (
+      <>
+        <General />
+        {settings && (
+          <label className="grid gap-1.5 text-sm font-medium">
+            Default bot
+            <NativeSelect value={settings.defaultProfile} onChange={(e) => save({ defaultProfile: e.target.value })} className="w-full">
+              <NativeSelectOption value="">None</NativeSelectOption>
+              {profiles?.map((p) => (
+                <NativeSelectOption key={p.id} value={p.id}>
+                  {p.name}
+                </NativeSelectOption>
+              ))}
+            </NativeSelect>
+            <span className="font-normal text-muted-foreground">fxbot opens to this bot's chat when it starts at its address.</span>
+          </label>
+        )}
+      </>
+    );
   else if (tab === "providers")
     content = settings && (
       <>

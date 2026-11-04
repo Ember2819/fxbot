@@ -117,7 +117,7 @@ These are the best prior art for plugin tabs and About, beyond the list.
 
 | Tab | Address | What it holds |
 | --- | --- | --- |
-| **General** | `/settings` | Install fxbot as an app: the prompt, the iOS steps, or "fxbot runs as an app on this device" when it does. The default bot, from [default bot](../../phases/default-bot.md). |
+| **General** | `/settings` | Install fxbot as an app: the prompt, the iOS steps, or "fxbot runs as an app on this device" when it does. The default bot, from [default bot](default-bot.md). |
 | **Providers** | `/settings/providers` | `Providers` as it is, then "New bots start on the default provider, with its default model." |
 | **Memory** | `/settings/memory` | `MemorySearch` as it is |
 | **Plugins** | `/settings/plugins` | **Show unvetted plugins**, its text, and a line that links to **Plugins** to add, update, and remove them |

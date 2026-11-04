@@ -34,7 +34,8 @@ export async function createStore({ databaseUrl, dataDir, backupsDir }: MigrateO
   });
   const one = <T>(rows: readonly T[]) => rows[0] ?? null;
   const profile = (rows: readonly StoredProfile[]) => one(rows);
-  const columns = sql`id, name, instructions, coalesce(provider, '') as provider, model, shape, color, session_id, handoff, preview, pinned_at is not null as pinned`;
+  const columns = sql`id, name, instructions, coalesce(provider, '') as provider, model, shape, color, session_id, handoff, preview, pinned_at is not null as pinned,
+    exists (select 1 from settings where default_profile = profiles.id) as is_default`;
 
   return {
     sql,
@@ -67,15 +68,16 @@ export async function createStore({ databaseUrl, dataDir, backupsDir }: MigrateO
       remove: async (id: string) => void (await sql`delete from profiles where id = ${id}`),
       usingProvider: async (provider: string) => Number((await sql`select count(*) from profiles where provider = ${provider}`)[0].count),
     },
-    // The default provider. Memory search's fields are embeddings.ts's.
+    // The default provider and bot. Memory search's fields are embeddings.ts's.
     settings: {
-      get: async (): Promise<Pick<Settings, "defaultProvider" | "unvetted">> => {
-        const row = one(await sql<{ defaultProvider: string | null; unvetted: boolean }[]>`select default_provider, unvetted from settings`);
-        return { defaultProvider: row?.defaultProvider ?? "", unvetted: row?.unvetted ?? false };
+      get: async (): Promise<Pick<Settings, "defaultProvider" | "defaultProfile" | "unvetted">> => {
+        const row = one(await sql<{ defaultProvider: string | null; defaultProfile: string | null; unvetted: boolean }[]>`select default_provider, default_profile, unvetted from settings`);
+        return { defaultProvider: row?.defaultProvider ?? "", defaultProfile: row?.defaultProfile ?? "", unvetted: row?.unvetted ?? false };
       },
-      save: async (fields: Partial<Pick<Settings, "defaultProvider" | "unvetted">>) => {
+      save: async (fields: Partial<Pick<Settings, "defaultProvider" | "defaultProfile" | "unvetted">>) => {
         const values = {
           ...(fields.defaultProvider !== undefined ? { defaultProvider: fields.defaultProvider || null } : {}),
+          ...(fields.defaultProfile !== undefined ? { defaultProfile: fields.defaultProfile || null } : {}),
           ...(fields.unvetted !== undefined ? { unvetted: fields.unvetted } : {}),
         };
         await sql`insert into settings ${sql({ id: 1, ...values })} on conflict (id) do update set ${sql(values)}`;

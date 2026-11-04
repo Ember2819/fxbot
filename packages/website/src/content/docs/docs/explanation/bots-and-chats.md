@@ -15,6 +15,10 @@ Each bot has one long-running chat, a durable libfx session on the server. The p
 
 Every message is also kept in Postgres, and each bot has a `chat_history` tool that searches its own messages, across all its chats, and reads them in full around a match. So a bot can look up what was said in an earlier chat, or long ago. It reaches only its own chats.
 
+## The default bot
+
+One bot can be the default, picked in **Settings** › **General**. Opening fxbot at its address then opens that bot's chat, where it left off, instead of the list of bots. A link to another screen opens that screen, and a reload stays where it was. Deleting the bot clears the choice.
+
 ## Memories
 
 A bot keeps what it learns as memories: what you prefer, facts about you and your work, decisions, and corrections. Each memory is one fact, in a sentence that stands on its own, of at most 1,000 characters. Memories belong to one bot, not to a chat, so a new chat, or a move to another provider, keeps them. Deleting the bot deletes them.

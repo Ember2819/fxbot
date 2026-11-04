@@ -11,7 +11,7 @@ Every call returns a promise, unless its row says it is synchronous. A call that
 
 | Call | What it does | Returns |
 | --- | --- | --- |
-| `profiles.list()` | Every bot: the pinned ones first, in the order they were pinned, then the rest by name | `Profile[]` |
+| `profiles.list()` | Every bot: the pinned ones first, in the order they were pinned, then the rest by name. Each has `isDefault`, true for the bot a launch at `/` opens (Settings' `defaultProfile`). | `Profile[]` |
 | `profiles.get(id)` | One bot | `Profile` |
 | `profiles.create(fields)` | A new bot. Only `name` is required. `provider` defaults to Settings' `defaultProvider`. The first bot starts pinned. | `Profile` |
 | `profiles.update(id, update)` | Changes any of the fields, and `pinned` | `Profile` |
@@ -119,6 +119,7 @@ A new Vercel account with one team gets that team.
 | Field | Type | Default | What it is |
 | --- | --- | --- | --- |
 | `defaultProvider` | `string` | `""` | The provider new bots start on, or `""` for none |
+| `defaultProfile` | `string` | `""` | The bot whose chat a launch at `/` opens, or `""` for none. A bot's id: an id of another shape fails with 400, and an unknown one with 404. Deleting the bot clears it. Since 0.5.0. |
 | `unvetted` | `boolean` | `false` | Whether plugins fxbot doesn't vet can be found and added: the public registries, and adding by address or repository |
 | `embedder` | `"local"`, `"remote"`, or `"off"` | `"local"` | Where memory search's vectors come from: `embedUrl`, a provider's `/embeddings`, or none |
 | `embeddingProvider` | `string` | `""` | For `remote`: a provider whose kind is in `embeddingKinds` |
