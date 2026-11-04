@@ -10,7 +10,7 @@ import { client } from "./client.ts";
 const most = 1000;
 const day = (at: string) => new Date(at).toLocaleDateString(undefined, { year: "numeric", month: "short", day: "numeric" });
 
-// The Memories tab: what a bot keeps, newest first, or the matches for a search. The owner adds, edits, and deletes;
+// A bot's memories, on its edit screen: what it keeps, newest first, or the matches for a search. The owner adds, edits, and deletes;
 // a change reaches the bot's next turn. `version` changes when a turn ends, so a memory the bot just saved shows up.
 export function BotMemories({ profile, version }: { profile: Profile; version: number }) {
   const [memories, setMemories] = useState<Memory[] | null>(null);

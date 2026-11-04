@@ -40,6 +40,7 @@ import { client } from "./client.ts";
 import { maxFiles, readFile } from "./attachments.ts";
 import { Blob, LookPicker } from "./blob.tsx";
 import { BotPanel, usePanel } from "./bot-panel.tsx";
+import { BotMemories } from "./memories.tsx";
 import { PluginsPage, BotPlugins } from "./plugins-page.tsx";
 import { LibraryPage } from "./library.tsx";
 import { MemorySearch } from "./memory-search.tsx";
@@ -489,6 +490,15 @@ function ProfileForm({ id, onSaved }: { id: string; onSaved: () => void }) {
             </Button>
           </div>
         </form>
+        {/* A form of its own, after the bot's: each change to a memory is saved as it's made. */}
+        {bot && (
+          <section aria-labelledby="memories" className="mx-auto mt-10 grid max-w-xl gap-3">
+            <h2 id="memories" className="font-medium">
+              Memories
+            </h2>
+            <BotMemories profile={bot} version={0} />
+          </section>
+        )}
       </main>
     </>
   );

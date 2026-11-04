@@ -31,7 +31,7 @@ The newest memories are in the bot's instructions, which fxbot sends on every tu
 
 The section changes only when a memory is saved, changed, or removed, not when one is searched, so the model's prompt cache holds between changes. And since the instructions go with every turn, a memory saved in a long chat reaches that chat on its next turn.
 
-You see a bot's memories in the **Memories** tab of its panel, beside **Details** and **Library**: newest first, each with its date, and **Saved by** the bot or **Added by you**. Search them there, add one with **Add a memory**, change one with its pencil button, or delete one. The bot sees your change on its next turn.
+You see a bot's memories under **Memories** on its edit screen, which **Edit** in its panel opens: newest first, each with its date, and **Saved by** the bot or **Added by you**. Search them there, add one with **Add a memory**, change one with its pencil button, or delete one. The bot sees your change on its next turn.
 
 ## Search by words and by meaning
 

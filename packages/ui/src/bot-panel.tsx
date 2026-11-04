@@ -7,11 +7,10 @@ import { useIsMobile } from "@/hooks/use-mobile";
 import type { LibraryItem, Profile, Provider } from "@fxbot/sdk/client";
 import { client } from "./client.ts";
 import { Preview, Thumb } from "./library.tsx";
-import { BotMemories } from "./memories.tsx";
 import { follow } from "./nav.ts";
 import { Place } from "./plugins.tsx";
 
-type Tab = "details" | "library" | "memories";
+type Tab = "details" | "library";
 
 // Storage can be off, as in a private window; the panel then starts closed on the Details tab.
 const read = (key: string) => {
@@ -32,7 +31,7 @@ export function usePanel() {
   const [open, setOpen] = useState(() => read("fxbot.panel") === "open");
   const [tab, setTab] = useState<Tab>(() => {
     const saved = read("fxbot.panel.tab");
-    return saved === "library" || saved === "memories" ? saved : "details";
+    return saved === "library" ? saved : "details";
   });
   return {
     open,
@@ -54,7 +53,6 @@ export function BotPanel({ profile, profiles, panel, version }: { profile: Profi
         <TabsList className="flex-1">
           <TabsTrigger value="details">Details</TabsTrigger>
           <TabsTrigger value="library">Library</TabsTrigger>
-          <TabsTrigger value="memories">Memories</TabsTrigger>
         </TabsList>
         <Button variant="ghost" size="icon-sm" aria-label="Close panel" onClick={() => panel.setOpen(false)}>
           <XIcon />
@@ -66,9 +64,6 @@ export function BotPanel({ profile, profiles, panel, version }: { profile: Profi
       <TabsContent value="library" className="min-h-0 overflow-y-auto pb-4">
         <BotLibrary profile={profile} profiles={profiles} version={version} />
       </TabsContent>
-      <TabsContent value="memories" className="min-h-0 overflow-y-auto pb-4">
-        <BotMemories profile={profile} version={version} />
-      </TabsContent>
     </Tabs>
   );
   if (mobile)
@@ -76,7 +71,7 @@ export function BotPanel({ profile, profiles, panel, version }: { profile: Profi
       <Sheet open={panel.open} onOpenChange={panel.setOpen}>
         <SheetContent side="right" showCloseButton={false} className="w-full gap-0 p-0 sm:max-w-sm">
           <SheetTitle className="sr-only">{profile.name}</SheetTitle>
-          <SheetDescription className="sr-only">Details, library, and memories</SheetDescription>
+          <SheetDescription className="sr-only">Details and library</SheetDescription>
           {body}
         </SheetContent>
       </Sheet>
