@@ -185,6 +185,12 @@ export async function createFxbot(options: FxbotOptions) {
           if (!Number.isInteger(cursor) || cursor < 0) fail(400, "cursor must be a whole number");
           return (await lines(profile, session, cursor)).pipeThrough(new TextEncoderStream());
         },
+        async cancel(plugin, bot, session) {
+          started();
+          const profile = await get(bot);
+          await pluginSession(plugin, profile, session);
+          await (await open(profile, session)).cancel();
+        },
       },
       async addServer({ url, headers, transport, allowLocal }) {
         const ref = { url, headers, allowLocal, ...(transport ? { transport } : {}) };

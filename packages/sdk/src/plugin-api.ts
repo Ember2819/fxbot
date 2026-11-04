@@ -85,6 +85,8 @@ export type PluginApi = {
     send(bot: string, message: { text: string; files?: Upload[]; session?: string; messageId?: string }): Promise<{ messageId: string; sessionId: string }>;
     /** A session's lines as NDJSON, from `cursor` on, then each new one. */
     stream(bot: string, session: string, cursor?: number): Promise<ReadableStream<Uint8Array>>;
+    /** Stops the turn running in one of the plugin's own sessions, if one runs: it ends `cancelled`. */
+    cancel(bot: string, session: string): Promise<void>;
   };
   /** The added plugins that need this one, each with its block for this one. */
   dependents(): Dependent[];

@@ -159,6 +159,7 @@ A plugin's turns run as the owner's do, with the same hooks, history, library, a
 | `fx.chats.newSession(bot)` | A session of the plugin's own for the bot, on the bot's provider now. Keep its id. |
 | `fx.chats.send(bot, { text, files?, session?, messageId? })` | A message. Without `session`, it goes to the bot's own chat, which shows it as "From <plugin>". With one, it stays out of the bot's chat, its earlier chats, and its preview, and `chat_history` still finds it. `messageId` defaults to a new UUID. |
 | `fx.chats.stream(bot, session, cursor?)` | That session's lines, as NDJSON, from `cursor` on, then each new one. The same lines as [`fxbot.stream`](/sdk/how-to/stream-replies/). |
+| `fx.chats.cancel(bot, session)` | Stops the turn running in one of the plugin's own sessions, if one runs. It ends `cancelled`, and the session's stream says so. Since 0.4.1. |
 
 A session belongs to the provider it started on. After the bot moves to another provider, `send` and `stream` for it fail with `status` 409: make a new one.
 
@@ -201,6 +202,7 @@ Each part sits in its own error boundary: one that throws shows a short card in 
 | `applyLine` | Folds a stream line into turns |
 | `go(path)` | Opens a path in the app |
 | `useBots()` | The app's list of bots, or `null` while it loads |
+| `createPortal(children, node)` | React's, from `react-dom`, for drawing a component into DOM the plugin doesn't render with React, such as an editor's node. Since 0.4.1. |
 | `ui` | The app's components: Button, Input, Textarea, Badge, Switch, Checkbox, the Dialog, Empty, Sidebar (with `useSidebar`), Attachment, Message, Bubble, and MessageScroller parts, `Streamdown` for Markdown, `Header` for a screen's top bar, `Blob` for a bot's look, and `Reply` for a turn's reply |
 
 The page's styles hold only the classes the app uses. A plugin brings its own CSS for anything else.

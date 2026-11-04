@@ -2,6 +2,7 @@ import * as React from "react";
 import * as jsxRuntime from "react/jsx-runtime";
 import { Component, createContext, useContext, useSyncExternalStore, type ComponentType, type ReactNode } from "react";
 import { Streamdown } from "streamdown";
+import { createPortal } from "react-dom";
 import * as attachment from "@/components/ui/attachment";
 import * as badge from "@/components/ui/badge";
 import * as bubble from "@/components/ui/bubble";
@@ -86,6 +87,8 @@ function appModule(name: string) {
     api: (path: string, init?: RequestInit) => fetch(`/api/plugins/${name}/${path.replace(/^\//, "")}`, init),
     go,
     useBots: () => useContext(BotsContext),
+    // React's, for a plugin that draws a component into DOM it doesn't render, such as an editor's node.
+    createPortal,
     ui: ui(),
   };
 }

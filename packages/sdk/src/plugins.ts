@@ -164,6 +164,7 @@ export type PluginHost = {
     newSession(plugin: string, bot: string): Promise<string>;
     send(plugin: string, bot: string, message: Parameters<PluginApi["chats"]["send"]>[1]): Promise<{ messageId: string; sessionId: string }>;
     stream(plugin: string, bot: string, session: string, cursor?: number): Promise<ReadableStream<Uint8Array>>;
+    cancel(plugin: string, bot: string, session: string): Promise<void>;
   };
   // A package's remote MCP server, added as an MCP plugin of its own, which follows the package's switch and bots, and
   // is removed with it.
@@ -478,6 +479,7 @@ export async function createPlugins(options: {
         newSession: (bot) => host.chats.newSession(record.name, bot),
         send: (bot, message) => host.chats.send(record.name, bot, message),
         stream: (bot, session, cursor) => host.chats.stream(record.name, bot, session, cursor),
+        cancel: (bot, session) => host.chats.cancel(record.name, bot, session),
       },
       log: (...parts) => write(plugin, parts.map((p) => (typeof p === "string" ? p : JSON.stringify(p))).join(" ")),
       signal: loaded.controller.signal,
