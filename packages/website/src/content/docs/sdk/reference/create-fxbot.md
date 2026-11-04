@@ -47,6 +47,8 @@ To add the SDK to a project, see [Use the SDK in a project](/sdk/how-to/set-up/)
 | `listsUrl` | `string` | `https://fxbot.sh` | The site that publishes fxbot's own lists, `<listsUrl>/mcp-registry.json` and `<listsUrl>/skills-registry.json`. They are read hourly. Until a read succeeds, fxbot uses the lists this release shipped with. |
 | `syncRegistry` | `boolean` | `true` | `false` skips the registry sync at start. In 0.3.0, the hourly sync still runs. |
 | `embedUrl` | `string` | None | The machine's local embedder, an OpenAI-style API such as `http://embed:8080/v1`, for memory search. Trailing slashes are dropped. Without it, there is no local embedder. |
+| `pluginDirs` | `string[]` | None | Plugin folders, for writing a plugin. Each is added on first sight, loaded at start, and loaded again a moment after its files change. See [Plugin API](/sdk/reference/plugin-api/#where-plugins-come-from). |
+| `machine` | `PluginMachine` | None | The machine's `fxbot` command, for a job only root can do. Plugins get it as `fx.machine`, which is `null` without it. See [Plugin API](/sdk/reference/plugin-api/#server-code). |
 
 ### How fxbot's server sets them
 
@@ -65,6 +67,8 @@ To add the SDK to a project, see [Use the SDK in a project](/sdk/how-to/set-up/)
 | `everythingUrl` | `FXBOT_MCP_EVERYTHING` |
 | `listsUrl` | `FXBOT_LISTS_URL` |
 | `embedUrl` | `FXBOT_EMBED_URL` |
+| `pluginDirs` | `FXBOT_PLUGIN_DIRS`, folders separated as `PATH` is |
+| `machine` | The request folder that an install made by `setup.sh` shares with the machine. None in a checkout. |
 
 The server leaves `fetch` and `syncRegistry` at their defaults. The variables are in [Configuration](/docs/reference/configuration/).
 

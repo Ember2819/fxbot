@@ -219,3 +219,11 @@ The page's styles hold only the classes the app uses. A plugin brings its own CS
 - The hourly check marks **Update available** when a plugin's files change in its repository. **Update** moves it to the commit its page showed, and keeps the old version running when the new one doesn't load.
 - Its skills join the catalog of the bots it's on for. Each remote server in its `mcp.json` is added with it, under the usual rules for addresses: a record of its own, which shows in the package's settings, follows the package's switch and bots, and is removed with it. A server that runs a command isn't used yet.
 - In a release, fxbot runs in its container, and a plugin reaches what the container does.
+
+## In your own app
+
+Plugins load inside [`createFxbot`](/sdk/reference/create-fxbot/), so an app built on the SDK runs them as fxbot does, with some parts left to the app:
+- **Server code runs as it is:** hooks, tools, tables, settings, turns, skills, and MCP servers. [`fxbot.plugins`](/sdk/reference/server-api/#plugins) adds, updates, and removes plugins, and `pluginDirs` loads folders.
+- **Routes and sockets need your server.** Pass requests under `/api/plugins/<name>/` to `fxbot.plugins.handle(name, request, path)`, its page code and CSS under `files/` to `fxbot.plugins.file`, and WebSocket upgrades there to `fxbot.plugins.socket`, as fxbot's server does (`packages/server/src/index.ts`). A plugin's page calls that path.
+- **Page code needs fxbot's page.** `fxbot.plugins.pages()` lists each plugin's bundle, but what runs one, the `app` places and `@fxbot/app`, is part of fxbot's own app (`packages/ui/src/plugins.tsx`), not `@fxbot/sdk/client`. An app with a page of its own shows none of a plugin's screens, panels, or buttons, unless it gives the bundle that `require` and `app` itself.
+- **`fx.machine` is `null`** unless you pass `machine`. The computer plugin then sets up its engine by itself only when the app runs as root, and otherwise shows the command to run.
