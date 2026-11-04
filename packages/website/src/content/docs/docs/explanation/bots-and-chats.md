@@ -50,9 +50,11 @@ The vectors come from a local embedder on the machine, on its CPU by default or 
 
 Vectors are kept in Postgres, with pgvector, beside the rows they belong to. A search compares the query with each of the bot's vectors, with no index, since an index takes vectors of one size and each model has its own. Over 100,000 messages of one bot, that took about a quarter of a second when measured.
 
-## Moving a bot to another provider
+## Starting a chat over
 
-A session can't move between agents, and fxbot runs one agent per provider. So moving a bot starts a new chat. The old provider writes a summary of the old chat, or the new one when the old can't, and the new chat starts from it. The earlier messages show above the summary, and stay searchable with `chat_history`.
+A chat starts over two ways, and both work the same. The bot's model writes a summary of the chat so far, and the bot starts a new chat from it. The earlier messages show above a card with the summary, and stay searchable with `chat_history`. Pages open on the chat follow it to the new one.
+- **Moving a bot to another provider.** A session can't move between agents, and fxbot runs one agent per provider, so a move starts a new chat. The old provider writes the summary, or the new one when the old can't. The card says **Continued from** the old provider.
+- **`/fresh`,** from the fresh plugin. A summary aimed at what you write next keeps what bears on it, and your message goes to the new chat. The card says **Started over**. See [Start a chat over with /fresh](/docs/how-to/start-fresh/).
 
 ## The library
 

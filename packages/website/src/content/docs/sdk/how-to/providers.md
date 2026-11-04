@@ -96,7 +96,7 @@ A Vercel account needs fxbot's Vercel OAuth app: pass its id to `createFxbot` as
    await fxbot.profiles.update(bot.id, { provider: local.id, model: "qwen3:8b" });
    ```
 
-   A bot with a chat starts a new one there, from a summary of the old one. See [Moving a bot to another provider](/docs/explanation/bots-and-chats/#moving-a-bot-to-another-provider).
+   A bot with a chat starts a new one there, from a summary of the old one. See [Moving a bot to another provider](/docs/explanation/bots-and-chats/#starting-a-chat-over).
 
 `providers.remove(id)` removes a provider that no bot uses.
 

@@ -10,7 +10,10 @@ Each release of fxbot, newest first. A release that adds migrations, bumps libfx
 - **Plugin icons.** Each plugin has an icon of its own, a soft shape on a tinted tile in two hues, drawn from who made it and its name, so it looks the same everywhere: in **Plugins**, in Settings, and in the sidebar. For the SDK, each plugin and card has `iconKey`, and `@fxbot/sdk/client` exports `pluginIcon(key)`, which draws it. A plugin's `app.nav` button with no `icon` shows the plugin's icon.
 - **A plugin directory** at [fxbot.sh/plugins/](https://fxbot.sh/plugins/): the plugins fxbot vets, with a search box, a card each with its icon, and a page each that says what it carries and how to add it.
 - **Settings in tabs:** General, Providers, Memory, Plugins, and About, each at its own address, and a tab for each plugin that draws in Settings, such as Computer. About has the version, updates, and links.
-- **For plugins:** `app.settings` makes a tab, at `/settings/plugins/<plugin>`.
+- **/fresh starts a chat over,** from the new fresh plugin, on fxbot's list. `/fresh` and where you want to go, in a bot's chat, has the bot summarize the chat, keeping what bears on your words, and start a new chat from it with your message. The chat shows a **Started over** card, and the old chat stays above it. See [Start a chat over with /fresh](https://fxbot.sh/docs/how-to/start-fresh/).
+- **A provider switch** now stops a reply still running in the old chat, and pages open on the bot follow it to the new chat without a reload. A summary that fails gives up after 2 minutes, not 4.
+- **For plugins:** `app.settings` makes a tab, at `/settings/plugins/<plugin>`. A `message` hook can answer `{ startOver: { ask } }`, to start the bot's own chat over before the message runs, and `plugin.json` can list `commands` for the `/` list.
+- **For the SDK:** a chat that starts over ends its streams with a `moved` line naming the new session, and `stream` and `client.stream` take `session`, the session a cursor is in.
 
 ## 0.4.1 (2026-11-04)
 

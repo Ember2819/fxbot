@@ -132,12 +132,13 @@ After `plugins.signIn`, open the attempt's `url`, then call `oauth.get` until th
 ## stream
 
 ```ts
-stream(id: string, options?: { cursor?: number; signal?: AbortSignal; onConnection?: (connected: boolean) => void; onCaughtUp?: () => void }): AsyncGenerator<StreamLine>
+stream(id: string, options?: { cursor?: number; session?: string; signal?: AbortSignal; onConnection?: (connected: boolean) => void; onCaughtUp?: () => void }): AsyncGenerator<StreamLine>
 ```
 
 | Option | Default | What it does |
 | --- | --- | --- |
 | `cursor` | `0` | Where to start. 0 replays the whole chat. |
+| `session` | None | The session `cursor` is in. When the chat has moved from it since, the stream is the `moved` line alone. Since 0.5.0. |
 | `signal` | None | Stops the stream. The generator then returns. |
 | `onConnection` | None | Hears `true` on each connection, and `false` when one drops |
 | `onCaughtUp` | None | Hears each connection catch up: every line the chat had when it opened has been yielded, so the lines before were the replay |
@@ -145,6 +146,7 @@ stream(id: string, options?: { cursor?: number; signal?: AbortSignal; onConnecti
 - It yields every line of the bot's chat from `cursor` on, then each new line, until `signal` aborts.
 - It keeps the `cursor` of the last line it read. When the connection drops, the server answers with an error, or the stream ends, it waits 2 seconds and asks again from that cursor. The server ends the stream at once for a bot with no chat yet, so the client asks again every 2 seconds until the chat starts.
 - It hides a line whose `epoch` is lower than one it has already seen, as libfx's rule says.
+- A `moved` line, when the chat starts over, is the last it yields: a cursor of the old session means nothing in the new one. Read the bot again, and stream its new `sessionId` from 0.
 - Each connection's `x-fxbot-version` header goes to `onVersion`. Its `x-fxbot-end` header, the chat's newest cursor, says when to call `onCaughtUp`. A server without it is caught up at once.
 - A page can hold the replay's lines and show them together at `onCaughtUp`, so a chat opens at its end instead of scrolling past each turn as it arrives. fxbot's own page does.
 
@@ -207,6 +209,7 @@ A turn from `profiles.earlier` has `reply` and no `parts`.
 | `error` | `{ message: string }` | Why the turn failed, on `turn_end` |
 | `cursor` | `number` | Where to start again to get the lines after this one |
 | `epoch` | `number` | The lease epoch of the line's writer |
+| `sessionId` | `string` | On `moved`: the session the chat started over in |
 
 The types `applyLine` reads:
 
@@ -220,7 +223,7 @@ The types `applyLine` reads:
 | `tool_end` | A tool call ends |
 | `turn_end` | A turn ends |
 
-libfx writes other types too, such as `turn_yield` and `idle`. `applyLine` passes over them.
+libfx writes other types too, such as `turn_yield` and `idle`. `applyLine` passes over them, and over `moved`, fxbot's own last line of a chat that started over, by a provider switch or a plugin's `startOver`, with the new `sessionId`. Since 0.5.0.
 
 ## Exports
 

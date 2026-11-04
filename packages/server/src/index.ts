@@ -265,7 +265,7 @@ async function api(req: IncomingMessage, res: ServerResponse, url: URL) {
     return json(res, 200, await fxbot.profiles.skills(id));
   } else if (action === "stream" && method === "GET") {
     const end = await fxbot.streamEnd(id);
-    const lines = Readable.fromWeb((await fxbot.stream(id, Number(url.searchParams.get("cursor") ?? 0))) as ReadableStream<Uint8Array>);
+    const lines = Readable.fromWeb((await fxbot.stream(id, Number(url.searchParams.get("cursor") ?? 0), url.searchParams.get("session") ?? undefined)) as ReadableStream<Uint8Array>);
     // A long chat's replay is mostly repeated JSON, which gzip makes many times smaller for a phone. Each write is
     // flushed, so a new line still arrives at once.
     const gzip = /\bgzip\b/.test(String(req.headers["accept-encoding"] ?? ""));

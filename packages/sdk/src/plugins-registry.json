@@ -11,6 +11,12 @@
       "description": "Rooms where several of your bots talk with you, each answering in turn.",
       "repo": "iammrduncan/fxbot",
       "path": "plugins/chat-rooms"
+    },
+    {
+      "name": "fresh",
+      "description": "/fresh starts a bot's chat over toward what you write next, from a summary of it that keeps what matters.",
+      "repo": "iammrduncan/fxbot",
+      "path": "plugins/fresh"
     }
   ]
 }

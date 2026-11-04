@@ -142,7 +142,7 @@ A file's answer has these headers:
 | `PATCH` | `/api/profiles/<id>` | Any of the fields, and `pinned` | `Profile` |
 | `DELETE` | `/api/profiles/<id>` | | `{ "ok": true }` |
 | `GET` | `/api/profiles/<id>/earlier` | | `Turn[]`: the chats before the current one |
-| `GET` | `/api/profiles/<id>/skills` | | `BotSkill[]` |
+| `GET` | `/api/profiles/<id>/skills` | | `BotSkill[]`: the bot's skills, then its plugins' commands, with `command: true` |
 | `GET` | `/api/profiles/<id>/memories` | `?query=&limit=` | `Memory[]` |
 | `POST` | `/api/profiles/<id>/memories` | `{ "text": "<fact>" }` | 201 and `Memory` |
 | `PATCH` | `/api/profiles/<id>/memories/<memoryId>` | `{ "text": "<fact>" }` | `Memory` |
@@ -153,7 +153,7 @@ A file's answer has these headers:
 | Method | Path | Body or query | Answer |
 | --- | --- | --- | --- |
 | `POST` | `/api/profiles/<id>/messages` | `Message`: `text`, `messageId`, and optional `files`, each `{ name, type, data }` with `data` in base64. At most 12 MiB. | `{ messageId, sessionId }`, once the message is stored |
-| `GET` | `/api/profiles/<id>/stream` | `cursor`, default 0 | NDJSON lines, from the cursor on, then each new one |
+| `GET` | `/api/profiles/<id>/stream` | `cursor`, default 0, and `session`, the session the cursor is in | NDJSON lines, from the cursor on, then each new one, and `{"type":"moved","sessionId":"<new>"}` last when the chat starts over. A `session` the chat has moved from answers that line alone. |
 
 The stream:
 

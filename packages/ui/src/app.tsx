@@ -558,8 +558,12 @@ function Chat({ id, profiles, onChange, onShown }: { id: string; profiles: Profi
   const box = useRef<HTMLTextAreaElement>(null);
   const picker = useRef<HTMLInputElement>(null);
   const skills = useSkillPicker(id, box, draft, setDraft);
-  const skillNames = new Set(skills.skills.map((s) => s.name));
-  const { turns, setTurns, connected, ready } = useTurnStream(id, Boolean(profile?.sessionId));
+  const skillNames = new Set(skills.skills.filter((s) => !s.command).map((s) => s.name));
+  // A chat that started over, here or on another page, is read again: its new session, and its handoff.
+  const reread = () => void client.profiles.get(id).then(setProfile, () => {});
+  const { turns, setTurns, connected, ready } = useTurnStream(id, profile?.sessionId ?? null, reread);
+  const following = useRef(profile?.sessionId);
+  following.current = profile?.sessionId;
   // A long chat shows its newest turns, and more each time it's scrolled near its top, or while they all fit. Turns
   // that arrive later are added below, so `from` holds still.
   const viewport = useRef<HTMLDivElement>(null);
@@ -632,7 +636,9 @@ function Chat({ id, profiles, onChange, onShown }: { id: string; profiles: Profi
     try {
       const { sessionId, handled } = await client.send(id, { text, messageId, files: files.map(({ name, type, data }) => ({ name, type, data })) });
       if (handled) setTurns((all) => all.map((t) => (t.messageId === messageId ? { ...t, done: true, handled } : t)));
-      setProfile((current) => current && { ...current, sessionId });
+      // A message that started the chat over answers from the new session.
+      if (following.current && following.current !== sessionId) reread();
+      else setProfile((current) => current && { ...current, sessionId });
       onChange();
     } catch (e) {
       const note = `Not sent: ${(e as Error).message}`;
@@ -914,11 +920,12 @@ function Files({ files, remove, className = "" }: { files: Upload[]; remove?: (i
 function Handoff({ text }: { text: string }) {
   const [first, ...summary] = text.split("\n\n");
   const from = /moved from (.+) to .+:$/.exec(first)?.[1];
+  const startedOver = /started over:$/.test(first);
   return (
     <Collapsible className="mx-auto w-full max-w-3xl rounded-xl border px-3 py-2 text-sm">
       <CollapsibleTrigger className="group flex w-full items-center gap-2 font-medium">
         <ChevronRightIcon className="size-4 transition-transform group-data-[state=open]:rotate-90" />
-        Continued from {from ?? "an earlier chat"}
+        {startedOver ? "Started over" : `Continued from ${from ?? "an earlier chat"}`}
       </CollapsibleTrigger>
       <CollapsibleContent className="pt-2 whitespace-pre-wrap text-muted-foreground">{summary.join("\n\n")}</CollapsibleContent>
     </Collapsible>

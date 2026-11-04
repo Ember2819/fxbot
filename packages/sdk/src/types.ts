@@ -292,7 +292,8 @@ export type McpSearch = { cards: McpCard[]; syncedAt: string | null; error?: str
 export type SkillCard = { kind: "skill"; id: string; name: string; iconKey: string; repository: string; from: SkillSource["from"]; description?: string; installs?: number };
 export type SkillSearch = { cards: SkillCard[]; error?: string };
 // A skill a bot has, as its chat's picker lists it: `$name` in a message, or `/name` at its start, sends it along.
-export type BotSkill = { name: string; description: string; manual?: boolean };
+// `command` is a plugin's command, which goes in the `/` list without being a skill.
+export type BotSkill = { name: string; description: string; manual?: boolean; command?: true };
 // Write-only: header values, or the person's own OAuth client for a server that registers none itself.
 export type PluginSecrets = { headers?: Record<string, string>; clientId?: string; clientSecret?: string };
 // An OAuth sign-in as the page sees it. "redirect" comes back on its own; "paste" needs the address of the page that
@@ -320,4 +321,6 @@ export type StreamLine = {
   epoch?: number;
   /** On `turn_start`: the plugin that sent the message, when one did. */
   from?: string;
+  /** On `moved`, the stream's last line: the session the chat started over in. */
+  sessionId?: string;
 };

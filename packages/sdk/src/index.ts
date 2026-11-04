@@ -1,7 +1,7 @@
 import type { FxResumeTurn, FxSessionPromptInput, FxTurn } from "libfx";
 import { createArchives } from "./archive.ts";
 import { createEmbeddings, type EmbeddingSettings } from "./embeddings.ts";
-import { createHistory, summarize } from "./history.ts";
+import { createHistory, summarize, switchAsk } from "./history.ts";
 import { createLibrary } from "./library.ts";
 import { createMcp } from "./mcp.ts";
 import { createMemories } from "./memories.ts";
@@ -14,7 +14,7 @@ import { openSessions } from "./sessions.ts";
 import { readKey } from "./secrets.ts";
 import { createSkills } from "./skills.ts";
 import { createStore, isId, type StoredProfile } from "./store.ts";
-import { colors, maxPinned, shapes, type Plugin, type PluginRef, type RepoRef, type PluginSecrets, type Fields, type Kind, type LibraryQuery, type Message, type NewProvider, type Profile, type ProfileUpdate, type ProviderUpdate, type Settings, type StreamLine, embeddingKinds, type SkillRef, type Upload } from "./types.ts";
+import { colors, maxPinned, shapes, type BotSkill, type Plugin, type PluginRef, type RepoRef, type PluginSecrets, type Fields, type Kind, type LibraryQuery, type Message, type NewProvider, type Profile, type ProfileUpdate, type ProviderUpdate, type Settings, type StreamLine, embeddingKinds, type SkillRef, type Upload } from "./types.ts";
 
 export type * from "./types.ts";
 export type * from "./plugin-api.ts";
@@ -342,27 +342,100 @@ export async function createFxbot(options: FxbotOptions) {
       .pipeThrough(withSent(profile.id));
   }
 
-  // A provider switch compacts the chat: the old provider summarizes its own session, or else the new one summarizes
-  // the stored messages. The new session on the new provider starts from that summary.
-  async function switchProvider(profile: StoredProfile, next: string, model: string) {
-    const [from, to] = [await providers.get(profile.provider).catch(() => null), await providers.get(next)];
+  // One start-over of a bot's own chat at a time. A send to that chat, and a provider switch, wait for the one running;
+  // a start-over a message asked for holds it until that message is in the new chat, so one sent meanwhile lands after.
+  const moving = new Map<string, Promise<void>>();
+  async function hold(id: string) {
+    while (moving.has(id)) await moving.get(id);
+    let release!: () => void;
+    moving.set(id, new Promise<void>((done) => (release = done)));
+    return () => (moving.delete(id), release());
+  }
+
+  // Starts the bot's own chat over: a new session, whose handoff is a summary of the chat so far that answers `ask`.
+  // The provider that ran the chat summarizes its session from its checkpoint, or else `provider` summarizes the stored
+  // messages, after the earlier handoff. A turn still running in the old session is cancelled first, and each open
+  // stream of the chat ends with a moved line. A provider switch is one: it moves the bot to `provider`.
+  async function startOver(profile: StoredProfile, options: { ask: string; heading: (from: string, to: string) => string; provider?: string; model?: string }) {
+    const { ask, heading, provider = profile.provider, model = profile.model } = options;
+    const [from, to] = [await providers.get(profile.provider).catch(() => null), await providers.get(provider)];
     const previous = profile.handoff ? [profile.handoff] : [];
+    if (from) await (await open(profile, profile.sessionId!)).cancel().catch(() => {});
     let summary: string;
+    // When the model itself failed, asking the same provider and model again from the transcript only doubles the wait.
+    let failed: { model: string; error: Error } | undefined;
     try {
       if (!from) throw new Error("the old provider is gone");
       const oldModel = await modelFor(profile);
       const checkpoint = await (await providers.agentFor(from.id, oldModel)).session(profile.sessionId!).checkpoint();
-      summary = await summarize(await providers.options(from), oldModel, instructionsFor(profile), checkpoint);
+      summary = await summarize(await providers.options(from), oldModel, instructionsFor(profile), ask, checkpoint).catch((error: Error) => {
+        failed = { model: oldModel, error };
+        throw error;
+      });
     } catch {
       const newModel = model || to.model || fail(400, `Pick a model for ${to.name} first: the old provider could not summarize the chat.`);
+      if (failed && from?.id === to.id && failed.model === newModel) fail(502, `The chat could not be summarized: ${failed.error.message}`);
       const known = (await providers.models(to.id).catch(() => [])).find((m) => m.id === newModel);
       const transcript = await history.transcript(profile.id, profile.sessionId!, ((to.contextWindow ?? known?.contextWindow ?? 32_000) * 4) / 2);
-      summary = await summarize(await providers.options(to), newModel, [profile.instructions].filter(Boolean), undefined, [...previous, transcript].join("\n\n"))
-        .catch((error: Error) => fail(502, `Neither provider could summarize the chat for the switch: ${error.message}`));
+      summary = await summarize(await providers.options(to), newModel, [profile.instructions].filter(Boolean), ask, undefined, [...previous, transcript].join("\n\n"))
+        .catch((error: Error) => fail(502, `The chat could not be summarized: ${error.message}`));
     }
-    const handoff = `Earlier conversation, summarized when this bot moved from ${from?.name ?? "a removed provider"} to ${to.name}:\n\n${summary}`;
+    const handoff = `${heading(from?.name ?? "a removed provider", to.name)}:\n\n${summary}`;
     const sessionId = await (await providers.agentFor(to.id, "")).newSessionId();
-    return (await store.profiles.update(profile.id, { provider: next, model, sessionId, handoff }))!;
+    const saved = (await store.profiles.update(profile.id, { provider, model, sessionId, handoff }))!;
+    for (const stream of following.get(profile.id) ?? []) stream.move(sessionId);
+    return saved;
+  }
+
+  async function switchProvider(profile: StoredProfile, next: string, model: string) {
+    const done = await hold(profile.id);
+    try {
+      return await startOver((await store.profiles.get(profile.id)) ?? profile, {
+        provider: next,
+        model,
+        ask: switchAsk,
+        heading: (from, to) => `Earlier conversation, summarized when this bot moved from ${from} to ${to}`,
+      });
+    } finally {
+      done();
+    }
+  }
+
+  // The open streams of each bot's own chat. A start-over writes a moved line to each, naming the new session, and
+  // ends it.
+  const following = new Map<string, Set<{ move: (sessionId: string) => void }>>();
+  function follow(id: string, source: ReadableStream<Uint8Array>) {
+    const reader = source.getReader();
+    const streams = following.get(id) ?? following.set(id, new Set()).get(id)!;
+    let closed = false;
+    const entry = { move: (_: string) => {} };
+    const leave = () => (streams.delete(entry), streams.size || following.delete(id));
+    return new ReadableStream<Uint8Array>({
+      start(controller) {
+        entry.move = (sessionId) => {
+          leave();
+          if (closed) return;
+          closed = true;
+          controller.enqueue(new TextEncoder().encode(JSON.stringify({ type: "moved", sessionId }) + "\n"));
+          controller.close();
+          void reader.cancel().catch(() => {});
+        };
+        streams.add(entry);
+      },
+      async pull(controller) {
+        const { done, value } = await reader.read().catch(() => ({ done: true, value: undefined }));
+        if (closed) return;
+        if (!done) return controller.enqueue(value!);
+        closed = true;
+        leave();
+        controller.close();
+      },
+      cancel() {
+        closed = true;
+        leave();
+        return reader.cancel();
+      },
+    });
   }
 
   // A plugin's session, which must be its own, for this bot, on the bot's provider now.
@@ -375,6 +448,8 @@ export async function createFxbot(options: FxbotOptions) {
   // A message to a bot's own chat, or to a plugin's session for it. Resolves once libfx has stored the prompt; the reply
   // arrives on the stream. libfx takes at most 8 images, 3.75 MiB each and 6 MiB together. A plugin's message names it.
   async function deliver(id: string, { text, messageId, files = [] }: Message, { session, from }: { session?: string; from?: string } = {}) {
+    // A message to the bot's own chat waits for a start-over of it.
+    if (!session) while (moving.has(id)) await moving.get(id);
     let profile = await get(id);
     if (!Array.isArray(files) || files.length > 8) fail(400, "files must be a list of at most 8");
     if (typeof text !== "string" || (!text.trim() && !files.length)) fail(400, "text is required");
@@ -384,15 +459,41 @@ export async function createFxbot(options: FxbotOptions) {
     // Saved before the prompt, so a restart still finds the session and every upload knows its chat. A concurrent
     // first send keeps the id already saved.
     else if (!profile.sessionId) profile = (await store.profiles.claimSession(id, await (await providers.agentFor(profile.provider, "")).newSessionId())) ?? fail(404, "profile not found");
-    const sessionId = session ?? profile.sessionId!;
+    let sessionId = session ?? profile.sessionId!;
     const by = from ? { from } : {};
+    let done: (() => void) | undefined;
     // Plugins may change the message, or handle it themselves, and then no turn runs.
     if (packages.hooked("message")) {
       const event = { bot: id, session: sessionId, text, files, ...by };
-      if ((await packages.run("message", event))?.handled) return { messageId, sessionId, handled: true as const };
+      const answer = await packages.run("message", event);
+      if (answer?.handled) return { messageId, sessionId, handled: true as const };
       ({ text, files } = event);
       if (typeof text !== "string" || !Array.isArray(files)) fail(400, "A plugin left this message without text or files.");
+      // Or start the bot's own chat over first: only a chat with messages, and only once for a message, so a retry of
+      // one that went through runs nothing new.
+      if (answer?.startOver && !session) {
+        done = await hold(id);
+        try {
+          profile = await get(id);
+          const [{ any, seen }] = await store.sql<{ any: boolean; seen: boolean }[]>`select
+            exists (select 1 from messages where profile_id = ${id} and session_id = ${profile.sessionId}) as any,
+            exists (select 1 from messages where profile_id = ${id} and message_id = ${messageId} and role = 'user') as seen`;
+          if (any && !seen) profile = await startOver(profile, { ask: answer.startOver.ask, heading: () => "Earlier conversation, summarized when the chat started over" });
+          sessionId = profile.sessionId!;
+        } catch (error) {
+          done();
+          throw error;
+        }
+      }
     }
+    try {
+      return await prompt();
+    } finally {
+      done?.();
+    }
+  async function prompt() {
+    // A plugin that took everything out of the message leaves nothing to send.
+    if (!text.trim() && !files.length) return { messageId, sessionId, handled: true as const };
     // A skill named as $name, or /name at the start, goes with the message, so the bot has it without asking.
     const skilled = skills.invoked(id, text);
     const input = files.length || skilled.length ? await attach(profile, sessionId, text, messageId, files, skilled, from) : text;
@@ -411,6 +512,7 @@ export async function createFxbot(options: FxbotOptions) {
       // libfx throws a TypeError or RangeError for a prompt it refuses, such as an image whose bytes are not its type.
       throw error instanceof TypeError || error instanceof RangeError ? Object.assign(error, { status: 400 }) : error;
     }
+  }
   }
 
   // Until the owner turns on unvetted plugins, only the ones in fxbot's lists can be looked at and added. Ones already
@@ -469,7 +571,8 @@ export async function createFxbot(options: FxbotOptions) {
         await store.profiles.remove(id);
       },
       // The bot's skills, for the $ and / picker in its chat.
-      skills: async (id: string) => (await get(id), skills.listFor(id)),
+      // Its skills, then its plugins' commands, for the $ and / list.
+      skills: async (id: string): Promise<BotSkill[]> => (await get(id), [...skills.listFor(id), ...packages.commands(id).map((c) => ({ ...c, command: true as const }))]),
       // The bot's chats before its current one, which a provider switch leaves behind.
       async earlier(id: string) {
         const profile = await get(id);
@@ -544,12 +647,16 @@ export async function createFxbot(options: FxbotOptions) {
     send: (id: string, message: Message) => deliver(id, message),
 
     // Every line of the bot's chat from `cursor` on as NDJSON, staying open for new ones. Cancel it to stop.
-    // A bot with no session yet, or whose provider is gone, has nothing to replay, so its stream ends at once.
-    async stream(id: string, cursor = 0): Promise<ReadableStream<Uint8Array>> {
+    // A bot with no session yet, or whose provider is gone, has nothing to replay, so its stream ends at once. When the
+    // chat starts over, the stream ends with a moved line naming the new session. `session` is the one `cursor` is
+    // in, and a chat that moved from it since answers that line alone.
+    async stream(id: string, cursor = 0, session?: string): Promise<ReadableStream<Uint8Array>> {
       const profile = await get(id);
       if (!Number.isInteger(cursor) || cursor < 0) fail(400, "cursor must be a whole number");
+      if (session && profile.sessionId && session !== profile.sessionId)
+        return new ReadableStream({ start: (c) => (c.enqueue(new TextEncoder().encode(JSON.stringify({ type: "moved", sessionId: profile.sessionId }) + "\n")), c.close()) });
       if (!profile.sessionId || !providers.has(profile.provider)) return new ReadableStream({ start: (controller) => controller.close() });
-      return (await lines(profile, profile.sessionId, cursor)).pipeThrough(new TextEncoderStream());
+      return follow(id, (await lines(profile, profile.sessionId, cursor)).pipeThrough(new TextEncoderStream()));
     },
 
     // The cursor of the newest line in the bot's chat, 0 for none. A stream opened after asking replays up to it, then

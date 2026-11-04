@@ -45,6 +45,8 @@ export type Manifest = {
   migrations?: string;
   settings: PluginSetting[];
   needs: Record<string, Record<string, unknown>>;
+  /** Commands for the `/` list, which its message hook carries out. */
+  commands?: { name: string; description: string }[];
 };
 // A plugin from GitHub keeps its files' list, for what an update changes, and the MCP servers it added.
 type Config = Manifest & { files?: SkillFile[]; servers?: string[] };
@@ -128,6 +130,9 @@ export function parseManifest(text: string): Manifest {
   if (!isObject(needs) || Object.entries(needs).some(([other, block]) => !pluginName.test(other) || other === name || !isObject(block)))
     fail(400, "plugin.json's needs must map other plugins' names to an object each.");
   if (Buffer.byteLength(JSON.stringify(needs)) > 16 * 1024) fail(400, "plugin.json's needs must be at most 16 KiB.");
+  const commands = (own.commands ?? []) as { name: string; description: string }[];
+  if (!Array.isArray(commands) || commands.some((c) => typeof c?.name !== "string" || !pluginName.test(c.name) || c.name.length > 40 || typeof c.description !== "string" || c.description.length > 200))
+    fail(400, "plugin.json's commands must each have a name of up to 40 lowercase letters, digits, and dashes, and a description of up to 200 characters.");
   return {
     name: name as string,
     version: version as string,
@@ -144,6 +149,7 @@ export function parseManifest(text: string): Manifest {
       ...(isSecret === true ? { isSecret: true } : {}),
     })),
     needs: needs as Manifest["needs"],
+    ...(commands.length ? { commands: commands.map(({ name, description }) => ({ name, description })) } : {}),
   };
 }
 
@@ -529,23 +535,30 @@ export async function createPlugins(options: {
   }
 
   // A hook's handlers, plugin by plugin, for the event's bot. A message hook may handle the message, and a tool.before
-  // hook may block the call; either ends the run with its answer. A handler that throws or runs late is logged and
+  // hook may block the call; either ends the run with its answer. A message hook may also ask to start the chat over:
+  // the first such answer counts, and the other hooks still run. A handler that throws or runs late is logged and
   // skipped, except before a tool call, where it blocks, so a broken guard never lets a call through.
-  async function run<E extends keyof HookEvents>(event: E, payload: HookEvents[E] & { bot: string }): Promise<{ handled?: true; block?: string } | undefined> {
+  async function run<E extends keyof HookEvents>(event: E, payload: HookEvents[E] & { bot: string }): Promise<{ handled?: true; block?: string; startOver?: { ask: string } } | undefined> {
+    let startOver: { ask: string } | undefined;
     for (const plugin of plugins.values()) {
       if (!applies(plugin, payload.bot)) continue;
       for (const handler of plugin.loaded!.hooks.get(event) ?? []) {
         try {
-          const answer = (await within(() => handler(payload), limit, `A ${event} hook`)) as { handled?: unknown; block?: unknown } | undefined;
+          const answer = (await within(() => handler(payload), limit, `A ${event} hook`)) as { handled?: unknown; block?: unknown; startOver?: { ask?: unknown } } | undefined;
           if (event === "message" && answer?.handled === true) return { handled: true };
           if (event === "tool.before" && typeof answer?.block === "string") return { block: answer.block };
+          if (event === "message" && answer?.startOver && !startOver) {
+            const ask = answer.startOver.ask;
+            if (typeof ask === "string" && ask.trim() && Buffer.byteLength(ask) <= 16 * 1024) startOver = { ask };
+            else report(plugin, "A message hook", new Error("startOver needs an ask of 1 to 16 KiB of text."));
+          }
         } catch (error) {
           report(plugin, `A ${event} hook`, error);
           if (event === "tool.before") return { block: `${plugin.record.name} stopped this call: ${said(error)}` };
         }
       }
     }
-    return undefined;
+    return startOver && { startOver };
   }
 
   // turn.start and turn.end only observe, so they never hold up a turn.
@@ -792,6 +805,8 @@ export async function createPlugins(options: {
     },
 
     // The skills running plugins carry, for the bots each is on for.
+    // The commands of the plugins that run for this bot, for its `/` list.
+    commands: (bot: string) => [...plugins.values()].flatMap((plugin) => (applies(plugin, bot) ? (plugin.record.config.commands ?? []) : [])),
     carried: (): CarriedSkill[] =>
       [...plugins.values()].flatMap((plugin) => plugin.skills.map((row) => ({ id: `${plugin.record.name}/${row.name}`, row, applies: (bot: string) => applies(plugin, bot) }))),
 

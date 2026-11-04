@@ -1,5 +1,5 @@
 import { useEffect, useLayoutEffect, useRef, useState, type KeyboardEvent, type RefObject } from "react";
-import { BookOpenIcon, XIcon } from "lucide-react";
+import { BookOpenIcon, SquareSlashIcon, XIcon } from "lucide-react";
 import { Attachment, AttachmentAction, AttachmentActions, AttachmentContent, AttachmentGroup, AttachmentMedia, AttachmentTitle } from "@/components/ui/attachment";
 import type { BotSkill } from "@fxbot/sdk/client";
 import { client } from "./client.ts";
@@ -37,7 +37,8 @@ export function useSkillPicker(id: string, box: RefObject<HTMLTextAreaElement | 
   // Read when the chat opens, and again when the box gets focus, so skills added since show up.
   const load = () => client.profiles.skills(id).then(setSkills, () => {});
   useEffect(() => void (setPicked([]), load()), [id]);
-  const matches = token ? rank(skills, token.query) : [];
+  // Plugins' commands, such as /fresh, are in the / list only.
+  const matches = token ? rank(token.trigger === "$" ? skills.filter((s) => !s.command) : skills, token.query) : [];
   // A $ that matches no skill is likely money, so the list stays shut; a / at the start says what there is.
   const open = Boolean(token) && (matches.length > 0 || token?.trigger === "/");
 
@@ -52,6 +53,14 @@ export function useSkillPicker(id: string, box: RefObject<HTMLTextAreaElement | 
 
   function choose(name: string) {
     if (!token) return;
+    // A command is typed out, `/name `, at the start of the box, for its plugin to read; it isn't a chip.
+    if (skills.find((s) => s.name === name)?.command) {
+      const rest = draft.slice(token.start + 1 + token.query.length).replace(/^ /, "");
+      setDraft(`/${name} ${rest}`);
+      setToken(null);
+      caret.current = name.length + 2;
+      return;
+    }
     const next = draft.slice(0, token.start) + draft.slice(token.start + 1 + token.query.length).replace(/^ /, "");
     setDraft(next);
     setPicked((all) => (all.includes(name) ? all : [...all, name]));
@@ -102,7 +111,7 @@ export function SkillMenu({ picker }: { picker: SkillPicker }) {
           onClick={() => picker.choose(skill.name)}
           className={`flex w-full min-w-0 items-start gap-2.5 rounded-xl px-2.5 py-2 text-left text-sm ${i === picker.active ? "bg-accent text-accent-foreground" : ""}`}
         >
-          <BookOpenIcon className="mt-0.5 size-4 shrink-0 text-muted-foreground" />
+          {skill.command ? <SquareSlashIcon className="mt-0.5 size-4 shrink-0 text-muted-foreground" /> : <BookOpenIcon className="mt-0.5 size-4 shrink-0 text-muted-foreground" />}
           <span className="grid min-w-0 flex-1">
             <span className="font-medium">{skill.name}</span>
             <span className="line-clamp-1 text-xs text-muted-foreground">{skill.description}</span>

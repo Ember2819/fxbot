@@ -13,18 +13,28 @@ export function useVisible() {
   return visible;
 }
 
-// A bot's thread, read from its stream from the start and followed while `live`. A hidden page closes the stream, so a
-// phone in a pocket holds no connection, and opens it again from the last line it read when it's shown. `ready` is
-// false until the chat's lines so far have arrived.
-export function useTurnStream(profileId: string, live: boolean) {
+// A bot's thread, read from its stream from the start and followed while it has a `session`. A hidden page closes the
+// stream, so a phone in a pocket holds no connection, and opens it again from the last line it read when it's shown.
+// `ready` is false until the chat's lines so far have arrived. When the chat starts over, its stream ends with a moved
+// line, which calls `onMoved`; the page reads the bot again, and its new session is read from the start, with the
+// finished turns left to the earlier chat.
+export function useTurnStream(profileId: string, session: string | null, onMoved: () => void) {
   const [turns, setTurns] = useState<Turn[]>([]);
   const [connected, setConnected] = useState(true);
   const [ready, setReady] = useState(false);
   const visible = useVisible();
   const cursor = useRef(0);
+  const following = useRef(session);
+  const moved = useRef(onMoved);
+  moved.current = onMoved;
 
   useEffect(() => {
-    if (!live || !visible) return;
+    if (!session || !visible) return;
+    if (following.current !== session) {
+      if (following.current) setTurns((turns) => turns.filter((turn) => !turn.done));
+      following.current = session;
+      cursor.current = 0;
+    }
     const abort = new AbortController();
     // The lines each connection replays are held, and shown together once it has caught up, so the chat opens at its
     // end instead of scrolling past each turn as it arrives. Lines after that show as they come.
@@ -45,13 +55,14 @@ export function useTurnStream(profileId: string, live: boolean) {
       if (on) holding = true;
     };
     (async () => {
-      for await (const line of client.stream(profileId, { cursor: cursor.current, signal: abort.signal, onConnection: connection, onCaughtUp: caughtUp })) {
-        if (holding) held.push(line);
+      for await (const line of client.stream(profileId, { cursor: cursor.current, session, signal: abort.signal, onConnection: connection, onCaughtUp: caughtUp })) {
+        if (line.type === "moved") moved.current();
+        else if (holding) held.push(line);
         else show([line]);
       }
     })();
     return () => abort.abort();
-  }, [profileId, live, visible]);
+  }, [profileId, session, visible]);
 
   return { turns, setTurns, connected, ready };
 }

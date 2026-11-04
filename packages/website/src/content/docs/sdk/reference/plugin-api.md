@@ -33,6 +33,7 @@ Only `plugin.json` is required, and only the paths it names count.
 | `extensions["sh.fxbot"].css` | Its CSS |
 | `extensions["sh.fxbot"].migrations` | A folder of `.sql` files |
 | `extensions["sh.fxbot"].settings` | A list of settings, each with `name`, `description`, and optionally `default`, `isRequired`, and `isSecret` |
+| `extensions["sh.fxbot"].commands` | Commands for the `/` list in a bot's message box, each with `name` (up to 40 lowercase letters, digits, and dashes) and `description` (up to 200 characters). Listing one runs nothing: the plugin's `message` hook sees `/name` as text. Since 0.5.0. |
 | `extensions["sh.fxbot"].needs` | The plugins it needs, each name mapped to an object for that plugin, up to 16 KiB in all. See [Plugins that need others](#plugins-that-need-others). |
 
 ## Server code
@@ -75,7 +76,7 @@ Handlers run in the order the plugins were added, and change the event's fields 
 
 | Event | When | Fields | Can |
 | --- | --- | --- | --- |
-| `message` | Before a message runs, after the chat is known | `bot`, `session`, `text`, `files`, `from` | Change `text` and `files`, or answer `{ handled: true }`, and no turn runs |
+| `message` | Before a message runs, after the chat is known | `bot`, `session`, `text`, `files`, `from` | Change `text` and `files`; answer `{ handled: true }`, and no turn runs; or answer `{ startOver: { ask } }`, and the message goes to a new chat |
 | `instructions` | Each time a chat opens | `bot`, `session`, `instructions`, a list | Add, change, or remove entries |
 | `tool.before` | Before every tool call: fxbot's, MCP servers', skills', and plugins' | `bot`, `session`, `tool`, `input` | Change `input`, or answer `{ block: reason }`, which the model gets as a failed call |
 | `tool.after` | After it | the same, with `result`, or `error` when it failed | Change `result` |
@@ -88,6 +89,7 @@ Handlers run in the order the plugins were added, and change the event's fields 
 - `turn.start` and `turn.end` run beside the turn, and never hold it up.
 - `from` is the plugin that sent the message, when one did.
 - A message that a `message` hook handled answers `send` with `{ messageId, sessionId, handled: true }`.
+- `{ startOver: { ask } }`, since 0.5.0, starts the bot's own chat over before the message runs: the bot's model summarizes the chat, answering `ask`, up to 16 KiB of text, and the bot starts a new chat from that summary, as a provider switch does. The message then goes to the new chat as the owner's. It applies only to the bot's own chat, only to a chat with messages, and only once for a message: a retry of one that went through doesn't start over again. The other plugins' hooks still run, and the first `startOver` counts. A message left with no text and no files answers `handled: true`. A summary that fails fails the send, with 502, and nothing moves. The fresh plugin, in fxbot's `plugins/fresh`, is one.
 
 ## Tools
 

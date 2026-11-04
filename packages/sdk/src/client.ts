@@ -55,6 +55,8 @@ export type ClientOptions = {
 export type StreamOptions = {
   /** Where to start: 0 replays the whole chat. */
   cursor?: number;
+  /** The session `cursor` is in. When the chat has moved from it, the stream is the moved line alone. */
+  session?: string;
   /** Stops the stream. */
   signal?: AbortSignal;
   /** Hears the connection drop and come back. */
@@ -86,12 +88,13 @@ export function createClient({ baseUrl = "", onVersion }: ClientOptions = {}) {
   }
 
   // Every line of a bot's chat from `cursor` on, then each new one, until `signal` aborts. After a dropped
-  // connection it asks again from the last cursor it read, every 2 seconds.
-  async function* stream(id: string, { cursor = 0, signal, onConnection, onCaughtUp }: StreamOptions = {}): AsyncGenerator<StreamLine> {
+  // connection it asks again from the last cursor it read, every 2 seconds. A `moved` line, when the chat starts over,
+  // is the last: a cursor of the old session means nothing in the new one.
+  async function* stream(id: string, { cursor = 0, session, signal, onConnection, onCaughtUp }: StreamOptions = {}): AsyncGenerator<StreamLine> {
     let epoch = 0;
     while (!signal?.aborted) {
       try {
-        const res = await fetch(`${baseUrl}/api/profiles/${id}/stream?cursor=${cursor}`, { signal });
+        const res = await fetch(`${baseUrl}/api/profiles/${id}/stream?${new URLSearchParams({ cursor: String(cursor), ...(session ? { session } : {}) })}`, { signal });
         if (!res.ok || !res.body) throw new Error(`HTTP ${res.status}`);
         const version = res.headers.get("x-fxbot-version");
         if (version) onVersion?.(version);
@@ -122,6 +125,7 @@ export function createClient({ baseUrl = "", onVersion }: ClientOptions = {}) {
             }
             epoch = line.epoch ?? epoch;
             yield line;
+            if (line.type === "moved") return;
             caughtUp();
           }
         }

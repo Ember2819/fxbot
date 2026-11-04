@@ -75,7 +75,7 @@ Status: built on 2026-11-04, for 0.5.0, as planned the same day at the owner's w
 - **Launch.** The app reads the bots once at launch (`client.profiles.list()`, `packages/ui/src/app.tsx:65-89`). It stays laid out but hidden until its first screen is whole: the bots, and on a chat its messages (`app.tsx:108-122`).
 - **`/` is Home,** "Pick a bot" (`app.tsx:124`, `Home` at `app.tsx:367`).
 - **The app goes to `/` itself** after a bot is deleted (`app.tsx:438`), and the chat-rooms plugin does after a room is deleted (`plugins/chat-rooms/fxbot/page.jsx:174`).
-- **Each bot has one lasting chat,** `profile.sessionId`. `/profiles/<id>` opens it at its end (`Chat`, `app.tsx:586`). A provider switch, and [/fresh](../../phases/fresh.md), move a bot to a new session, and the chat follows.
+- **Each bot has one lasting chat,** `profile.sessionId`. `/profiles/<id>` opens it at its end (`Chat`, `app.tsx:586`). A provider switch, and [/fresh](fresh.md), move a bot to a new session, and the chat follows.
 - **Pins are on the bot** (`profiles.pinned_at`, `packages/sdk/src/migrations/0001_baseline.sql:54-58`). The sidebar has no menu on a bot, only Pin and Unpin buttons (`app.tsx:211-279`).
 - **The settings table is one row:** `check (id = 1)`, with `default_provider` and `unvetted` (`0001_baseline.sql:1`, `0007_one_kind_of_plugin.sql:11`). Its store calls are `packages/sdk/src/store.ts:71-83`.
 - **`PATCH /api/settings`** passes its fields to the SDK as they are (`packages/server/src/index.ts:184-195`).

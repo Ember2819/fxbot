@@ -5,7 +5,7 @@ import type { Sql } from "./store.ts";
 import type { Upload } from "./types.ts";
 
 // What the summary on a provider switch asks for, after fx's compaction: requests in order, the rest summed up.
-const ask =
+export const switchAsk =
   "Write a handoff summary of this conversation so far, for the assistant that continues it on another model. " +
   "Keep the user's requests in order, summarize the replies, decisions, and facts, and list open tasks. At most 1,500 words.";
 
@@ -167,9 +167,9 @@ export function createHistory(sql: Sql, embeddings?: Embeddings) {
   };
 }
 
-// One tool-free request to a throwaway engine. With `checkpoint`, the engine starts from the old session's own
-// history; without it, `input` carries the transcript. Gives up after 2 minutes.
-export async function summarize(options: Record<string, unknown>, model: string, instructions: string[], checkpoint?: Uint8Array, transcript?: string) {
+// One tool-free request to a throwaway engine, asking `ask`. With `checkpoint`, the engine starts from the old
+// session's own history; without it, `input` carries the transcript. Gives up after 2 minutes.
+export async function summarize(options: Record<string, unknown>, model: string, instructions: string[], ask: string, checkpoint?: Uint8Array, transcript?: string) {
   // The provider options come from the same code that makes the provider's agent.
   const engine = await createFxEngine({ ...options, model, instructions, ...(checkpoint ? { checkpoint } : {}) } as unknown as Parameters<typeof createFxEngine>[0]);
   try {
@@ -178,6 +178,8 @@ export async function summarize(options: Record<string, unknown>, model: string,
     let text = "";
     for await (const event of turn) if (event.type === "text_delta") text += event.delta;
     const { stopReason } = await turn.result;
+    // libfx retries a failing provider until the time runs out, which ends the turn cancelled.
+    if (stopReason === "cancelled") throw new Error("the model didn't answer within 2 minutes.");
     if (stopReason !== "end_turn") throw new Error(`The summary stopped: ${stopReason}.`);
     if (!text.trim()) throw new Error("The summary came back empty.");
     return text.trim();

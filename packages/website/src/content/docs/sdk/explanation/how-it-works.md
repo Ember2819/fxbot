@@ -23,7 +23,7 @@ Each bot has one durable session, its chat. libfx keeps the session in Postgres,
 
 libfx keeps no model or instructions with a session. So each time the SDK opens a bot's chat, it passes them: the bot's model, its instructions, the summary from a provider switch, its newest memories, and the list of its skills, within libfx's 64 KiB. It also passes the bot's id, which every tool reads to know whose chat it runs in.
 
-Moving a bot to another provider can't move its session, so the bot starts a new one there, from a summary of the old. See [Moving a bot to another provider](/docs/explanation/bots-and-chats/#moving-a-bot-to-another-provider).
+Moving a bot to another provider can't move its session, so the bot starts a new one there, from a summary of the old. See [Moving a bot to another provider](/docs/explanation/bots-and-chats/#starting-a-chat-over).
 
 ## A turn, end to end
 

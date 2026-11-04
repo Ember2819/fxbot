@@ -24,7 +24,9 @@ export type HookEvents = {
   /** A plugin that needs this one was added, updated, or removed: the ones that need it now. */
   dependents: { dependents: Dependent[] };
 };
-export type HookAnswers = { message: { handled: true }; "tool.before": { block: string } };
+// A message hook handles the message, or starts the bot's own chat over from a summary that answers `ask`, and then the
+// message goes to the new chat.
+export type HookAnswers = { message: { handled: true } | { startOver: { ask: string } }; "tool.before": { block: string } };
 export type Hook<E extends keyof HookEvents> = (event: HookEvents[E]) => unknown;
 
 // A tool for bots, named `<plugin>_<name>` when they see it. `bot` and `session` are the chat's that called it.

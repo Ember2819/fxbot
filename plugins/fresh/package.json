@@ -1,0 +1,5 @@
+{
+  "private": true,
+  "type": "module",
+  "description": "The fresh plugin has no page code to build. fxbot reads only type, which makes its server code an ES module."
+}

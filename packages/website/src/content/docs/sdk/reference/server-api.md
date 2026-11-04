@@ -17,7 +17,7 @@ Every call returns a promise, unless its row says it is synchronous. A call that
 | `profiles.update(id, update)` | Changes any of the fields, and `pinned` | `Profile` |
 | `profiles.remove(id)` | Removes the bot, its messages, and its memories. Its library items stay, with `null` for the bot. Its libfx session stays in the database. | nothing |
 | `profiles.earlier(id)` | The bot's chats before its current one, which a provider switch leaves behind, as finished turns, oldest first: the newest 400 messages of them. `Turn` is the client's type. | `Turn[]` |
-| `profiles.skills(id)` | The skills the bot has, for a `$` and `/` picker | `BotSkill[]` |
+| `profiles.skills(id)` | The skills the bot has, for a `$` and `/` picker, then the commands of the plugins on for it, with `command: true` | `BotSkill[]` |
 
 The fields of a bot:
 
@@ -53,7 +53,7 @@ Other keys are ignored. An update also takes `pinned`:
 | Call | What it does | Returns |
 | --- | --- | --- |
 | `send(id, message)` | Sends a message to the bot. It resolves once libfx has stored the prompt. The reply arrives on the stream. | `{ messageId, sessionId }` |
-| `stream(id, cursor = 0)` | Every line of the bot's chat from `cursor` on, as NDJSON, then each new line. Cancel the stream to stop it. | `ReadableStream<Uint8Array>` |
+| `stream(id, cursor = 0, session?)` | Every line of the bot's chat from `cursor` on, as NDJSON, then each new line. Cancel the stream to stop it. When the chat starts over, by a provider switch or a plugin's `startOver`, the stream ends with `{"type":"moved","sessionId":"<new>"}`. `session` is the session `cursor` is in: one the chat has moved from answers that line alone. | `ReadableStream<Uint8Array>` |
 | `streamEnd(id)` | The cursor of the newest line in the bot's chat, 0 for none. A stream opened after it replays up to that cursor, then follows. | `number` |
 
 `send` takes a `Message`:

@@ -34,7 +34,7 @@ Because the turn lives on the server, a reload, a closed app, or a lost connecti
 
 ## Why one agent per provider
 
-A libfx session belongs to the agent that started it, and an agent's tools are fixed when it is made. So fxbot keeps one agent per provider, shared by the bots on it, and decides inside each tool which bots may use it. Moving a bot to another provider starts a new session, which [carries a summary](/docs/explanation/bots-and-chats/#moving-a-bot-to-another-provider) of the old one.
+A libfx session belongs to the agent that started it, and an agent's tools are fixed when it is made. So fxbot keeps one agent per provider, shared by the bots on it, and decides inside each tool which bots may use it. Moving a bot to another provider starts a new session, which [carries a summary](/docs/explanation/bots-and-chats/#starting-a-chat-over) of the old one.
 
 ## Kept small on purpose
 

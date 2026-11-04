@@ -5,7 +5,7 @@
 - **The new chat:** it starts from that summary, and the owner's words are its first message, as the owner's.
 - **The old chat** stays readable above it, and searchable with `chat_history`.
 
-Status: planned on 2026-11-04, for 0.5.0, at the owner's word; researched against the research directive's references.
+Status: built on 2026-11-04, for 0.5.0, as planned the same day at the owner's word, and researched against the research directive's references. Where the build differs from the plan, [What the build changed](#what-the-build-changed) says so.
 
 The owner's words: "New plugin `/fresh` kick off a topic change or fresh direction by sending your message + a compaction that is a targeted compaction to keep important facts but get the conversation started on the right direction. And it sends that compaction + your new message to the agent."
 
@@ -27,7 +27,7 @@ The first draft of this plan had the plugin take the message, start over through
 
 **A plugin, `fresh`, on one core piece and two small seams.**
 
-- **Core: starting a chat over from a summary.** "Context that fits the model" is core ([conventions](../../CONVENTIONS.md#core-or-plugin)). Core already starts a chat over once: a provider switch summarizes the chat and starts a new session from the summary (`switchProvider`, `packages/sdk/src/index.ts:344-366`). This phase makes that `startOver`, which takes the ask, and has the page follow the move. [Context management](context-management.md) will call it when a chat nears its model's window.
+- **Core: starting a chat over from a summary.** "Context that fits the model" is core ([conventions](../../../CONVENTIONS.md#core-or-plugin)). Core already starts a chat over once: a provider switch summarizes the chat and starts a new session from the summary (`switchProvider`, `packages/sdk/src/index.ts:344-366`). This phase makes that `startOver`, which takes the ask, and has the page follow the move. [Context management](../../phases/context-management.md) will call it when a chat nears its model's window.
 - **The seams the plugin can't do without:**
   - **A `message` hook answer, `{ startOver: { ask } }`:** start the bot's own chat over, then deliver this message there. A plugin can't do this itself:
     - The message's session is picked before the hook runs (`index.ts:385-386`).
@@ -412,7 +412,7 @@ What it costs:
 
 ### Not in this phase
 
-- **Starting over by itself** when a chat nears its model's window: [context management](context-management.md), which will call `startOver`.
+- **Starting over by itself** when a chat nears its model's window: [context management](../../phases/context-management.md), which will call `startOver`.
 - **A draft to edit** before it's sent, as in Pi and Amp. See the open questions.
 - **Going back** to the old chat. It stays readable and searchable, not resumable.
 - **`/fresh` in a room,** or in any plugin's session.
@@ -438,73 +438,73 @@ Build in a git worktree on a branch from `release/0.5.0`, so the owner's `npm ru
 - out of scope: the list under [Not in this phase](#not-in-this-phase)
 
 **M1. `startOver` and the switch**
-- [ ] `summarize` takes the ask, `switchProvider` calls `startOver`, and `npm run typecheck` passes.
-- [ ] A provider switch through the mock works as before:
+- [x] `summarize` takes the ask, `switchProvider` calls `startOver`, and `npm run typecheck` passes.
+- [x] A provider switch through the mock works as before:
   - The handoff starts "Earlier conversation, summarized when this bot moved from A to B:".
   - The old chat shows above a card that says "Continued from A".
-  - `chat_history` finds an old message.
+  - `chat_history` finds an old message. Not run: the mock model makes no tool calls, and neither `chat_history` nor the transcript it reads changed.
   - The mock's log shows the switch's ask, unchanged.
-- [ ] A switch while a reply streams: the old turn ends `cancelled` on the old session's stream.
+- [x] A switch while a reply streams: the old turn ends `cancelled` on the old session's stream.
 
 **M2. The hook answer, through the plugin**
-- [ ] `/fresh let's plan the Lisbon trip` in a chat of 6 turns:
+- [x] `/fresh let's plan the Lisbon trip` in a chat of 6 turns:
   - The mock gets one summary request. Its last message is the ask, with the words inside `<next>`, and its instructions are the bot's own.
   - `GET /api/profiles/<id>` shows a new `sessionId` and the handoff, and the send answers with that `sessionId`.
-- [ ] The new chat's first turn, in the mock's log:
+- [x] The new chat's first turn, in the mock's log:
   - Its message is "let's plan the Lisbon trip", without `/fresh`.
   - Its instructions hold the handoff and "Search earlier messages with chat_history.".
   - Its `turn_start` has no `from`, and its `sent` row names no plugin.
-- [ ] `/fresh` alone: one summary request with the ask for no words, a new session, no turn, and the send answers `handled: true`.
-- [ ] `/fresh` with an image: the image goes with the message to the new chat, and its library item is tagged for the new chat.
-- [ ] `/freshly x` and `hi /fresh x` are ordinary messages, with no summary request.
-- [ ] A second `/fresh`: the summary request's instructions hold the first handoff.
-- [ ] The same `messageId` sent twice with `curl`: one summary request, and both sends answer the same `sessionId`.
-- [ ] A new bot whose first message is `/fresh x`: no summary, and `x` runs in its first chat.
-- [ ] The mock failing the summary, with a 500 on both paths: the send answers 502, "The chat could not be summarized: …", and `sessionId` and `handoff` are unchanged.
-- [ ] A message sent while a summary runs, with the mock holding it 5 seconds: it lands in the new chat, after the `/fresh` message.
-- [ ] In a room, the owner's `/fresh x` reaches the bots as text, and no bot's own chat moves.
-- [ ] With the plugin off for a bot, or removed: `/fresh x` is an ordinary message, sent as typed.
+- [x] `/fresh` alone: one summary request with the ask for no words, a new session, no turn, and the send answers `handled: true`.
+- [x] `/fresh` with an image: the image goes with the message to the new chat, and its library item is tagged for the new chat.
+- [x] `/freshly x` and `hi /fresh x` are ordinary messages, with no summary request.
+- [x] A second `/fresh`: the summary request's instructions hold the first handoff.
+- [x] The same `messageId` sent twice with `curl`: one summary request, and both sends answer the same `sessionId`.
+- [x] A new bot whose first message is `/fresh x`: no summary, and `x` runs in its first chat.
+- [x] The mock failing the summary, with a 500 on both paths: the send answers 502, "The chat could not be summarized: …", and `sessionId` and `handoff` are unchanged.
+- [x] A message sent while a summary runs, with the mock holding it 5 seconds: it lands in the new chat, after the `/fresh` message.
+- [x] In a room, the owner's `/fresh x` reaches the bots as text, and no bot's own chat moves.
+- [x] With the plugin off for a bot, or removed: `/fresh x` is an ordinary message, sent as typed.
 
 **M3. The stream and the page**
-- [ ] `curl -N` on the bot's stream during a `/fresh`: the last line is `{"type":"moved","sessionId":"<new>"}`, and the stream ends.
-- [ ] `curl -N` on the stream with `?cursor=5&session=<old>` answers the `moved` line alone. With the new session, it answers the chat's lines.
-- [ ] The `/` list:
+- [x] `curl -N` on the bot's stream during a `/fresh`: the last line is `{"type":"moved","sessionId":"<new>"}`, and the stream ends.
+- [x] `curl -N` on the stream with `?cursor=5&session=<old>` answers the `moved` line alone. With the new session, it answers the chat's lines.
+- [x] The `/` list:
   - It shows `fresh` with its description and the slash icon, among matching skills.
   - Enter on it writes `/fresh ` with no chip.
   - `$` doesn't list it, and neither does `/` for a bot the plugin is off for.
-- [ ] While the summary runs, the message shows with "Thinking…".
-- [ ] After it, without a reload, the chat shows, in order:
+- [x] While the summary runs, the message shows with "Thinking…".
+- [x] After it, without a reload, the chat shows, in order:
   - the earlier messages
   - the **Started over** card, which opens to the summary
   - the message without `/fresh`, and its reply, with no "From" label
-- [ ] A failed summary: the message shows "Not sent: The chat could not be summarized: …" with **Retry**, which works once the mock answers.
-- [ ] A second page on the bot shows the same, without a reload. A third page, hidden during the move and shown after it, shows the new chat from its start.
-- [ ] A provider switch made on another page moves an open chat the same way.
-- [ ] At a phone's width, 390 by 664, the `/` list and the card fit.
+- [x] A failed summary: the message shows "Not sent: The chat could not be summarized: …" with **Retry**, which works once the mock answers.
+- [x] A second page on the bot shows the same, without a reload. A third page, hidden during the move and shown after it, shows the new chat from its start.
+- [x] A provider switch made on another page moves an open chat the same way.
+- [x] At a phone's width, 390 by 664, the `/` list and the card fit: the list spans 16 to 374 px, and the page doesn't scroll sideways.
 
 **M4. The plugin, fxbot's list, and the docs**
-- [ ] `plugins/fresh/README.md`: what `/fresh` does, how to add it, the ask it sends the model, its files, that it needs fxbot 0.5.0, and that it has no page code to build.
-- [ ] `packages/sdk/src/plugins-registry.json` lists `fresh`, from `iammrduncan/fxbot` at `plugins/fresh`. With `FXBOT_LISTS_URL` at an address that doesn't answer, **Browse** shows it from the list the checkout ships, tagged **fxbot**.
-- [ ] Plugin API reference (`sdk/reference/plugin-api.md`):
+- [x] `plugins/fresh/README.md`: what `/fresh` does, how to add it, the ask it sends the model, its files, that it needs fxbot 0.5.0, and that it has no page code to build.
+- [x] `packages/sdk/src/plugins-registry.json` lists `fresh`, from `iammrduncan/fxbot` at `plugins/fresh`. With `FXBOT_LISTS_URL` at an address that doesn't answer, **Browse** shows it from the list the checkout ships, tagged **fxbot**.
+- [x] Plugin API reference (`sdk/reference/plugin-api.md`):
   - `commands` in `plugin.json`'s table
   - `{ startOver: { ask } }` in the `message` row, with a bullet on what it does: the bot's own chat only, not an empty chat, once per message, and since 0.5.0
-- [ ] Client reference (`sdk/reference/client.md`): `moved` among the line types, `sessionId` among the fields, and `session` in `StreamOptions`.
-- [ ] HTTP API (`sdk/reference/http-api.md`):
+- [x] Client reference (`sdk/reference/client.md`): `moved` among the line types, `sessionId` among the fields, and `session` in `StreamOptions`.
+- [x] HTTP API (`sdk/reference/http-api.md`):
   - the stream's `session` query and its `moved` line
   - `GET /api/profiles/<id>/skills`, which lists plugins' commands with `command: true`
-- [ ] Server API (`sdk/reference/server-api.md`): `stream(id, cursor, session?)`, commands in `profiles.skills`, and that a moved chat's streams end with `moved`.
-- [ ] A how-to, "Start a chat over with /fresh" (`docs/how-to/start-fresh.md`), in `src/sidebar.ts` after "Talk with several bots in a room".
-- [ ] Bots and chats (`docs/explanation/bots-and-chats.md`): "Moving a bot to another provider" becomes "Starting a chat over", which covers both.
-- [ ] `CHANGELOG.md`, under `## Unreleased`, which goes above 0.4.1 if it isn't there yet. No migration, so no Before upgrading.
+- [x] Server API (`sdk/reference/server-api.md`): `stream(id, cursor, session?)`, commands in `profiles.skills`, and that a moved chat's streams end with `moved`.
+- [x] A how-to, "Start a chat over with /fresh" (`docs/how-to/start-fresh.md`), in `src/sidebar.ts` after "Talk with several bots in a room".
+- [x] Bots and chats (`docs/explanation/bots-and-chats.md`): "Moving a bot to another provider" becomes "Starting a chat over", which covers both.
+- [x] `CHANGELOG.md`, under `## Unreleased`, which goes above 0.4.1 if it isn't there yet. No migration, so no Before upgrading.
   - the fresh plugin
   - "For plugins:" the `startOver` answer, and `commands`
   - "For the SDK:" the `moved` line, and `session`
 
 **M5. Checks and the commit**
-- [ ] `npm run typecheck`, `npm run build`, and `npm run build-site`, on Node 22.22 or newer, pass.
-- [ ] `git diff --check` passes, and so does `git diff --cached --check` once the new files are staged.
-- [ ] `git diff --stat` shows core within its bound.
-- [ ] One commit on `release/0.5.0`, or two: core, then the plugin and its docs. Each message says what changed. Nothing is pushed.
+- [x] `npm run typecheck`, `npm run build`, and `npm run build-site`, on Node 22.22 or newer, pass.
+- [x] `git diff --check` passes, and so does `git diff --cached --check` once the new files are staged.
+- [x] `git diff --stat` shows core at its bound: 209 lines added and 46 removed in the SDK, the server, and the page, about 25 of them moved from the switch, so about 163 more, of which 6 are fxbot's list's entry. See [What the build changed](#what-the-build-changed).
+- [x] One commit on `release/0.5.0`, which says what changed. Nothing is pushed.
 
 **The human checks these by hand:**
 - **A real chat:** with a real model and a long chat that changed subject a few times, `/fresh` toward one thread.
@@ -513,6 +513,16 @@ Build in a git worktree on a branch from `release/0.5.0`, so the owner's `npm ru
 - **Another language:** a `/fresh` in another language gets its summary in that language.
 - **Two devices:** a phone and a desktop open on the bot. `/fresh` on one, and the other follows.
 - **The wait:** how long the summary takes on the owner's providers, and whether the owner's proxy holds a send that long. A switch's save already waits as long.
+
+## What the build changed
+
+- **A failed summary gives up after 2 minutes, not 4.** libfx retries a failing provider until the summary's 2 minutes run out, and the fallback from the transcript then asked the same provider and model for 2 minutes more. When the first try reached the model and the fallback would ask the same one, the send fails at once with the first error. The message says "the model didn't answer within 2 minutes." instead of "The summary stopped: cancelled.". A provider switch keeps its fallback to the new provider.
+- **One start-over at a time** is a `hold` on a map from bot to a promise: a send to the bot's own chat waits on it before it reads the bot, a switch holds it, and a `/fresh` holds it until its own message is in the new chat. A message sent during a 5-second summary landed after the `/fresh` message, in the new chat.
+- **`deliver`'s turn** moved into a function of its own, `prompt`, so the hold is let go however the send ends. A message that a hook left with no text and no files answers `handled: true`, for `/fresh` alone.
+- **Commands** go in `plugin.json`'s `commands`, are checked when it's read, and are listed for a bot by `packages.commands(bot)`. `$` leaves them out, and a pick writes `/name ` at the start of the box with no chip.
+- **The page** follows a move from the stream's `moved` line, or from a send answered in another session, by reading the bot again. A page hidden during the move reads the new session from its start when it's shown.
+- **Size:** core as in M5. The plugin's code is 41 lines, under its 80; its README, about 50.
+- **Checks** ran against a disposable Postgres and a check server, with a mock model of the check's own (`chk/mock.mjs` in the build's scratchpad) that answers a summary request with a scripted summary, and fails or holds it on request, and with Playwright at 1280×900 and 390×664.
 
 ## 5. Open questions
 
