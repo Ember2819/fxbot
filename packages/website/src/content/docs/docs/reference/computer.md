@@ -56,7 +56,7 @@ The plugin has three skills:
 
 ## The desktop
 
-Each computer runs a desktop: XFCE on an X display, `:1`, with a panel, the Thunar file manager, Chromium, and a terminal window on the tmux session `main`. Its VNC server listens on a unix socket in the computer, `/tmp/fxbot/vnc.sock`, and no computer listens on a TCP port.
+Each computer is named for its bot, as its hostname, such as `bob-computer`, and runs a desktop: XFCE on an X display, `:1`, with a panel, the Thunar file manager, Chromium, and a terminal window on the tmux session `main`. Its VNC server listens on a unix socket in the computer, `/tmp/fxbot/vnc.sock`, and no computer listens on a TCP port.
 
 - **The Computer screen**, `/computer/bots/<id>`, shows the desktop through [noVNC](https://novnc.com) and the terminal through [xterm.js](https://xtermjs.org), over WebSockets at `/api/plugins/computer/desktop/<id>` and `/api/plugins/computer/terminal/<id>`. The desktop is view-only until **Take over**; the terminal takes typing always. For a stopped computer, the screen has **Start it**.
 - **The browser** is Chromium, run as root without its sandbox, with its profile in `/root/.config/chromium`, so sign-ins last. The `agent-browser` command starts it on the desktop when it isn't running, brings its window to the front, and drives it over DevTools on `127.0.0.1:9222`, inside the computer.

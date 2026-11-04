@@ -66,6 +66,10 @@ const files = [
   },
 ];
 const isBot = /^[0-9a-f]{12}$/;
+// A computer's hostname: its bot's name as a hostname can hold it, then -computer, such as bob-computer. A name with
+// nothing a hostname holds gives the bot's id instead.
+const hostOf = (name: string, bot: string) =>
+  `${name.normalize("NFKD").replace(/\p{M}/gu, "").toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+/, "").slice(0, 50).replace(/-+$/, "") || bot}-computer`;
 
 type Engine = { state: "ready" | "unreachable" | "rootful"; socket: string; name?: string; version?: string; error?: string };
 type Step = { from: string; run: string };
@@ -416,12 +420,15 @@ export default async function setup(fx: PluginApi) {
     const current = idOf((await json("GET", `/images/${tag}/json`)).Id);
     const sizes = limits();
     const look = `SCREEN=${screen()}`;
+    // A bot renamed since its computer was made gets the new name on its next start.
+    const host = hostOf((await fx.bots.get(bot).catch(() => null))?.name ?? "", bot);
     const stale =
       info &&
       (idOf(info.Image) !== current ||
         info.HostConfig?.Memory !== sizes.Memory ||
         info.HostConfig?.NanoCpus !== sizes.NanoCpus ||
         !info.Config?.Env?.includes(look) ||
+        info.Config?.Hostname !== host ||
         whose !== install);
     if (stale) await json("DELETE", `/containers/${name}?force=true`);
     if (!info || stale) {
@@ -431,7 +438,7 @@ export default async function setup(fx: PluginApi) {
         Cmd: ["session"],
         Env: [...env, look],
         WorkingDir: "/root",
-        Hostname: "computer",
+        Hostname: host,
         Labels: { "fxbot.computer": bot, "fxbot.install": install },
         HostConfig: { Init: true, ...sizes, PidsLimit: 512, ShmSize: 512 * mib, Mounts: [{ Type: "volume", Source: name, Target: "/root" }] },
       });
