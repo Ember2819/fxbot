@@ -294,7 +294,7 @@ The keys are trimmed and lowercased first, so `IAMMRDUNCAN/Computer ` draws the 
 - **The sidebar's footer:**
   - `plugins.tsx` keeps each page entry's `iconKey` on `Loaded`, and `usePluginNav()` returns it.
   - `app.tsx` draws `<PluginIcon iconKey={…} size={20} />` where it drew the letter. A plugin with two buttons and no icons shows its icon on both, and the tooltips say which.
-- **Settings:** when [settings tabs](settings-tabs.md) is built, each plugin's tab draws its icon at 16 px from `usePlugins()`. Whichever phase lands second wires it.
+- **Settings:** when [settings tabs](../_completed/phases/settings-tabs.md) is built, each plugin's tab draws its icon at 16 px from `usePlugins()`. Whichever phase lands second wires it.
 
 ### The site
 

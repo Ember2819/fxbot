@@ -177,6 +177,11 @@ export function Place<P extends object>({ pick, props }: { pick: (places: Places
   );
 }
 
+// Each loaded plugin that draws in Settings, with its parts, in load order: a tab each.
+export function usePluginSettings() {
+  return usePlugins().flatMap(({ name, places }) => (places.settings.length ? [{ name, parts: places.settings }] : []));
+}
+
 // The plugin screen for a path, `/<plugin>/…`, checked after the app's own.
 export function usePluginScreen(path: string): ReactNode | undefined {
   const plugins = usePlugins();

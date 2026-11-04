@@ -33,7 +33,7 @@ The library serves what chats hold as data, never as a page. Images are checked 
 
 ## Vetted plugins
 
-By default, fxbot finds and adds only the plugins on its own lists, which the project vets, tagged **fxbot**. Until you turn on **Show unvetted plugins** in Settings, fxbot asks none of the public registries, and its server refuses to look at or add anything else: an MCP server by its address, a public registry's entry, a skill from skills.sh, or a repository. Plugins you already added keep working either way. Vetting is the project's choice of what to list, not a review of every version that follows.
+By default, fxbot finds and adds only the plugins on its own lists, which the project vets, tagged **fxbot**. Until you turn on **Show unvetted plugins** in **Settings** › **Plugins**, fxbot asks none of the public registries, and its server refuses to look at or add anything else: an MCP server by its address, a public registry's entry, a skill from skills.sh, or a repository. Plugins you already added keep working either way. Vetting is the project's choice of what to list, not a review of every version that follows.
 
 ## MCP servers
 

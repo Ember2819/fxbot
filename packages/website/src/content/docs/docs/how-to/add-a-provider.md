@@ -1,9 +1,9 @@
 ---
 title: "Add a provider"
-description: "A provider is where a bot's model runs. Open Settings, choose Add provider\u2026, and pick one. What comes next depends on how it connects."
+description: "A provider is where a bot's model runs. Open Settings \u203a Providers, choose Add provider\u2026, and pick one. What comes next depends on how it connects."
 ---
 
-A provider is where a bot's model runs. Open **Settings**, choose **Add provider…**, and pick one. What comes next depends on how it connects.
+A provider is where a bot's model runs. Open **Settings** › **Providers**, choose **Add provider…**, and pick one. What comes next depends on how it connects.
 
 ## An account, with a device code
 

@@ -15,13 +15,13 @@ The changelog is written by hand. A release that adds migrations, bumps libfx, o
 
 ## Installs stay where they are
 
-An install stays on its release until someone chooses the next one. fx, which fxbot takes after, updates itself by default. fxbot doesn't: you update when you are ready. Once a day, the server asks GitHub for the newest release, and Settings shows its notes and an **Update** button. `FXBOT_UPDATE_CHECK=off` stops the asking. Prereleases install only by name, so nobody lands on one by accident.
+An install stays on its release until someone chooses the next one. fx, which fxbot takes after, updates itself by default. fxbot doesn't: you update when you are ready. Once a day, the server asks GitHub for the newest release, and **Settings** › **About** shows its notes and an **Update** button. `FXBOT_UPDATE_CHECK=off` stops the asking. Prereleases install only by name, so nobody lands on one by accident.
 
 ## An image per release
 
 An install runs three containers, from the release's compose file: the app, from fxbot's image for that version, its database, from pgvector's Postgres image, and the local embedder for memory search, from llama.cpp's server image, unless it's turned off. Every machine then runs the same Node, the same Postgres, and pgvector, whatever its distro ships. `/opt/fxbot/.env` names the version that runs.
 
-The app doesn't start containers itself, and has no podman or docker socket. Settings' **Update** writes a request into a folder the app shares with the machine. systemd sees it and runs the machine's `fxbot` command, as root, which takes only a version from the request. The command downloads the release's compose file and itself, pulls the images it doesn't have yet, writes the new version, and recreates the app's container. Running chats get up to 90 seconds to finish, the database keeps running, and the app is down for a few seconds. The command writes each step to a status file, which Settings shows, and the page reloads onto the new version once it answers.
+The app doesn't start containers itself, and has no podman or docker socket. **Update**, in Settings › About, writes a request into a folder the app shares with the machine. systemd sees it and runs the machine's `fxbot` command, as root, which takes only a version from the request. The command downloads the release's compose file and itself, pulls the images it doesn't have yet, writes the new version, and recreates the app's container. Running chats get up to 90 seconds to finish, the database keeps running, and the app is down for a few seconds. The command writes each step to a status file, which Settings shows, and the page reloads onto the new version once it answers.
 
 Nothing changes until the new release has downloaded, so a failed download leaves fxbot as it was. If the new app isn't healthy within 5 minutes, the command goes back to the release it replaced by itself, restoring the backup the new app took before its migrations, if it ran any. Settings then shows why, from the new app's last log lines. [Going back](/docs/how-to/go-back/) by hand later works the same way.
 

@@ -79,7 +79,7 @@ Seals every stored key and token again, providers' and MCP servers' alike, under
 sudo fxbot embedder gpu
 ```
 
-Runs the local embedder for memory search on the CPU (`cpu`), on an NVIDIA GPU (`gpu`), or not at all (`off`), and writes the choice into `/opt/fxbot/.env` as `FXBOT_EMBEDDER`. For `gpu`, it first makes a trial run, `nvidia-smi` in llama.cpp's CUDA image with the GPU, and changes nothing when no GPU answers. Then it recreates the `embed` container on the new compose files, or, for `off`, removes it. Its state goes to `/var/lib/fxbot/control/embedder-status.json`, which Settings shows. Settings' **Memory search** asks for the same through a request, which `fxbot apply` carries out.
+Runs the local embedder for memory search on the CPU (`cpu`), on an NVIDIA GPU (`gpu`), or not at all (`off`), and writes the choice into `/opt/fxbot/.env` as `FXBOT_EMBEDDER`. For `gpu`, it first makes a trial run, `nvidia-smi` in llama.cpp's CUDA image with the GPU, and changes nothing when no GPU answers. Then it recreates the `embed` container on the new compose files, or, for `off`, removes it. Its state goes to `/var/lib/fxbot/control/embedder-status.json`, which Settings shows. **Memory search**, in Settings › Memory, asks for the same through a request, which `fxbot apply` carries out.
 
 It changes what the machine runs, not where the app takes its vectors from: after `off`, pick **Off** in Settings as well. A new embedder is a new model, so the app gives every memory and message a new vector. See [Choose where memory search's vectors come from](/docs/how-to/memory-search/).
 
@@ -89,7 +89,7 @@ It changes what the machine runs, not where the app takes its vectors from: afte
 sudo fxbot computer off
 ```
 
-Sets up the [computer](/docs/reference/computer/) plugin's engine (`on`), or takes it away (`off`). It downloads the computer's setup script from the running release's own files into `/opt/fxbot/computer-setup.sh`, and runs it: `on` makes the `fxbot-computer` user, its rootless engine, and the firewall, and gives fxbot's container the engine's socket; `off` removes them, with every computer and its home. Either starts fxbot again. Its state goes to `/var/lib/fxbot/control/computer-status.json`, which the computer's section in Settings shows.
+Sets up the [computer](/docs/reference/computer/) plugin's engine (`on`), or takes it away (`off`). It downloads the computer's setup script from the running release's own files into `/opt/fxbot/computer-setup.sh`, and runs it: `on` makes the `fxbot-computer` user, its rootless engine, and the firewall, and gives fxbot's container the engine's socket; `off` removes them, with every computer and its home. Either starts fxbot again. Its state goes to `/var/lib/fxbot/control/computer-status.json`, which **Settings** › **Computer** shows.
 
 Adding the computer plugin asks for `on` through a request, which `fxbot apply` carries out, so you don't run it yourself. Remove the plugin before `off`, or it asks again when fxbot starts.
 

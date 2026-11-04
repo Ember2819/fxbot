@@ -53,14 +53,14 @@ Tailscale prints the address it serves, `https://<machine>.<tailnet>.ts.net`. Op
 
 Install it as an app:
 
-- **Android, in Chrome:** open **Settings** at the bottom of the sidebar, and tap **Install**.
+- **Android, in Chrome:** open **Settings** at the bottom of the sidebar, and on **General**, tap **Install**.
 - **iPhone:** tap **Share**, then **Add to Home Screen**, and leave Open as Web App on.
 
 Open fxbot from the home screen. It opens on its own, without the browser's bars.
 
 ## Add a provider
 
-Open **Settings**. Under Providers, choose **Add provider…**, then **ChatGPT plan**.
+Open **Settings** › **Providers**, and choose **Add provider…**, then **ChatGPT plan**.
 
 fxbot shows a link and a code. Open the link, sign in to ChatGPT, and enter the code. The dialog closes by itself once you have, and the provider appears under Providers, marked **Default**.
 

@@ -32,10 +32,9 @@ import {
   SidebarProvider,
   useSidebar,
 } from "@/components/ui/sidebar";
-import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
-import { colors, maxPinned, unreachable, type Color, type Fields, type Profile, type Provider, type Settings, type Shape, type Turn, type Upload } from "@fxbot/sdk/client";
+import { colors, maxPinned, unreachable, type Color, type Fields, type Profile, type Provider, type Shape, type Turn, type Upload } from "@fxbot/sdk/client";
 import { client } from "./client.ts";
 import { maxFiles, readFile } from "./attachments.ts";
 import { Blob, LookPicker } from "./blob.tsx";
@@ -43,14 +42,13 @@ import { BotPanel, usePanel } from "./bot-panel.tsx";
 import { BotMemories } from "./memories.tsx";
 import { PluginsPage, BotPlugins } from "./plugins-page.tsx";
 import { LibraryPage } from "./library.tsx";
-import { MemorySearch } from "./memory-search.tsx";
-import { Version } from "./release.tsx";
 import { Reply } from "./steps.tsx";
 import { follow, go } from "./nav.ts";
 import { Header } from "./header.tsx";
 import { BotsProvider, loadPlugins, Place, usePluginNav, usePluginScreen } from "./plugins.tsx";
-import { ModelField, Providers } from "./providers.tsx";
-import { install, keepDraft, reload, takeDraft, useInstall, useNewVersion } from "./pwa.ts";
+import { ModelField } from "./providers.tsx";
+import { keepDraft, reload, takeDraft, useNewVersion } from "./pwa.ts";
+import { SettingsScreen } from "./settings.tsx";
 import { useTurnStream } from "./use-turn-stream.ts";
 import { leadingSkills, SkillChips, SkillMenu, useSkillPicker } from "./skill-picker.tsx";
 
@@ -122,7 +120,7 @@ export function App() {
   }, []);
   let screen: ReactNode;
   if (path === "/") screen = <Home profiles={profiles} offline={offline} onNew={() => setCreating(true)} />;
-  else if (path === "/settings") screen = <SettingsForm />;
+  else if (top === "settings") screen = <SettingsScreen tab={path.split("/").slice(2).join("/")} />;
   else if (path === "/library") screen = <LibraryPage profiles={profiles} />;
   // /addons is where it was before 0.4.0.
   else if (path === "/plugins" || path === "/addons") screen = <PluginsPage profiles={profiles} />;
@@ -297,7 +295,7 @@ function BotSidebar({ profiles, offline, active, onNew, onChange }: { profiles: 
         <div className="flex items-center gap-1">
           <SidebarMenu className="flex-1">
             <SidebarMenuItem>
-              <SidebarMenuButton asChild isActive={location.pathname === "/settings"}>
+              <SidebarMenuButton asChild isActive={location.pathname === "/settings" || location.pathname.startsWith("/settings/")}>
                 <a href="/settings" onClick={open}>
                   <SettingsIcon />
                   Settings
@@ -499,51 +497,6 @@ function ProfileForm({ id, onSaved }: { id: string; onSaved: () => void }) {
             <BotMemories profile={bot} version={0} />
           </section>
         )}
-      </main>
-    </>
-  );
-}
-
-function SettingsForm() {
-  const [settings, setSettings] = useState<Settings | null>(null);
-  const [error, setError] = useState("");
-  useEffect(() => {
-    client.settings.get().then(setSettings, (e: Error) => setError(e.message));
-  }, []);
-  const makeDefault = (defaultProvider: string) => client.settings.update({ defaultProvider }).then(setSettings, (e: Error) => setError(e.message));
-  const installing = useInstall();
-
-  return (
-    <>
-      <Header title="Settings" />
-      <main className="flex-1 overflow-y-auto px-4 py-6">
-        <div className="mx-auto grid max-w-xl gap-5">
-          {error && <Problem>{error}</Problem>}
-          {installing === "prompt" && (
-            <div className="flex items-center gap-3 rounded-xl border p-3 text-sm">
-              <p className="flex-1">Install fxbot as an app on this device.</p>
-              <Button onClick={install}>Install</Button>
-            </div>
-          )}
-          {installing === "steps" && <p className="rounded-xl border p-3 text-sm">To install fxbot, tap Share, then Add to Home Screen, and leave Open as Web App on.</p>}
-          {settings && <Providers defaultProvider={settings.defaultProvider} onDefault={makeDefault} />}
-          <p className="text-sm text-muted-foreground">New bots start on the default provider, with its default model.</p>
-          <MemorySearch />
-          {settings && (
-            <section className="grid gap-3" aria-label="Plugins">
-              <h2 className="font-medium">Plugins</h2>
-              <label className="flex items-center justify-between gap-3 text-sm">
-                Show unvetted plugins
-                <Switch checked={settings.unvetted} onCheckedChange={(unvetted) => client.settings.update({ unvetted }).then(setSettings, (e: Error) => setError(e.message))} />
-              </label>
-              <p className="text-sm text-muted-foreground">
-                fxbot shows the plugins it vets, tagged fxbot. Turn this on to also browse GitHub's MCP registry and skills.sh, and to add any MCP server by its address or any plugin by its repository. fxbot doesn't vet those: read what each one does before you add it.
-              </p>
-            </section>
-          )}
-          <Place pick={(places) => places.settings} props={{}} />
-          <Version />
-        </div>
       </main>
     </>
   );
@@ -753,7 +706,7 @@ function Chat({ id, profiles, onChange, onShown }: { id: string; profiles: Profi
                     <h2 className="text-2xl font-semibold">{profile.name} has no provider</h2>
                     <p className="text-muted-foreground">Add a provider in Settings, then pick it in the bot's settings.</p>
                     <div className="flex gap-2">
-                      <a href="/settings" onClick={follow} className={buttonVariants()}>
+                      <a href="/settings/providers" onClick={follow} className={buttonVariants()}>
                         Settings
                       </a>
                       <a href={`/profiles/${id}/edit`} onClick={follow} className={buttonVariants({ variant: "outline" })}>

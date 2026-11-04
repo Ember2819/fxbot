@@ -25,11 +25,11 @@ For a server the registry doesn't list. Its docs give the address, often ending 
 3. For a server that takes a key, paste it. It is sent as `Authorization: Bearer`; for another header, write it as `Name: value`.
 4. Choose the **Add** button, then follow steps 6 to 8 above.
 
-A bot's **Edit** page lists the servers too, under **Plugins**. A server that a plugin brought with it shows in that plugin's settings instead, and follows its switch and its bots.
+A bot's **Edit** page lists the servers too, in its **Plugins** section. A server that a plugin brought with it shows in that plugin's settings instead, and follows its switch and its bots.
 
 ## When it goes differently
 
-- **Browse shows only fxbot's picks.** Turn on **Show unvetted plugins** in Settings, under **Plugins**. fxbot doesn't vet what that shows.
+- **Browse shows only fxbot's picks.** Turn on **Show unvetted plugins** in **Settings** › **Plugins**. fxbot doesn't vet what that shows.
 - **The search doesn't find it.** Tick **Search everything** to look in the official MCP registry as well. Nobody reviews its entries, so check who published one before you add it.
 - **The page warns that the server isn't on the publisher's domain.** The registry checks who published an entry, not where its server runs. Add it only if you trust that host.
 - **The page says it runs on this machine.** That server is a program, not a remote server, and fxbot can't add it yet.

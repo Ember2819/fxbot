@@ -85,9 +85,9 @@ The computer's engine is set up by `host/setup.sh`, in the plugin's files, run a
 | --- | --- |
 | From a release install | The machine's `fxbot` command, with `fxbot computer on`, which the plugin asks for through fxbot's requests. It runs the script from the release's own files, not the plugin's folder, then starts fxbot again. |
 | From a checkout, as root | The plugin, with `--user root` |
-| From a checkout, as another user | Nobody: **Settings** shows the command, to run as root |
+| From a checkout, as another user | Nobody: **Settings** › **Computer** shows the command, to run as root |
 
-**Settings** shows the setup while it works, and why it failed, with **Try again**. `FXBOT_COMPUTER_NAME` names another user than `fxbot-computer`, for checks beside a real install.
+**Settings** › **Computer** shows the setup while it works, and why it failed, with **Try again**. `FXBOT_COMPUTER_NAME` names another user than `fxbot-computer`, for checks beside a real install.
 
 The script's options, for running it by hand:
 

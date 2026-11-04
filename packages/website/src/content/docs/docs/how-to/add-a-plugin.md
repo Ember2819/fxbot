@@ -22,7 +22,7 @@ Some plugins build on another, such as one that installs programs on the compute
 
 ## Show unvetted plugins
 
-fxbot's picks are the plugins it vets. To see the rest, open **Settings**, and under **Plugins**, turn on **Show unvetted plugins**. **Browse** then adds:
+fxbot's picks are the plugins it vets. To see the rest, open **Settings** › **Plugins**, and turn on **Show unvetted plugins**. **Browse** then adds:
 - MCP servers from GitHub's registry, with **Search everything** for the official one, and **Add by address**: see [Add an MCP server](/docs/how-to/add-an-mcp-server/)
 - skills from skills.sh: see [Add a skill](/docs/how-to/add-a-skill/)
 - **From GitHub**: any plugin with a `plugin.json`, by its repository, as `owner/repo`, or `owner/repo/folder` when it's in a folder

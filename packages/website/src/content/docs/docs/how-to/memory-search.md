@@ -16,7 +16,7 @@ The local choices need an install made by `setup.sh`, which runs `embed` as one 
 
 ## Pick one
 
-1. Open **Settings**. **Memory search** is below Providers.
+1. Open **Settings**, then **Memory**.
 2. Under **Where vectors come from**, pick one of the choices. A local choice, or **Off**, asks the machine to start, move, or stop `embed`. While it does, the line below says so, such as **Switching the local embedder to the GPU…**.
 3. Read the line below the choices. Once vectors are on, it names the model and how far they have got:
 

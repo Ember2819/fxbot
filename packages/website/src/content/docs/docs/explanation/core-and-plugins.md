@@ -25,7 +25,7 @@ Everything else is a plugin. A plugin carries any mix of three things, and at le
 - [MCP servers](/docs/how-to/add-an-mcp-server/), which give bots tools from a remote service
 - [code](/docs/how-to/add-a-plugin/), which runs inside fxbot and can add screens, tools, its own tables and settings, and the turns it starts
 
-Each goes to all bots, or only to the ones you choose; its screens are for everyone. By default, fxbot shows only the plugins it vets, tagged **fxbot**, and a switch in Settings shows the public registries too. What each part may do is in the [Security model](/docs/explanation/security/#vetted-plugins).
+Each goes to all bots, or only to the ones you choose; its screens are for everyone. By default, fxbot shows only the plugins it vets, tagged **fxbot**, and a switch in Settings › Plugins shows the public registries too. What each part may do is in the [Security model](/docs/explanation/security/#vetted-plugins).
 
 The plugin API is the seam that most later features plug into. fxbot's own plugins, such as chat rooms, use it as anyone's do.
 

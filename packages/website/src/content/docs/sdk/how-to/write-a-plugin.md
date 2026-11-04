@@ -168,7 +168,7 @@ A plugin can build on another. The browser plugin has no code: it gives the comp
 ## 7. Publish it
 
 1. Push the plugin's folder to a public GitHub repository, at its root or in a folder of it.
-2. Anyone can add it from **Plugins**, on **Browse**, under **From GitHub**: `owner/repo`, or `owner/repo/folder`. That's there once they turn on unvetted plugins in Settings, since fxbot doesn't vet it. fxbot pins it to the commit that its page showed.
+2. Anyone can add it from **Plugins**, on **Browse**, under **From GitHub**: `owner/repo`, or `owner/repo/folder`. That's there once they turn on unvetted plugins in Settings › Plugins, since fxbot doesn't vet it. fxbot pins it to the commit that its page showed.
 3. When you push a change that touches its files, fxbot marks it **Update available** within the hour, and shows the owner what changes before it moves.
 
 A plugin can also carry skills, as `skills/<name>/SKILL.md`, and remote MCP servers, in `mcp.json`. To ask for a place in fxbot's own list, open a pull request that adds it to `packages/sdk/src/plugins-registry.json`.

@@ -218,7 +218,7 @@ export function PluginsPage({ profiles }: { profiles: Profile[] | null }) {
                 {!unvetted && (
                   <p className="text-sm text-muted-foreground">
                     These are the plugins fxbot vets. To browse public registries, and add any plugin by its address or repository, turn on{" "}
-                    <a href="/settings" onClick={follow} className="text-foreground underline underline-offset-4">
+                    <a href="/settings/plugins" onClick={follow} className="text-foreground underline underline-offset-4">
                       unvetted plugins in Settings
                     </a>
                     .

@@ -82,7 +82,7 @@ addEventListener("beforeinstallprompt", (event) => {
   changed();
 });
 const ios = /iPhone|iPad|iPod/.test(navigator.userAgent) || (/Macintosh/.test(navigator.userAgent) && navigator.maxTouchPoints > 1);
-const standalone = matchMedia("(display-mode: standalone)").matches;
+export const standalone = matchMedia("(display-mode: standalone)").matches;
 
 export function useInstall() {
   const prompt = useSyncExternalStore(subscribe, () => installPrompt);

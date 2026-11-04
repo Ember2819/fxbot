@@ -2,14 +2,14 @@
 
 Settings becomes a screen of tabs: **General**, **Providers**, **Memory**, **Plugins**, and **About**. Each plugin that draws in Settings gets a tab of its own, between Plugins and About. About is the version, updates, links, and the license. Each tab has its own address.
 
-Status: planned on 2026-11-04, for 0.5.0, at the owner's word; researched against the research directive's references. The owner asked: "Turn setting into multi tab settings with dedicated about page and allow plugins to add tabs." The owner's decisions:
+Status: built on 2026-11-04, for 0.5.0, as planned the same day at the owner's word, and researched against the research directive's references. Where the build differs from the plan, [What the build changed](#what-the-build-changed) says so. The owner asked: "Turn setting into multi tab settings with dedicated about page and allow plugins to add tabs." The owner's decisions:
 - The tabs are General, Providers, Memory, Plugins, and About.
 - About is a tab of its own.
 - Plugins can add tabs.
 
 ## 0. Core or plugin
 
-**Core.** Settings is the app's own screen, and what plugins plug into ([Core or plugin](../../CONVENTIONS.md#core-or-plugin)): a plugin's `app.settings` part is a place in the app. Updates are core too, and About is where they show.
+**Core.** Settings is the app's own screen, and what plugins plug into ([Core or plugin](../../../CONVENTIONS.md#core-or-plugin)): a plugin's `app.settings` part is a place in the app. Updates are core too, and About is where they show.
 
 The plugin API keeps its one call. `app.settings(Component)` makes a tab named for the plugin, instead of a section in one long page. No plugin has to change, and the API gains no hook.
 
@@ -82,7 +82,7 @@ These are the best prior art for plugin tabs and About, beyond the list.
   - About is a dialog under Help, with the versions of its parts. That's from use, not checked today.
 - **Chrome:** the settings sidebar ends with **About Chrome** (`chrome://settings/help`), which shows the version and checks for and applies updates. From use, not checked today.
 - **ChatGPT:** Settings is a dialog with its sections in a column on the left. OpenAI's help says to "select Settings, then select Data controls" ([help](https://help.openai.com/en/articles/7730893-data-controls-faq)). Third-party guides disagree on the list of sections, so I couldn't verify the current one.
-- **opencode:** its desktop app has "registries for commands, panels, settings pages" ([plugins phase](../_completed/phases/plugins.md)). That's from 0.4.0's research, not checked today.
+- **opencode:** its desktop app has "registries for commands, panels, settings pages" ([plugins phase](plugins.md)). That's from 0.4.0's research, not checked today.
 
 ### fxbot today
 
@@ -117,7 +117,7 @@ These are the best prior art for plugin tabs and About, beyond the list.
 
 | Tab | Address | What it holds |
 | --- | --- | --- |
-| **General** | `/settings` | Install fxbot as an app: the prompt, the iOS steps, or "fxbot runs as an app on this device" when it does. The default bot, from [default bot](default-bot.md). |
+| **General** | `/settings` | Install fxbot as an app: the prompt, the iOS steps, or "fxbot runs as an app on this device" when it does. The default bot, from [default bot](../../phases/default-bot.md). |
 | **Providers** | `/settings/providers` | `Providers` as it is, then "New bots start on the default provider, with its default model." |
 | **Memory** | `/settings/memory` | `MemorySearch` as it is |
 | **Plugins** | `/settings/plugins` | **Show unvetted plugins**, its text, and a line that links to **Plugins** to add, update, and remove them |
@@ -126,7 +126,7 @@ These are the best prior art for plugin tabs and About, beyond the list.
 
 - **Plugin tabs** come in the order the app loads plugins, as the sidebar's plugin buttons do.
 - **A plugin's label** is its name, with its first letter capitalized and dashes as spaces. `computer` becomes **Computer**, and `chat-rooms` becomes **Chat rooms**.
-- **Icons.** The core tabs have lucide icons: General `SlidersHorizontal`, Providers `KeyRound`, Memory `Brain`, Plugins `Puzzle`, and About `Info`. A plugin's tab shows its icon from [plugin icons](plugin-icons.md) once that's built, and no icon until then.
+- **Icons.** The core tabs have lucide icons: General `SlidersHorizontal`, Providers `KeyRound`, Memory `Brain`, Plugins `Puzzle`, and About `Info`. A plugin's tab shows its icon from [plugin icons](../../phases/plugin-icons.md) once that's built, and no icon until then.
 - **An unknown address,** such as a plugin's tab before its page code has loaded or after it's removed, shows the tab list with an empty pane. When the plugin loads, its tab appears. A plugin's screen already shows "Not found" until then.
 
 ### About
@@ -239,36 +239,36 @@ Size: about 90 new lines of code, net of the move, and about 15 lines of docs. I
 Checks run against a disposable Postgres and `FXBOT_DATA`, on another `FXBOT_PORT`, with the computer plugin loaded from `FXBOT_PLUGIN_DIRS=plugins/computer`. Playwright runs at 1280×800 and 375×667. Don't start a server on the owner's dev port.
 
 **M1. The tabs**
-- [ ] `/settings` shows General, and its tab is the one with `aria-current="page"`.
-- [ ] `/settings/providers`, `/settings/memory`, `/settings/plugins`, and `/settings/about` each open their tab.
-- [ ] Clicking a tab changes the address without reloading the page. Back returns to the tab before. A reload stays on the tab.
-- [ ] General shows **Install** where the browser offers it, the iOS steps on iOS Safari, and "fxbot runs as an app on this device" in the installed app.
-- [ ] Providers lists the providers, sets the default provider, and opens **Add provider…** as before. Memory works as before.
-- [ ] Plugins' switch saves `unvetted` (`GET /api/settings` shows the change), and its link opens `/plugins`.
-- [ ] The sidebar's Settings button is active on every `/settings` address.
-- [ ] A bot with no provider shows a Settings button that opens Providers. The Plugins page's "unvetted plugins in Settings" link opens the Plugins tab.
+- [x] `/settings` shows General, and its tab is the one with `aria-current="page"`.
+- [x] `/settings/providers`, `/settings/memory`, `/settings/plugins`, and `/settings/about` each open their tab.
+- [x] Clicking a tab changes the address without reloading the page. Back returns to the tab before. A reload stays on the tab.
+- [x] General shows **Install** where the browser offers it, the iOS steps on iOS Safari, and "fxbot runs as an app on this device" in the installed app. Headless Chromium offers no install, so the check saw the new line for that case; the prompt, the steps, and the installed line are the code that was there before, moved, and left for the owner's phone check below.
+- [x] Providers lists the providers, sets the default provider, and opens **Add provider…** as before. Memory works as before.
+- [x] Plugins' switch saves `unvetted` (`GET /api/settings` shows the change), and its link opens `/plugins`.
+- [x] The sidebar's Settings button is active on every `/settings` address.
+- [x] A bot with no provider shows a Settings button that opens Providers. The Plugins page's "unvetted plugins in Settings" link opens the Plugins tab.
 
 **M2. Plugin tabs**
-- [ ] With the computer plugin, a **Computer** tab sits between Plugins and About, at `/settings/plugins/computer`. Its section works: the engine's state, and **Try again** or **Rebuild image**.
-- [ ] Opening `/settings/plugins/computer` in a new tab shows that tab once the plugins load.
-- [ ] A scratch plugin in `FXBOT_PLUGIN_DIRS` with two `app.settings` calls gets one tab, with both parts in it.
-- [ ] A part that throws shows its error card inside its tab, and the other tabs keep working. Delete the scratch plugin after.
-- [ ] With no plugin that calls `app.settings`, there are exactly five tabs.
-- [ ] Turning the computer plugin off in **Plugins** removes its tab. Its address then shows the tab list and an empty pane.
+- [x] With the computer plugin, a **Computer** tab sits between Plugins and About, at `/settings/plugins/computer`. Its section works: the engine's state shows. **Rebuild image** wasn't pressed, since it rebuilds the machine's real image; it's in the owner's checks below.
+- [x] Opening `/settings/plugins/computer` in a new tab shows that tab once the plugins load.
+- [x] A scratch plugin in `FXBOT_PLUGIN_DIRS` with two `app.settings` calls gets one tab, with both parts in it.
+- [x] A part that throws shows its error card inside its tab, and the other tabs keep working. Delete the scratch plugin after.
+- [x] With no plugin that calls `app.settings`, there are exactly five tabs.
+- [x] Turning the computer plugin off in **Plugins** removes its tab. Its address then shows the tab list and an empty pane.
 
 **M3. Layout**
-- [ ] At 1280×800, with the bots' sidebar open, the tabs are a column left of the content.
-- [ ] At 375×667, the tabs are one row under the header that scrolls sideways, and the active tab is in view on load. `document.scrollingElement.scrollWidth <= innerWidth`.
-- [ ] Tab moves through the tab links, Enter opens one, and the focus ring shows.
-- [ ] Light and dark both read: the active tab stands out in each.
+- [x] At 1280×800, with the bots' sidebar open, the tabs are a column left of the content.
+- [x] At 375×667, the tabs are one row under the header that scrolls sideways, and the active tab is in view on load. `document.scrollingElement.scrollWidth <= innerWidth`.
+- [x] Tab moves through the tab links, Enter opens one, and the focus ring shows.
+- [x] Light and dark both read: the active tab stands out in each.
 
 **M4. About**
-- [ ] About shows `fxbot <version>`, the four links, and the license, each opening in a new tab at the address in [About](#about).
-- [ ] In a checkout, with a newer release out, About shows the notes and "Settings updates an install made by setup.sh. This checkout updates with git."
+- [x] About shows `fxbot <version>`, the four links, and the license, each opening in a new tab at the address in [About](#about).
+- [x] In a checkout, with a newer release out, About shows the notes and "Settings updates an install made by setup.sh. This checkout updates with git."
 
 **M5. Docs and checks**
-- [ ] `packages/website/src/content/docs/sdk/reference/plugin-api.md`: `app.settings(Component)` is "A tab of its own in Settings, named for the plugin, at `/settings/plugins/<plugin>`. Several calls stack in that tab. Before 0.5.0, a section of Settings' one page."
-- [ ] These pages, under `packages/website/src/content/docs/`, say where things are now:
+- [x] `packages/website/src/content/docs/sdk/reference/plugin-api.md`: `app.settings(Component)` is "A tab of its own in Settings, named for the plugin, at `/settings/plugins/<plugin>`. Several calls stack in that tab. Before 0.5.0, a section of Settings' one page."
+- [x] These pages, under `packages/website/src/content/docs/`, say where things are now:
   - `docs/how-to/memory-search.md`: Settings › Memory.
   - `docs/how-to/add-a-plugin.md` and `docs/how-to/add-an-mcp-server.md`: Settings › Plugins.
   - `docs/tutorials/first-fxbot.md`: Install in Settings › General, and Settings › Providers.
@@ -276,11 +276,11 @@ Checks run against a disposable Postgres and `FXBOT_DATA`, on another `FXBOT_POR
   - `docs/how-to/update.md` and `docs/explanation/releases.md`: Settings › About.
   - `docs/how-to/give-bots-a-computer.md`: Settings › Computer.
   - `docs/explanation/security.md`: Settings › Plugins.
-- [ ] `grep -rn "below Providers\|under \*\*Plugins\*\*\|Under Providers" packages/website/src/content/docs` finds nothing.
-- [ ] `CHANGELOG.md` has `## Unreleased` above 0.4.1, with: "**Settings in tabs:** General, Providers, Memory, Plugins, and About, each at its own address, and a tab for each plugin that draws in Settings, such as Computer. About has the version, updates, and links." Under it, for plugins: "`app.settings` makes a tab, at `/settings/plugins/<plugin>`."
-- [ ] `npm run typecheck`, `npm run build`, and `npm run build-site` pass.
-- [ ] `git diff --check` passes, and the new `settings.tsx` has no trailing whitespace.
-- [ ] One commit on `release/0.5.0` says what changed. Don't push.
+- [x] `grep -rn "below Providers\|under \*\*Plugins\*\*\|Under Providers" packages/website/src/content/docs` finds nothing.
+- [x] `CHANGELOG.md` has `## Unreleased` above 0.4.1, with: "**Settings in tabs:** General, Providers, Memory, Plugins, and About, each at its own address, and a tab for each plugin that draws in Settings, such as Computer. About has the version, updates, and links." Under it, for plugins: "`app.settings` makes a tab, at `/settings/plugins/<plugin>`."
+- [x] `npm run typecheck`, `npm run build`, and `npm run build-site` pass.
+- [x] `git diff --check` passes, and the new `settings.tsx` has no trailing whitespace.
+- [x] One commit on `release/0.5.0` says what changed. Not pushed.
 
 **Bounds.** About 90 new lines of code. Stop and ask if `settings.tsx` passes 200 lines, or if the work needs the SDK, the server, a migration, or a new package. Out of scope: [Not in this phase](#not-in-this-phase).
 
@@ -289,6 +289,14 @@ Checks run against a disposable Postgres and `FXBOT_DATA`, on another `FXBOT_POR
 - With the computer's engine really set up, the Computer tab's **Rebuild image** and **Delete all computers**.
 - In a release install with an update out, **Update** from About. Use another `COMPOSE_PROJECT_NAME`, `FXBOT_PORT`, and `FXBOT_ROOT`, clear of a real install.
 - That the tab names and their order read right.
+
+## What the build changed
+
+- **General's line for a browser that offers no install.** "fxbot can run as an app of its own: install it from the browser's menu, where the browser offers it." Without it, General was empty in a desktop browser that hadn't offered to install, such as Firefox or a Chrome window of an app already installed.
+- **The effect that keeps the open tab in view returns nothing.** Chromium's `scrollIntoView` now returns a promise, and an effect that returned it crashed the page when the tab changed ("l is not a function"). The effect is `void`.
+- **More pages name their tab** than the checklist listed: Add a skill, Core and plugins, Commands, the computer's reference, Providers, and Write a plugin. Add an MCP server's line about a bot's **Edit** page now says "in its **Plugins** section", so the grep in M5 finds nothing.
+- **Size:** `settings.tsx` is 151 lines, about 40 of them moved from `app.tsx`; `app.tsx`, `plugins.tsx`, `plugins-page.tsx`, and `pwa.ts` lost 56 lines and gained 14. That's about 70 new lines, under the 90 planned.
+- **Checks** ran against a disposable Postgres on 55460 and a server on 18850, with Playwright at 1280×800 and 375×667, light and dark. About's update notes were checked against a stand-in for GitHub's `releases/latest`.
 
 ## 5. Open questions
 

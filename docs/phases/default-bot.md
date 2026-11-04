@@ -94,7 +94,7 @@ Status: planned on 2026-11-04, for 0.5.0, at the owner's word; researched agains
 
 ### Where the owner picks it
 
-**Settings › General** ([settings tabs](settings-tabs.md)) gets one row:
+**Settings › General** ([settings tabs](../_completed/phases/settings-tabs.md)) gets one row:
 - **Default bot,** a `NativeSelect` with **None**, then each bot by name, in the sidebar's order.
 - Under it: "fxbot opens to this bot's chat when it starts at its address."
 - **A change saves at once,** with `client.settings.update({ defaultProfile })`. A failure shows in General's error line.
@@ -191,7 +191,7 @@ Size: about 40 lines of code and one migration, plus about 15 lines of docs. It 
 
 ## 4. Checklist
 
-Checks run against a disposable Postgres and `FXBOT_DATA`, on another `FXBOT_PORT`, with the mock model. Playwright runs at 1280×800 and 375×667. Don't start a server on the owner's dev port. [Settings tabs](settings-tabs.md) is built first; if it isn't, the select goes at the top of `SettingsForm`.
+Checks run against a disposable Postgres and `FXBOT_DATA`, on another `FXBOT_PORT`, with the mock model. Playwright runs at 1280×800 and 375×667. Don't start a server on the owner's dev port. [Settings tabs](../_completed/phases/settings-tabs.md) is built first; if it isn't, the select goes at the top of `SettingsForm`.
 
 **M1. Store and API**
 - [ ] On a scratch database that 0.4.1 made, the server backs up, runs `0008_default_bot`, and starts. `\d settings` shows `default_profile` referencing `profiles(id)` `on delete set null`.

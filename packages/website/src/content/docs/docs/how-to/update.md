@@ -9,7 +9,7 @@ First, read the release's section of the [changelog](/docs/reference/changelog/)
 
 ## From Settings
 
-When a newer release is out, Settings shows its notes and an **Update** button. Choose it. The machine's `fxbot` command downloads the release, lets running chats finish, and starts it, while the database keeps running. Settings shows each step, and the page reloads onto the new version once it answers.
+When a newer release is out, **Settings** › **About** shows its notes and an **Update** button. Choose it. The machine's `fxbot` command downloads the release, lets running chats finish, and starts it, while the database keeps running. Settings shows each step, and the page reloads onto the new version once it answers.
 
 ## From a shell
 

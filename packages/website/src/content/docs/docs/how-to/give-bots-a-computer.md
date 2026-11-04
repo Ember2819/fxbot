@@ -8,7 +8,7 @@ Each bot can have a Linux computer of its own: a Debian machine where it is root
 You need fxbot on Debian 13 or Ubuntu 24.04, with podman or docker: a release install has one already.
 
 1. Open **Plugins**, choose **Browse**, and choose **computer**. Read what runs inside fxbot, then choose **Add computer**.
-2. The machine sets up the computer's engine by itself, in a minute or two: this machine's podman or docker, run rootless for a user of its own, `fxbot-computer`, with a firewall that keeps its computers to the internet. fxbot starts again when it's done. **Settings**, under **Computer**, shows it working, then names the engine, such as `podman 5.4.2, rootless`.
+2. The machine sets up the computer's engine by itself, in a minute or two: this machine's podman or docker, run rootless for a user of its own, `fxbot-computer`, with a firewall that keeps its computers to the internet. fxbot starts again when it's done. **Settings** › **Computer** shows it working, then names the engine, such as `podman 5.4.2, rootless`.
 3. The computer is on for every bot once added. To give it to some bots only, open **Plugins**, choose the pencil button on its row, and under **Bots** choose **Choose**, then switch it on for each bot that should have one.
 4. Ask a bot to do something on its computer, such as "make a chart of these numbers with Python and save it to the library", or "find the opening hours on the library's site". To point it at the computer, choose the screen button beside the message box, which adds `$computer` to the message.
 
@@ -31,7 +31,7 @@ Chromium is on each computer's desktop. Bots drive it with [agent-browser](https
 
 ## Look after the computers
 
-- **Settings**, under **Computer**, lists each bot's computer, running or stopped, with its home's size. **Rebuild image** makes the image again from a new copy of Debian. **Delete all computers** deletes every computer and its home.
+- **Settings** › **Computer** lists each bot's computer, running or stopped, with its home's size. **Rebuild image** makes the image again from a new copy of Debian. **Delete all computers** deletes every computer and its home.
 - A bot's settings, under **Computer**, have **Stop**, and **Reset**, which deletes that bot's computer and its home.
 - Removing the plugin keeps the computers, their homes, and the engine. Delete the computers first, or, after removing it, run `sudo fxbot computer off`, which also removes the user, its firewall, and the engine's socket. In a checkout, run the setup script with `--remove`.
 

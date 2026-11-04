@@ -188,7 +188,7 @@ A plugin names the plugins it needs, and what it asks of each, under `needs`:
 | `app.botPanel(Component)` | Above the tabs of a bot's panel, beside its chat. It gets `bot`. |
 | `app.composer(Component)` | A control beside the attach button. It gets `bot`, `setDraft(text)`, and `attach(files)`. `setDraft` also takes a function from the draft to the new text. |
 | `app.toolView(tool, Component)` | How a call of `<plugin>_<tool>` shows in a reply. It gets `call`: `name`, `input`, `output`, `error`, and `done`. |
-| `app.settings(Component)` | A section in Settings |
+| `app.settings(Component)` | A tab of its own in Settings, named for the plugin, at `/settings/plugins/<plugin>`. Several calls stack in that tab. Before 0.5.0, a section of Settings' one page. |
 | `app.botSettings(Component)` | A section in a bot's settings. It gets `bot`. |
 
 Each part sits in its own error boundary: one that throws shows a short card in its place, and the rest of the app goes on. A plugin's page parts are for everyone, whichever bots it's on for. The page reads the list of plugins again after a change in **Plugins**, and keeps code it already ran until it reloads.

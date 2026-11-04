@@ -1,9 +1,9 @@
 ---
 title: "Providers"
-description: "The kinds of provider in Add provider\u2026, in Settings. Each bot runs on one provider."
+description: "The kinds of provider in Add provider\u2026, in Settings \u203a Providers. Each bot runs on one provider."
 ---
 
-The kinds of provider in **Add provider…**, in Settings. Each bot runs on one provider.
+The kinds of provider in **Add provider…**, in **Settings** › **Providers**. Each bot runs on one provider.
 
 | Kind | Connects with | Base URL | Models from |
 | --- | --- | --- | --- |
@@ -36,7 +36,7 @@ The kinds of provider in **Add provider…**, in Settings. Each bot runs on one 
 
 ## Embeddings
 
-Memory search can take its vectors from a provider's embedding model, picked in Settings' **Memory search** ([Choose where memory search's vectors come from](/docs/how-to/memory-search/)).
+Memory search can take its vectors from a provider's embedding model, picked in **Settings** › **Memory** ([Choose where memory search's vectors come from](/docs/how-to/memory-search/)).
 
 | Kind | Embeddings from |
 | --- | --- |

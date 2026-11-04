@@ -2,6 +2,11 @@
 
 Each release of fxbot, newest first. A release that adds migrations, bumps libfx, or needs a step by hand opens with **Before upgrading**. Lines for the next release collect under Unreleased, and the release workflow publishes a version's section as its notes.
 
+## Unreleased
+
+- **Settings in tabs:** General, Providers, Memory, Plugins, and About, each at its own address, and a tab for each plugin that draws in Settings, such as Computer. About has the version, updates, and links.
+- **For plugins:** `app.settings` makes a tab, at `/settings/plugins/<plugin>`.
+
 ## 0.4.1 (2026-11-04)
 
 - **Chat rooms: tag bots, and let them hand work on.** The chat-rooms plugin goes to 0.2.0; update it from **Plugins**.
