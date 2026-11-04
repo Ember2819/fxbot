@@ -8,11 +8,11 @@ A plugin is code that changes fxbot itself, the way [Pi's](https://github.com/ea
 
 A plugin can also carry [skills](skills.md) and remote [MCP servers](mcp.md), in the format other agents share. It is found and added through [add-ons](addons.md).
 
-Status: built on 2026-11-03, for 0.4.0. Replanned on 2026-11-02 after the owner asked for plugins that change the app rather than sit beside it, and refreshed on 2026-11-03 for [containers](containers.md) and the project's site, [fxbot.sh](https://fxbot.sh). It builds on [add-ons](addons.md), [skills](skills.md), and [MCP servers](mcp.md). This phase proves the API with two plugins of fxbot's own: [chat rooms](../../phases/chat-rooms.md) and herdr.
+Status: built on 2026-11-03, for 0.4.0. Replanned on 2026-11-02 after the owner asked for plugins that change the app rather than sit beside it, and refreshed on 2026-11-03 for [containers](containers.md) and the project's site, [fxbot.sh](https://fxbot.sh). It builds on [add-ons](addons.md), [skills](skills.md), and [MCP servers](mcp.md). This phase proves the API with two plugins of fxbot's own: [chat rooms](chat-rooms.md) and herdr.
 
 ## 0. Core or add-on
 
-**Core: the plugin API.** The API is the seam every other add-on phase plugs into: [chat rooms](../../phases/chat-rooms.md), [routines](../../phases/routines.md), [triggers](../../phases/triggers.md), [soul](../../phases/soul.md), [permissions](../../phases/permissions.md), and the rest. Chat rooms and herdr are add-ons, and the core never names them ([Core or add-on](../../../CONVENTIONS.md#core-or-plugin)).
+**Core: the plugin API.** The API is the seam every other add-on phase plugs into: [chat rooms](chat-rooms.md), [routines](../../phases/routines.md), [triggers](../../phases/triggers.md), [soul](../../phases/soul.md), [permissions](../../phases/permissions.md), and the rest. Chat rooms and herdr are add-ons, and the core never names them ([Core or add-on](../../../CONVENTIONS.md#core-or-plugin)).
 
 ## 1. Research
 
@@ -320,7 +320,7 @@ A plugin runs with everything fxbot can reach, as Pi, opencode, and eve plugins 
 
 ### The first plugins
 
-**Chat rooms** ([stub](../../phases/chat-rooms.md)) uses every part of the API:
+**Chat rooms** ([stub](chat-rooms.md)) uses every part of the API:
 - **Tables:** `rooms` (id, name), `members` (room, bot), `messages` (id, room, author, text, at), and `sessions` (room, bot, session).
 - **Page:** a **Rooms** group in the sidebar, with a **+** that names a room and picks its bots. The room at `/chat-rooms/rooms/<id>` shows its messages and a message box, made from the app's components.
 - **A message in a room:**

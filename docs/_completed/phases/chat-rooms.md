@@ -5,9 +5,9 @@ Rooms where the owner and several bots talk together:
 - **Handoffs:** bots tag each other to hand work on, within limits the room sets, until you say stop.
 - **Skills:** these teach each bot how to work in a room.
 
-Status: planned on 2026-11-04, at the owner's word, for the patch release 0.4.1. The research covers the references and the group chats of messaging platforms, AI products, and multi-agent frameworks.
+Status: built on 2026-11-04, for the patch release 0.4.1, as chat-rooms 0.2.0 and two pieces of the plugin API. Planned the same day, at the owner's word. The research covers the references and the group chats of messaging platforms, AI products, and multi-agent frameworks. Where the build found the plan wrong, the plan below says what was built, and [What the build changed](#what-the-build-changed) lists it.
 
-A first version shipped in 0.4.0, as one of the plugins on fxbot's list. It is the plugin that proved the plugin API ([plugins: the first plugins](../_completed/phases/plugins.md#the-first-plugins)), planned in about ten lines of that phase and never researched as a feature: each of the owner's messages gets one answer from each bot, in turn. This phase replaces it.
+A first version shipped in 0.4.0, as one of the plugins on fxbot's list. It is the plugin that proved the plugin API ([plugins: the first plugins](plugins.md#the-first-plugins)), planned in about ten lines of that phase and never researched as a feature: each of the owner's messages gets one answer from each bot, in turn. This phase replaces it.
 
 ## What the owner expects
 
@@ -32,7 +32,7 @@ A first version shipped in 0.4.0, as one of the plugins on fxbot's list. It is t
 
 ## 0. Core or plugin
 
-A plugin: [conventions](../../CONVENTIONS.md#core-or-plugin) name chat rooms as one. The mentions, the message box, who answers, the limits, the skills, and the tables are all the plugin's. The core never names rooms.
+A plugin: [conventions](../../../CONVENTIONS.md#core-or-plugin) name chat rooms as one. The mentions, the message box, who answers, the limits, the skills, and the tables are all the plugin's. The core never names rooms.
 
 The core gains two small pieces the plugin can't build itself:
 - **`fx.chats.cancel(bot, session)`**, for **Stop**. It stops a running turn in one of the plugin's own sessions, through libfx's `session.cancel()`. About 15 lines in the SDK, the same shape as `fx.chats.send`.
@@ -182,7 +182,10 @@ plugins/chat-rooms/
 │   ├── mentions.ts                 the token, and @Name to token and back: the page and the server share it
 │   ├── page.jsx                    the sidebar group, the room screen, its settings, and chips in messages
 │   ├── composer.jsx                the message box: ProseMirror, the @ list, and chips
-│   ├── page.js                     built
+│   ├── faces.jsx                   a mention's chip, and a room's bots, stacked
+│   ├── page.css                    the box's, chips', and stacks' styles, and ProseMirror's
+│   ├── page.js                     built, without comments
+│   ├── page-licenses.txt           the MIT licenses of the packages page.js bundles
 │   └── migrations/
 │       ├── 0001_rooms.sql          as built
 │       └── 0002_mentions.sql       the room's settings, and each message's place in a chain
@@ -214,15 +217,13 @@ plugins/chat-rooms/
   - The box keeps its textbox role, with `aria-activedescendant`, `aria-controls`, and `aria-autocomplete="list"`.
   - The list is a `listbox` of options.
   - A polite live region says how many bots match and who was mentioned.
-- **The cost:** about 64 KB gzipped, added to the plugin's page bundle, which loads only where the plugin is added.
+- **The cost:** `page.js` is 386 KB as built, 92 KB gzipped, with ProseMirror in it, and loads only where the plugin is added. Plugins' page code isn't minified, so the owner can read it before adding it; it's built without comments instead.
 
 ### Showing messages
 
 - **`MentionChip`** draws a token with the bot's current name and avatar from `useBots()`. A bot that's gone shows as "@a bot that's gone", and `<@all>` as "@everyone".
 - **The owner's messages** are split on the token, into text and chips.
-- **Bots' replies** go through `Streamdown`, with:
-  - a small remark plugin that turns tokens into `<mention bot="…">` (about 20 lines)
-  - `allowedTags`, and `components` that draw it as a chip
+- **Bots' replies** go through `Streamdown`. Each whole token outside code becomes a `<mention bot="…">` tag first, which `allowedTags` lets through and `components` draws as a chip. A remark plugin would do the same, but Streamdown's `remarkPlugins` replaces its own, which plugins can't reach.
 
 ### Who answers
 
@@ -349,7 +350,7 @@ The plugin's version goes to 0.2.0. An install on 0.4.0 that added rooms gets it
 
 ### Cross-bot messaging
 
-[Cross-bot messaging](cross-bot-messaging.md) plans a `send` tool for bots to message each other outside rooms. Rooms don't need it: a room's handoffs are its mentions.
+[Cross-bot messaging](../../phases/cross-bot-messaging.md) plans a `send` tool for bots to message each other outside rooms. Rooms don't need it: a room's handoffs are its mentions.
 
 The guards are the same in both, and set by the server:
 - a count per chain
@@ -385,46 +386,62 @@ When that phase comes, it uses this plugin's counting.
 
 About 890 lines, and 64 KB gzipped in the plugin's page.
 
+**As built:** about 820 lines of code: `server.ts` 154 more, `page.jsx` 114 more, `composer.jsx` 238, `faces.jsx` 38, `mentions.ts` 40, `page.css` 105, the skills 114, the migration 7, and the core 13. `page.js` is 386 KB, 92 KB gzipped.
+
 ## 4. Checklist
 
 Checks use v1's harness: a disposable Postgres, the mock model making scripted replies with `@Name`, Playwright at desktop and phone widths, and the check server. Nothing reaches a real model.
 
 **M1. Mentions and the box**
-- [ ] `@` lists the room's bots and **Everyone**, with avatars, filtered by what follows. Arrows, Enter, Tab, and Escape work, and focus stays in the box.
-- [ ] A pick becomes a chip with the bot's avatar. Backspace deletes it whole, and undo brings it back.
-- [ ] A sent message stores `<@bot:id>`. After the bot is renamed, the chip shows the new name.
-- [ ] Mentions show as chips in the owner's messages and in replies, around bold and outside code.
-- [ ] At a phone's width, the list fits above the keyboard. Picking with a tap works in Playwright's touch mode.
-- [ ] The live region says who was mentioned. Chips read as `@Name`.
+- [x] `@` lists the room's bots and **Everyone**, with avatars, filtered by what follows. Arrows, Enter, Tab, and Escape work, and focus stays in the box.
+- [x] A pick becomes a chip with the bot's avatar. Backspace deletes it whole, and undo brings it back. ProseMirror's history groups edits closer than half a second, so an undo right after a quick pick and delete takes back both.
+- [x] A sent message stores `<@bot:id>`. After the bot is renamed, the chip shows the new name.
+- [x] Mentions show as chips in the owner's messages and in replies, around bold and outside code. Streamdown draws bold as a `span`, and the chip sits inside it.
+- [x] At a phone's width, the list fits above the box, in a viewport cut to what a keyboard leaves (390 by 664). Picking with a tap works in Playwright's touch mode.
+- [x] The live region says who was mentioned. Chips read as `@Name`.
 
 **M2. Who answers**
-- [ ] A message tagging Jill wakes only Jill. Untagged, only the lead answers. With **Everyone answers**, all answer in order.
-- [ ] A reply tagging another bot queues it: a chain of four bots runs, each seeing the earlier replies, and ends when a reply tags no one.
-- [ ] A bot tagging itself, a bot already waiting, and a fourth bot in one reply don't queue. A note says why.
-- [ ] After 10 replies to one message the chain pauses with a note, and tagging a bot goes on.
-- [ ] **Stop** ends the running turn (`cancelled`) and the queue, and posts "Stopped."
-- [ ] A message from the owner mid-chain drops the waiting turns.
-- [ ] `(no reply)` posts nothing.
+- [x] A message tagging Jill wakes only Jill. Untagged, only the lead answers. With **Everyone answers**, all answer in order.
+- [x] A reply tagging another bot queues it: a chain of four bots runs, each seeing the earlier replies, and ends when a reply tags no one.
+- [x] A bot tagging itself, a bot already waiting, and a fourth bot in one reply don't queue. A note says why for the fourth; a bot's own `@Name` isn't a mention, and a bot already waiting answers anyway.
+- [x] After the room's limit of replies to one message the chain pauses with a note, and tagging a bot goes on. Checked with the limit at 3.
+- [x] **Stop** ends the running turn (`cancelled`) and the queue, and posts "Stopped." after what the turn had written, which is kept and wakes no one.
+- [x] A message from the owner mid-chain drops the waiting turns.
+- [x] `(no reply)` posts nothing.
 
 **M3. What bots see**
-- [ ] The mock's request has the identity line, the quoted framing, who woke it, and the replies left. A bot at the limit is told not to tag.
-- [ ] A bot's first turn in a room carries `chat-room`'s text, and the lead's first untagged turn `room-lead`'s. A bot's own chat names them only in its line of skills the person calls by name.
-- [ ] After a provider switch, the new session gets the room's last 40 messages.
+- [x] The mock's request has the identity line, the quoted framing, who woke it, and the replies left. A bot at the limit is told not to tag.
+- [x] A bot's first turn in a room carries `chat-room`'s text, and the lead's first untagged turn `room-lead`'s. A bot's own chat names them only in its line of skills the person calls by name.
+- [x] After a provider switch, the new session gets the room's last 40 messages, says earlier ones are left out, and marks the bot's own lines as its own.
 
 **M4. Settings and fixes**
-- [ ] **Edit** changes the name, the bots and their order, the untagged setting, and replies per message.
-- [ ] A bot the plugin is off for isn't offered, and the server refuses it.
-- [ ] A room's sidebar link shows its bots' avatars, stacked, the lead first, with `+N` past four. A writing bot's avatar is busy.
-- [ ] A room made by 0.4.0's plugin keeps **Everyone answers** after the update. A new room starts with **The lead answers**.
-- [ ] On a 0.4.0 core, the updated plugin works: **Stop** empties the queue, and chips in the box show `@Name`.
+- [x] **Edit** changes the name, the bots and their order, the untagged setting, and replies per message.
+- [x] A bot the plugin is off for isn't offered. The server can't tell which bots a plugin is on for, so it notices at the turn: the room's instructions never reached the bot, so it cancels the turn and posts a note.
+- [x] A room's sidebar link shows its bots' avatars, stacked, the lead first, with `+N` past four. A writing bot's avatar is busy.
+- [x] A room made by 0.4.0's plugin keeps **Everyone answers** after the update, and a new room starts with **The lead answers**: the two migrations, run on a scratch schema.
+- [x] On a 0.4.0 core, the updated plugin works: **Stop** empties the queue, and chips in the box show `@Name`.
 
 **M5. Docs and checks**
-- [ ] A how-to page, "Talk with several bots in a room". The plugin's README. The Plugin API reference for `fx.chats.cancel` and `createPortal`. The changelog.
-- [ ] Typecheck, build, build-site, and `git diff --check` pass. `page.js` is built and committed.
+- [x] A how-to page, "Talk with several bots in a room". The plugin's README. The Plugin API reference for `fx.chats.cancel` and `createPortal`. The changelog.
+- [x] Typecheck, build, build-site, and `git diff --check` pass. `page.js` is built and committed.
 
 **The human runs these:**
 - With two or three bots on real models, a room where one bot hands work to another and back. See that they stop when done, don't thank each other in circles, and don't speak for each other.
 - Tagging on a phone, in iOS Safari and Android Chrome, with VoiceOver or TalkBack once.
+
+## What the build changed
+
+- **Mentions in replies are tags, not a remark plugin.** Streamdown's `remarkPlugins` replaces its own, tables and math among them, and plugins can't reach those to add them back. Each whole token outside code becomes a `<mention>` tag, which `allowedTags` lets through.
+- **The page is built without comments.** Plugins' page code isn't minified, so the owner can read it. ProseMirror's long doc comments ended lines in tabs, which `git diff --check` refuses. `page.js` is 386 KB, 92 KB gzipped, not the 64 KB the plan measured minified.
+- **A license notice ships beside it.** `page.js` bundles ten MIT packages, whose license asks that its notice go with copies: `page-licenses.txt`.
+- **`faces.jsx`** holds the chip and the stacked avatars, which the box, the messages, and the sidebar share.
+- **The server can't tell which bots the plugin is on for.** The plugin API has no way to ask. The page reads the plugins' list, and the server notices at each turn when the room's instructions didn't reach the bot.
+- **"Stopped." follows the reply Stop cut short,** which is kept, but wakes no one.
+- **The sidebar hears who's writing from the room.** The app reads its bots again only while one is busy, so a room turn that starts while none is wouldn't show. The room list says who's writing, and the open room's stream keeps it current.
+- **The room keeps a Send button,** since Enter is a new line on a phone's keyboard.
+- **The lead's skill is sent once each start.** Which sessions have had it is kept in memory, so after a restart the lead's next untagged turn carries it again.
+- **A bot can't tag everyone.** Only the owner's **Everyone** chip makes `<@all>`; a bot's `@everyone` stays text.
+- **ProseMirror is pinned to releases at least two weeks old,** so `prosemirror-view` is 1.42.6.
 
 ## 5. Open questions
 

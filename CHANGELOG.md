@@ -2,6 +2,18 @@
 
 Each release of fxbot, newest first. A release that adds migrations, bumps libfx, or needs a step by hand opens with **Before upgrading**. Lines for the next release collect under Unreleased, and the release workflow publishes a version's section as its notes.
 
+## Unreleased
+
+- **Chat rooms: tag bots, and let them hand work on.** The chat-rooms plugin goes to 0.2.0; update it from **Plugins**.
+  - **Tagging:** in a room, `@` lists its bots and **Everyone**, and a pick becomes a chip with the bot's avatar.
+  - **Who answers:** a message wakes the bots it tags. One that tags no one goes to the room's lead, which can bring others in.
+  - **Handing on:** a bot that tags another hands it the conversation. The room limits bot replies to one message of yours, 10 by default, and **Stop** ends them.
+  - **Skills:** three skills teach bots how to work in a room.
+  - **The sidebar** shows each room's bots, stacked.
+  - **Rooms made in 0.4.0** keep every bot answering a message that tags no one.
+  - See [Talk with several bots in a room](https://fxbot.sh/docs/how-to/talk-in-a-room/).
+- **For plugins:** `fx.chats.cancel` stops a turn running in one of the plugin's own sessions, and `@fxbot/app` gains React's `createPortal`.
+
 ## 0.4.0 (2026-11-04)
 
 **Before upgrading.** Migration `0006_plugins` adds a `plugin` column to `sent` and a `plugin_sessions` table. Migration `0007_one_kind_of_plugin` renames the add-ons' tables: `addons` to `plugins`, `addon_secrets` to `plugin_secrets`, `profile_addons` to `profile_plugins`, and `skills.addon_id` to `plugin_id`. Your MCP servers and skills carry over as plugins. Only the plugins fxbot vets show from now on: to search GitHub's MCP registry and skills.sh, or add by address or repository, turn on **Show unvetted plugins** in Settings. For SDK users, the add-on calls and routes are renamed: see the last item.
