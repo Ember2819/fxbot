@@ -33,7 +33,6 @@ fxbot doesn't vet any of these. Read what each one does before you add it. While
 
 - **chat-rooms**: rooms where several of your bots talk with you. Tag a bot with `@` to ask it, and bots hand work to each other by tagging: see [Talk with several bots in a room](/docs/how-to/talk-in-a-room/).
 - **computer**: a Linux computer for each bot, with a desktop you watch and take over, a terminal, a web browser, and files. Its engine is set up once on the machine: see [Give bots a computer](/docs/how-to/give-bots-a-computer/).
-- **herdr**: bots see the coding agents [herdr](https://herdr.dev) runs, and read what their panes show. Its **socket** setting says where herdr's socket is. In a release, fxbot's container can't reach that socket by itself: its [README](https://github.com/iammrduncan/fxbot/tree/main/plugins/herdr#reach-herdrs-socket) shows how to let it.
 
 ## When it goes differently
 

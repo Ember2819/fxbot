@@ -14,6 +14,7 @@ Each release of fxbot, newest first. A release that adds migrations, bumps libfx
   - See [Talk with several bots in a room](https://fxbot.sh/docs/how-to/talk-in-a-room/).
 - **Each computer is named for its bot.** Its hostname is the bot's name and `-computer`, such as `bob-computer`, so bots in a room can tell their computers apart. A computer takes it the next time it starts.
 - **License notices.** The computer plugin, 0.2.1, ships the notices of what its page bundles: xterm.js, under MIT, and noVNC, under MPL-2.0, with where noVNC's source is. Chat rooms ships ProseMirror's.
+- **herdr leaves fxbot's plugins,** to be planned again. It's off fxbot's list and out of the repository. An install that added it keeps it as it was, until it's removed in **Plugins**.
 - **For plugins:** `fx.chats.cancel` stops a turn running in one of the plugin's own sessions, and `@fxbot/app` gains React's `createPortal`.
 
 ## 0.4.0 (2026-11-04)
