@@ -2,16 +2,16 @@
 
 `chat-rooms-computer` gives a chat room a computer of its own. The room's bots share that one machine, taking turns: one desktop, one terminal, one browser, and one home. The owner watches it on the computer's screen, where each bot's last cursor is drawn with its name. Each bot learns where the others last pointed from its own tool results.
 
-Status: planned on 2026-11-04, for 0.5.0, at the owner's word; researched against the research directive's references. It is a plugin of its own, which needs the [computer](../_completed/phases/computer.md) and [chat rooms](../_completed/phases/chat-rooms.md). The owner made two decisions:
+Status: built on 2026-11-04, for 0.5.0, as planned the same day at the owner's word, and researched against the research directive's references. It is a plugin of its own, which needs the [computer](computer.md) and [chat rooms](chat-rooms.md). Where the build differs from the plan, [What the build changed](#what-the-build-changed) says so. The owner made two decisions:
 1. **The room's bots take turns** on the room's computer. Room turns stay one bot at a time, as chat-rooms runs them now. They never run in parallel.
 2. **The owner's view is enough** for cursors. The owner sees every bot's cursor drawn over the live desktop, and the bots learn the others' positions as text. Nothing is drawn into X or into the bots' screenshots.
 
 ## 0. Core or plugin
 
-**A plugin**, `chat-rooms-computer`, which needs `computer` and `chat-rooms` ([Core or plugin](../../CONVENTIONS.md#core-or-plugin)). A room is a plugin's, and so is a computer. The new plugin also changes those two plugins: the computer learns to name a computer by a key instead of a bot, and chat rooms tells other plugins which room a session is for.
+**A plugin**, `chat-rooms-computer`, which needs `computer` and `chat-rooms` ([Core or plugin](../../../CONVENTIONS.md#core-or-plugin)). A room is a plugin's, and so is a computer. The new plugin also changes those two plugins: the computer learns to name a computer by a key instead of a bot, and chat rooms tells other plugins which room a session is for.
 
 The plugin API gains two small pieces, because plugins can't use each other today. Core owns these, as "what plugins plug into":
-- **On the server: `fx.provide(api)` and `fx.need(name)`.** A plugin offers an object, and a plugin that names it under `needs` gets it. Each entry of `fx.dependents()` also gains `api`, so a plugin can ask the plugins that need it. The [computer](../_completed/phases/computer.md#0-core-or-plugin) phase named `fx.need("computer")` and left it "for the first plugin that needs it". This is that plugin.
+- **On the server: `fx.provide(api)` and `fx.need(name)`.** A plugin offers an object, and a plugin that names it under `needs` gets it. Each entry of `fx.dependents()` also gains `api`, so a plugin can ask the plugins that need it. The [computer](computer.md#0-core-or-plugin) phase named `fx.need("computer")` and left it "for the first plugin that needs it". This is that plugin.
 - **On the page: `app.slot(name, Component)` and `@fxbot/app`'s `Slot`.** One plugin's page leaves a named place, and another plugin fills it. Without one, a room's screen can't show the room's computer.
 
 Ways around them, and why not:
@@ -500,7 +500,7 @@ Checks use the computer phase's harness:
 - the mock model making scripted tool calls, with `@Name` handoffs in rooms
 - Playwright at desktop and phone widths
 
-Containers run under the box's rootless podman for its `agent` user (uid 1000), as `/root/.claude/projects/-root-github-fxbot/memory/test-environment.md` describes:
+Containers run under the check machine's rootless podman for an unprivileged user of its own:
 - Start its `dbus.socket` and `podman.socket` user units for the checks: `runuser -u agent -- env XDG_RUNTIME_DIR=/run/user/1000 DBUS_SESSION_BUS_ADDRESS=unix:path=/run/user/1000/bus systemctl --user start dbus.socket podman.socket`, from a folder it can read, such as `/tmp`.
 - Set the computer's `engine` setting to `/run/user/1000/podman/podman.sock`.
 - Afterwards, stop the units and remove the containers, volumes, and images the checks made.
@@ -514,89 +514,90 @@ The owner's dev server runs from this checkout:
 Scratch plugins live in the scratchpad and aren't committed.
 
 **M1. The plugin API**
-- [ ] A scratch plugin `a` calls `fx.provide({ hi: () => "hi" })`, and a scratch `b` with `needs: { a: {} }` answers `fx.need("a").hi()` from a route: `hi`.
-- [ ] `b`'s `fx.need("c")` throws "b doesn't name c under needs".
-- [ ] After `a`'s file is touched and it reloads, `b`'s next call reaches `a`'s new object. With `a` turned off, `fx.need("a")` is null.
-- [ ] `a`'s `fx.dependents()` lists `b` with its `api`. With `b` turned off, `api` is null.
-- [ ] `a`'s screen leaves `<Slot name="a.place" props={{ n: 1 }} />`, and `b` fills it with `app.slot("a.place", …)`:
+- [x] A scratch plugin `a` calls `fx.provide({ hi: () => "hi" })`, and a scratch `b` with `needs: { a: {} }` answers `fx.need("a").hi()` from a route: `hi`.
+- [x] `b`'s `fx.need("c")` throws "b doesn't name c under needs".
+- [x] After `a`'s file is touched and it reloads, `b`'s next call reaches `a`'s new object. With `a` turned off, `fx.need("a")` is null.
+- [x] `a`'s `fx.dependents()` lists `b` with its `api`. With `b` turned off, `api` is null.
+- [x] `a`'s screen leaves `<Slot name="a.place" props={{ n: 1 }} />`, and `b` fills it with `app.slot("a.place", …)`:
   - the screen shows `b`'s part with `n`
   - with `b` removed, the place is empty
   - with `b`'s part throwing, the error card shows there, and the rest of `a`'s screen stays
-- [ ] `npm run typecheck` passes.
+- [x] `npm run typecheck` passes.
 
 **M2. The computer by key**, on the `agent` user's podman
-- [ ] With no dependent providing anything, a bot's first call makes `fxbot-computer-<bot>` with hostname `<name>-computer`, as 0.2.2 did. A computer made by 0.2.2 is used again, not made again.
-- [ ] A scratch dependent provides `computerFor`, answering `{ key: "room-test0001", name: "Test room" }` for one session, and `computers()`, listing it:
+- [x] With no dependent providing anything, a bot's first call makes `fxbot-computer-<bot>` with hostname `<name>-computer`, as 0.2.2 did.
+- [ ] A computer made by 0.2.2 is used again, not made again. Left for the owner: the check had no computer from 0.2.2. A bot's computer keeps its name, its labels, and the check that makes it again, so the owner's dev install's computers are the first to show it.
+- [x] A scratch dependent provides `computerFor`, answering `{ key: "room-test0001", name: "Test room" }` for one session, and `computers()`, listing it:
   - a `computer_shell` call in that session makes `fxbot-computer-room-test0001`, labelled `fxbot.by=<the scratch plugin>`
   - `hostname` there answers `test-room-computer`
   - the same bot's own chat still gets `<name>-computer`
-- [ ] A skill with a script, read in that session, lands in `/skills/<name>` on `room-test0001`, not on the bot's own computer.
-- [ ] Sweeps, with `idleMinutes` at 1:
+- [x] A skill with a script, read in that session, lands in `/skills/<name>` on `room-test0001`, not on the bot's own computer.
+- [x] Sweeps, with `idleMinutes` at 1:
   - a listed key stays
   - a key the dependent stops listing goes, container and volume
   - with the dependent turned off, or `computers()` answering null, the key stays
   - with the dependent removed, the key goes
   - after a restart, which loads the computer before its dependents, the key stays
-- [ ] `/desktop/room-test0001` opens. `/desktop/room-nothere` closes with 1008. `GET computers/room-test0001/state` names "Test room".
-- [ ] **Take over** of `room-test0001`:
+- [x] `/desktop/room-test0001` opens. `/desktop/room-nothere` closes with 1008. `GET computers/room-test0001/state` names "Test room".
+- [x] **Take over** of `room-test0001`:
   - two bots' `computer_desktop` calls in that session answer that the owner has it
   - **Hand back** sends nothing to either bot's own chat
   - `computer_ask_owner` there answers with "they'll tell you to go on"
   - on a bot's own computer, Hand back after `computer_ask_owner` still sends its message
-- [ ] Marks:
+- [x] Marks:
   - two bots click on `room-test0001`, then `GET computers/room-test0001/cursors` lists both, with x, y, what, and time
   - a later `agent-browser` shell call by the first bot marks it "browser" and keeps its position
   - the second bot's next `computer_desktop` result has the "Others on this computer" line with the first bot
   - on a bot's own computer the line never shows
   - **Stop** and **Reset** clear the marks
-- [ ] `npm run typecheck` passes.
+- [x] `npm run typecheck` passes.
 
 **M3. The owner's view**
-- [ ] The Computer screen of `room-test0001`, after two bots clicked at (100, 100) and (1100, 700):
+- [x] The Computer screen of `room-test0001`, after two bots clicked at (100, 100) and (1100, 700):
   - two arrows show, in the bots' colours, with their names
   - the newest is solid, and the other faded
   - each arrow's tip is within 2 pixels of the point mapped through the canvas's box, at 1280 by 800 and at 390 by 844
-- [ ] Whether Xvnc draws the real pointer into the picture after a bot's click is noted, with a screenshot of the screen.
-- [ ] After **Take over**, a click on the desktop reaches it through the overlay.
-- [ ] With the Terminal tab shown, or the page hidden, the server log shows no `cursors` reads.
-- [ ] The screen opens at `/computer/computers/<bot>` and at `/computer/bots/<bot>`. Settings lists the room's computer under its name.
-- [ ] `page.js` is built from `page.jsx` by the README's command.
+- [x] Whether Xvnc draws the real pointer into the picture after a bot's click is noted, with a screenshot of the screen: it doesn't show. noVNC draws the server's pointer as the browser's own cursor, only while the mouse is over the desktop, so the newest arrow stands alone.
+- [x] After **Take over**, a click on the desktop reaches it through the overlay.
+- [x] With the Terminal tab shown, or the page hidden, no `cursors` reads: counted from the page's requests, since the server logs none.
+- [x] The screen opens at `/computer/computers/<bot>` and at `/computer/bots/<bot>`. Settings lists the room's computer under its name.
+- [x] `page.js` is built from `page.jsx` by the README's command.
 
 **M4. Chat rooms 0.3.0**
-- [ ] From a scratch plugin that needs chat rooms, `roomOf` gives a room session's id, name, and bots, and null for another session and for a deleted room's. `rooms()` lists the rooms.
-- [ ] With nothing filling the slot, the room's header looks as before, at desktop and phone widths.
-- [ ] `page.js` is built. The version is 0.3.0. The README names `roomOf`, `rooms`, and the slot.
+- [x] From a scratch plugin that needs chat rooms, `roomOf` gives a room session's id, name, and bots, and null for another session and for a deleted room's. `rooms()` lists the rooms.
+- [x] With nothing filling the slot, the room's header looks as before, at desktop and phone widths.
+- [x] `page.js` is built. The version is 0.3.0. The README names `roomOf`, `rooms`, and the slot.
 
 **M5. chat-rooms-computer 0.1.0**
-- [ ] With `FXBOT_PLUGIN_DIRS` naming it and chat rooms but not the computer, its row says "It needs computer. Add it first." (`plugins.ts:491`).
-- [ ] The room's header shows the screen button. The switch turns the computer on, the dot shows, and **Open** goes to `/computer/computers/room-…`.
-- [ ] In a room of Ann and Bob with the computer on, scripted by the mock:
+- [x] With `FXBOT_PLUGIN_DIRS` naming it and chat rooms but not the computer, its row says "It needs computer. Add it first." (`plugins.ts:491`).
+- [x] The room's header shows the screen button. The switch turns the computer on, the dot shows, and **Open** goes to `/computer/computers/room-…`.
+- [x] In a room of Ann and Bob with the computer on, scripted by the mock:
   - Ann runs `hostname; echo hi > /root/note` and tags Bob, and Bob runs `cat /root/note`
   - the hostname is `<room>-computer`, and Bob reads `hi`
-- [ ] Ann's first room turn after it's on carries `room-computer`'s text in the mock's request, and every room turn carries the sharing line. A turn in her own chat carries neither, and `hostname` there is `ann-computer`.
-- [ ] With the plugin narrowed to Ann alone, Bob's room calls use `bob-computer`.
-- [ ] Labelled tabs, with agent-browser 0.41.1 on the room's computer:
+- [x] Ann's first room turn after it's on carries `room-computer`'s text in the mock's request, and every room turn carries the sharing line. A turn in her own chat carries neither, and `hostname` there is `ann-computer`.
+- [x] With the plugin narrowed to Ann alone, Bob's room calls use `bob-computer`.
+- [x] Labelled tabs, with agent-browser 0.41.1 on the room's computer:
   - Ann runs `agent-browser tab new --label ann https://example.com`, then Bob runs `agent-browser tab new --label bob https://example.org`
   - Ann's `agent-browser tab ann` brings her tab to the front, and a `computer_desktop` screenshot shows it
-  - this holds whether each names the session the agent-browser skill suggests or none
-- [ ] Turned off, the next room call uses the bot's own computer, the room's computer is stopped, and its volume is still there. Turned on again, it uses the same home.
-- [ ] A deleted room's computer and volume go on the computer's next sweep. Removing chat-rooms-computer leaves rooms working as in 0.2.0, and its computers go on the next sweep.
-- [ ] Updating the computer, by touching its files, with this plugin running doesn't remove the room's computer, and the room's next call finds it.
-- [ ] A one-off Node script calls the plugin's setup with an `fx` that has no `need`. It rejects with "chat-rooms-computer needs fxbot 0.5.0 or newer."
-- [ ] `page.js` is built from `page.jsx`. The README says what it does and what it needs, and how to build the page.
+  - this holds whether each names the session the agent-browser skill suggests or none. Checked with none: Ann's `tab ann` brought `https://example.com/` to the front, and the window read "Example Domain - Chromium". A named session was left for the human checks.
+- [x] Turned off, the next room call uses the bot's own computer, the room's computer is stopped, and its volume is still there. Turned on again, it uses the same home.
+- [x] A deleted room's computer and volume go on the computer's next sweep. Removing chat-rooms-computer leaves rooms working as in 0.2.0, and its computers go on the next sweep.
+- [x] Updating the computer, by touching its files, with this plugin running doesn't remove the room's computer, and the room's next call finds it.
+- [x] A one-off Node script calls the plugin's setup with an `fx` that has no `need`. It rejects with "chat-rooms-computer needs fxbot 0.5.0 or newer."
+- [x] `page.js` is built from `page.jsx`. The README says what it does and what it needs, and how to build the page.
 
 **M6. The list, docs, and checks**
-- [ ] `packages/sdk/src/plugins-registry.json` lists `chat-rooms-computer`, with `repo` `iammrduncan/fxbot` and `path` `plugins/chat-rooms-computer`.
-- [ ] The SDK's Plugin API reference covers `fx.provide`, `fx.need`, `api` on `fx.dependents()`, `app.slot`, and `Slot`, each "Since 0.5.0", with a short example of one plugin using another.
-- [ ] "Give bots a computer" has a section, "Give a room a computer". "The computer" covers keys, the provider contract, the routes and screen by key, and the cursors. "Talk with several bots in a room" links to the new section.
-- [ ] The computer's README covers keys, `ComputerProvider`, the cursors, and the screen's path. Chat rooms' README covers what it provides and its slot. The versions are 0.3.0, 0.3.0, and 0.1.0.
-- [ ] `CHANGELOG.md` has an `## Unreleased` section, added if no other 0.5.0 work has added one. It says:
+- [x] `packages/sdk/src/plugins-registry.json` lists `chat-rooms-computer`, with `repo` `iammrduncan/fxbot` and `path` `plugins/chat-rooms-computer`.
+- [x] The SDK's Plugin API reference covers `fx.provide`, `fx.need`, `api` on `fx.dependents()`, `app.slot`, and `Slot`, each "Since 0.5.0", with a short example of one plugin using another.
+- [x] "Give bots a computer" has a section, "Give a room a computer". "The computer" covers keys, the provider contract, the routes and screen by key, and the cursors. "Talk with several bots in a room" links to the new section.
+- [x] The computer's README covers keys, `ComputerProvider`, the cursors, and the screen's path. Chat rooms' README covers what it provides and its slot. The versions are 0.3.0, 0.3.0, and 0.1.0.
+- [x] `CHANGELOG.md` has an `## Unreleased` section, added if no other 0.5.0 work has added one. It says:
   - a room's computer
   - the three plugin versions, and "update them from Plugins"
   - cursors on the Computer screen
   - for plugins: `fx.provide`, `fx.need`, and `Slot`
-- [ ] `npm run typecheck`, `npm run build`, `npm run build-site`, and `git diff --check` pass. New files are checked for whitespace too: `git diff --check` doesn't see untracked files.
-- [ ] One commit on `release/0.5.0` per piece: core, computer, chat rooms, the new plugin, and the docs, each with a message that says what changed. Nothing is pushed.
+- [x] `npm run typecheck`, `npm run build`, `npm run build-site`, and `git diff --check` pass. New files are checked for whitespace too: `git diff --check` doesn't see untracked files.
+- [x] One commit on `release/0.5.0` per piece: core, computer, chat rooms, the new plugin, and the docs, each with a message that says what changed. Nothing is pushed.
 
 **Bounds.** If the code passes about 600 lines, core and plugins without docs, skill, READMEs, and built pages, stop and say why. Out of scope is everything under [Not in this phase](#not-in-this-phase).
 
@@ -608,6 +609,16 @@ Scratch plugins live in the scratchpad and aren't committed.
 - Ask a bot in the room to sign in somewhere. It should call `computer_ask_owner`. **Take over**, sign in, **Hand back**, and tag it to go on.
 - On a phone, open a room's computer through the tailnet, and check the arrows sit on what the bots clicked.
 - Look at whether the real pointer and the newest arrow sit together without confusion. If they do confuse, see open question 4.
+
+## What the build changed
+
+- **The routes** under `bots/:id/` became `computers/:key/`, with one helper that answers 404 for a key that's neither a bot nor listed by a running plugin. The state route also names the computer, says whether it's shared, and names the bot that asked for help.
+- **A tool finds its computer before it checks a take-over,** since a take-over is kept by computer: `ready(bot, session)` answers the container, the key, and whether it's shared.
+- **What a mark says:** clicked, right-clicked, double-clicked, pointed, dragged, scrolled, typed, pressed keys, looked, browser, desktop app, shell, or terminal. The line in a desktop result reads, for example, "Others on this computer: Ann used the browser 2 s ago." or "Ann clicked (100, 100) 1 min ago".
+- **Settings** lists each computer by its name, with the plugin that named it beside a room's.
+- **chat-rooms-computer's** `PUT` that turns a room's computer off also forgets which of that room's sessions it reached, so the very next call uses the bot's own computer. Its `rooms()` answer leaves out rooms deleted meanwhile.
+- **Size:** core 31 lines; the computer's server 244 added and 119 removed, and its page 109 and 31; chat rooms 9; the new plugin 160. About 550 added and 400 net, under the bound of 600.
+- **Checks** ran on the `agent` user's rootless podman 5.4.2, with the computer's image built there, 1.18 GB, and removed after, with its units stopped. The mock model was the computer phase's, taught to find a command on any line of a room's framing (`as <bot>: call: …`) and to add a tag after it. Scratch plugins provided a test computer (`rtest`), asked chat rooms (`rcheck`), and checked `provide`, `need`, and slots (`sa`, `sb`). The error without the computer was checked on a second, fresh database.
 
 ## 5. Open questions
 

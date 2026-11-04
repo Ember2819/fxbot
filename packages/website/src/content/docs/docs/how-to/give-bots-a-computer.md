@@ -25,6 +25,16 @@ To use the desktop yourself, choose **Take over**. The mouse and keyboard are yo
 
 When a bot needs you for something only you can do, such as a sign-in, a passkey, or a CAPTCHA, it asks: the dot turns orange, and the computer's screen says what it needs. Do it, then choose **Hand back**. The bot hears, looks at the screen, and carries on.
 
+## Give a room a computer
+
+With [chat rooms](/docs/how-to/talk-in-a-room/), a room can have a computer of its own, which its bots share. Add **chat-rooms-computer** from **Plugins**: it needs the computer and chat rooms, version 0.3.0 of each.
+
+1. In a room, choose the screen button at the top, beside **Edit**, and turn on **Computer**.
+2. The room's bots now use the room's computer in the room, taking turns, as they take turns talking, and their own computers in their own chats. Its hostname is the room's name and `-computer`.
+3. **Open** shows it, with an arrow where each bot last pointed. A skill, `room-computer`, teaches the bots to look before they act, to keep a browser tab of their own, and to say in the room what they did.
+
+Turning it off stops it and keeps its files, for the next time it's on. Deleting the room deletes its computer. When a bot asks you for help on it, take over, do it, hand it back, and tag the bot in the room to go on.
+
 ## The browser
 
 Chromium is on each computer's desktop. Bots drive it with [agent-browser](https://github.com/vercel-labs/agent-browser), and you see each page they open. It starts the first time a bot uses it.

@@ -60,7 +60,9 @@ export default async function setup(fx: PluginApi) {
 | `fx.settings` | Its settings, with defaults, and secrets opened. The same object, kept up to date. |
 | `fx.bots.list()`, `fx.bots.get(id)` | The bots, as [the fxbot object](/sdk/reference/server-api/) lists them |
 | `fx.chats` | Sessions and turns of its own. See [Turns](#turns). |
-| `fx.dependents()` | The added plugins that need this one: `{ name, version, needs }` each, where `needs` is its object for this plugin |
+| `fx.dependents()` | The added plugins that need this one: `{ name, version, needs, api }` each, where `needs` is its object for this plugin, and `api` what it provides, or null while it isn't running |
+| `fx.provide(api)` | Offers an object to the plugins that need this one, which get it with `fx.need`. Since 0.5.0. See [Plugins that need others](#plugins-that-need-others). |
+| `fx.need(name)` | What a plugin this one names under `needs` provides, or null while it isn't running. It throws for a plugin `needs` doesn't name. Since 0.5.0. |
 | `fx.library.read(bot, id)` | A library item's `name`, `type`, and `bytes`, if it's tagged for the bot; otherwise it throws |
 | `fx.library.save({ bot, session, name, type, bytes })` | Saves an image, or UTF-8 text, to the bot's library, tagged for the chat, through the library's checks. It answers the item. |
 | `fx.skills.files(bot, name)` | The files besides `SKILL.md` of the skill the bot sees by that name, as `{ path, text }`. None when it has no such skill. |
@@ -178,6 +180,25 @@ A plugin names the plugins it needs, and what it asks of each, under `needs`:
 - What each object holds is up to the plugin it names, which reads them with `fx.dependents()` and hears a change with the `dependents` event.
 - A plugin with no code, only `needs` and skills, is a plugin too.
 
+Since 0.5.0, plugins call each other through objects they provide. A plugin offers one with `fx.provide`, and a plugin that needs it gets it with `fx.need`. The plugin needed reads its dependents' objects as `api` in `fx.dependents()`:
+
+```ts
+// rooms: what other plugins may ask it.
+fx.provide({ roomOf: async (session: string) => rooms.get(session) ?? null });
+
+// room-notes, with "needs": { "rooms": {} }: asks rooms, at each use.
+fx.route("GET", "/notes/:session", async (_request, { session }) => {
+  const room = await fx.need<{ roomOf(session: string): Promise<{ id: number } | null> }>("rooms")?.roomOf(session);
+  return Response.json({ room });
+});
+```
+
+- **Read it at each use.** An update or a reload of the plugin replaces its object, and one turned off, failed, or unloading provides null.
+- **It's the provider's own object,** not a copy: its functions run the provider's code, with no time limit, and their errors reach the caller.
+- **On the page,** a plugin leaves a place with `Slot`, from `@fxbot/app`, and another fills it with `app.slot`. Name a place for the plugin that leaves it, such as `chat-rooms.room-header`.
+
+The computer and chat rooms provide objects of their own: see [the computer's](/docs/reference/computer/#a-computer-for-another-plugin) and chat rooms' README.
+
 ## Page code
 
 `page` is one CommonJS bundle that leaves `react`, `react/jsx-runtime`, and `@fxbot/app` out. The page runs it with a `require` that gives those three, its own copies, and nothing else. Its default export is called with `app`:
@@ -192,6 +213,7 @@ A plugin names the plugins it needs, and what it asks of each, under `needs`:
 | `app.toolView(tool, Component)` | How a call of `<plugin>_<tool>` shows in a reply. It gets `call`: `name`, `input`, `output`, `error`, and `done`. |
 | `app.settings(Component)` | A tab of its own in Settings, named for the plugin, at `/settings/plugins/<plugin>`. Several calls stack in that tab. Before 0.5.0, a section of Settings' one page. |
 | `app.botSettings(Component)` | A section in a bot's settings. It gets `bot`. |
+| `app.slot(name, Component)` | A part in a place another plugin's page leaves with `Slot`, which gets that `Slot`'s `props`. Several stack in order. Since 0.5.0. |
 
 Each part sits in its own error boundary: one that throws shows a short card in its place, and the rest of the app goes on. A plugin's page parts are for everyone, whichever bots it's on for. The page reads the list of plugins again after a change in **Plugins**, and keeps code it already ran until it reloads.
 
@@ -205,6 +227,7 @@ Each part sits in its own error boundary: one that throws shows a short card in 
 | `go(path)` | Opens a path in the app |
 | `useBots()` | The app's list of bots, or `null` while it loads |
 | `createPortal(children, node)` | React's, from `react-dom`, for drawing a component into DOM the plugin doesn't render with React, such as an editor's node. Since 0.4.1. |
+| `Slot` | `<Slot name="<plugin>.<place>" props={…} />` leaves a place other plugins fill with `app.slot`, each part in its own error boundary. One nobody fills draws nothing. Since 0.5.0. |
 | `ui` | The app's components: Button, Input, Textarea, Badge, Switch, Checkbox, the Dialog, Empty, Sidebar (with `useSidebar`), Attachment, Message, Bubble, and MessageScroller parts, `Streamdown` for Markdown, `Header` for a screen's top bar, `Blob` for a bot's look, and `Reply` for a turn's reply |
 
 The page's styles hold only the classes the app uses. A plugin brings its own CSS for anything else.

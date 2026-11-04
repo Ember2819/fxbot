@@ -58,10 +58,30 @@ The plugin has three skills:
 
 Each computer is named for its bot, as its hostname, such as `bob-computer`, and runs a desktop: XFCE on an X display, `:1`, with a panel, the Thunar file manager, Chromium, and a terminal window on the tmux session `main`. Its VNC server listens on a unix socket in the computer, `/tmp/fxbot/vnc.sock`, and no computer listens on a TCP port.
 
-- **The Computer screen**, `/computer/bots/<id>`, shows the desktop through [noVNC](https://novnc.com) and the terminal through [xterm.js](https://xtermjs.org), over WebSockets at `/api/plugins/computer/desktop/<id>` and `/api/plugins/computer/terminal/<id>`. The desktop is view-only until **Take over**; the terminal takes typing always. For a stopped computer, the screen has **Start it**.
+- **The Computer screen**, `/computer/computers/<key>`, shows the desktop through [noVNC](https://novnc.com) and the terminal through [xterm.js](https://xtermjs.org), over WebSockets at `/api/plugins/computer/desktop/<key>` and `/api/plugins/computer/terminal/<key>`. A bot's key is its id, and `/computer/bots/<id>`, from before 0.3.0, opens the same screen. The desktop is view-only until **Take over**; the terminal takes typing always. For a stopped computer, the screen has **Start it**.
+- **Cursors.** Over the desktop, each bot that pointed at something has an arrow in its colour, with its name, what it last did, and how long ago. The newest is solid, and the others faded. A bot that last used the browser or an app's accessibility tree, which move no pointer, shows as a label at the top left. They come from `computer_desktop`'s clicks, moves, drags, and scrolls, kept in memory, and cleared when the computer stops or is reset. Since 0.3.0.
 - **The browser** is Chromium, run as root without its sandbox, with its profile in `/root/.config/chromium`, so sign-ins last. The `agent-browser` command starts it on the desktop when it isn't running, brings its window to the front, and drives it over DevTools on `127.0.0.1:9222`, inside the computer.
 - **Accessibility** is on for every app, so `agent-desktop` reads their trees.
 - **Fonts** are DejaVu and Noto, which cover most scripts, but not Chinese, Japanese, Korean, or color emoji.
+
+## A computer for another plugin
+
+Since computer 0.3.0, a plugin that needs the computer can name computers of its own, such as [a room's](/docs/how-to/give-bots-a-computer/#give-a-room-a-computer). Each is named by a key, a word, a dash, and more, such as `room-1a2b3c4d`, which a bot's id never is. The plugin provides, with `fx.provide`:
+
+```ts
+type ComputerProvider = {
+  /** The computer for a chat, or null for the bot's own. `name` makes its hostname: `<name>-computer`. */
+  computerFor(call: { bot: string; session: string }): Promise<{ key: string; name: string } | null>;
+  /** Every computer it keeps, with its name; null while it can't tell. */
+  computers(): Promise<{ key: string; name: string }[] | null>;
+};
+```
+
+- **Which computer a call uses.** Before each call, the computer asks each such plugin, in turn, for the chat the call is in. The first that names one wins; otherwise the bot's own is used.
+- **Its container and home** are `fxbot-computer-<key>`, labelled `fxbot.by=<plugin>`.
+- **Keeping it.** A plugin's computer goes when that plugin is removed, or when it runs and its `computers()` doesn't list the key. One added but not running, or whose `computers()` answers null, keeps its own.
+- **Shared.** The bots it names it for share it, taking turns. A `computer_desktop` result there says where the others last pointed: "Others on this computer: Ann clicked (412, 300) 2 min ago." **Take over** pauses every bot's desktop and terminal tools on it, and **Hand back** sends nothing: the owner tells the bot that asked to go on.
+- **Routes,** under `/api/plugins/computer/computers/<key>/`, for the page: `state`, `cursors`, `start`, `stop`, `reset`, and `takeover`. A key no running plugin lists, and no bot's id, gets 404.
 
 ## Settings
 

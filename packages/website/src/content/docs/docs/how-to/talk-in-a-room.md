@@ -29,6 +29,8 @@ While bots answer, the room shows who's writing and who's next. **Stop** ends th
 
 Only bots that chat rooms is on for can be in a room. To give it to some bots only, see [Add a plugin](/docs/how-to/add-a-plugin/).
 
+A room can also have a computer of its own, which its bots share: see [Give a room a computer](/docs/how-to/give-bots-a-computer/#give-a-room-a-computer).
+
 ## What a bot knows in a room
 
 Each bot answers in a chat of its own for the room, which stays out of its own chat. Its `chat_history` tool still finds what was said in a room. Each turn, it's sent:
