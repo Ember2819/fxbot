@@ -41,11 +41,13 @@ type Places = {
   settings: ComponentType[];
   botSettings: ComponentType<{ bot: Profile }>[];
   botPanel: ComponentType<{ bot: Profile }>[];
+  // Places other plugins leave with Slot, by name, such as `chat-rooms.room-header`.
+  slots: Map<string, ComponentType<any>[]>;
 };
 // `key` is the URLs it loaded from, which change with its files.
 type Loaded = { name: string; iconKey: string; key: string; css?: HTMLLinkElement; places: Places };
 
-const emptyPlaces = (): Places => ({ routes: [], sidebar: [], nav: [], composer: [], toolViews: new Map(), settings: [], botSettings: [], botPanel: [] });
+const emptyPlaces = (): Places => ({ routes: [], sidebar: [], nav: [], composer: [], toolViews: new Map(), settings: [], botSettings: [], botPanel: [], slots: new Map() });
 
 // The loaded plugins, by name. A change makes a new array, which the places read through usePlugins.
 let loaded: Loaded[] = [];
@@ -89,6 +91,9 @@ function appModule(name: string) {
     useBots: () => useContext(BotsContext),
     // React's, for a plugin that draws a component into DOM it doesn't render, such as an editor's node.
     createPortal,
+    // A place in this plugin's page that other plugins fill with app.slot(name, Component), each part in its own
+    // error boundary. One nobody fills draws nothing.
+    Slot: ({ name, props }: { name: string; props?: Record<string, unknown> }) => <Place pick={(places) => places.slots.get(name) ?? []} props={props ?? {}} />,
     ui: ui(),
   };
 }
@@ -119,6 +124,7 @@ async function run(name: string, version: string, url: string): Promise<Places> 
     settings: (Component: ComponentType) => places.settings.push(Component),
     botSettings: (Component: ComponentType<{ bot: Profile }>) => places.botSettings.push(Component),
     botPanel: (Component: ComponentType<{ bot: Profile }>) => places.botPanel.push(Component),
+    slot: (name: string, Component: ComponentType<any>) => places.slots.set(name, [...(places.slots.get(name) ?? []), Component]),
   });
   return places;
 }

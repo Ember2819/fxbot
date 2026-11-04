@@ -39,8 +39,9 @@ export type PluginTool = {
   execute: (input: any, call: { bot: string; session: string; signal: AbortSignal }) => unknown;
 };
 
-// A plugin that needs this one, with what it asked of it: its block under `needs` in its plugin.json.
-export type Dependent = { name: string; version: string; needs: Record<string, unknown> };
+// A plugin that needs this one, with what it asked of it: its block under `needs` in its plugin.json. `api` is what it
+// provides, or null while it isn't running.
+export type Dependent = { name: string; version: string; needs: Record<string, unknown>; api: Record<string, unknown> | null };
 
 // A route under `/api/plugins/<plugin>/`, such as `/rooms/:id`. `params` holds the named parts.
 export type PluginRoute = (request: Request, params: Record<string, string>) => Response | Promise<Response>;
@@ -90,8 +91,14 @@ export type PluginApi = {
     /** Stops the turn running in one of the plugin's own sessions, if one runs: it ends `cancelled`. */
     cancel(bot: string, session: string): Promise<void>;
   };
-  /** The added plugins that need this one, each with its block for this one. */
+  /** The added plugins that need this one, each with its block for this one, and what it provides. */
   dependents(): Dependent[];
+  /** Offers an object to the plugins that need this one: they get it with fx.need, and this one reads theirs in
+   * fx.dependents(). Since 0.5.0. */
+  provide(api: Record<string, unknown>): void;
+  /** What a plugin named under this one's needs provides, or null while it isn't running. Read it at each use: an
+   * update or a reload replaces it. Since 0.5.0. */
+  need<T = Record<string, unknown>>(name: string): T | null;
   library: {
     /** An item's bytes, if it is tagged for the bot. */
     read(bot: string, id: string): Promise<{ name: string; type: string; bytes: Buffer }>;

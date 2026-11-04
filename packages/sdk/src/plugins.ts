@@ -63,6 +63,8 @@ type Loaded = {
   sql?: Sql;
   cleanup?: () => unknown;
   controller: AbortController;
+  /** What it provides to the plugins that need it. */
+  api?: Record<string, unknown>;
 };
 // `saved` holds the owner's settings, and `settings` those with the defaults, which the plugin reads.
 // `skills` are the ones it carries, read when it loads.
@@ -226,10 +228,11 @@ export async function createPlugins(options: {
   // A manifest stored before needs existed has none.
   const needsOf = (record: PackageRecord) => Object.keys(record.config.needs ?? {});
 
-  // The added plugins that need `name`, each with its block for it. A copy, so a plugin can't change another's.
+  // The added plugins that need `name`, each with its block for it, a copy, so a plugin can't change another's, and the
+  // object it provides, its own.
   const dependentsOf = (name: string): Dependent[] =>
-    [...plugins.values()].flatMap(({ record }) =>
-      record.config.needs?.[name] ? [{ name: record.name, version: record.config.version, needs: structuredClone(record.config.needs[name]) }] : [],
+    [...plugins.values()].flatMap(({ record, loaded }) =>
+      record.config.needs?.[name] ? [{ name: record.name, version: record.config.version, needs: structuredClone(record.config.needs[name]), api: loaded?.api ?? null }] : [],
     );
   // Tells each named plugin that runs who needs it now.
   async function tell(names: Iterable<string>) {
@@ -481,6 +484,14 @@ export async function createPlugins(options: {
       settings: plugin.settings,
       bots: host.bots,
       dependents: () => dependentsOf(record.name),
+      provide(offer) {
+        if (!offer || typeof offer !== "object") throw new Error("provide takes an object.");
+        loaded.api = offer;
+      },
+      need(name) {
+        if (!record.config.needs?.[name]) throw new Error(`${record.name} doesn't name ${name} under needs.`);
+        return (named(name)?.loaded?.api ?? null) as never;
+      },
       library: host.library,
       skills: host.skills,
       machine: host.machine,
