@@ -22,11 +22,10 @@ Add it from **Plugins**, where fxbot's list has it. It runs inside fxbot: read i
 
 ## Set up the engine
 
-Computers run in this machine's own container engine, podman or docker, whichever fxbot runs on, started rootless for a user of its own. The plugin's section in **Settings** shows the command to run, once, as root, and the script it runs:
-
-```sh
-sudo bash /var/lib/fxbot/data/plugins/computer/<commit>/host/setup.sh
-```
+Computers run in this machine's own container engine, podman or docker, whichever fxbot runs on, started rootless for a user of its own. When the plugin finds no engine, the machine sets it up by itself, with `host/setup.sh`:
+- in a release install, the machine's `fxbot` command runs it, as `fxbot computer on`, from the release's own files, then starts fxbot again
+- in a checkout run as root, the plugin runs it
+- in a checkout run as another user, the plugin's section in **Settings** shows the command to run as root
 
 `host/setup.sh`:
 - installs what the engine needs to run rootless: `uidmap`, `dbus-user-session`, and `nftables`, with `podman` and `passt`, or `rootlesskit` (or Docker's `docker-ce-rootless-extras`) and `slirp4netns`
@@ -35,7 +34,7 @@ sudo bash /var/lib/fxbot/data/plugins/computer/<commit>/host/setup.sh
 - loads a firewall, `/etc/fxbot/fxbot-computer.nft`, that lets the user's connections reach the internet and DNS, and not this machine, its tailnet, or its networks
 - in a release install, writes `/opt/fxbot/compose.override.yaml`, which gives fxbot's container the socket's folder and the user's group
 
-In a checkout, add `--user <login>` for the login that runs fxbot. `--remove` takes it all away. It's safe to run again.
+In a checkout, add `--user <login>` for the login that runs fxbot. `--remove` takes it all away, as `sudo fxbot computer off` does in a release install. It's safe to run again.
 
 ## Settings
 

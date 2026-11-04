@@ -159,6 +159,7 @@ export type PluginHost = {
   bots: PluginApi["bots"];
   library: PluginApi["library"];
   skills: PluginApi["skills"];
+  machine: PluginApi["machine"];
   chats: {
     newSession(plugin: string, bot: string): Promise<string>;
     send(plugin: string, bot: string, message: Parameters<PluginApi["chats"]["send"]>[1]): Promise<{ messageId: string; sessionId: string }>;
@@ -472,6 +473,7 @@ export async function createPlugins(options: {
       dependents: () => dependentsOf(record.name),
       library: host.library,
       skills: host.skills,
+      machine: host.machine,
       chats: {
         newSession: (bot) => host.chats.newSession(record.name, bot),
         send: (bot, message) => host.chats.send(record.name, bot, message),

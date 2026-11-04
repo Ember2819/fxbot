@@ -5,6 +5,7 @@ import { createHistory, summarize } from "./history.ts";
 import { createLibrary } from "./library.ts";
 import { createMcp } from "./mcp.ts";
 import { createMemories } from "./memories.ts";
+import type { PluginMachine } from "./plugin-api.ts";
 import { createPlugins } from "./plugins.ts";
 import { createProviders } from "./providers.ts";
 import { createRegistry } from "./registry.ts";
@@ -54,6 +55,8 @@ export type FxbotOptions = {
   embedUrl?: string;
   /** Plugin folders to load at start, unpinned, for writing a plugin in a checkout. */
   pluginDirs?: string[];
+  /** The machine's fxbot command, which does a job only root can do when a plugin asks. None in a checkout. */
+  machine?: PluginMachine;
 };
 
 // Bad input fails with `status` 400 and a missing bot with 404, so a server can answer with the same status.
@@ -163,6 +166,7 @@ export async function createFxbot(options: FxbotOptions) {
         save: ({ bot, session, name, type, bytes }) => library.save({ profileId: bot, sessionId: session, origin: "generated", name, type, bytes }),
       },
       skills: { files: (bot, name) => skills.files(bot, name) },
+      machine: options.machine ?? null,
       chats: {
         async newSession(plugin, bot) {
           started();

@@ -9,6 +9,7 @@
 #   fxbot restore <folder>     a backup: its database.dump, and its data.tar.gz when there is one
 #   fxbot rotate-key           every stored secret sealed again under a new key
 #   fxbot embedder cpu|gpu|off  the local embedder for memory search, on the CPU, on a GPU, or not at all
+#   fxbot computer on|off      the computer plugin's engine: a user of its own, rootless, with a firewall
 set -euo pipefail
 
 [ "$(id -u)" -eq 0 ] || { echo "fxbot: run it as root, such as: sudo fxbot ${1:-status}" >&2; exit 1; }
@@ -253,12 +254,46 @@ apply() {
         rm -f "$control/.$name"
         (embedder "$version") || true
         ;;
+      # The app asks only to set the computer up; taking it away is the owner's, with fxbot computer off.
+      computer.json)
+        version=$(sed -n 's/.*"to" *: *"\([a-z]*\)".*/\1/p' "$control/.$name" | head -n 1)
+        rm -f "$control/.$name"
+        if [ "$version" = on ]; then (computer on) || true; else echo "fxbot: computer.json asked for ${version:-nothing}, not on" >&2; fi
+        ;;
       *)
         rm -f "$control/.$name"
         echo "fxbot: no such request: $name" >&2
         ;;
     esac
   done
+}
+
+# What the computer's setup did, in computer-status.json for its plugin: the state, and why it failed.
+computer_status() {
+  printf '{"state":%s%s}\n' "$(quote "$1")" "${2:+,\"error\":$(quote "$2")}" >"$control/.computer-status.json"
+  mv "$control/.computer-status.json" "$control/computer-status.json"
+}
+
+# The computer plugin's engine, set up or taken away by the plugin's own setup script, from this release's files: never
+# from the plugin's folder, which the app can write. The script writes compose.override.yaml, which gives the app the
+# engine's socket, and starts fxbot again. FXBOT_COMPUTER_NAME names its user, for checks beside a real install.
+computer() {
+  local to=${1:-} script=$here/computer-setup.sh log remove=()
+  case $to in on | off) ;; *) die "name on or off" ;; esac
+  [ "$to" = on ] || remove=(--remove)
+  computer_status working
+  if ! curl -fsSL "$files/v$FXBOT_VERSION/plugins/computer/host/setup.sh" -o "$script.next"; then
+    rm -f "$script.next"
+    computer_status failed "Couldn't download the computer's setup script for $FXBOT_VERSION from $files."
+    die "couldn't download the computer's setup script for $FXBOT_VERSION from $files"
+  fi
+  mv "$script.next" "$script"
+  if ! log=$(bash "$script" --install "$here" --name "${FXBOT_COMPUTER_NAME:-fxbot-computer}" "${remove[@]}" 2>&1); then
+    computer_status failed "$(printf '%s\n' "$log" | tail -n 5)"
+    die "the computer's setup failed: $(printf '%s\n' "$log" | tail -n 1)"
+  fi
+  computer_status done
+  printf '%s\n' "$log" | tail -n 3
 }
 
 case ${1:-} in
@@ -282,8 +317,9 @@ case ${1:-} in
   restore) restore "${2:-}" ;;
   rotate-key) rotate_key ;;
   embedder) embedder "${2:-}" ;;
+  computer) computer "${2:-}" ;;
   *)
-    sed -n '6,11p' "$0" | sed 's/^# //'
+    sed -n '6,12p' "$0" | sed 's/^# //'
     exit 1
     ;;
 esac

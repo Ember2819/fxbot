@@ -63,6 +63,7 @@ export default async function setup(fx: PluginApi) {
 | `fx.library.read(bot, id)` | A library item's `name`, `type`, and `bytes`, if it's tagged for the bot; otherwise it throws |
 | `fx.library.save({ bot, session, name, type, bytes })` | Saves an image, or UTF-8 text, to the bot's library, tagged for the chat, through the library's checks. It answers the item. |
 | `fx.skills.files(bot, name)` | The files besides `SKILL.md` of the skill the bot sees by that name, as `{ path, text }`. None when it has no such skill. |
+| `fx.machine` | In an install made by `setup.sh`, the machine's `fxbot` command, for a job only root can do; `null` in a checkout. `ask("computer")` asks it to set up the computer plugin's engine, and `status("computer")` says how that went: `{ state, error? }`, with `state` `asked`, `working`, `done`, or `failed`, or `null` when nothing asked. `computer` is its only job. |
 | `fx.log(...parts)` | A line in its log, which its settings in **Plugins** show |
 | `fx.signal` | An `AbortSignal` that aborts when the plugin unloads |
 

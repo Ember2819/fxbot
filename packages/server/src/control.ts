@@ -1,4 +1,4 @@
-import type { LocalEmbedder } from "@fxbot/sdk";
+import type { LocalEmbedder, MachineJob, PluginMachine } from "@fxbot/sdk";
 import { existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from "node:fs";
 import { join, resolve } from "node:path";
 
@@ -61,3 +61,24 @@ export function localEmbedder(): { embedder: LocalEmbedder; switching: { to: Loc
   return { embedder, switching: null };
 }
 export const requestEmbedder = (to: LocalEmbedder) => request("embedder.json", { to });
+
+// A plugin's job for the machine, which only `computer` is: the computer plugin's engine, set up as root by the fxbot
+// command. It writes how that went to computer-status.json. None in a checkout.
+export const machine: PluginMachine | undefined = folder
+  ? {
+      ask(job) {
+        if (job !== "computer") throw new Error(`The machine has no job ${String(job)}.`);
+        request("computer.json", { to: "on" });
+      },
+      status(job) {
+        if (job !== "computer") return null;
+        if (existsSync(join(folder, "requests", "computer.json"))) return { state: "asked" };
+        try {
+          const run = JSON.parse(readFileSync(join(folder, "computer-status.json"), "utf8")) as MachineJob;
+          return ["working", "done", "failed"].includes(run.state) ? { state: run.state, ...(run.error ? { error: run.error } : {}) } : null;
+        } catch {
+          return null;
+        }
+      },
+    }
+  : undefined;

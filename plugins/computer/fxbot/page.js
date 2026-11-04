@@ -13050,16 +13050,18 @@ async function call(path, method = "GET", body) {
 	if (!res.ok) throw new Error(answer.error ?? `HTTP ${res.status}`);
 	return answer;
 }
+const settingUp = (status) => ["asked", "working"].includes(status?.setup?.state) && status.engine.state !== "ready";
 function useStatus() {
 	const [status, setStatus] = (0, react.useState)(null);
 	const [error, setError] = (0, react.useState)("");
 	const load = () => call("status").then((next) => (setStatus(next), setError("")), (e) => setError(e.message));
 	(0, react.useEffect)(() => void load(), []);
+	const waiting = Boolean(status?.building) || settingUp(status);
 	(0, react.useEffect)(() => {
-		if (!status?.building) return;
-		const timer = setTimeout(load, 2e3);
-		return () => clearTimeout(timer);
-	}, [status]);
+		if (!waiting) return;
+		const timer = setInterval(load, 2e3);
+		return () => clearInterval(timer);
+	}, [waiting]);
 	const act = (path, method = "POST") => call(path, method).then(setStatus, (e) => setError(e.message));
 	return {
 		status,
@@ -13317,10 +13319,10 @@ function ComputerScreen({ params }) {
 		})]
 	});
 }
-function Engine({ status }) {
+function Engine({ status, act }) {
 	const { Button } = _fxbot_app.ui;
 	const [script, setScript] = (0, react.useState)(null);
-	const { engine, command } = status;
+	const { engine, command, setup } = status;
 	if (engine.state === "ready") return /* @__PURE__ */ (0, react_jsx_runtime.jsxs)("p", {
 		className: "text-sm",
 		children: [
@@ -13335,13 +13337,39 @@ function Engine({ status }) {
 			"."
 		]
 	});
+	if (engine.state !== "rootful" && settingUp(status)) return /* @__PURE__ */ (0, react_jsx_runtime.jsxs)("div", {
+		className: "grid gap-2 text-sm",
+		children: [/* @__PURE__ */ (0, react_jsx_runtime.jsxs)("p", { children: [
+			"Setting up the computer on this machine: a user of its own, which runs its podman or docker rootless, and a firewall that keeps its computers to the internet. It takes a minute or two",
+			setup.lines ? "" : ", and fxbot starts again when it's done",
+			"."
+		] }), setup.lines?.length > 0 && /* @__PURE__ */ (0, react_jsx_runtime.jsx)(Code, { children: setup.lines.join("\n") })]
+	});
 	const read = () => script ? setScript(null) : (0, _fxbot_app.api)("script").then((res) => res.text()).then(setScript);
+	const failed = engine.state !== "rootful" && setup?.state === "failed";
+	const missing = engine.state !== "rootful" && setup?.state === "done";
 	return /* @__PURE__ */ (0, react_jsx_runtime.jsxs)("div", {
 		className: "grid gap-2",
 		children: [
+			(failed || missing) && /* @__PURE__ */ (0, react_jsx_runtime.jsxs)("div", {
+				className: "grid justify-items-start gap-2 text-sm",
+				children: [
+					/* @__PURE__ */ (0, react_jsx_runtime.jsx)("p", {
+						className: "text-destructive",
+						children: failed ? "Setting up the computer on this machine failed:" : `The computer was set up, but fxbot can't reach its engine at ${engine.socket}.`
+					}),
+					failed && setup.error && /* @__PURE__ */ (0, react_jsx_runtime.jsx)(Code, { children: setup.error }),
+					/* @__PURE__ */ (0, react_jsx_runtime.jsx)(Button, {
+						size: "sm",
+						variant: "outline",
+						onClick: () => act("setup"),
+						children: "Try again"
+					})
+				]
+			}),
 			/* @__PURE__ */ (0, react_jsx_runtime.jsx)("p", {
 				className: "text-sm",
-				children: engine.state === "rootful" ? "This engine runs as root, so the computer won't use it. Run the setup script on the machine, as root:" : "The computer's engine isn't set up on this machine yet. Run this on the machine, once, as root:"
+				children: engine.state === "rootful" ? "This engine runs as root, so the computer won't use it. Run the setup script on the machine, as root:" : failed || missing ? "Or run it on the machine yourself, as root:" : "The computer's engine isn't set up on this machine yet. Run this on the machine, once, as root:"
 			}),
 			/* @__PURE__ */ (0, react_jsx_runtime.jsx)(Code, { children: command }),
 			/* @__PURE__ */ (0, react_jsx_runtime.jsx)("p", {
@@ -13380,7 +13408,10 @@ function SettingsSection() {
 				className: "font-medium",
 				children: "Computer"
 			}),
-			status && /* @__PURE__ */ (0, react_jsx_runtime.jsx)(Engine, { status }),
+			status && /* @__PURE__ */ (0, react_jsx_runtime.jsx)(Engine, {
+				status,
+				act
+			}),
 			ready && /* @__PURE__ */ (0, react_jsx_runtime.jsxs)("div", {
 				className: "grid gap-1.5 text-sm",
 				children: [

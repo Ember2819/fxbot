@@ -88,6 +88,7 @@ Running it again finishes an install that stopped, and leaves a working one alon
 | `sudo fxbot restore <folder>` | Puts a backup in place of the database, and unpacks its data folder |
 | `sudo fxbot rotate-key` | Seals every stored key and token again under a new key, and keeps the old key as `secret.key.old` |
 | `sudo fxbot embedder cpu\|gpu\|off` | Runs memory search's local embedder on the CPU, on a GPU after a trial run reaches one, or not at all |
+| `sudo fxbot computer on\|off` | Sets up the computer plugin's engine, as adding the plugin does, or takes it away with its computers |
 
 **Moving from 0.2.** An install of 0.2 ran on the machine's own Postgres. Run `setup.sh` again: it stops 0.2, copies its database into the database container, and starts the containers on the same chats, key, and settings. The 0.2 files, settings, and database stay until you remove them, and `sudo fxbot status` says how to remove them or go back to 0.2. Settings' Update in 0.2 can't make this move.
 

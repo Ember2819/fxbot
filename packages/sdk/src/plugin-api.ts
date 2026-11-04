@@ -55,6 +55,16 @@ export type PluginSocket = {
 // A socket under `/api/plugins/<plugin>/`, such as `/desktop/:bot`, with the request that opened it.
 export type PluginSocketHandler = (socket: PluginSocket, request: Request, params: Record<string, string>) => unknown;
 
+/** How a job the machine does as root went: asked and not taken yet, working, done, or failed and why. */
+export type MachineJob = { state: "asked" | "working" | "done" | "failed"; error?: string };
+/** The machine's fxbot command, in an install made by setup.sh. Its only job for plugins is `computer`, which sets up
+ * the computer plugin's engine. */
+export type PluginMachine = {
+  ask(job: "computer"): void;
+  /** How the job went, or null when it was never asked for. */
+  status(job: "computer"): MachineJob | null;
+};
+
 export type PluginApi = {
   /** The plugin's name, its id in fxbot. */
   name: string;
@@ -88,6 +98,8 @@ export type PluginApi = {
     /** The files of the skill the bot sees by that name, besides SKILL.md. None when it has no such skill. */
     files(bot: string, name: string): { path: string; text: string }[];
   };
+  /** The machine's fxbot command, for a job only root can do; null in a checkout, which has none. */
+  machine: PluginMachine | null;
   /** Writes to the plugin's log, which shows on its row in Plugins. */
   log(...parts: unknown[]): void;
   /** Aborts when the plugin unloads. */

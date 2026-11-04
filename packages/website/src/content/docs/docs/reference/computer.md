@@ -1,9 +1,9 @@
 ---
 title: "The computer"
-description: "The computer plugin's tools, skills, desktop, settings, setup command, and image, and what a computer reaches."
+description: "The computer plugin's tools, skills, desktop, settings, setup, and image, and what a computer reaches."
 ---
 
-The computer plugin's tools, skills, desktop, settings, setup command, and image, and what a computer reaches. To add it, see [Give bots a computer](/docs/how-to/give-bots-a-computer/).
+The computer plugin's tools, skills, desktop, settings, setup, and image, and what a computer reaches. To add it, see [Give bots a computer](/docs/how-to/give-bots-a-computer/).
 
 ## Tools
 
@@ -77,9 +77,19 @@ In the plugin's settings in **Plugins**:
 
 Each computer also has at most 512 processes, and 512 MiB of shared memory for browsers. A computer made with other sizes, or another screen, is made again with the new ones when it next starts; its home stays.
 
-## The setup command
+## The setup
 
-`host/setup.sh`, in the plugin's files, run once as root. The plugin's section in **Settings** shows the command, with the script's path.
+The computer's engine is set up by `host/setup.sh`, in the plugin's files, run as root. When the plugin loads and finds no engine, it has the script run, once each time fxbot starts:
+
+| fxbot runs | Who runs the script |
+| --- | --- |
+| From a release install | The machine's `fxbot` command, with `fxbot computer on`, which the plugin asks for through fxbot's requests. It runs the script from the release's own files, not the plugin's folder, then starts fxbot again. |
+| From a checkout, as root | The plugin, with `--user root` |
+| From a checkout, as another user | Nobody: **Settings** shows the command, to run as root |
+
+**Settings** shows the setup while it works, and why it failed, with **Try again**. `FXBOT_COMPUTER_NAME` names another user than `fxbot-computer`, for checks beside a real install.
+
+The script's options, for running it by hand:
 
 | Option | What it does |
 | --- | --- |

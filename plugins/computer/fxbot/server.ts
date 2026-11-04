@@ -1,3 +1,4 @@
+import { spawn } from "node:child_process";
 import { createHash, randomUUID } from "node:crypto";
 import { existsSync, readFileSync } from "node:fs";
 import { request, type IncomingHttpHeaders } from "node:http";
@@ -46,8 +47,10 @@ const maxImage = 3.75 * mib;
 const page = 60_000;
 const maxText = mib;
 const maxRead = 32 * mib;
+// The engine's user on the machine: fxbot-computer, or FXBOT_COMPUTER_NAME, for checks beside a real install.
+const user = process.env.FXBOT_COMPUTER_NAME || "fxbot-computer";
 // The socket in a release install's app container, then where setup.sh makes it, for a checkout.
-const sockets = ["/run/fxbot-computer/engine.sock", "/var/lib/fxbot-computer/run/engine.sock"];
+const sockets = ["/run/fxbot-computer/engine.sock", `/var/lib/${user}/run/engine.sock`];
 const script = resolve(import.meta.dirname, "../host/setup.sh");
 // Copied into the image.
 const file = (name: string) => readFileSync(join(import.meta.dirname, name));
@@ -130,7 +133,41 @@ export default function setup(fx: PluginApi) {
   const notReady = () =>
     engine.state === "rootful"
       ? "The computer's engine runs as root, so the computer won't use it. The owner runs the setup command in Settings."
-      : `The computer isn't set up on this machine: its engine doesn't answer at ${engine.socket}. The owner runs the setup command in Settings.`;
+      : ["asked", "working"].includes(setupState()?.state ?? "")
+        ? "The computer is being set up on this machine, which takes a minute or two. Try again then."
+        : `The computer isn't set up on this machine: its engine doesn't answer at ${engine.socket}. See the computer's section in Settings.`;
+
+  // No engine yet: the machine sets it up, since the owner added the plugin to have one. In a release install the
+  // machine's fxbot command does it; in a checkout run as root, the plugin runs its own script. Each happens once a
+  // start, and a failure waits for Try again. Elsewhere nothing here can act as root, and Settings shows the command.
+  let asked = false;
+  let here: { state: "working" | "done" | "failed"; lines: string[]; error?: string } | null = null;
+  const setupState = () => (fx.machine ? fx.machine.status("computer") : here);
+  function setUp(again = false) {
+    if (fx.settings.engine?.trim() || (asked && !again)) return;
+    const was = setupState();
+    if (!again && was && was.state !== "done") return;
+    if (fx.machine) {
+      asked = true;
+      fx.machine.ask("computer");
+      fx.log("Asked the machine to set up the computer's engine.");
+    } else if (process.getuid?.() === 0) {
+      asked = true;
+      here = { state: "working", lines: [] };
+      fx.log(`Setting up the computer's engine: bash ${script} --user ${userInfo().username} --name ${user}`);
+      const run = spawn("bash", [script, "--user", userInfo().username, "--name", user], { stdio: ["ignore", "pipe", "pipe"] });
+      const take = (chunk: Buffer) => here!.lines.push(...chunk.toString("utf8").split("\n").filter(Boolean)) && here!.lines.splice(0, Math.max(0, here!.lines.length - 40));
+      run.stdout.on("data", take);
+      run.stderr.on("data", take);
+      run.on("error", (error) => (here = { state: "failed", lines: here!.lines, error: error.message }));
+      run.on("close", (code) => {
+        if (here?.state !== "working") return;
+        here = code === 0 ? { state: "done", lines: here.lines } : { state: "failed", lines: here.lines, error: here.lines.slice(-5).join("\n") || `It ended with exit ${code}.` };
+        fx.log(code === 0 ? "Set up the computer's engine." : `Setting up the computer's engine failed: ${here.error}`);
+        void check();
+      });
+    }
+  }
 
   // One call to the engine. A streamed answer goes to `stream` as it comes.
   function call(method: string, path: string, options: { body?: unknown; type?: string; timeout?: number } = {}, stream?: (chunk: Buffer) => void) {
@@ -817,15 +854,16 @@ export default function setup(fx: PluginApi) {
       await forget();
     } catch (error) {
       engine.error = (error as Error).message;
+      setUp();
     }
   }
 
-  // What the page shows: the engine, the command that sets it up, the image, and each computer.
+  // What the page shows: the engine, its setup or the command that does it, the image, and each computer.
   async function status() {
     if (engine.state !== "ready") await check();
     const inContainer = existsSync("/run/.containerenv") || existsSync("/.dockerenv");
     const command = `sudo bash ${script}${inContainer ? "" : ` --user ${userInfo().username}`}`;
-    const answer: Record<string, unknown> = { engine, command, building: build?.lines.slice(-40) ?? null, buildError };
+    const answer: Record<string, unknown> = { engine, command, setup: setupState(), building: build?.lines.slice(-40) ?? null, buildError };
     if (engine.state !== "ready") return answer;
     const tag = tagOf(steps());
     const made = await call("GET", `/images/${tag}/json`);
@@ -856,6 +894,8 @@ export default function setup(fx: PluginApi) {
   };
   fx.route("GET", "/status", async () => Response.json(await status()));
   fx.route("GET", "/script", () => new Response(readFileSync(script, "utf8"), { headers: { "content-type": "text/plain; charset=utf-8" } }));
+  // Try again, after a setup that failed.
+  fx.route("POST", "/setup", () => answer(async () => setUp(true)));
   fx.route("POST", "/rebuild", () => answer(async () => void image(true).catch(() => {})));
   fx.route("POST", "/bots/:id/stop", (_, { id }) =>
     answer(async () => {

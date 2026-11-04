@@ -7,7 +7,7 @@ import { pipeline } from "node:stream/promises";
 import type { ReadableStream } from "node:stream/web";
 import { constants, createGzip } from "node:zlib";
 import { WebSocketServer, type WebSocket } from "ws";
-import { canUpdate, lastUpdate, localEmbedder, repository, requestEmbedder, requestUpdate, version, waiting } from "./control.ts";
+import { canUpdate, lastUpdate, localEmbedder, machine, repository, requestEmbedder, requestUpdate, version, waiting } from "./control.ts";
 
 // Loopback by default. Other devices reach it through `tailscale serve`; the page never holds a secret. In its container
 // it listens on FXBOT_HOST, 0.0.0.0, and compose publishes the port on the machine's loopback only. FXBOT_PORT lets a
@@ -36,6 +36,8 @@ const fxbot = await createFxbot({
   embedUrl: process.env.FXBOT_EMBED_URL || undefined,
   // Plugin folders, for writing a plugin in a checkout, separated as PATH is.
   pluginDirs: process.env.FXBOT_PLUGIN_DIRS?.split(delimiter).filter(Boolean),
+  // The machine's fxbot command, in an install made by setup.sh.
+  machine,
 });
 
 // The ui package's build, served beside the API.

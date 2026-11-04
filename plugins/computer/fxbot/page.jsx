@@ -16,17 +16,22 @@ async function call(path, method = "GET", body) {
   return answer;
 }
 
-// The plugin's status, read again every 2 seconds while the image builds.
+// Whether the machine is setting the engine up.
+const settingUp = (status) => ["asked", "working"].includes(status?.setup?.state) && status.engine.state !== "ready";
+
+// The plugin's status, read again every 2 seconds while the image builds or the engine is set up. A setup in a release
+// install starts fxbot again, so a read that fails then doesn't stop the next.
 function useStatus() {
   const [status, setStatus] = useState(null);
   const [error, setError] = useState("");
   const load = () => call("status").then((next) => (setStatus(next), setError("")), (e) => setError(e.message));
   useEffect(() => void load(), []);
+  const waiting = Boolean(status?.building) || settingUp(status);
   useEffect(() => {
-    if (!status?.building) return;
-    const timer = setTimeout(load, 2000);
-    return () => clearTimeout(timer);
-  }, [status]);
+    if (!waiting) return;
+    const timer = setInterval(load, 2000);
+    return () => clearInterval(timer);
+  }, [waiting]);
   const act = (path, method = "POST") => call(path, method).then(setStatus, (e) => setError(e.message));
   return { status, error, act };
 }
@@ -206,23 +211,46 @@ function ComputerScreen({ params }) {
 }
 
 // Ready, or the command that sets the engine up, with the script it runs.
-function Engine({ status }) {
+function Engine({ status, act }) {
   const { Button } = ui;
   const [script, setScript] = useState(null);
-  const { engine, command } = status;
+  const { engine, command, setup } = status;
   if (engine.state === "ready")
     return (
       <p className="text-sm">
         {engine.name} {engine.version}, rootless, at <span className="font-mono text-xs break-all">{engine.socket}</span>.
       </p>
     );
+  if (engine.state !== "rootful" && settingUp(status))
+    return (
+      <div className="grid gap-2 text-sm">
+        <p>
+          Setting up the computer on this machine: a user of its own, which runs its podman or docker rootless, and a firewall that keeps its computers to the
+          internet. It takes a minute or two{setup.lines ? "" : ", and fxbot starts again when it's done"}.
+        </p>
+        {setup.lines?.length > 0 && <Code>{setup.lines.join("\n")}</Code>}
+      </div>
+    );
   const read = () => (script ? setScript(null) : api("script").then((res) => res.text()).then(setScript));
+  const failed = engine.state !== "rootful" && setup?.state === "failed";
+  const missing = engine.state !== "rootful" && setup?.state === "done";
   return (
     <div className="grid gap-2">
+      {(failed || missing) && (
+        <div className="grid justify-items-start gap-2 text-sm">
+          <p className="text-destructive">{failed ? "Setting up the computer on this machine failed:" : `The computer was set up, but fxbot can't reach its engine at ${engine.socket}.`}</p>
+          {failed && setup.error && <Code>{setup.error}</Code>}
+          <Button size="sm" variant="outline" onClick={() => act("setup")}>
+            Try again
+          </Button>
+        </div>
+      )}
       <p className="text-sm">
         {engine.state === "rootful"
           ? "This engine runs as root, so the computer won't use it. Run the setup script on the machine, as root:"
-          : "The computer's engine isn't set up on this machine yet. Run this on the machine, once, as root:"}
+          : failed || missing
+            ? "Or run it on the machine yourself, as root:"
+            : "The computer's engine isn't set up on this machine yet. Run this on the machine, once, as root:"}
       </p>
       <Code>{command}</Code>
       <p className="text-xs text-muted-foreground">
@@ -249,7 +277,7 @@ function SettingsSection() {
   return (
     <section className="grid gap-3" aria-label="Computer">
       <h2 className="font-medium">Computer</h2>
-      {status && <Engine status={status} />}
+      {status && <Engine status={status} act={act} />}
       {ready && (
         <div className="grid gap-1.5 text-sm">
           <p>
