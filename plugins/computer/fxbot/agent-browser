@@ -1,0 +1,19 @@
+#!/bin/bash
+# agent-browser on the desktop's own Chromium, the one the person watches: when DevTools doesn't answer on
+# 127.0.0.1:9222, it starts Chromium there, then runs agent-browser connected to it with --cdp. The profile is in the
+# home, so sign-ins last. Chromium runs as root, so without its sandbox, and --test-type hides the bar that says so.
+# A computer that stopped when idle stopped Chromium too, which isn't a crash to offer to restore.
+# `agent-browser skills get` reads the skill text that came with the binary.
+export AGENT_BROWSER_SKILLS_DIR=${AGENT_BROWSER_SKILLS_DIR:-/usr/local/lib/agent-browser/skill-data} DISPLAY=${DISPLAY:-:1}
+real=/usr/local/lib/agent-browser/agent-browser
+case ${1:-} in skills | --help | -h | --version | -V | "") exec "$real" "$@" ;; esac
+up() { curl -fs -m 1 -o /dev/null http://127.0.0.1:9222/json/version; }
+if ! up; then
+  setsid chromium --no-sandbox --test-type --force-renderer-accessibility --remote-debugging-port=9222 \
+    --user-data-dir=/root/.config/chromium --no-first-run --no-default-browser-check --hide-crash-restore-bubble --start-maximized about:blank \
+    >/tmp/fxbot/chromium.log 2>&1 </dev/null &
+  for _ in $(seq 100); do up && break; sleep 0.1; done
+fi
+# Its window comes to the front, so the screen shows the page it works on.
+xdotool search --onlyvisible --class chromium 2>/dev/null | head -1 | xargs -r xdotool windowactivate 2>/dev/null
+exec "$real" --cdp 9222 "$@"

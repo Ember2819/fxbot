@@ -18,7 +18,7 @@ By default, fxbot shows only the plugins it vets, tagged **fxbot**.
 
 ## A plugin that needs another
 
-Some plugins build on another: the browser needs the computer. Its page says **Needs computer**, and **Add** waits until the computer is added. While the browser is added, the computer can't be removed. A bot that has the browser on and the computer off says **Needs computer on this bot** in its settings: switch the computer on for it too.
+Some plugins build on another, such as one that installs programs on the computer. Its page says **Needs computer**, and **Add** waits until the computer is added. While it's added, the computer can't be removed. A bot that has it on and the computer off says **Needs computer on this bot** in its settings: switch the computer on for it too.
 
 ## Show unvetted plugins
 
@@ -32,8 +32,7 @@ fxbot doesn't vet any of these. Read what each one does before you add it. While
 ## fxbot's plugins
 
 - **chat-rooms**: rooms where several of your bots talk with you. Choose **+** beside **Rooms** in the sidebar, name the room, and pick its bots in the order they answer. Each of your messages gets one answer from each bot, in turn, and each bot sees what the others said.
-- **computer**: a Linux computer for each bot, where it runs commands and keeps files. Its engine is set up once on the machine: see [Give bots a computer](/docs/how-to/give-bots-a-computer/).
-- **browser**: a web browser on each bot's computer. It needs the computer.
+- **computer**: a Linux computer for each bot, with a desktop you watch and take over, a terminal, a web browser, and files. Its engine is set up once on the machine: see [Give bots a computer](/docs/how-to/give-bots-a-computer/).
 - **herdr**: bots see the coding agents [herdr](https://herdr.dev) runs, and read what their panes show. Its **socket** setting says where herdr's socket is. In a release, fxbot's container can't reach that socket by itself: its [README](https://github.com/iammrduncan/fxbot/tree/main/plugins/herdr#reach-herdrs-socket) shows how to let it.
 
 ## When it goes differently

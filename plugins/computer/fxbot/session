@@ -1,0 +1,19 @@
+#!/bin/bash
+# The computer's command, under the engine's init: its desktop. Xvnc is the display, :1, and the VNC server, on a unix
+# socket with no TCP port. The D-Bus session bus and the VNC socket sit at fixed paths in /tmp/fxbot, which every exec
+# names. The accessibility bus starts before any app, so each one registers on it. Then the tmux session `main`, and
+# XFCE, whose autostart opens a terminal window on `main`. When Xvnc ends, so does the computer; its next call starts
+# it again. SCREEN is the screen's size, such as 1280x800.
+export DISPLAY=:1 XDG_RUNTIME_DIR=/tmp/fxbot DBUS_SESSION_BUS_ADDRESS=unix:path=/tmp/fxbot/bus ACCESSIBILITY_ENABLED=1 QT_ACCESSIBILITY=1
+mkdir -p /tmp/fxbot && chmod 700 /tmp/fxbot
+# A computer that stopped keeps its /tmp, with the last session's sockets and lock.
+rm -f /tmp/fxbot/bus /tmp/fxbot/vnc.sock /tmp/.X1-lock /tmp/.X11-unix/X1
+dbus-daemon --session --address="$DBUS_SESSION_BUS_ADDRESS" --nofork --nopidfile >/tmp/fxbot/dbus.log 2>&1 &
+Xvnc :1 -geometry "${SCREEN:-1280x800}" -depth 24 -rfbport -1 -rfbunixpath /tmp/fxbot/vnc.sock -rfbunixmode 0600 \
+  -SecurityTypes None -AlwaysShared -nolisten tcp >/tmp/fxbot/xvnc.log 2>&1 &
+xvnc=$!
+for _ in $(seq 100); do [ -S /tmp/.X11-unix/X1 ] && [ -S /tmp/fxbot/bus ] && break; sleep 0.05; done
+/usr/libexec/at-spi-bus-launcher --launch-immediately >/tmp/fxbot/a11y.log 2>&1 &
+tmux new-session -d -s main -x 160 -y 48
+setsid xfce4-session >/tmp/fxbot/xfce.log 2>&1 &
+wait "$xvnc"

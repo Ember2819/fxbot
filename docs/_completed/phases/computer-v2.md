@@ -6,9 +6,9 @@ Each bot gets a whole Linux computer, in one plugin:
 - **a web browser** on that desktop
 - **the tools a model uses to control all three**: by pixels, by accessibility tree, and by text
 
-It replaces [v1](../_completed/phases/computer.md), whose computer was a headless shell, and folds the separate browser plugin into the computer.
+It replaces [v1](computer.md), whose computer was a headless shell, and folds the separate browser plugin into the computer.
 
-Status: planned, not built. Research and plan written on 2026-11-03, with prototypes on this machine, and the same day a second read of how the references steer an agent to the right control and how people invoke a computer. v1 is built on the release/0.4.0 branch and isn't released, so v2 changes the computer plugin in place, and the browser plugin goes before 0.4.0 ships.
+Status: built on 2026-11-04, on the release/0.4.0 branch, in `plugins/computer`, with `fx.socket` in the plugin API; the browser plugin is gone. Checked on this machine on podman 5.4.2, and on Debian's docker.io 26.1.5 with rootlesskit, installed for the check and removed after. Research and plan written on 2026-11-03, with prototypes on this machine, and the same day a second read of how the references steer an agent to the right control and how people invoke a computer. Where the build found the plan wrong, the plan below says what was built, and [What the build changed](#what-the-build-changed) lists it.
 
 ## 0. Core or plugin
 
@@ -199,7 +199,7 @@ Run as a computer is: `--init`, 2 GiB, 2 CPUs, 512 processes, 512 MiB of shared 
 | A click, half a second, and a screenshot, in one exec | 636 ms |
 | `xdotool type` of 25 characters | 80 ms |
 | agent-desktop | `status`: accessibility granted on XFCE and Xvnc. The terminal snapshot has 29 refs in 32 ms. Chromium's has 79 refs in 575 ms, once started with both flags. |
-| agent-browser on the visible Chromium | `AGENT_BROWSER_CDP=9222` and nothing else; open and snapshot in 340 ms, on the screen the person watches |
+| agent-browser on the visible Chromium | `--cdp 9222` and nothing else (`AGENT_BROWSER_CDP`, which this row first named, isn't read); open and snapshot in 340 ms, on the screen the person watches |
 | The live view | Xvnc on a unix socket, a relay in the computer over a hijacked exec on the engine's socket, and a WebSocket to noVNC in a page. Connected and drawn in 1.7 s, 540 KB for the first screen. Taking over: a click and typing in noVNC changed Chromium's address, which DevTools confirmed. No port is published. |
 | The shared terminal | One tmux session: the person through a TTY exec attached to it, and the bot through `send-keys` and `capture-pane`. Each saw the other's line. |
 | Rootless | The same, as an unprivileged user under its own systemd: the limits held (`memory.max` 2147483648, `pids.max` 512, `cpu.max` 200000 100000), and agent-browser, agent-desktop, and screenshots worked |
@@ -263,7 +263,7 @@ plugins/computer/
 └── host/setup.sh            the engine, set up once on the machine (v1)
 ```
 
-`novnc.js` and `page.js` are built with rolldown, by the commands in the README, and both are committed. `novnc.js` is about 190 KB, and `page.js`, with xterm.js, about 500 KB: each under fxbot's 2 MiB for a plugin's file.
+`novnc.js` and `page.js` are built with rolldown, by the commands in the README, and both are committed. `novnc.js` is 307 KB, and `page.js`, with xterm.js, 658 KB, unminified: each under fxbot's 2 MiB for a plugin's file.
 
 ### The plugin API piece: `fx.socket` (`packages/sdk`, `packages/server`)
 
@@ -292,12 +292,12 @@ run   apt-get install tigervnc-standalone-server tigervnc-tools dbus-x11 at-spi2
 run   apt-get install xfce4-session xfwm4 xfce4-panel xfdesktop4 xfce4-terminal thunar
 run   apt-get install chromium socat fonts-noto-core
 run   agent-desktop 1.1.0 and agent-browser 0.41.1, for amd64 or arm64, each checked against its sha256
-file  session, fxbot-run, fxbot-screen, and the agent-browser wrapper → /usr/local/bin/
+file  session, fxbot-run, fxbot-screen, and the agent-browser wrapper → /usr/local/bin/, after every step, so no plugin's step replaces them
 ```
 
 - **agent-desktop** comes from its release archives, `agent-desktop-v1.1.0-<arch>-unknown-linux-gnu.tar.gz`: x86_64 `efbdcf4caf10132e4fe915db1ec643184c947c65e0511845aeb4839445d7ea43`, aarch64 `252c17e271a444352a5ba1e9f8fcbace89fa7b6b0bfcc4abebad2b35eb1f7a4d`. It installs `agent-desktop` and its `agent-desktop-linux-clipboard-owner`.
-- **agent-browser** keeps v1's digests. Its binary goes to `/usr/local/lib/agent-browser/`, and the wrapper takes its name on the `PATH`.
-- **About 1.2 GB**, measured at 1.19 GB. It builds in about 90 s on a bot's first call, and again when a plugin that needs the computer comes or goes.
+- **agent-browser** comes from its npm package, `agent-browser-0.41.1.tgz`, sha256 `6316d0f6d33df8dd545eb65da19f36f5f5272035fefdb8aaabd1d815bc3b179d`, which holds the binary for each CPU (the x64 one is v1's release binary, byte for byte) and the skill text `agent-browser skills get` prints. The binary and `skill-data` go to `/usr/local/lib/agent-browser/`, and the wrapper takes its name on the `PATH`.
+- **About 1.2 GB**, measured at 1.18 GB on podman and 1.17 GB on docker. It built in 42 to 66 s here, with Debian's image already pulled, on a bot's first call, and again when a plugin that needs the computer comes or goes.
 
 ### The session (`fxbot/session`)
 
@@ -313,11 +313,10 @@ Every exec, the tools' and the views', gets the session's environment. That is v
 - `DISPLAY=:1`
 - `DBUS_SESSION_BUS_ADDRESS`, `XDG_RUNTIME_DIR`
 - `ACCESSIBILITY_ENABLED=1`, `QT_ACCESSIBILITY=1`
-- `AGENT_BROWSER_CDP=9222`
 
-So `agent-desktop`, `xdotool`, and `agent-browser` work from the shell as they do on the desktop.
+So `agent-desktop`, `xdotool`, and `agent-browser` work from the shell as they do on the desktop. A computer counts as started once XFCE has opened the terminal window, about 1.1 to 1.3 s from cold: before that, agent-desktop can't list windows.
 
-**The browser.** The `agent-browser` wrapper starts Chromium when DevTools doesn't answer on `127.0.0.1:9222` inside the computer, then runs agent-browser. The flags are `--no-sandbox --test-type --force-renderer-accessibility --remote-debugging-port=9222 --user-data-dir=/root/.config/chromium --no-first-run --start-maximized`. The profile is in the home, so sign-ins last. The person sees each page the bot opens.
+**The browser.** The `agent-browser` wrapper starts Chromium when DevTools doesn't answer on `127.0.0.1:9222` inside the computer, brings its window to the front, then runs agent-browser with `--cdp 9222`. The flags are `--no-sandbox --test-type --force-renderer-accessibility --remote-debugging-port=9222 --user-data-dir=/root/.config/chromium --no-first-run --no-default-browser-check --hide-crash-restore-bubble --start-maximized about:blank`. The profile is in the home, so sign-ins last. The person sees each page the bot opens.
 
 ### Tools
 
@@ -407,14 +406,14 @@ That's about 110 words in each chat of those bots, and nothing in any other.
 `server.ts` adds two sockets and a route:
 - **`desktop/:bot`.** It starts the computer if it's stopped. Then it runs `socat STDIO UNIX-CONNECT:/tmp/fxbot/vnc.sock` in an exec with stdin attached (`Tty: false`), on a hijacked connection: the page's binary messages go to its stdin, and its stdout frames go back as messages.
 - **`terminal/:bot`.** An exec with `Tty: true`, made so at creation (podman's start ignores `Tty`), running `tmux new-session -A -s main`. The page's text goes to its stdin, and a JSON resize message calls `POST /exec/{id}/resize`.
-- **`POST bots/:id/takeover`**, with `{ on }`. While the owner has the computer, `computer_desktop` and `computer_terminal` answer "Your owner is using this computer. Wait for them to hand it back, or ask what they want." `computer_shell` and the file tools go on.
+- **`POST bots/:id/takeover`**, with `{ on }`. While the owner has the computer, `computer_desktop` and `computer_terminal` answer "Your owner has this computer now. Wait for them to hand it back, or ask what they want. computer_shell and the file tools still work." `computer_shell` and the file tools go on.
 - When the last view of a computer closes, the take-over ends.
 
 ### Speed and cost
 
-- **The image:** about 1.2 GB once for all bots, against v1's 230 MB, or 960 MB with the browser. It builds in about 90 s, and only on the first call or a change of steps.
+- **The image:** about 1.2 GB once for all bots, against v1's 230 MB, or 960 MB with the browser. It builds in about a minute, and only on the first call or a change of steps.
 - **Starting:** a computer starts in about 0.1 s, as in v1, and its desktop in about 1 s more.
-- **Memory:** a running computer holds about 92 MB at idle, against v1's 2 MB, and 260 to 290 MB with Chromium and a page open. It is still held to `memoryMiB`, 2 GiB by default. A stopped computer holds none.
+- **Memory:** a running computer holds about 120 MB at idle, against v1's 2 MB, and about 330 MB with Chromium and a page open, by its cgroup's `memory.current`. It is still held to `memoryMiB`, 2 GiB by default. A stopped computer holds none.
 - **CPU at idle:** about 0.2% of one CPU.
 - **The view:** about 540 KB for the first screen, then only what changes. Nothing when the screen is still.
 - **Nothing new until it's used:** no session runs for a bot that never called, and no stream for a computer nobody watches.
@@ -446,53 +445,53 @@ About 1,140 lines, beside v1's:
 Checks use v1's harness: a disposable Postgres, the mock model making scripted tool calls, the mock GitHub, Playwright, and `setup.sh --name fxbot-computer-check`, on podman, then on docker with Debian's `docker.io` and `rootlesskit`. The owner's go-ahead covers the user, its firewall, and its units; ask again for anything else. Remove all of it after, as v1 did.
 
 **M1. Sockets**
-- [ ] A scratch plugin's `fx.socket` echoes binary and text messages, and its `onclose` hears the page leave.
-- [ ] An upgrade whose `Origin` is another site gets 403; one with no `Origin` or the same host goes through; a path no socket has gets 404.
-- [ ] Unloading the plugin closes its sockets; stopping fxbot closes them all.
+- [x] A scratch plugin's `fx.socket` echoes binary and text messages, and its `onclose` hears the page leave.
+- [x] An upgrade whose `Origin` is another site gets 403; one with no `Origin` or the same host goes through; a path no socket has gets 404. A handler that throws closes its socket with 1011.
+- [x] Unloading the plugin closes its sockets, with 1001; stopping fxbot closes them all.
 - [ ] Through the owner's `tailscale serve` address, a socket opens and carries messages.
 
 **M2. The image and the session**, on each engine
-- [ ] The image builds from the steps, with agent-desktop and agent-browser checked for amd64; its size is noted. arm64 is left to the human where nothing emulates it here.
-- [ ] A computer's desktop is up within 2 s of its start: Xvnc on the unix socket, no TCP port (`ss -ltn` in the computer is empty), XFCE with the terminal window attached to `main`.
-- [ ] `agent-desktop status` says granted, from `computer_shell`.
-- [ ] `agent-browser open` from the shell starts the visible Chromium and drives it; a screenshot shows the page.
-- [ ] Memory at idle, and with a page open, is noted; the limits hold rootless.
-- [ ] A page in Arabic, Chinese, and Hindi shows no boxes, or the gaps are noted.
+- [x] The image builds from the steps, with agent-desktop and agent-browser checked for amd64: 1.18 GB on podman, 1.17 GB on docker, in 42 to 66 s. arm64 is left to the human.
+- [x] A computer's desktop is up within 2 s of its start, 1.1 to 1.3 s on both engines: Xvnc on the unix socket, no TCP port (the image has no `ss`; `/proc/net/tcp` and `tcp6` list no listener), XFCE with the terminal window attached to `main`.
+- [x] `agent-desktop status` says granted, from `computer_shell`.
+- [x] `agent-browser open` from the shell starts the visible Chromium and drives it; a screenshot shows the page.
+- [x] Memory at idle, and with a page open, is noted: 121 MiB and 327 MiB by the cgroup's `memory.current`. The limits hold rootless on both engines.
+- [x] A page in Arabic, Chinese, and Hindi shows no boxes, or the gaps are noted: Arabic and Hindi draw; Chinese, and one emoji of two, are boxes, as open question 7's default leaves them. The docs say how a plugin can add the fonts.
 
 **M3. Tools**, through the mock model, on each engine
-- [ ] `computer_desktop`:
+- [x] `computer_desktop`:
   - each action works: a left click moves focus, `type` and `key` reach a terminal window, `scroll` scrolls a page, `left_click_drag` moves a window, `zoom` returns the region at its size
   - each answer has the window's title and the cursor, and an image that reaches the model's request
-- [ ] `computer_terminal`:
+- [x] `computer_terminal`:
   - runs `python3`, sends `1+1` with `Enter`, and its screen shows `2`
   - `C-c` stops a `sleep 100`
   - the desktop's terminal window shows the same lines
-- [ ] `agent-desktop snapshot` reads Thunar, the terminal, and Chromium, and `click` on a ref acts.
-- [ ] A scripted turn browses with agent-browser, and finishes a step that has no tree with `computer_desktop`.
-- [ ] A model whose provider has no vision gets the desktop's text and the image: what libfx and the provider do with the image is noted, and the skill steers that bot to the trees and text.
-- [ ] `computer_write_file` with `old_text` and `new_text` replaces one place in a file, and refuses when `old_text` is there twice or not at all.
-- [ ] v1's checks still pass on the new image: the shell's limits and long output, files, the library, skill scripts, idle stops, rebuilds, and the firewall's refusals.
-- [ ] The instructions entry is in each chat of a bot the computer is on for, as the mock model's request shows, and in no other bot's.
-- [ ] `$computer` in a message, and the Computer button, put the computer skill's text in that message's request.
-- [ ] `agent-browser skills get core` and `agent-desktop skills get desktop` print their text in the image, at its versions.
-- [ ] `computer_ask_owner` puts the computer in the owner's hands; `computer_desktop` then answers that the owner has it; **Hand back** starts the bot's turn with the plugin's message, shown as from the computer.
+- [x] `agent-desktop snapshot` reads Thunar (90 refs), the terminal (29), and Chromium (77, by `--window-id`, as it has more than one window), and `click` on Thunar's Open Parent moves it up a folder.
+- [x] A scripted turn browses with agent-browser, and finishes a step that has no tree with `computer_desktop`: the screenshot's window title is the page's.
+- [x] A model whose provider has no vision gets the desktop's text and the image: libfx keeps the image back and puts a note before the text, "Tool images were retained but not sent: this model does not accept inline images…". The skill's seventh rule steers that bot to the trees and text.
+- [x] `computer_write_file` with `old_text` and `new_text` replaces one place in a file, and refuses when `old_text` is there twice or not at all. An executable stays executable.
+- [x] v1's checks still pass on the new image: the shell's limits and long output, files, the library, skill scripts, idle stops, rebuilds, and the firewall's refusals.
+- [x] The instructions entry is in each chat of a bot the computer is on for, as the mock model's request shows, and in no other bot's. The other bot's request still lists the computer's tools, as fxbot lists every plugin's, and a call is refused.
+- [x] `$computer` in a message, and the Computer button, put the computer skill's text in that message's request.
+- [x] `agent-browser skills get core` and `agent-desktop skills get desktop` print their text in the image, at its versions.
+- [x] `computer_ask_owner` puts the computer in the owner's hands; `computer_desktop` then answers that the owner has it; **Hand back** starts the bot's turn with the plugin's message, shown as from the computer.
 
 **M4. The owner's view**
-- [ ] The Computer screen shows the desktop within 3 s, view-only: a click there does nothing.
-- [ ] **Take over**: a click and typing reach the desktop, `computer_desktop` and `computer_terminal` answer that the owner has it, and `computer_shell` still runs. **Hand back** ends it, and so does closing the last view.
-- [ ] The terminal tab shows `main`, typing there reaches it, and resizing the window resizes it.
-- [ ] A computer someone watches doesn't stop when idle; one nobody watches does.
-- [ ] At a phone's width, the desktop scales to fit and the terminal fits.
-- [ ] The tool view shows a `computer_desktop` call's screenshot in the reply.
+- [x] The Computer screen shows the desktop within 3 s, in about 0.3 s, view-only: a click there does nothing.
+- [x] **Take over**: a click and typing reach the desktop, `computer_desktop` and `computer_terminal` answer that the owner has it, and `computer_shell` still runs. **Hand back** ends it, and so does closing the last view. On docker, the typing missed once in four runs, the first after the tool checks, and didn't again.
+- [x] The terminal tab shows `main`, typing there reaches it, and resizing the window resizes it.
+- [x] A computer someone watches doesn't stop when idle; one nobody watches does: with a 1-minute idle, watched for 100 s it ran, and closed it stopped 85 s later.
+- [x] At a phone's width, the desktop scales to fit and the terminal fits.
+- [x] The tool view shows a `computer_desktop` call's screenshot in the reply, when its line is opened, as every plugin's tool view shows.
 - [ ] The screen works through `tailscale serve`.
 
 **M5. One plugin**
-- [ ] `plugins/browser` and its list entry are gone; the computer's page lists its three skills; the changelog says the browser is part of the computer.
-- [ ] A plugin that needs the computer still adds setup steps.
+- [x] `plugins/browser` and its list entry are gone; the computer's page lists its three skills; the changelog says the browser is part of the computer.
+- [x] A plugin that needs the computer still adds setup steps, and one that writes over the computer's own files doesn't replace them.
 
 **M6. Docs and checks**
-- [ ] "Give bots a computer" and "The computer" cover the desktop, the terminal, the browser, the Computer screen, Take over, and the six tools; the SDK's Plugin API reference covers `fx.socket`.
-- [ ] `npm run typecheck`, `npm run build`, `npm run build-site`, `git diff --check`, and `bash -n` on the scripts pass. `page.js` and `novnc.js` are built and committed.
+- [x] "Give bots a computer" and "The computer" cover the desktop, the terminal, the browser, the Computer screen, Take over, and the seven tools; the SDK's Plugin API reference covers `fx.socket`.
+- [x] `npm run typecheck`, `npm run build`, `npm run build-site`, `git diff --check`, and `bash -n` on the scripts pass, and so does `podman build .`, whose image gains `ws`. `page.js` and `novnc.js` are built and committed.
 
 **The human runs these:**
 - On their own install: open a bot's computer, watch it browse, take over for a sign-in, and hand back.
@@ -501,6 +500,21 @@ Checks use v1's harness: a disposable Postgres, the mock model making scripted t
 - Ask a bot to make something in a desktop app, such as a drawing, and send it.
 - On a phone, watch a computer through the tailnet.
 - On an arm64 machine, the image builds and the desktop starts.
+
+## What the build changed
+
+- **agent-browser's CDP.** It reads no `AGENT_BROWSER_CDP`: the wrapper passes `--cdp 9222`, and brings Chromium's window to the front, so the screen shows the page it works on. Without that, a screenshot showed whichever window was on top.
+- **agent-browser from npm.** Its release binary has no skill text, so `skills get core` failed. The npm package has both, and the x64 binary in it is the release's. Its binary comes without the exec bit, which the step sets.
+- **Chromium's restore bubble.** A computer that stopped when idle stopped Chromium too, which then offered to restore its pages. `--hide-crash-restore-bubble`, and `about:blank` to start on.
+- **A start waits for the terminal window,** not just Xvnc's socket. About a second from cold, agent-desktop's `list-windows` failed: "The native window type of accessibility frame … could not be proven".
+- **Drags in steps.** xfwm4 starts a move only after several motion events with the button down, so `left_click_drag` moves in ten steps.
+- **A file's mode stays.** Writing a file reset its mode to 0644, so an edited script stopped running. Podman's stat gives a plain file's own path as its link target, which hid the mode at first.
+- **The computer's files go in after the steps,** so no plugin's step replaces the wrapper or the session.
+- **A screenshot that's gone shows nothing.** Screenshots are kept in memory, the last 50 per bot, so a reply from before a restart drops its image rather than showing a broken one.
+- **The skills' descriptions** had a colon and a space, which YAML reads as a mapping; fxbot refused them until reworded.
+- **`setDraft`** in a composer control takes a function too, as React's setters do, so the Computer button doesn't add `$computer` twice. The type and the Plugin API reference say so.
+- **The plugin's `package.json`** holds the page's build dependencies, and `"type": "module"`, which the server code needs for `import.meta`.
+- **The tools' list** stays the same for every bot, as fxbot lists every plugin's tools; a bot the computer is off for is refused when it calls one. The instructions entry is the part that's only for its bots.
 
 ## 5. Open questions
 
@@ -515,7 +529,7 @@ Each has a default that the build follows unless the owner changes it.
 7. **Fonts.** *Default:* DejaVu and Noto. Noto's CJK and emoji fonts would add 102 MB.
 8. **A desktop in every computer.** *Default:* yes: one plugin, one image, one shape, and about 90 MB per running computer. A setting that turns the desktop off could come later.
 9. **Models without vision.** *Default:* `computer_desktop` always returns its image, and the skill steers those bots to the trees and text. If M3 finds that libfx or a provider refuses the image, the tool leaves it out for that bot's model.
-10. **Approvals.** *Default:* the rule in the instructions, and no prompt of the plugin's own. Allow once, Always allow, or Deny for sends, buys, sign-ins, and deletes belong to the [Permissions](permissions.md) phase, a plugin on a core hook, and the computer's tools will go through it.
+10. **Approvals.** *Default:* the rule in the instructions, and no prompt of the plugin's own. Allow once, Always allow, or Deny for sends, buys, sign-ins, and deletes belong to the [Permissions](../../phases/permissions.md) phase, a plugin on a core hook, and the computer's tools will go through it.
 11. **Untrusted text.** *Default:* the rule only. OpenBot wraps each tool result in an untrusted envelope; that could come with Permissions.
 12. **The Computer button.** *Default:* yes, adding `$computer`. Codex has a composer icon and `@Computer`; fxbot's `$` picker already lists the skill, so the button is the shortcut.
 13. **The order's wording.** *Default:* the five lines above. They're the always-on part, so each word costs in every chat of those bots.
