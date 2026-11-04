@@ -448,7 +448,7 @@ Checks use v1's harness: a disposable Postgres, the mock model making scripted t
 - [x] A scratch plugin's `fx.socket` echoes binary and text messages, and its `onclose` hears the page leave.
 - [x] An upgrade whose `Origin` is another site gets 403; one with no `Origin` or the same host goes through; a path no socket has gets 404. A handler that throws closes its socket with 1011.
 - [x] Unloading the plugin closes its sockets, with 1001; stopping fxbot closes them all.
-- [ ] Through the owner's `tailscale serve` address, a socket opens and carries messages.
+- [ ] Through the owner's `tailscale serve` address, a socket opens and carries messages. Half done: an upgrade there passes through `tailscale serve` and Vite's proxy to the API, which refuses a path no plugin has with 404, and another site's `Origin` with 403. The owner's install has no plugin with a socket, so one opening there is left to the human.
 
 **M2. The image and the session**, on each engine
 - [x] The image builds from the steps, with agent-desktop and agent-browser checked for amd64: 1.18 GB on podman, 1.17 GB on docker, in 42 to 66 s. arm64 is left to the human.
@@ -483,7 +483,7 @@ Checks use v1's harness: a disposable Postgres, the mock model making scripted t
 - [x] A computer someone watches doesn't stop when idle; one nobody watches does: with a 1-minute idle, watched for 100 s it ran, and closed it stopped 85 s later.
 - [x] At a phone's width, the desktop scales to fit and the terminal fits.
 - [x] The tool view shows a `computer_desktop` call's screenshot in the reply, when its line is opened, as every plugin's tool view shows.
-- [ ] The screen works through `tailscale serve`.
+- [ ] The screen works through `tailscale serve`. Left to the human, with the item above. The screen's checks ran against the check server's built page, served by fxbot's own server.
 
 **M5. One plugin**
 - [x] `plugins/browser` and its list entry are gone; the computer's page lists its three skills; the changelog says the browser is part of the computer.
