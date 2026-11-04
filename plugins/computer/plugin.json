@@ -1,6 +1,6 @@
 {
   "name": "computer",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "description": "A Linux computer for each bot: a desktop you watch and take over, a terminal, a browser, and files.",
   "license": "Apache-2.0",
   "extensions": {
@@ -10,11 +10,30 @@
       "css": "./fxbot/page.css",
       "migrations": "./fxbot/migrations",
       "settings": [
-        { "name": "engine", "description": "The engine's socket, when it isn't where the setup script puts it" },
-        { "name": "memoryMiB", "description": "Memory for each computer, in MiB", "default": "2048" },
-        { "name": "cpus", "description": "CPUs for each computer", "default": "2" },
-        { "name": "idleMinutes", "description": "Minutes without a call before a computer stops", "default": "15" },
-        { "name": "screen", "description": "The screen's size, width x height in pixels", "default": "1280x800" }
+        {
+          "name": "engine",
+          "description": "The engine's socket, when it isn't where the setup script puts it"
+        },
+        {
+          "name": "memoryMiB",
+          "description": "Memory for each computer, in MiB",
+          "default": "2048"
+        },
+        {
+          "name": "cpus",
+          "description": "CPUs for each computer",
+          "default": "2"
+        },
+        {
+          "name": "idleMinutes",
+          "description": "Minutes without a call before a computer stops",
+          "default": "15"
+        },
+        {
+          "name": "screen",
+          "description": "The screen's size, width x height in pixels",
+          "default": "1280x800"
+        }
       ]
     }
   }

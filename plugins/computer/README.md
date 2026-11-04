@@ -64,6 +64,7 @@ A computer made before a change to its sizes or its screen is made again with th
 | `fxbot/page.js` | `page.jsx`, built |
 | `fxbot/novnc.js` | noVNC 1.7.0, built as one module, which the page loads from a route |
 | `fxbot/page.css` | xterm.js's CSS |
+| `fxbot/page-licenses.txt` | The licenses of what `page.js`, `page.css`, and `novnc.js` bundle: xterm.js, MIT, and noVNC 1.7.0, MPL-2.0, with where its source is |
 | `skills/` | The `computer`, `browser`, and `desktop` skills |
 | `host/setup.sh` | The engine, set up once on the machine |
 
@@ -77,3 +78,5 @@ npx rolldown fxbot/page.jsx --format cjs -e react -e react/jsx-runtime -e @fxbot
 npx rolldown node_modules/@novnc/novnc/core/rfb.js --format esm --file fxbot/novnc.js
 cp node_modules/@xterm/xterm/css/xterm.css fxbot/page.css
 ```
+
+When the bundled packages change, write `fxbot/page-licenses.txt` again from their license files.
