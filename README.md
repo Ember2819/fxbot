@@ -43,6 +43,7 @@ In order of execution priority. Checked phases are built. Each is marked **core*
 - [x] [Streams](docs/_completed/phases/streams.md) (core): chats in the Postgres fxbot already runs, so an open chat costs nothing while idle and a long one is as quick to send to as a new one
 - [x] [Computer v2](docs/_completed/phases/computer-v2.md) (plugin, with one core hook): a whole computer in one plugin: a desktop the owner watches and takes over, a shared terminal, a browser on the desktop, and the tools to drive them by pixels, accessibility trees, and text
 - [ ] [Permissions](docs/phases/permissions.md) (plugin, on a core hook): ask, auto, and yolo modes for tool calls
+- [ ] [Chat rooms](docs/phases/chat-rooms.md) (plugin, with two core hooks; for 0.4.1): rooms of the owner and several bots, with `@` chips, bots tagging each other within limits, a Stop, and skills for working in a room
 - [ ] [Cross-bot messaging](docs/phases/cross-bot-messaging.md) (plugin): bots message each other
 - [ ] [Routines](docs/phases/routines.md) (plugin): saved tasks a bot runs on a schedule
 - [ ] [Triggers](docs/phases/triggers.md) (plugins): webhooks and new email start a bot's turn
