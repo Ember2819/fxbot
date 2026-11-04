@@ -230,5 +230,7 @@ libfx writes other types too, such as `turn_yield` and `idle`. `applyLine` passe
 | `applyLine` | Folds a stream line into a list of turns |
 | `unreachable` | `"Cannot reach the server."`, the message of a call that got no answer |
 | `colors`, `shapes`, `kinds`, `itemKinds`, `embeddingKinds`, `maxPinned` | The same tables as `@fxbot/sdk`'s. See [Exports](/sdk/reference/server-api/#exports). |
+| `pluginIcon(key)` | A plugin's icon from its `iconKey`: `path`, a closed curve in a 100 by 100 box; `turn`, in degrees; and `light` and `dark`, each four colors: the tile's two stops, then the shape's two. The tile is a rounded square, `rx` 24, with a gradient turned by `turn`, and the shape's gradient is turned 90 degrees more. Since 0.5.0. |
+| `iconSeed(key)` | The 32-bit number a key seeds its icon with. |
 
-The types are `Client`, `ClientOptions`, `StreamOptions`, `Turn`, and `Part`, and the shared types that `@fxbot/sdk` exports too, such as `Profile`, `Provider`, `Settings`, and `StreamLine`.
+The types are `Client`, `ClientOptions`, `StreamOptions`, `Turn`, `Part`, `PluginIcon`, and `Tones`, and the shared types that `@fxbot/sdk` exports too, such as `Profile`, `Provider`, `Settings`, and `StreamLine`.

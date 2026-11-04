@@ -4,11 +4,12 @@ import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import type { McpPlugin, Plugin, PackagePlugin, PackagePreview, PackageSearch } from "@fxbot/sdk/client";
-import { Details, heading, hint, Initial } from "./mcp-add.tsx";
+import { Details, heading, hint } from "./mcp-add.tsx";
+import { PluginIcon } from "./plugin-icon.tsx";
 import { client } from "./client.ts";
 
 // What Browse opens for a package: a card from fxbot's list, or a repository the owner typed.
-export type PluginTarget = { ref: string; from: "fxbot" | "github"; name?: string; description?: string };
+export type PluginTarget = { ref: string; from: "fxbot" | "github"; name?: string; iconKey?: string; description?: string };
 
 const size = (n: number) => (n < 1024 ? `${n} B` : `${(n / 1024).toFixed(1)} KB`);
 const fromText = { fxbot: "fxbot's list", github: "GitHub" };
@@ -167,7 +168,7 @@ export function PluginDialog({ target, onAdded, onClose }: { target: PluginTarge
       <DialogContent className="flex max-h-[90dvh] flex-col sm:max-w-xl">
         <DialogHeader>
           <div className="flex min-w-0 items-center gap-2 pr-6">
-            <Initial title={name} />
+            {(page?.iconKey || target.iconKey) && <PluginIcon iconKey={(page?.iconKey || target.iconKey)!} />}
             <DialogTitle className="truncate">{name}</DialogTitle>
           </div>
           {(page?.description || target.description) && <DialogDescription>{page?.description || target.description}</DialogDescription>}

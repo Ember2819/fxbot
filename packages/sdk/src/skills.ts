@@ -92,6 +92,7 @@ export async function createSkills(options: { store: Store; archives: Archives; 
       id: record.id,
       kind: "skill",
       name: record.name,
+      iconKey: `${record.source.skill.split("/")[0]}/${record.source.skill.split("/").at(-1)}`,
       enabled: record.enabled,
       bots: record.bots,
       on: [...(on.get(record.id) ?? [])],

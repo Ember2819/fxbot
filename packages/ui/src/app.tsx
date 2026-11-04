@@ -49,6 +49,7 @@ import { BotsProvider, loadPlugins, Place, usePluginNav, usePluginScreen } from 
 import { ModelField } from "./providers.tsx";
 import { keepDraft, reload, takeDraft, useNewVersion } from "./pwa.ts";
 import { SettingsScreen } from "./settings.tsx";
+import { PluginIcon } from "./plugin-icon.tsx";
 import { useTurnStream } from "./use-turn-stream.ts";
 import { leadingSkills, SkillChips, SkillMenu, useSkillPicker } from "./skill-picker.tsx";
 
@@ -324,7 +325,7 @@ function BotSidebar({ profiles, offline, active, onNew, onChange }: { profiles: 
             </TooltipTrigger>
             <TooltipContent>Library</TooltipContent>
           </Tooltip>
-          {pluginNav.map(({ plugin, label, href, icon: Icon }) => (
+          {pluginNav.map(({ plugin, label, href, icon: Icon, iconKey }) => (
             <Tooltip key={href}>
               <TooltipTrigger asChild>
                 <a
@@ -334,7 +335,7 @@ function BotSidebar({ profiles, offline, active, onNew, onChange }: { profiles: 
                   aria-current={location.pathname === href ? "page" : undefined}
                   className={buttonVariants({ variant: "ghost", size: "icon", className: "shrink-0 aria-[current=page]:bg-sidebar-accent" })}
                 >
-                  {Icon ? <Icon className="size-4" /> : <span className="text-sm font-medium">{label.slice(0, 1)}</span>}
+                  {Icon ? <Icon className="size-4" /> : <PluginIcon iconKey={iconKey} size={20} />}
                   <span className="sr-only">{plugin}</span>
                 </a>
               </TooltipTrigger>

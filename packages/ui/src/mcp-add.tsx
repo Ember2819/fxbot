@@ -1,4 +1,5 @@
 import { useEffect, useState, type FormEvent, type ReactNode } from "react";
+import { PluginIcon } from "./plugin-icon.tsx";
 import { LoaderCircleIcon, TriangleAlertIcon } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -73,12 +74,6 @@ export function Results({ search, everything, onEverything, added, onOpen, onAdd
   );
 }
 
-// The plugin's initial, in place of a remote icon, which would tell its host who looked.
-export const Initial = ({ title }: { title: string }) => (
-  <span aria-hidden className="flex size-9 shrink-0 items-center justify-center rounded-md bg-muted font-medium">
-    {(title.trim()[0] ?? "?").toUpperCase()}
-  </span>
-);
 
 // What a card says under its description: where it runs, what it needs, and anything to be wary of.
 function facts(card: McpCard, added: boolean) {
@@ -97,7 +92,7 @@ function facts(card: McpCard, added: boolean) {
 function Card({ card, added, onOpen }: { card: McpCard; added: boolean; onOpen: () => void }) {
   return (
     <button type="button" onClick={onOpen} className="flex w-full min-w-0 gap-3 rounded-lg border p-3 text-left transition-colors outline-none hover:bg-muted/50 focus-visible:ring-3 focus-visible:ring-ring/50">
-      <Initial title={card.title} />
+      <PluginIcon iconKey={card.iconKey} />
       <span className="grid min-w-0 flex-1 gap-0.5">
         <span className="flex min-w-0 items-baseline gap-2">
           <span className="max-w-[70%] shrink-0 truncate font-medium">{card.title}</span>
@@ -177,7 +172,7 @@ export function EntryDialog({ card, onAdded, onClose }: { card: McpCard; onAdded
       <DialogContent className="flex max-h-[90dvh] flex-col sm:max-w-xl">
         <DialogHeader>
           <div className="flex min-w-0 items-center gap-2 pr-6">
-            <Initial title={info.title} />
+            <PluginIcon iconKey={card.iconKey} />
             <DialogTitle className="truncate">{info.title}</DialogTitle>
           </div>
           {info.description && <DialogDescription>{info.description}</DialogDescription>}

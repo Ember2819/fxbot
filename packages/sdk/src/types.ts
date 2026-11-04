@@ -138,7 +138,8 @@ export type SignInStatus = { status: "waiting" | "done" | "failed"; provider?: s
 
 // A plugin gives bots more to use: a remote MCP server, or a skill. `bots` is "all", or "each" for only the bots in
 // `on`. `status` says what it waits for, if anything. A mark is what the hourly check found.
-type PluginCommon = { id: string; name: string; enabled: boolean; bots: "all" | "each"; on: string[]; status: string; mark?: PluginMark };
+// `iconKey` is who made it and its name, `creator/name`, which a page draws with `pluginIcon` (plugin-icon.ts).
+type PluginCommon = { id: string; name: string; iconKey: string; enabled: boolean; bots: "all" | "each"; on: string[]; status: string; mark?: PluginMark };
 // A remote MCP server. `auth` is how it signs in: not at all, with headers whose values fxbot keeps sealed, or with
 // OAuth. `signedIn` says it has its token or header values. Bots get only the tools in `allowed`, which are the
 // read-only ones until the person picks. Its `status` says "Connected" once it is.
@@ -202,6 +203,8 @@ export type RepoRef = { repo: string; from?: "fxbot" | "github" };
 export type PackagePreview = {
   hash: string;
   name: string;
+  /** Its icon's key, once its plugin.json is read: the repository's owner and its name. */
+  iconKey: string;
   version: string;
   description: string;
   source: { repo: string; path: string; commit: string; from: "fxbot" | "github" };
@@ -222,10 +225,10 @@ export type PackagePreview = {
   error?: string;
 };
 // A plugin in fxbot's own list.
-export type PackageCard = { kind: "package"; name: string; description: string; ref: string; from: "fxbot" };
+export type PackageCard = { kind: "package"; name: string; iconKey: string; description: string; ref: string; from: "fxbot" };
 export type PackageSearch = { cards: PackageCard[] };
 // What the page loads for a running plugin: its page code and its CSS, by URL.
-export type PluginPage = { name: string; version: string; page?: string; css?: string };
+export type PluginPage = { name: string; iconKey: string; version: string; page?: string; css?: string };
 // Where a registry entry comes from: fxbot's own list, GitHub's registry, or the official one, unmoderated.
 export type RegistryFrom = "fxbot" | "github" | "official";
 // What the page asks to add: a server by its URL, with the names of any headers it needs, or a registry entry, from
@@ -280,13 +283,13 @@ export type RegistryInfo = {
 // A search result. `url` and `host` are its remote's, and `hostMatches` whether it is on the namespace's domain, when
 // the namespace names one. `needs` is "key" when the entry asks for a secret header; a sign-in is learned on its page.
 // `local` runs only on this machine.
-export type McpCard = RegistryInfo & { kind: "mcp"; url?: string; host?: string; hostMatches?: boolean; needs?: "key"; local?: boolean };
+export type McpCard = RegistryInfo & { kind: "mcp"; iconKey: string; url?: string; host?: string; hostMatches?: boolean; needs?: "key"; local?: boolean };
 // What the hourly check found about an installed plugin. It changes nothing by itself.
 export type PluginMark = { kind: "update"; version: string } | { kind: "deprecated" } | { kind: "removed" };
 // A search's cards, and the mirror's state: when it last synced, and why the last try failed.
 export type McpSearch = { cards: McpCard[]; syncedAt: string | null; error?: string; everythingError?: string };
 // A skill found in fxbot's list or on skills.sh. skills.sh gives installs but no description; fxbot's list gives one.
-export type SkillCard = { kind: "skill"; id: string; name: string; repository: string; from: SkillSource["from"]; description?: string; installs?: number };
+export type SkillCard = { kind: "skill"; id: string; name: string; iconKey: string; repository: string; from: SkillSource["from"]; description?: string; installs?: number };
 export type SkillSearch = { cards: SkillCard[]; error?: string };
 // A skill a bot has, as its chat's picker lists it: `$name` in a message, or `/name` at its start, sends it along.
 export type BotSkill = { name: string; description: string; manual?: boolean };

@@ -10,7 +10,8 @@ import { SidebarTrigger } from "@/components/ui/sidebar";
 import { Switch } from "@/components/ui/switch";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import type { Plugin, McpCard, PluginMark, McpPreview, McpPlugin, OAuthAttempt, OAuthStatus, PackagePlugin, Profile, SkillCard } from "@fxbot/sdk/client";
-import { AddressDialog, bearer, EntryDialog, heading, hint, hostOf, Information, Initial, label, Results, signsIn, useSearch } from "./mcp-add.tsx";
+import { AddressDialog, bearer, EntryDialog, heading, hint, hostOf, Information, label, Results, signsIn, useSearch } from "./mcp-add.tsx";
+import { PluginIcon } from "./plugin-icon.tsx";
 import { Blob } from "./blob.tsx";
 import { client } from "./client.ts";
 import { follow } from "./nav.ts";
@@ -46,7 +47,7 @@ const markText: Record<Plugin["kind"], Record<PluginMark["kind"], string>> = {
 
 type Tab = "installed" | "browse";
 // A card in fxbot's picks: a plugin from one of its three lists.
-type Card = { key: string; name: string; carries: string; description: string; added: boolean; open: () => void };
+type Card = { key: string; name: string; iconKey: string; carries: string; description: string; added: boolean; open: () => void };
 
 // One list of plugins. Installed has one row each, with a switch and an edit button that opens its settings; a
 // package's MCP servers show in its settings. Browse shows fxbot's picks, the plugins it vets; with unvetted plugins on
@@ -103,9 +104,9 @@ export function PluginsPage({ profiles }: { profiles: Profile[] | null }) {
   const packagesAdded = new Set((addons ?? []).flatMap((a) => (a.kind === "package" && "repo" in a.source ? [`${a.source.repo}${a.source.path ? `/${a.source.path}` : ""}`] : [])));
   // fxbot's picks from its three lists, as one list: packages, then servers, then skills.
   const picks: Card[] = [
-    ...(packageSearch.result?.cards ?? []).map((c) => ({ key: `p:${c.ref}`, name: c.name, carries: "", description: c.description, added: packagesAdded.has(c.ref), open: () => setPlugin({ ref: c.ref, from: "fxbot", name: c.name, description: c.description }) })),
-    ...(search.result?.cards ?? []).filter((c) => c.from === "fxbot").map((c) => ({ key: `m:${c.name}`, name: c.title || c.name, carries: "MCP server", description: c.description, added: added.has(c.name), open: () => setEntry(c) })),
-    ...(skillSearch.result?.cards ?? []).filter((c) => c.from === "fxbot").map((c) => ({ key: `s:${c.id}`, name: c.name, carries: "Skill", description: c.description ?? "", added: skillsAdded.has(c.id), open: () => setSkill(c) })),
+    ...(packageSearch.result?.cards ?? []).map((c) => ({ key: `p:${c.ref}`, name: c.name, iconKey: c.iconKey, carries: "", description: c.description, added: packagesAdded.has(c.ref), open: () => setPlugin({ ref: c.ref, from: "fxbot", name: c.name, iconKey: c.iconKey, description: c.description }) })),
+    ...(search.result?.cards ?? []).filter((c) => c.from === "fxbot").map((c) => ({ key: `m:${c.name}`, name: c.title || c.name, iconKey: c.iconKey, carries: "MCP server", description: c.description, added: added.has(c.name), open: () => setEntry(c) })),
+    ...(skillSearch.result?.cards ?? []).filter((c) => c.from === "fxbot").map((c) => ({ key: `s:${c.id}`, name: c.name, iconKey: c.iconKey, carries: "Skill", description: c.description ?? "", added: skillsAdded.has(c.id), open: () => setSkill(c) })),
   ];
   const publicServers = { ...search, result: search.result && { ...search.result, cards: search.result.cards.filter((c) => c.from !== "fxbot") } };
   const publicSkills = { ...skillSearch, result: skillSearch.result && { ...skillSearch.result, cards: skillSearch.result.cards.filter((c) => c.from !== "fxbot") } };
@@ -168,7 +169,8 @@ export function PluginsPage({ profiles }: { profiles: Profile[] | null }) {
           {tab === "installed" && mine.length > 0 && (
             <ul className="divide-y rounded-xl border">
               {mine.map((addon) => (
-                <li key={addon.id} className="flex items-center gap-2 py-2.5 pr-3 pl-3">
+                <li key={addon.id} className="flex items-center gap-3 py-2.5 pr-3 pl-3">
+                  <PluginIcon iconKey={addon.iconKey} size={32} />
                   <div className="min-w-0 flex-1">
                     <p className="flex min-w-0 items-baseline gap-2">
                       <span className="truncate font-medium">{addon.name}</span>
@@ -200,7 +202,7 @@ export function PluginsPage({ profiles }: { profiles: Profile[] | null }) {
                     onClick={pick.open}
                     className="flex w-full min-w-0 gap-3 rounded-lg border p-3 text-left transition-colors outline-none hover:bg-muted/50 focus-visible:ring-3 focus-visible:ring-ring/50"
                   >
-                    <Initial title={pick.name} />
+                    <PluginIcon iconKey={pick.iconKey} />
                     <span className="grid min-w-0 flex-1 gap-0.5">
                       <span className="flex min-w-0 items-baseline gap-2">
                         <span className="truncate font-medium">{pick.name}</span>

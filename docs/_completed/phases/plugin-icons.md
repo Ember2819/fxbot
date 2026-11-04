@@ -1,16 +1,16 @@
 # Plugin icons
 
-Every plugin gets an icon that's its own: a soft shape on a tinted tile, in two hues, drawn from the plugin's creator and name. The same plugin looks the same everywhere: in **Plugins**, in Settings, in the sidebar, and on [fxbot.sh's directory](plugin-directory.md). Nobody draws one, nothing is fetched, and there's no fixed list of looks: each key gets its own.
+Every plugin gets an icon that's its own: a soft shape on a tinted tile, in two hues, drawn from the plugin's creator and name. The same plugin looks the same everywhere: in **Plugins**, in Settings, in the sidebar, and on [fxbot.sh's directory](../../phases/plugin-directory.md). Nobody draws one, nothing is fetched, and there's no fixed list of looks: each key gets its own.
 
-Status: planned on 2026-11-04, for 0.5.0, at the owner's word; researched against the research directive's references. The owner's decisions:
+Status: built on 2026-11-04, for 0.5.0, as planned the same day at the owner's word, and researched against the research directive's references. Where the build differs from the plan, [What the build changed](#what-the-build-changed) says so. The owner's decisions:
 - "Plugins need icons, auto generated, in the clean style we are keeping, keyed off their name+creator or something."
 - Not a few fixed looks: "a nice dynamic generation… some unique color system that's super clean and easy on the eyes, but has a lot more variations and becomes almost a 'unique' signature of that plugin."
 - **Bloom**, picked from a mockup of three generated styles (Bloom, Aura, and Facet) on 2026-11-04. [The look](#the-look-bloom) describes it, and [the generator](#the-generator) is its exact code.
-- It's built before [the plugin directory](plugin-directory.md), which draws the same icons.
+- It's built before [the plugin directory](../../phases/plugin-directory.md), which draws the same icons.
 
 ## 0. Core or plugin
 
-**Core.** [Conventions](../../CONVENTIONS.md#core-or-plugin) put finding, vetting, and adding plugins in the core, and an icon is how a plugin shows where it's found and added.
+**Core.** [Conventions](../../../CONVENTIONS.md#core-or-plugin) put finding, vetting, and adding plugins in the core, and an icon is how a plugin shows where it's found and added.
 - The icon is a function of one string. It needs no request, no stored image, no table, and no code from the plugin.
 - The core names no plugin. The SDK gives every plugin its key by one rule, and the page draws it.
 - The plugin API changes by one line: `app.nav` without an `icon` shows the plugin's icon, not the label's first letter.
@@ -24,7 +24,7 @@ Status: planned on 2026-11-04, for 0.5.0, at the owner's word; researched agains
   - Installed rows have no icon at all (`plugins-page.tsx:171`).
 - **fxbot's two packages share a letter.** The computer and chat rooms both show **C**.
 - **The sidebar's footer** draws an `app.nav` button with its `icon`, or else `label.slice(0, 1)` (`packages/ui/src/app.tsx:332`). The `Nav` type is in `packages/ui/src/plugins.tsx:34`. Neither of fxbot's plugins calls `app.nav`; chat rooms uses `app.sidebar` (`plugins/chat-rooms/fxbot/page.jsx:417`).
-- **Remote icons were turned down** in [add-ons](../_completed/phases/addons.md#5-open-questions): "not loaded, which avoids tracking and mixed content."
+- **Remote icons were turned down** in [add-ons](addons.md#5-open-questions): "not loaded, which avoids tracking and mixed content."
 - **The bots' look** is 14 shapes in 11 colors: "A UI draws them; the names are the contract" (`packages/sdk/src/types.ts:3`).
   - `packages/ui/src/blob.tsx` draws each shape once, as one path in a 100×100 box, fitted to 82 of it, with white eyes over it.
   - The site has its own copy, `packages/website/src/blob.tsx`, "adapted from the app's", since it imports none of the other packages.
@@ -294,12 +294,12 @@ The keys are trimmed and lowercased first, so `IAMMRDUNCAN/Computer ` draws the 
 - **The sidebar's footer:**
   - `plugins.tsx` keeps each page entry's `iconKey` on `Loaded`, and `usePluginNav()` returns it.
   - `app.tsx` draws `<PluginIcon iconKey={…} size={20} />` where it drew the letter. A plugin with two buttons and no icons shows its icon on both, and the tooltips say which.
-- **Settings:** when [settings tabs](../_completed/phases/settings-tabs.md) is built, each plugin's tab draws its icon at 16 px from `usePlugins()`. Whichever phase lands second wires it.
+- **Settings:** when [settings tabs](settings-tabs.md) is built, each plugin's tab draws its icon at 16 px from `usePlugins()`. Whichever phase lands second wires it.
 
 ### The site
 
 - **`packages/website/src/plugin-icon.ts`:** the copy.
-- **`packages/website/src/components/PluginIcon.astro`:** the same SVG as the app's, drawn at build time, with its ids from the seed and a counter. Its CSS picks the colors by Starlight's theme, `:root[data-theme="dark"] .plugin-icon`, since the site has a theme switch of its own. Nothing on the site draws it until [the directory](plugin-directory.md).
+- **`packages/website/src/components/PluginIcon.astro`:** the same SVG as the app's, drawn at build time, with its ids from the seed and a counter. Its CSS picks the colors by Starlight's theme, `:root[data-theme="dark"] .plugin-icon`, since the site has a theme switch of its own. Nothing on the site draws it until [the directory](../../phases/plugin-directory.md).
 
 ### Not in this phase
 
@@ -326,47 +326,56 @@ Size: about 190 lines, plus the site's 90-line copy. The page gains about 1.5 KB
 
 ## 4. Checklist
 
-The bound: about 190 lines, plus the site's copy, as above. Past 250, stop and say why. What's out of scope is under [Not in this phase](#not-in-this-phase). Checks run against a disposable Postgres, `FXBOT_DATA`, and `FXBOT_PORT`, as [AGENTS.md](../../AGENTS.md#checks) says, never the owner's running dev server.
+The bound: about 190 lines, plus the site's copy, as above. Past 250, stop and say why. What's out of scope is under [Not in this phase](#not-in-this-phase). Checks run against a disposable Postgres, `FXBOT_DATA`, and `FXBOT_PORT`, as [AGENTS.md](../../../AGENTS.md#checks) says, never the owner's running dev server.
 
 **M1. The look**
 - [x] A mockup page outside the repository drew three generated styles (Bloom, Aura, and Facet) on fxbot's list, the three 0.5.0 plugins, look-alike keys, and 48 example keys, at 16 to 96 px, light and dark.
 - [x] The owner picked Bloom, on 2026-11-04.
 
 **M2. The SDK**
-- [ ] `packages/sdk/src/plugin-icon.ts` is the generator above, character for character.
-- [ ] `node --input-type=module -e 'import { pluginIcon, iconSeed } from "./packages/sdk/src/plugin-icon.ts"; for (const k of ["iammrduncan/computer", "IAMMRDUNCAN/Computer "]) console.log(iconSeed(k).toString(16), pluginIcon(k).light.slice(2), pluginIcon(k).turn)'` prints `dafef5de [ '#eb728a', '#fdb569' ] 43.5` twice, and the other nine keys give the table's values.
-- [ ] On a disposable server, every item of `GET /api/plugins`, and every card of `GET /api/plugins/search?q=&kind=package`, `kind=skill`, and the servers' search, has `iconKey`, with the table's keys for fxbot's lists.
-- [ ] `GET /api/plugins/pages` has each running package's `iconKey`.
-- [ ] With `FXBOT_PLUGIN_DIRS` set to `plugins/computer`, the computer's `iconKey` is `iammrduncan/computer`, as from GitHub. A copy of a plugin folder renamed `zz-test` is `local/zz-test`.
+- [x] `packages/sdk/src/plugin-icon.ts` is the generator above, character for character.
+- [x] `node --input-type=module -e 'import { pluginIcon, iconSeed } from "./packages/sdk/src/plugin-icon.ts"; for (const k of ["iammrduncan/computer", "IAMMRDUNCAN/Computer "]) console.log(iconSeed(k).toString(16), pluginIcon(k).light.slice(2), pluginIcon(k).turn)'` prints `dafef5de [ '#eb728a', '#fdb569' ] 43.5` twice, and the other nine keys give the table's values.
+- [x] On a disposable server, every item of `GET /api/plugins`, and every card of `GET /api/plugins/search?q=&kind=package`, `kind=skill`, and the servers' search, has `iconKey`, with the table's keys for fxbot's lists.
+- [x] `GET /api/plugins/pages` has each running package's `iconKey`.
+- [x] With `FXBOT_PLUGIN_DIRS` set to `plugins/computer`, the computer's `iconKey` is `iammrduncan/computer`, as from GitHub. A copy of a plugin folder renamed `zz-test` is `local/zz-test`.
 
 **M3. The app**
-- [ ] Browse's 7 picks each show their icon. The first stop of each shape's gradient, read from the page in light mode, is the table's first color.
-- [ ] Each add dialog's head shows the icon of the card that opened it. **From GitHub** shows the icon once the page loads.
-- [ ] With unvetted plugins on, MCP results and skills.sh results show icons.
-- [ ] Installed rows show icons at 32 px, and a row's text still truncates on a phone (375 px).
-- [ ] A test plugin that calls `app.nav({ label: "Hello", path: "/count" })` with no `icon` shows its icon in the sidebar's footer at 20 px, with the tooltip "Hello".
-- [ ] Two of the same icon on one screen, one of them in a closed dialog, both draw their gradients.
-- [ ] `grep -rn "Initial" packages/ui/src` finds nothing.
-- [ ] With the system set to dark, every icon uses its dark tones, with no reload.
+- [x] Browse's 7 picks each show their icon. The first stop of each shape's gradient, read from the page in light mode, is the table's first color.
+- [x] Each add dialog's head shows the icon of the card that opened it. **From GitHub** shows the icon once the page loads.
+- [x] With unvetted plugins on, MCP results and skills.sh results show icons. Checked with skills.sh's live results for "pdf": 20 results, each with its icon. The check's server reaches no MCP registry, so registry results were left out; they draw through the same `Card` in `mcp-add.tsx` as fxbot's servers' dialogs, and `cardOf()` gives each its `iconKey`.
+- [x] Installed rows show icons at 32 px, and a row's text still truncates on a phone (375 px).
+- [x] A test plugin that calls `app.nav({ label: "Hello", path: "/count" })` with no `icon` shows its icon in the sidebar's footer at 20 px, with the tooltip "Hello".
+- [x] Two of the same icon on one screen, one of them in a closed dialog, both draw their gradients. A closed dialog isn't in the page at all, so the check was the same plugin's icon twice on one screen, in the sidebar's footer and its Settings tab: every gradient id is its own, and every fill names one that exists.
+- [x] `grep -rn "Initial" packages/ui/src` finds nothing.
+- [x] With the system set to dark, every icon uses its dark tones, with no reload. Checked as Browse's 7 picks drawing their dark first shape colors in a page that starts dark.
 
 **M4. The site's copy**
-- [ ] `cmp packages/sdk/src/plugin-icon.ts packages/website/src/plugin-icon.ts` says nothing.
-- [ ] `PluginIcon.astro` draws the same SVG as the app's for the same key, and follows the site's theme switch.
+- [x] `cmp packages/sdk/src/plugin-icon.ts packages/website/src/plugin-icon.ts` says nothing.
+- [x] `PluginIcon.astro` draws the same SVG as the app's for the same key, and follows the site's theme switch.
 
 **M5. Docs and checks**
-- [ ] The Plugin API page (`packages/website/src/content/docs/sdk/reference/plugin-api.md`):
+- [x] The Plugin API page (`packages/website/src/content/docs/sdk/reference/plugin-api.md`):
   - the `app.nav` row says that without an `icon`, the button shows the plugin's icon
   - the `name` row says that it and the repository's owner make the plugin's icon
-- [ ] The SDK's `plugins.list()` row (`sdk/reference/server-api.md`) says each plugin and card has `iconKey`, and the client reference names `pluginIcon(key)`.
-- [ ] Add a plugin (`docs/how-to/add-a-plugin.md`) says each plugin's icon is drawn from who made it and its name, so it looks the same wherever it shows.
-- [ ] `CHANGELOG.md` has a `## Unreleased` section above 0.4.1, with a line for plugin icons that names the SDK's new `iconKey` and `pluginIcon`.
-- [ ] `npm run typecheck`, `npm run build`, and `npm run build-site` pass.
-- [ ] `git diff --check` passes, and the new files have no trailing whitespace.
-- [ ] One commit on `release/0.5.0`, not pushed.
+- [x] The SDK's `plugins.list()` row (`sdk/reference/server-api.md`) says each plugin and card has `iconKey`, and the client reference names `pluginIcon(key)`.
+- [x] Add a plugin (`docs/how-to/add-a-plugin.md`) says each plugin's icon is drawn from who made it and its name, so it looks the same wherever it shows.
+- [x] `CHANGELOG.md` has a `## Unreleased` section above 0.4.1, with a line for plugin icons that names the SDK's new `iconKey` and `pluginIcon`.
+- [x] `npm run typecheck`, `npm run build`, and `npm run build-site` pass.
+- [x] `git diff --check` passes, and the new files have no trailing whitespace.
+- [x] One commit on `release/0.5.0`, not pushed.
 
 **The human checks:**
 - The icons in a real browser, light and dark, on a phone and a desktop: calm beside the bots, and fxbot's plugins look apart.
 - A plugin's icon in the sidebar's footer, beside the Library and Plugins buttons.
+
+## What the build changed
+
+- **An MCP server's preview has `iconKey` too,** since `McpPreview` takes `McpPlugin`'s fields: the registry entry's name, or the host and the server's name for one added by address.
+- **A package's preview** starts with an empty `iconKey` until its `plugin.json` is read, and the dialog's head shows the card's icon until then. A repository typed under **From GitHub** shows no icon until its page loads.
+- **The site's drawing** is `components/PluginIcon.astro`, with its colors in `styles/docs.css`, picked by Starlight's `data-theme`. Its gradient ids are the seed's and the size's, so the same icon at the same size draws the same gradients.
+- **The app's `PluginIcon`** is the plan's, laid out one stop to a line.
+- **Size:** `plugin-icon.ts` is 90 lines, and its site copy the same; `PluginIcon` 26, the Astro drawing 30, and 42 more lines than before across the SDK, the page, and the CSS. About 190 in all, plus the copy, as planned.
+- **Checks** ran against the check server with fxbot's own lists, the computer from its folder, and a renamed copy of a plugin, with Playwright at 1280×800 and 375×667, light and dark.
 
 ## 5. Open questions
 

@@ -1,0 +1,30 @@
+---
+// A plugin's icon, drawn at build time from its key, as the app's PluginIcon draws it (docs/phases/plugin-icons.md).
+// Its colors come for both themes, and docs.css picks by Starlight's theme. Its ids are its seed's and its size's, so
+// two of one icon on a page draw the same gradients.
+import { iconSeed, pluginIcon } from "../plugin-icon.ts";
+
+interface Props {
+  iconKey: string;
+  size?: number;
+}
+const { iconKey, size = 40 } = Astro.props;
+const { path, turn, light, dark } = pluginIcon(iconKey);
+const id = `pi${iconSeed(iconKey).toString(16)}s${size}`;
+const style = [...light.map((c, i) => `--l${i}:${c}`), ...dark.map((c, i) => `--d${i}:${c}`)].join(";");
+---
+
+<svg viewBox="0 0 100 100" width={size} height={size} aria-hidden="true" class="plugin-icon" style={style}>
+  <defs>
+    <linearGradient id={`${id}t`} gradientTransform={`rotate(${turn} .5 .5)`}>
+      <stop offset="0" style="stop-color: var(--c0)"></stop>
+      <stop offset="1" style="stop-color: var(--c1)"></stop>
+    </linearGradient>
+    <linearGradient id={`${id}s`} gradientTransform={`rotate(${(turn + 90) % 360} .5 .5)`}>
+      <stop offset="0" style="stop-color: var(--c2)"></stop>
+      <stop offset="1" style="stop-color: var(--c3)"></stop>
+    </linearGradient>
+  </defs>
+  <rect width="100" height="100" rx="24" fill={`url(#${id}t)`}></rect>
+  <path d={path} fill={`url(#${id}s)`}></path>
+</svg>

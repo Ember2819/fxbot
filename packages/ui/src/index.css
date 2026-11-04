@@ -154,3 +154,8 @@
 @media (prefers-color-scheme: dark) {
     .blob-shape { stroke: oklch(1 0 0 / 0.15); stroke-width: 1.5; }
 }
+/* A plugin's icon: its light colors, or its dark ones (plugin-icon.tsx). */
+.plugin-icon { --c0: var(--l0); --c1: var(--l1); --c2: var(--l2); --c3: var(--l3); }
+@media (prefers-color-scheme: dark) {
+    .plugin-icon { --c0: var(--d0); --c1: var(--d1); --c2: var(--d2); --c3: var(--d3); }
+}

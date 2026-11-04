@@ -152,7 +152,7 @@ Until Settings' `unvetted` is true, search answers only from fxbot's own lists a
 
 | Call | What it does | Returns |
 | --- | --- | --- |
-| `plugins.list()` | Every plugin. A server from a registry carries that entry's `info`, and a `mark` when it has a newer version, or is deprecated or gone. A skill or a package carries the `mark` of the hourly check. A package lists the servers it added in `servers`. | `Plugin[]` |
+| `plugins.list()` | Every plugin. A server from a registry carries that entry's `info`, and a `mark` when it has a newer version, or is deprecated or gone. A skill or a package carries the `mark` of the hourly check. A package lists the servers it added in `servers`. Each plugin, and each card of a search, has `iconKey`, `creator/name`, which `pluginIcon` from `@fxbot/sdk/client` draws. | `Plugin[]` |
 | `plugins.search(q, options)` | Up to 20 servers from fxbot's list and the mirror of GitHub's registry. `{ everything: true }` adds the official registry's results, for 3 characters or more. `{ kind: "skill" }` searches skills instead: fxbot's list, then skills.sh for 2 characters or more. `options` is required: pass `{}` for servers. | `McpSearch` or `SkillSearch` |
 | `plugins.preview(ref)` | A plugin's page, with a `hash`. For a server, what probing it found. For a skill or a package, its files at its repository's current commit. | `McpPreview`, `SkillPreview`, or `PackagePreview` |
 | `plugins.add(ref, hash)` | Adds what the preview showed. It fails with 409 when that changed since, or the skill is already added. | `Plugin` |

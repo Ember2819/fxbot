@@ -185,3 +185,18 @@ h1#_top,
 .fxbot-kinds a:hover {
     text-decoration-color: currentColor;
 }
+
+/* A plugin's icon (components/PluginIcon.astro): its light colors, or its dark ones. */
+.plugin-icon {
+  flex-shrink: 0;
+  --c0: var(--l0);
+  --c1: var(--l1);
+  --c2: var(--l2);
+  --c3: var(--l3);
+}
+:root[data-theme="dark"] .plugin-icon {
+  --c0: var(--d0);
+  --c1: var(--d1);
+  --c2: var(--d2);
+  --c3: var(--d3);
+}

@@ -1,11 +1,11 @@
 # The plugin directory on fxbot.sh
 
-fxbot.sh gets a **Plugins** page: fxbot's vetted plugins, from its three lists, with a search box and a card each, drawn with its [icon](plugin-icons.md). Each plugin gets a page that says what it carries and how to add it. It's the place to look before installing, and the address to link to.
+fxbot.sh gets a **Plugins** page: fxbot's vetted plugins, from its three lists, with a search box and a card each, drawn with its [icon](../_completed/phases/plugin-icons.md). Each plugin gets a page that says what it carries and how to add it. It's the place to look before installing, and the address to link to.
 
 Status: planned on 2026-11-04, for 0.5.0, at the owner's word; researched against the research directive's references. The owner's decisions:
 - "a Plugins page on fxbot.sh: search fxbot's vetted plugins (from plugins-registry.json, plus its MCP and skill lists), a card per plugin with its generated icon, and a page each saying what it carries and how to add it"
 - The owner chose this over making the Plugin API reference easier to search.
-- It comes after [plugin icons](plugin-icons.md), whose site copy (its M4) it draws with.
+- It comes after [plugin icons](../_completed/phases/plugin-icons.md), whose site copy (its M4) it draws with.
 
 ## 0. Core or plugin
 
@@ -210,7 +210,7 @@ A `StarlightPage` with `frontmatter={{ title: "Plugins", description, template: 
 | `src/content.config.ts`, `astro.config.mjs` | `pageActions`; the topic; the validator | about 6 |
 | `SiteTitle.astro`, `layout.tsx`, `home.tsx` | The links | about 9 |
 | Add a plugin, `CHANGELOG.md` | A line each | about 3 |
-| `src/plugin-icon.ts`, `src/components/PluginIcon.astro` | From [plugin icons](plugin-icons.md) | counted there |
+| `src/plugin-icon.ts`, `src/components/PluginIcon.astro` | From [plugin icons](../_completed/phases/plugin-icons.md) | counted there |
 
 Size: about 260 lines. Only `/plugins/` gains a script, about 0.5 KB. Other pages gain a header link, and the app, the SDK, and the server don't change.
 
@@ -225,7 +225,7 @@ Size: about 260 lines. Only `/plugins/` gains a script, about 0.5 KB. Other page
 
 ## 4. Checklist
 
-The bound: about 260 lines, as above. Past 350, stop and say why. What's out of scope is under [Not in this phase](#not-in-this-phase). It needs [plugin icons](plugin-icons.md) through its M4, the site's copy. The site builds into `out/`; nothing here starts the app.
+The bound: about 260 lines, as above. Past 350, stop and say why. What's out of scope is under [Not in this phase](#not-in-this-phase). It needs [plugin icons](../_completed/phases/plugin-icons.md) through its M4, the site's copy. The site builds into `out/`; nothing here starts the app.
 
 **M1. The data**
 - [ ] `src/plugins.ts` gives 7 entries, in this order: computer, chat-rooms, alphaXiv, Keiro, show-me, frontend-design, grilling.

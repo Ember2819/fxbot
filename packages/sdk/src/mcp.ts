@@ -352,6 +352,7 @@ export async function createMcp({ store, secretKey, fetch, localUrl, clientMetad
       id: record.id,
       kind: "mcp",
       name: record.name,
+      iconKey: registered(record.source) ? record.source.registry : `${URL.canParse(url) ? new URL(url).hostname : ""}/${record.name}`,
       url,
       transport,
       auth,
@@ -441,14 +442,16 @@ export async function createMcp({ store, secretKey, fetch, localUrl, clientMetad
   async function preview(ref: McpRef) {
     const definition = await define(ref);
     const info = "info" in definition ? { info: definition.info } : {};
+    // Its icon's key: the registry entry's name, or the server's host and name.
+    const iconKey = (name: string, url: string) => ("info" in definition && definition.info ? definition.info.name : `${URL.canParse(url) ? new URL(url).hostname : ""}/${name}`);
     if ("local" in definition) {
-      const page: McpPreview = { hash: "", name: definition.name, url: "", transport: definition.transport, auth: "none", headers: [], allowLocal: false, tools: null, local: true, ...info };
+      const page: McpPreview = { hash: "", name: definition.name, iconKey: iconKey(definition.name, ""), url: "", transport: definition.transport, auth: "none", headers: [], allowLocal: false, tools: null, local: true, ...info };
       return { page, definition, found: { name: definition.name, auth: "none" as Plugin["auth"], tools: null } };
     }
     const found = await probe(definition);
     const { url, transport, allowLocal, headers } = definition;
     const hash = createHash("sha256").update(JSON.stringify([url, transport, allowLocal, headers, found.auth])).digest("hex");
-    const page: McpPreview = { hash, name: found.name, url, transport, auth: found.auth, headers, allowLocal, tools: found.tools?.map(toolView) ?? null, ...info };
+    const page: McpPreview = { hash, name: found.name, iconKey: iconKey(found.name, url), url, transport, auth: found.auth, headers, allowLocal, tools: found.tools?.map(toolView) ?? null, ...info };
     return { page, definition, found };
   }
 

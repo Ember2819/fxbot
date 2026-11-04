@@ -8,12 +8,13 @@ import { client } from "./client.ts";
 import { Header } from "./header.tsx";
 import { MemorySearch } from "./memory-search.tsx";
 import { follow } from "./nav.ts";
+import { PluginIcon } from "./plugin-icon.tsx";
 import { PluginPart, usePluginSettings } from "./plugins.tsx";
 import { Providers } from "./providers.tsx";
 import { install, standalone, useInstall } from "./pwa.ts";
 import { Version } from "./release.tsx";
 
-type Tab = { tab: string; label: string; Icon?: ComponentType };
+type Tab = { tab: string; label: string; Icon?: ComponentType; iconKey?: string };
 // The core's tabs. Each plugin that draws in Settings gets one after Plugins, and About comes last.
 const core: Tab[] = [
   { tab: "", label: "General", Icon: SlidersHorizontalIcon },
@@ -41,7 +42,7 @@ export function SettingsScreen({ tab, profiles }: { tab: string; profiles: Profi
   useEffect(() => void client.settings.get().then(setSettings, (e: Error) => setError(e.message)), []);
   const save = (fields: Partial<Settings>) => client.settings.update(fields).then(setSettings, (e: Error) => setError(e.message));
   const plugins = usePluginSettings();
-  const tabs: Tab[] = [...core, ...plugins.map(({ name }) => ({ tab: `plugins/${name}`, label: labelOf(name) })), about];
+  const tabs: Tab[] = [...core, ...plugins.map(({ name, iconKey }) => ({ tab: `plugins/${name}`, label: labelOf(name), iconKey })), about];
 
   // On a phone the tabs are a row that scrolls sideways, kept with the open one in view. Newer browsers' scrollIntoView
   // returns a promise, which an effect must not.
@@ -110,7 +111,7 @@ export function SettingsScreen({ tab, profiles }: { tab: string; profiles: Profi
       <Header title="Settings" />
       <div className="flex min-h-0 flex-1 flex-col lg:flex-row">
         <nav ref={nav} aria-label="Settings" className="flex shrink-0 gap-1 overflow-x-auto border-b px-3 pb-2 [scrollbar-width:none] lg:w-48 lg:flex-col lg:overflow-visible lg:border-b-0 lg:py-6">
-          {tabs.map(({ tab: to, label, Icon }) => (
+          {tabs.map(({ tab: to, label, Icon, iconKey }) => (
             <a
               key={to}
               href={to ? `/settings/${to}` : "/settings"}
@@ -118,7 +119,7 @@ export function SettingsScreen({ tab, profiles }: { tab: string; profiles: Profi
               aria-current={to === tab ? "page" : undefined}
               className={buttonVariants({ variant: "ghost", size: "sm", className: "shrink-0 justify-start rounded-full text-muted-foreground aria-[current=page]:bg-accent aria-[current=page]:text-foreground lg:rounded-md" })}
             >
-              {Icon && <Icon />}
+              {Icon ? <Icon /> : iconKey && <PluginIcon iconKey={iconKey} size={16} />}
               {label}
             </a>
           ))}

@@ -41,6 +41,7 @@ import type {
 
 export type * from "./types.ts";
 export { colors, embeddingKinds, itemKinds, kinds, maxPinned, shapes } from "./types.ts";
+export { iconSeed, pluginIcon, type PluginIcon, type Tones } from "./plugin-icon.ts";
 
 export const unreachable = "Cannot reach the server.";
 

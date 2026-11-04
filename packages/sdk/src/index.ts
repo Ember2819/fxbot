@@ -158,6 +158,7 @@ export async function createFxbot(options: FxbotOptions) {
     archives,
     dirs: options.pluginDirs ?? [],
     taken: () => mcp.prefixes(),
+    listedOwner: registry.listedOwner,
     onChange: () => void retool(),
     host: {
       bots: { list: async () => (await store.profiles.list()).map(withBusy), get: async (id) => withBusy(await get(id)) },

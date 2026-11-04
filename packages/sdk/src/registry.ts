@@ -63,6 +63,7 @@ export function cardOf(entry: Entry, from: RegistryFrom): McpCard {
   return {
     ...info,
     kind: "mcp",
+    iconKey: entry.server.name,
     ...(host ? { url: remote!.url, host } : {}),
     ...(host && info.domain ? { hostMatches: host === info.domain || host.endsWith(`.${info.domain}`) } : {}),
     ...(remote?.headers?.some((h) => h.isSecret) ? { needs: "key" as const } : {}),
@@ -84,6 +85,7 @@ const skillCard = (e: SkillEntry, from: SkillCard["from"]): SkillCard => ({
   kind: "skill",
   id: e.id,
   name: e.name.slice(0, 64),
+  iconKey: `${e.source.split("/")[0]}/${e.skillId}`,
   repository: e.source,
   from,
   ...(e.description ? { description: e.description.slice(0, 1024) } : {}),
@@ -382,12 +384,14 @@ export function createRegistry({
     ourSkill: (id: string) => ourSkills.find((e) => e.id === id),
     // A package in fxbot's list, by its repository and folder.
     ourPackage: (ref: string) => ourPlugins.find((e) => `${e.repo}${e.path ? `/${e.path}` : ""}`.toLowerCase() === ref.trim().replace(/^https:\/\/github\.com\//, "").replace(/\/+$/, "").toLowerCase()),
+    // The owner of the repository of the plugin by this name in fxbot's list, so a checkout's folder of it draws its icon.
+    listedOwner: (name: string) => ourPlugins.find((e) => e.name === name)?.repo.split("/")[0],
     // fxbot's plugins that match, all of them with no words.
     searchPackages(q: unknown): PackageSearch {
       const words = typeof q === "string" ? q.trim().toLowerCase().slice(0, 100) : "";
       const cards = ourPlugins
         .filter((e) => !words || [e.name, e.repo, e.description].some((t) => t.toLowerCase().includes(words)))
-        .map((e): PackageCard => ({ kind: "package", name: e.name.slice(0, 64), description: e.description.slice(0, 1024), ref: `${e.repo}${e.path ? `/${e.path}` : ""}`, from: "fxbot" }));
+        .map((e): PackageCard => ({ kind: "package", name: e.name.slice(0, 64), iconKey: `${e.repo.split("/")[0]}/${e.name}`, description: e.description.slice(0, 1024), ref: `${e.repo}${e.path ? `/${e.path}` : ""}`, from: "fxbot" }));
       return { cards };
     },
     close: () => clearInterval(timer),

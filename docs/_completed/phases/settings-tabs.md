@@ -126,7 +126,7 @@ These are the best prior art for plugin tabs and About, beyond the list.
 
 - **Plugin tabs** come in the order the app loads plugins, as the sidebar's plugin buttons do.
 - **A plugin's label** is its name, with its first letter capitalized and dashes as spaces. `computer` becomes **Computer**, and `chat-rooms` becomes **Chat rooms**.
-- **Icons.** The core tabs have lucide icons: General `SlidersHorizontal`, Providers `KeyRound`, Memory `Brain`, Plugins `Puzzle`, and About `Info`. A plugin's tab shows its icon from [plugin icons](../../phases/plugin-icons.md) once that's built, and no icon until then.
+- **Icons.** The core tabs have lucide icons: General `SlidersHorizontal`, Providers `KeyRound`, Memory `Brain`, Plugins `Puzzle`, and About `Info`. A plugin's tab shows its icon from [plugin icons](plugin-icons.md) once that's built, and no icon until then.
 - **An unknown address,** such as a plugin's tab before its page code has loaded or after it's removed, shows the tab list with an empty pane. When the plugin loads, its tab appears. A plugin's screen already shows "Not found" until then.
 
 ### About

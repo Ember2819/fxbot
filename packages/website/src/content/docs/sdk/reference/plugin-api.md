@@ -25,7 +25,7 @@ Only `plugin.json` is required, and only the paths it names count.
 
 | Field | What it is |
 | --- | --- |
-| `name` | Required. Up to 40 lowercase letters, digits, and dashes. Its tools are `<name>_<tool>`, its routes are under `/api/plugins/<name>/`, its page paths under `/<name>/`, and its schema is `plugin_<name>`, with `_` for `-`. It can't be `chat`, `memory`, `library`, or `skill`, or an MCP server's prefix, nor a name fxbot uses itself: `pages`, `preview`, `search`, `addons`, `plugins`, `settings`, `profiles`, or 12 hex characters, which is a plugin's id. |
+| `name` | Required. Up to 40 lowercase letters, digits, and dashes. Its tools are `<name>_<tool>`, its routes are under `/api/plugins/<name>/`, its page paths under `/<name>/`, and its schema is `plugin_<name>`, with `_` for `-`. It can't be `chat`, `memory`, `library`, or `skill`, or an MCP server's prefix, nor a name fxbot uses itself: `pages`, `preview`, `search`, `addons`, `plugins`, `settings`, `profiles`, or 12 hex characters, which is a plugin's id. It and the repository's owner make the plugin's icon. |
 | `version` | Shown on its row. Default `0.0.0` |
 | `description` | Shown on its page and its row |
 | `extensions["sh.fxbot"].server` | Its server code, a path inside the folder |
@@ -184,7 +184,7 @@ A plugin names the plugins it needs, and what it asks of each, under `needs`:
 | --- | --- |
 | `app.route(path, Component)` | The screen at `/<plugin><path>`. `path` may have `:name` parts, which `Component` gets as `params`. |
 | `app.sidebar(Component)` | A group in the sidebar, after the bots |
-| `app.nav({ label, path, icon? })` | A button in the sidebar's footer row, to `/<plugin><path>`. `icon` is a component; without one, the button shows the label's first letter. |
+| `app.nav({ label, path, icon? })` | A button in the sidebar's footer row, to `/<plugin><path>`. `icon` is a component; without one, the button shows the plugin's icon. |
 | `app.botPanel(Component)` | Above the tabs of a bot's panel, beside its chat. It gets `bot`. |
 | `app.composer(Component)` | A control beside the attach button. It gets `bot`, `setDraft(text)`, and `attach(files)`. `setDraft` also takes a function from the draft to the new text. |
 | `app.toolView(tool, Component)` | How a call of `<plugin>_<tool>` shows in a reply. It gets `call`: `name`, `input`, `output`, `error`, and `done`. |

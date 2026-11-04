@@ -43,7 +43,7 @@ type Places = {
   botPanel: ComponentType<{ bot: Profile }>[];
 };
 // `key` is the URLs it loaded from, which change with its files.
-type Loaded = { name: string; key: string; css?: HTMLLinkElement; places: Places };
+type Loaded = { name: string; iconKey: string; key: string; css?: HTMLLinkElement; places: Places };
 
 const emptyPlaces = (): Places => ({ routes: [], sidebar: [], nav: [], composer: [], toolViews: new Map(), settings: [], botSettings: [], botPanel: [] });
 
@@ -129,11 +129,11 @@ export async function loadPlugins() {
   const list = await client.plugins.pages().catch(() => null);
   if (!list) return;
   const next: Loaded[] = [];
-  for (const { name, version, page, css } of list) {
+  for (const { name, iconKey, version, page, css } of list) {
     const now = loaded.find((p) => p.name === name);
     const key = `${page ?? ""} ${css ?? ""}`;
     if (now && now.key === key) {
-      next.push(now);
+      next.push({ ...now, iconKey });
       continue;
     }
     now?.css?.remove();
@@ -143,7 +143,7 @@ export async function loadPlugins() {
       document.head.append(link);
     }
     const places = page ? await run(name, version, page).catch((error: Error) => (console.error(`Plugin ${name}:`, error), emptyPlaces())) : emptyPlaces();
-    next.push({ name, key, css: link, places });
+    next.push({ name, iconKey, key, css: link, places });
   }
   for (const gone of loaded.filter((p) => !list.some((l) => l.name === p.name))) gone.css?.remove();
   publish(next);
@@ -179,7 +179,7 @@ export function Place<P extends object>({ pick, props }: { pick: (places: Places
 
 // Each loaded plugin that draws in Settings, with its parts, in load order: a tab each.
 export function usePluginSettings() {
-  return usePlugins().flatMap(({ name, places }) => (places.settings.length ? [{ name, parts: places.settings }] : []));
+  return usePlugins().flatMap(({ name, iconKey, places }) => (places.settings.length ? [{ name, iconKey, parts: places.settings }] : []));
 }
 
 // The plugin screen for a path, `/<plugin>/…`, checked after the app's own.
@@ -213,5 +213,5 @@ export function usePluginToolView(tool: string) {
 
 // The sidebar footer's buttons, one per plugin nav entry, and each one's address.
 export function usePluginNav() {
-  return usePlugins().flatMap(({ name, places }) => places.nav.map((nav) => ({ ...nav, plugin: name, href: `/${name}${nav.path.startsWith("/") ? nav.path : `/${nav.path}`}` })));
+  return usePlugins().flatMap(({ name, iconKey, places }) => places.nav.map((nav) => ({ ...nav, plugin: name, iconKey, href: `/${name}${nav.path.startsWith("/") ? nav.path : `/${nav.path}`}` })));
 }

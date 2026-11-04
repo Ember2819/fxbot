@@ -4,7 +4,8 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import type { Plugin, SkillPlugin, SkillCard, SkillFile, SkillPreview, SkillSearch } from "@fxbot/sdk/client";
-import { Details, heading, hint, Initial } from "./mcp-add.tsx";
+import { Details, heading, hint } from "./mcp-add.tsx";
+import { PluginIcon } from "./plugin-icon.tsx";
 import { client } from "./client.ts";
 
 const compact = (n: number) => new Intl.NumberFormat("en", { notation: "compact" }).format(n);
@@ -56,7 +57,7 @@ export function SkillResults({ search, words, added, onOpen }: { search: ReturnT
           onClick={() => onOpen(card)}
           className="flex w-full min-w-0 gap-3 rounded-lg border p-3 text-left transition-colors outline-none hover:bg-muted/50 focus-visible:ring-3 focus-visible:ring-ring/50"
         >
-          <Initial title={card.name} />
+          <PluginIcon iconKey={card.iconKey} />
           <span className="grid min-w-0 flex-1 gap-0.5">
             <span className="flex min-w-0 items-baseline gap-2">
               <span className="max-w-[70%] shrink-0 truncate font-medium">{card.name}</span>
@@ -142,7 +143,7 @@ export function SkillDialog({ card, onAdded, onClose }: { card: SkillCard; onAdd
       <DialogContent className="flex max-h-[90dvh] flex-col sm:max-w-xl">
         <DialogHeader>
           <div className="flex min-w-0 items-center gap-2 pr-6">
-            <Initial title={page?.name ?? card.name} />
+            <PluginIcon iconKey={card.iconKey} />
             <DialogTitle className="truncate">{page?.name ?? card.name}</DialogTitle>
           </div>
           {(page?.description || card.description) && <DialogDescription>{page?.description || card.description}</DialogDescription>}

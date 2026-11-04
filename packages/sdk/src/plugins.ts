@@ -187,8 +187,10 @@ export async function createPlugins(options: {
   taken: () => string[];
   onChange: () => void;
   host: PluginHost;
+  // The owner of fxbot's list entry with a plugin's name, for a checkout's folder of it.
+  listedOwner: (name: string) => string | undefined;
 }) {
-  const { store, databaseUrl, secretKey, dataDir, archives, dirs, taken, onChange, host } = options;
+  const { store, databaseUrl, secretKey, dataDir, archives, dirs, taken, onChange, host, listedOwner } = options;
   // Settings, secret or not, are sealed together, as an MCP server's header values are.
   const secrets = createSecrets(store.sql, secretKey, "plugin_secrets");
   const plugins = new Map<string, Package>();
@@ -305,6 +307,7 @@ export async function createPlugins(options: {
     const page: PackagePreview = {
       hash: "",
       name: "",
+      iconKey: "",
       version: "",
       description: "",
       source: { repo, path, commit: at, from: ref.from === "fxbot" ? "fxbot" : "github" },
@@ -328,7 +331,7 @@ export async function createPlugins(options: {
     } catch (error) {
       return { page: { ...page, error: said(error) }, files };
     }
-    Object.assign(page, { name: manifest.name, version: manifest.version, description: manifest.description, settings: manifest.settings });
+    Object.assign(page, { name: manifest.name, iconKey: `${repo.split("/")[0]}/${manifest.name}`, version: manifest.version, description: manifest.description, settings: manifest.settings });
     page.needs = Object.keys(manifest.needs).map((name) => ({ name, added: Boolean(named(name)) }));
     page.code = [manifest.server, manifest.page].filter((p): p is string => Boolean(p));
     const missing = [...page.code, manifest.css].filter((p) => p && !byPath.has(p));
@@ -593,12 +596,17 @@ export async function createPlugins(options: {
     }));
   }
 
+  // Who made a plugin, for its icon: its repository's owner, or for a checkout's folder, the owner of fxbot's list entry
+  // with its name, so it looks as released.
+  const iconKeyOf = (record: PackageRecord) => `${"repo" in record.source ? record.source.repo.split("/")[0] : (listedOwner(record.name) ?? "local")}/${record.name}`;
+
   function view(plugin: Package): PackagePlugin {
     const { record, loaded } = plugin;
     return {
       id: record.id,
       kind: "package",
       name: record.name,
+      iconKey: iconKeyOf(record),
       enabled: record.enabled,
       bots: record.bots,
       on: [...(on.get(record.id) ?? [])],
@@ -664,7 +672,7 @@ export async function createPlugins(options: {
         const stamp = async (file: string) =>
           "commit" in record.source ? record.source.commit.slice(0, 12) : String(Math.floor((await stat(resolve(folderOf(record), file))).mtimeMs));
         const url = async (file?: string) => (file ? { [file === page ? "page" : "css"]: `/api/plugins/${record.name}/files/${file}?v=${await stamp(file)}` } : {});
-        pages.push({ name: record.name, version, ...(await url(page)), ...(await url(css)) });
+        pages.push({ name: record.name, iconKey: iconKeyOf(record), version, ...(await url(page)), ...(await url(css)) });
       }
       return pages;
     },
