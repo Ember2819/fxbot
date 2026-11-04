@@ -12,13 +12,32 @@ A plugin for [fxbot](https://fxbot.sh): each bot gets a Linux computer of its ow
 
 Its three skills, `computer`, `browser`, and `desktop`, say which part to use for what, and a few lines in each chat's instructions say it for bots that read none. `$computer` in a message, or the screen button beside the message box, sends the `computer` skill with it.
 
-The Computer screen, at `/computer/bots/<id>`, shows a bot's desktop live, through noVNC, and its terminal, through xterm.js, over the plugin's WebSockets. **Take over** gives you the mouse and keyboard; the bot's desktop and terminal tools wait until you **Hand back**.
+The Computer screen, at `/computer/computers/<key>`, shows a computer's desktop live, through noVNC, and its terminal, through xterm.js, over the plugin's WebSockets. A bot's key is its id, and `/computer/bots/<id>`, from before 0.3.0, opens the same screen. **Take over** gives you the mouse and keyboard; the bot's desktop and terminal tools wait until you **Hand back**. Over the desktop, an arrow in each bot's colour shows where it last pointed, with what it did; the newest is solid.
 
 A computer starts on its bot's first call and stops when it sits idle, unless someone watches it. Its home, `/root`, is kept, with the browser's profile; programs the bot installs last until the computer is made again from a new image. When a bot reads a skill that has scripts, they're copied to `/skills/<name>` on its computer.
 
 Plugins that need the computer add programs to every computer with setup steps, in `needs.computer.setup` in their `plugin.json`.
 
 Add it from **Plugins**, where fxbot's list has it. It runs inside fxbot: read its code there before you add it. Like every plugin, it's on for every bot once added; choose its bots in its settings.
+
+## Computers for other plugins
+
+Since 0.3.0, a plugin that needs the computer can name computers of its own, such as [chat-rooms-computer](../chat-rooms-computer/)'s, one for each room. It provides, with `fx.provide`:
+
+```ts
+type ComputerProvider = {
+  /** The computer for a chat, or null for the bot's own. `name` makes its hostname: `<name>-computer`. */
+  computerFor(call: { bot: string; session: string }): Promise<{ key: string; name: string } | null>;
+  /** Every computer it keeps, with its name; null while it can't tell. */
+  computers(): Promise<{ key: string; name: string }[] | null>;
+};
+```
+
+- A key is a word, a dash, and more, such as `room-1a2b3c4d`, which a bot's id never is. Its container and home are `fxbot-computer-<key>`, labelled `fxbot.by=<plugin>`.
+- Each call asks the plugins that provide one, in turn, which computer the chat uses; otherwise it's the bot's own.
+- A plugin's computer goes when the plugin is removed, or runs and doesn't list it. One added but not running, or that answers null, keeps its own.
+- On a shared computer, a `computer_desktop` result says where the other bots last pointed, **Take over** pauses every bot's desktop and terminal tools, and **Hand back** sends nothing: the owner tells the bot to go on.
+- The page's routes are under `computers/<key>/`: `state`, `cursors`, `start`, `stop`, `reset`, and `takeover`.
 
 ## Set up the engine
 

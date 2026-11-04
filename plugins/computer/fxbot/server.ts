@@ -66,11 +66,24 @@ const files = [
   },
 ];
 const isBot = /^[0-9a-f]{12}$/;
+// A computer that a plugin which needs this one names, such as a room's: a word, a dash, and more, which a bot's id
+// never is.
+const isKey = /^[a-z]+-[a-z0-9-]{1,40}$/;
 // A computer's hostname: its bot's name as a hostname can hold it, then -computer, such as bob-computer. A name with
 // nothing a hostname holds gives the bot's id instead.
 const hostOf = (name: string, bot: string) =>
   `${name.normalize("NFKD").replace(/\p{M}/gu, "").toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+/, "").slice(0, 50).replace(/-+$/, "") || bot}-computer`;
 
+// A computer: a bot's own, whose key is the bot's id, or one a plugin that needs the computer names (`by`), shared by the
+// bots it names it for. `name` makes its hostname and its title.
+type Computer = { key: string; name?: string; by: string | null };
+// What a plugin that needs the computer provides, to name computers of its own (docs: The computer).
+type ComputerProvider = {
+  computerFor(call: { bot: string; session: string }): Promise<{ key: string; name: string } | null>;
+  computers(): Promise<{ key: string; name: string }[] | null>;
+};
+// Where a bot last pointed on a computer, and what it did last.
+type Mark = { x?: number; y?: number; what: string; at: number };
 type Engine = { state: "ready" | "unreachable" | "rootful"; socket: string; name?: string; version?: string; error?: string };
 type Step = { from: string; run: string };
 type Answer = { status: number; headers: IncomingHttpHeaders; data: Buffer };
@@ -346,8 +359,9 @@ export default async function setup(fx: PluginApi) {
       if (idOf(Id) !== current && (Labels?.["fxbot.install"] ?? install) === install) await call("DELETE", `/images/${idOf(Id)}`).catch(() => {});
   }
 
-  // Computers, one for each bot, with its home in a volume of the same name.
-  const nameOf = (bot: string) => `fxbot-computer-${bot}`;
+  // Computers, each with its home in a volume of the same name: one for each bot, and those plugins that need the computer
+  // name, such as a room's. Everything below is kept by the computer's key.
+  const nameOf = (key: string) => `fxbot-computer-${key}`;
   const last = new Map<string, number>();
   const busy = new Map<string, number>();
   const starting = new Map<string, Promise<string>>();
@@ -356,7 +370,8 @@ export default async function setup(fx: PluginApi) {
   // The screen's size: the setting, when it's a width and height Xvnc takes.
   const screen = () => (/^\d{3,4}x\d{3,4}$/.test(fx.settings.screen ?? "") ? fx.settings.screen : "1280x800");
 
-  // This install's computers: those labelled with it, and those from before computers were, for a bot of its own.
+  // This install's computers: those labelled with it, and those from before computers were, for a bot of its own. `by`
+  // is the plugin that named one that isn't a bot's.
   async function computers() {
     const [list, bots] = await Promise.all([
       json<{ Labels: Record<string, string>; State: string }[]>("GET", `/containers/json?all=true&filters=${query({ label: ["fxbot.computer"] })}`),
@@ -365,63 +380,113 @@ export default async function setup(fx: PluginApi) {
     const ours = new Set(bots.map((bot) => bot.id));
     return list
       .filter((c) => (c.Labels["fxbot.install"] ? c.Labels["fxbot.install"] === install : ours.has(c.Labels["fxbot.computer"])))
-      .map((c) => ({ bot: c.Labels["fxbot.computer"], running: c.State === "running" }));
+      .map((c) => ({ key: c.Labels["fxbot.computer"], by: c.Labels["fxbot.by"] ?? null, running: c.State === "running" }));
+  }
+  // The plugins that need the computer and name computers of their own, running now.
+  const providers = () =>
+    fx.dependents().flatMap(({ name, api }) => (typeof (api as Partial<ComputerProvider> | null)?.computerFor === "function" ? [{ name, api: api as unknown as ComputerProvider }] : []));
+  // The computer a call uses: the one a plugin that needs the computer names for its chat, such as a room's, or else the
+  // bot's own.
+  async function computerOf(bot: string, session: string): Promise<Computer> {
+    for (const { name: by, api } of providers()) {
+      const found = await api.computerFor({ bot, session });
+      if (!found) continue;
+      if (typeof found.key !== "string" || !isKey.test(found.key)) throw new Error(`${by} named a computer, ${found.key}, that isn't a key.`);
+      return { key: found.key, name: String(found.name ?? ""), by };
+    }
+    return { key: bot, by: null };
+  }
+  // A computer the page or a socket may reach, with its name: a bot's that exists, or one a running plugin lists.
+  async function known(key: string): Promise<(Computer & { name: string }) | null> {
+    if (isBot.test(key)) {
+      const bot = await fx.bots.get(key).catch(() => null);
+      return bot ? { key, name: bot.name, by: null } : null;
+    }
+    if (!isKey.test(key)) return null;
+    for (const { name: by, api } of providers()) {
+      const found = (await api.computers().catch(() => null))?.find((c) => c.key === key);
+      if (found) return { key, name: String(found.name ?? key), by };
+    }
+    return null;
   }
   const inspect = async (name: string) => {
     const { status, data } = await call("GET", `/containers/${name}/json`);
     return status === 404 ? null : JSON.parse(data.toString("utf8"));
   };
   // Marks a call, and keeps the idle timer running while any computer does.
-  function used(bot: string) {
-    last.set(bot, Date.now());
+  function used(key: string) {
+    last.set(key, Date.now());
     const idle = (Number(fx.settings.idleMinutes) || 15) * 60_000;
     timer ??= setInterval(() => void sweep().catch((error) => fx.log(`Stopping idle computers failed: ${error.message}`)), Math.min(30_000, idle / 2));
   }
   async function sweep() {
     const idle = (Number(fx.settings.idleMinutes) || 15) * 60_000;
     let stopped = false;
-    for (const [bot, at] of last) {
-      if (Date.now() - at < idle || busy.get(bot) || starting.has(bot)) continue;
-      last.delete(bot);
-      await call("POST", `/containers/${nameOf(bot)}/stop?t=5`, { timeout: 30_000 });
+    for (const [key, at] of last) {
+      if (Date.now() - at < idle || busy.get(key) || starting.has(key)) continue;
+      last.delete(key);
+      marks.delete(key);
+      await call("POST", `/containers/${nameOf(key)}/stop?t=5`, { timeout: 30_000 });
       stopped = true;
     }
     if (stopped) await forget();
     if (!last.size) timer = (clearInterval(timer), undefined);
   }
-  // The computers and homes of bots that are gone.
+  // The computers and homes no one needs: a bot's when the bot is gone, and a plugin's when that plugin is no longer
+  // added, or runs and doesn't list it. A plugin added but not running, or that can't tell yet, keeps its own, as at
+  // start, before the plugins that need the computer have loaded.
   async function forget() {
     const bots = new Set((await fx.bots.list()).map((bot) => bot.id));
-    for (const { bot } of await computers()) if (!bots.has(bot)) await remove(bot);
+    const added = new Map(fx.dependents().map((d) => [d.name, d.api as Partial<ComputerProvider> | null]));
+    const listed = new Map<string, Set<string> | null>();
+    for (const { key, by } of await computers()) {
+      if (!by) {
+        if (!bots.has(key)) await remove(key);
+        continue;
+      }
+      if (!added.has(by)) {
+        await remove(key);
+        continue;
+      }
+      if (!listed.has(by)) {
+        const list = typeof added.get(by)?.computers === "function" ? await added.get(by)!.computers!().catch(() => null) : null;
+        listed.set(by, list ? new Set(list.map((c) => c.key)) : null);
+      }
+      const keys = listed.get(by);
+      if (keys && !keys.has(key)) await remove(key);
+    }
   }
-  async function remove(bot: string) {
-    await call("DELETE", `/containers/${nameOf(bot)}?force=true`, { timeout: 60_000 });
-    await call("DELETE", `/volumes/${nameOf(bot)}?force=true`);
-    last.delete(bot);
-    noted.delete(bot);
-    owner.delete(bot);
+  async function remove(key: string) {
+    await call("DELETE", `/containers/${nameOf(key)}?force=true`, { timeout: 60_000 });
+    await call("DELETE", `/volumes/${nameOf(key)}?force=true`);
+    last.delete(key);
+    noted.delete(key);
+    owner.delete(key);
+    marks.delete(key);
   }
 
-  // A bot's computer, running: made from the current image if it has none, or when it is stopped and its image or
-  // sizes changed. Its home stays. Calls at once share one start.
-  function open(bot: string) {
-    if (!starting.has(bot)) starting.set(bot, start(bot).then((name) => (used(bot), name)).finally(() => starting.delete(bot)));
-    return starting.get(bot)!;
+  // A computer, running: made from the current image if it has none, or when it is stopped and its image, sizes, or
+  // name changed. Its home stays. Calls at once share one start.
+  function open(computer: Computer) {
+    const { key } = computer;
+    if (!starting.has(key)) starting.set(key, start(computer).then((name) => (used(key), name)).finally(() => starting.delete(key)));
+    return starting.get(key)!;
   }
-  async function start(bot: string) {
+  async function start({ key, name: title, by }: Computer) {
     if (engine.state !== "ready") await check();
     if (engine.state !== "ready") throw new Error(notReady());
-    const name = nameOf(bot);
+    const name = nameOf(key);
     const info = await inspect(name);
     const whose = info?.Config?.Labels?.["fxbot.install"];
-    if (whose && whose !== install) throw new Error("Another fxbot on this machine has a computer for this bot, so this one leaves it be.");
+    if (whose && whose !== install) throw new Error("Another fxbot on this machine has a computer by this name, so this one leaves it be.");
     if (info?.State?.Running) return name;
     const tag = await image();
     const current = idOf((await json("GET", `/images/${tag}/json`)).Id);
     const sizes = limits();
     const look = `SCREEN=${screen()}`;
-    // A bot renamed since its computer was made gets the new name on its next start.
-    const host = hostOf((await fx.bots.get(bot).catch(() => null))?.name ?? "", bot);
+    // A bot or a room renamed since its computer was made gets the new name on its next start.
+    const host = hostOf(by ? (title ?? "") : ((await fx.bots.get(key).catch(() => null))?.name ?? ""), key);
+    const labels = { "fxbot.computer": key, "fxbot.install": install, ...(by ? { "fxbot.by": by } : {}) };
     const stale =
       info &&
       (idOf(info.Image) !== current ||
@@ -432,14 +497,14 @@ export default async function setup(fx: PluginApi) {
         whose !== install);
     if (stale) await json("DELETE", `/containers/${name}?force=true`);
     if (!info || stale) {
-      if ((await call("GET", `/volumes/${name}`)).status === 404) await json("POST", "/volumes/create", { Name: name, Labels: { "fxbot.computer": bot, "fxbot.install": install } });
+      if ((await call("GET", `/volumes/${name}`)).status === 404) await json("POST", "/volumes/create", { Name: name, Labels: labels });
       await json("POST", `/containers/create?name=${name}`, {
         Image: tag,
         Cmd: ["session"],
         Env: [...env, look],
         WorkingDir: "/root",
         Hostname: host,
-        Labels: { "fxbot.computer": bot, "fxbot.install": install },
+        Labels: labels,
         HostConfig: { Init: true, ...sizes, PidsLimit: 512, ShmSize: 512 * mib, Mounts: [{ Type: "volume", Source: name, Target: "/root" }] },
       });
       if (stale) void prune(tag).catch(() => {});
@@ -451,7 +516,7 @@ export default async function setup(fx: PluginApi) {
       if ((await exec(name, ["xdotool", "search", "--name", "^main$"])).code === 0) break;
       await new Promise((r) => setTimeout(r, 100));
     }
-    fx.log(`Started ${bot}'s computer`);
+    fx.log(`Started ${by ? `${by}'s computer ${key}` : `${key}'s computer`}`);
     return name;
   }
 
@@ -472,16 +537,37 @@ export default async function setup(fx: PluginApi) {
     if (!fx.skills.files(event.bot, input.name).length) return;
     noted.set(event.bot, (noted.get(event.bot) ?? new Set()).add(input.name));
     event.result += `\n\nIts files are at ${folderOf(input.name)} on your computer.`;
+    // At once, to the computer this chat uses, if it runs.
     if (engine.state === "ready")
-      void inspect(nameOf(event.bot))
-        .then((info) => info?.State?.Running && copySkills(event.bot, nameOf(event.bot)))
+      void computerOf(event.bot, event.session)
+        .then(async ({ key }) => (await inspect(nameOf(key)))?.State?.Running && copySkills(event.bot, nameOf(key)))
         .catch(() => {});
   });
-  // A computer that's ready for a call, with the skills the bot read since its last one.
-  async function ready(bot: string) {
-    const name = await open(bot);
+  // The computer a call uses, ready for it, with the skills the bot read since its last call.
+  async function ready(bot: string, session: string) {
+    const computer = await computerOf(bot, session);
+    const name = await open(computer);
     await copySkills(bot, name);
-    return name;
+    return { name, key: computer.key, shared: Boolean(computer.by) };
+  }
+
+  // Where each bot last pointed on each computer, and what it did, by key then bot, for the owner's view and for the
+  // other bots on a shared computer. In memory only. Stop, Reset, and an idle stop clear a computer's.
+  const marks = new Map<string, Map<string, Mark>>();
+  function mark(key: string, bot: string, what: string, xy?: unknown) {
+    const all = marks.get(key) ?? marks.set(key, new Map()).get(key)!;
+    const at = Array.isArray(xy) && xy.every((n) => Number.isFinite(n)) ? { x: Number(xy[0]), y: Number(xy[1]) } : { x: all.get(bot)?.x, y: all.get(bot)?.y };
+    all.set(bot, { ...at, what, at: Date.now() });
+  }
+  const ago = (ms: number) => (ms < 60_000 ? `${Math.max(1, Math.round(ms / 1000))} s ago` : ms < 3_600_000 ? `${Math.round(ms / 60_000)} min ago` : `${Math.round(ms / 3_600_000)} h ago`);
+  const doing: Record<string, string> = { browser: "used the browser", "desktop app": "used a desktop app", shell: "ran a command", terminal: "used the terminal", looked: "looked at the screen", typed: "typed", "pressed keys": "pressed keys" };
+  // One line for a bot on a shared computer: where the others last were, newest first, at most five.
+  async function others(key: string, bot: string) {
+    const rest = [...(marks.get(key) ?? [])].filter(([who]) => who !== bot).sort((a, b) => b[1].at - a[1].at).slice(0, 5);
+    if (!rest.length) return "";
+    const names = new Map((await fx.bots.list()).map((b) => [b.id, b.name]));
+    const said = rest.map(([who, m]) => `${names.get(who) ?? "Another bot"} ${doing[m.what] ?? m.what}${m.x !== undefined && !doing[m.what] ? ` (${m.x}, ${m.y})` : ""} ${ago(Date.now() - m.at)}`);
+    return ` Others on this computer: ${said.join("; ")}.`;
   }
 
   fx.tool({
@@ -499,22 +585,23 @@ export default async function setup(fx: PluginApi) {
       required: ["command"],
     },
     idempotent: false,
-    async execute(input: { command?: unknown; timeout?: unknown }, { bot, signal }) {
+    async execute(input: { command?: unknown; timeout?: unknown }, { bot, session, signal }) {
       const command = typeof input?.command === "string" ? input.command : "";
       if (!command.trim()) return "Give a command to run.";
       const seconds = Math.min(Math.max(Math.trunc(Number(input.timeout) || 120), 1), 600);
-      const name = await ready(bot);
+      const { name, key } = await ready(bot, session);
+      mark(key, bot, /\bagent-browser\b/.test(command) ? "browser" : /\bagent-desktop\b/.test(command) ? "desktop app" : "shell");
       const id = randomUUID();
       const stop = () => void exec(name, ["sh", "-c", `kill -KILL -- -$(cat /tmp/fxbot/${id}.pid)`]).catch(() => {});
       signal.addEventListener("abort", stop, { once: true });
-      busy.set(bot, (busy.get(bot) ?? 0) + 1);
+      busy.set(key, (busy.get(key) ?? 0) + 1);
       try {
         const { code, output } = await exec(name, ["fxbot-run", id, String(seconds), command], { timeout: (seconds + 60) * 1000 });
         return signal.aborted ? "Stopped: the turn was cancelled." : `exit ${code}\n${output}`;
       } finally {
         signal.removeEventListener("abort", stop);
-        busy.set(bot, busy.get(bot)! - 1);
-        used(bot);
+        busy.set(key, busy.get(key)! - 1);
+        used(key);
       }
     },
   });
@@ -530,9 +617,9 @@ export default async function setup(fx: PluginApi) {
       required: ["path"],
     },
     idempotent: true,
-    async execute(input: { path?: unknown; offset?: unknown; limit?: unknown }, { bot }) {
+    async execute(input: { path?: unknown; offset?: unknown; limit?: unknown }, { bot, session }) {
       const path = where(input?.path);
-      const bytes = await fetchFile(await ready(bot), path);
+      const bytes = await fetchFile((await ready(bot, session)).name, path);
       const type = imageType(bytes);
       if (type)
         return bytes.length > maxImage
@@ -573,12 +660,12 @@ export default async function setup(fx: PluginApi) {
       required: ["path"],
     },
     idempotent: true,
-    async execute(input: { path?: unknown; text?: unknown; library?: unknown; old_text?: unknown; new_text?: unknown }, { bot }) {
+    async execute(input: { path?: unknown; text?: unknown; library?: unknown; old_text?: unknown; new_text?: unknown }, { bot, session }) {
       const path = where(input?.path);
       if (typeof input.old_text === "string") {
         if (typeof input.new_text !== "string") return "Give new_text too.";
         if (!input.old_text) return "old_text can't be empty.";
-        const name = await ready(bot);
+        const { name } = await ready(bot, session);
         const text = (await fetchFile(name, path)).toString("utf8");
         const times = text.split(input.old_text).length - 1;
         if (times !== 1) return `old_text is in ${path} ${times} times, and must be there exactly once. Give more of the text around it.`;
@@ -592,7 +679,7 @@ export default async function setup(fx: PluginApi) {
       else if (typeof input.text === "string") bytes = Buffer.from(input.text, "utf8");
       else return "Give the text to write, or a library item as library.";
       if (typeof input.text === "string" && bytes.length > maxText) return "Text is at most 1 MiB. Write a longer file in parts, with computer_shell.";
-      const name = await ready(bot);
+      const { name } = await ready(bot, session);
       await put(name, [{ path, bytes, mode: await modeOf(name, path) }]);
       return `Wrote ${bytes.length.toLocaleString("en-US")} bytes to ${path}.`;
     },
@@ -607,7 +694,7 @@ export default async function setup(fx: PluginApi) {
     idempotent: true,
     async execute(input: { path?: unknown; name?: unknown }, { bot, session }) {
       const path = where(input?.path);
-      const bytes = await fetchFile(await ready(bot), path);
+      const bytes = await fetchFile((await ready(bot, session)).name, path);
       const image = imageType(bytes);
       if (bytes.length > (image ? maxImage : maxText)) return `Not saved: ${path} is ${sizeOf(bytes.length)}, over the library's ${image ? "3.75 MiB for an image" : "1 MiB for text"}.`;
       const name = (typeof input.name === "string" && input.name.trim()) || posix.basename(path);
@@ -621,15 +708,18 @@ export default async function setup(fx: PluginApi) {
     },
   });
 
-  // While the owner has a computer, its desktop and terminal tools wait. `reason` is set when the bot asked for it.
-  const owner = new Map<string, { reason?: string }>();
-  const taken = (bot: string) =>
-    owner.has(bot) ? "Your owner has this computer now. Wait for them to hand it back, or ask what they want. computer_shell and the file tools still work." : null;
-  // Hands a bot's computer back. When the bot had asked for help, a message to its chat starts its turn again.
-  async function handBack(bot: string) {
-    const was = owner.get(bot);
-    owner.delete(bot);
-    if (was?.reason) await fx.chats.send(bot, { text: "Your owner handed the computer back. Look at the screen before you go on." }).catch((error) => fx.log(`Telling ${bot} failed: ${error.message}`));
+  // While the owner has a computer, every bot's desktop and terminal tools on it wait. `reason` and `bot` are set when a
+  // bot asked for it.
+  const owner = new Map<string, { reason?: string; bot?: string }>();
+  const taken = (key: string) =>
+    owner.has(key) ? "Your owner has this computer now. Wait for them to hand it back, or ask what they want. computer_shell and the file tools still work." : null;
+  // Hands a computer back. When a bot had asked for help on its own computer, a message to its chat starts its turn
+  // again. On a shared one, such as a room's, nothing is sent: the owner tells the bot to go on there.
+  async function handBack(key: string) {
+    const was = owner.get(key);
+    owner.delete(key);
+    if (was?.reason && was.bot === key)
+      await fx.chats.send(key, { text: "Your owner handed the computer back. Look at the screen before you go on." }).catch((error) => fx.log(`Telling ${key} failed: ${error.message}`));
   }
 
   // A tmux key name, from the names models use.
@@ -650,14 +740,15 @@ export default async function setup(fx: PluginApi) {
       },
     },
     idempotent: false,
-    async execute(input: { text?: unknown; keys?: unknown; wait?: unknown }, { bot, signal }) {
-      const busyWith = taken(bot);
-      if (busyWith) return busyWith;
+    async execute(input: { text?: unknown; keys?: unknown; wait?: unknown }, { bot, session, signal }) {
       const text = typeof input?.text === "string" ? input.text : "";
       const keys = (Array.isArray(input?.keys) ? input.keys : []).filter((k): k is string => typeof k === "string" && /^[\w-]{1,20}$/.test(k)).map((k) => tmuxKeys[k.toLowerCase()] ?? k);
       const seconds = Math.min(Math.max(Number(input?.wait ?? 1) || 0, 0), 30);
-      const name = await ready(bot);
-      busy.set(bot, (busy.get(bot) ?? 0) + 1);
+      const { name, key } = await ready(bot, session);
+      const busyWith = taken(key);
+      if (busyWith) return busyWith;
+      mark(key, bot, "terminal");
+      busy.set(key, (busy.get(key) ?? 0) + 1);
       try {
         await exec(name, ["sh", "-c", "tmux has-session -t main 2>/dev/null || tmux new-session -d -s main -x 160 -y 48"]);
         if (text) await exec(name, ["tmux", "send-keys", "-t", "main", "-l", "--", text]);
@@ -670,12 +761,14 @@ export default async function setup(fx: PluginApi) {
         const { output } = await exec(name, ["tmux", "capture-pane", "-t", "main", "-J", "-p", "-S", "-200"]);
         return cutTo(output.replace(/\s+$/, ""), page) || "(the terminal is empty)";
       } finally {
-        busy.set(bot, busy.get(bot)! - 1);
-        used(bot);
+        busy.set(key, busy.get(key)! - 1);
+        used(key);
       }
     },
   });
 
+  // The actions that move the pointer, and what a mark says for each.
+  const pointed: Record<string, string> = { left_click: "clicked", right_click: "right-clicked", middle_click: "clicked", double_click: "double-clicked", triple_click: "clicked", mouse_move: "pointed", left_click_drag: "dragged", scroll: "scrolled" };
   const actions = ["screenshot", "left_click", "right_click", "middle_click", "double_click", "triple_click", "mouse_move", "left_click_drag", "scroll", "type", "key", "wait", "cursor_position", "zoom"];
   const at = (xy: unknown) => (Array.isArray(xy) ? `(${xy[0]}, ${xy[1]})` : "the pointer");
   // What a call did, in a few words.
@@ -730,24 +823,27 @@ export default async function setup(fx: PluginApi) {
       required: ["action"],
     },
     idempotent: false,
-    async execute(input: Record<string, any>, { bot }) {
-      const busyWith = taken(bot);
-      if (busyWith) return busyWith;
+    async execute(input: Record<string, any>, { bot, session }) {
       if (!actions.includes(input?.action)) return `action must be one of ${actions.join(", ")}.`;
-      const name = await ready(bot);
-      busy.set(bot, (busy.get(bot) ?? 0) + 1);
+      const { name, key, shared } = await ready(bot, session);
+      const busyWith = taken(key);
+      if (busyWith) return busyWith;
+      busy.set(key, (busy.get(key) ?? 0) + 1);
       try {
         const { output } = await exec(name, ["fxbot-screen", JSON.stringify(input)], { timeout: 90_000 });
         const end = output.indexOf("\n");
         const info = JSON.parse(end < 0 ? output : output.slice(0, end));
         if (info.error) return info.error;
-        const text = `${did(input)}. Screen ${info.screen[0]}×${info.screen[1]}. Active window: ${info.window || "none"}. Cursor (${info.cursor[0]}, ${info.cursor[1]}).`;
+        // A pointer action moves this bot's mark; typing and looking keep where it last pointed.
+        const action = String(input.action);
+        mark(key, bot, pointed[action] ?? (action === "type" ? "typed" : action === "key" ? "pressed keys" : "looked"), pointed[action] ? info.cursor : undefined);
+        const text = `${did(input)}. Screen ${info.screen[0]}×${info.screen[1]}. Active window: ${info.window || "none"}. Cursor (${info.cursor[0]}, ${info.cursor[1]}).${shared ? await others(key, bot) : ""}`;
         const data = end < 0 ? "" : output.slice(end + 1).trim();
         if (!data) return text;
         return { type: "libfx.tool-result", text: `Screenshot ${keep(bot, info.type, data)}. ${text}`, images: [{ type: "image", mimeType: info.type, data }] };
       } finally {
-        busy.set(bot, busy.get(bot)! - 1);
-        used(bot);
+        busy.set(key, busy.get(key)! - 1);
+        used(key);
       }
     },
   });
@@ -759,11 +855,14 @@ export default async function setup(fx: PluginApi) {
       "Calling it is how you ask: don't just write \"please sign in\". Your desktop and terminal tools wait until they hand it back, and then you hear.",
     inputSchema: { type: "object", properties: { reason: { type: "string", description: "What you need them to do, in one line" } }, required: ["reason"] },
     idempotent: true,
-    async execute(input: { reason?: unknown }, { bot }) {
+    async execute(input: { reason?: unknown }, { bot, session }) {
       const reason = typeof input?.reason === "string" && input.reason.trim() ? input.reason.trim().slice(0, 300) : "";
       if (!reason) return "Say what you need your owner to do, in reason.";
-      owner.set(bot, { reason });
-      return "Asked. Tell your owner in one line what you need, then end your turn. You'll hear when they hand the computer back.";
+      const { key, by } = await computerOf(bot, session);
+      owner.set(key, { reason, bot });
+      return by
+        ? "Asked. Tell the owner in one line what you need, then end your turn. When it's done, they'll tell you to go on."
+        : "Asked. Tell your owner in one line what you need, then end your turn. You'll hear when they hand the computer back.";
     },
   });
 
@@ -794,29 +893,30 @@ export default async function setup(fx: PluginApi) {
     });
     return { id: Id as string, stream };
   }
-  // The live views of each bot's computer, open now. A computer someone watches doesn't stop when idle, and when the
-  // last view closes, a take-over ends.
+  // The live views of each computer, open now. A computer someone watches doesn't stop when idle, and when the last
+  // view closes, a take-over ends.
   const views = new Map<string, number>();
-  function watching(bot: string, by: number) {
-    const now = (views.get(bot) ?? 0) + by;
-    views.set(bot, now);
-    busy.set(bot, (busy.get(bot) ?? 0) + by);
-    used(bot);
+  function watching(key: string, by: number) {
+    const now = (views.get(key) ?? 0) + by;
+    views.set(key, now);
+    busy.set(key, (busy.get(key) ?? 0) + by);
+    used(key);
     if (now <= 0) {
-      views.delete(bot);
-      if (owner.has(bot)) void handBack(bot);
+      views.delete(key);
+      if (owner.has(key)) void handBack(key);
     }
   }
   // A view of a bot's computer: it starts the computer, then carries the exec's streams to and from the page. A peek,
   // `?peek`, such as the small screen in a bot's panel, only looks at a computer that runs: it doesn't start one, keep
   // one from stopping when idle, or end a take-over when it closes.
   function view(path: string, connect: (name: string) => Promise<{ id: string; stream: import("node:net").Socket; tty: boolean }>, control?: (id: string, text: string) => void) {
-    fx.socket(path, async (page, request, { bot }) => {
+    fx.socket(path, async (page, request, { key }) => {
       let closed = false;
       page.onclose = () => void (closed = true);
-      if (!isBot.test(bot) || !(await fx.bots.get(bot).catch(() => null))) return page.close(1008, "No such bot.");
+      const computer = await known(key);
+      if (!computer) return page.close(1008, "No such computer.");
       const peek = new URL(request.url).searchParams.has("peek");
-      const watch = (by: number) => peek || watching(bot, by);
+      const watch = (by: number) => peek || watching(key, by);
       watch(1);
       let attached: Awaited<ReturnType<typeof connect>> | null = null;
       const leave = () => {
@@ -828,8 +928,8 @@ export default async function setup(fx: PluginApi) {
       };
       page.onclose = () => ((closed = true), leave());
       try {
-        if (peek && !(await inspect(nameOf(bot)))?.State?.Running) return page.close(1013, "The computer is stopped.");
-        attached = await connect(peek ? nameOf(bot) : await open(bot));
+        if (peek && !(await inspect(nameOf(key)))?.State?.Running) return page.close(1013, "The computer is stopped.");
+        attached = await connect(peek ? nameOf(key) : await open(computer));
       } catch (error) {
         page.close(1011, (error as Error).message.slice(0, 120));
         return watch(-1);
@@ -852,10 +952,10 @@ export default async function setup(fx: PluginApi) {
     });
   }
   // The desktop: VNC, through socat to Xvnc's socket. Nothing is published, and the firewall stays as it is.
-  view("/desktop/:bot", async (name) => ({ ...(await hijack(name, ["socat", "STDIO", "UNIX-CONNECT:/tmp/fxbot/vnc.sock"], false)), tty: false }));
+  view("/desktop/:key", async (name) => ({ ...(await hijack(name, ["socat", "STDIO", "UNIX-CONNECT:/tmp/fxbot/vnc.sock"], false)), tty: false }));
   // The terminal: a TTY attached to the tmux session `main`. A text message {"cols":n,"rows":n} resizes it.
   view(
-    "/terminal/:bot",
+    "/terminal/:key",
     async (name) => {
       await exec(name, ["sh", "-c", "tmux has-session -t main 2>/dev/null || tmux new-session -d -s main -x 160 -y 48"]);
       return { ...(await hijack(name, ["tmux", "attach", "-t", "main"], true)), tty: true };
@@ -879,7 +979,7 @@ export default async function setup(fx: PluginApi) {
       const podman = (version.Components ?? []).some((c: { Name: string }) => /podman/i.test(c.Name));
       engine = { ...engine, name: podman ? "podman" : "Docker", version: version.Version, state: (info.SecurityOptions ?? []).some((o: string) => o.includes("name=rootless")) ? "ready" : "rootful" };
       if (engine.state === "rootful") return fx.log("This engine runs as root. Run the computer's setup script.");
-      for (const { bot, running } of await computers()) if (running && !last.has(bot)) used(bot);
+      for (const { key, running } of await computers()) if (running && !last.has(key)) used(key);
       await forget();
     } catch (error) {
       engine.error = (error as Error).message;
@@ -898,18 +998,21 @@ export default async function setup(fx: PluginApi) {
     const made = await call("GET", `/images/${tag}/json`);
     answer.image = { tag, size: made.status === 200 ? JSON.parse(made.data.toString("utf8")).Size : null };
     const names = new Map((await fx.bots.list()).map((bot) => [bot.id, bot.name]));
+    for (const { api } of providers()) for (const c of (await api.computers().catch(() => null)) ?? []) names.set(c.key, String(c.name ?? c.key));
     const homes = new Map<string, number>();
     try {
       for (const v of (await json("GET", "/system/df", undefined, 30_000)).Volumes ?? []) homes.set(v.Name, v.UsageData?.Size);
     } catch {}
-    answer.computers = (await computers()).map(({ bot, running }) => ({
-      bot,
-      name: names.get(bot) ?? bot,
+    answer.computers = (await computers()).map(({ key, by, running }) => ({
+      key,
+      bot: by ? null : key,
+      by,
+      name: names.get(key) ?? key,
       running,
-      used: last.get(bot) ?? null,
-      home: homes.get(nameOf(bot)) ?? null,
-      owner: owner.has(bot) ? { reason: owner.get(bot)!.reason ?? null } : null,
-      views: views.get(bot) ?? 0,
+      used: last.get(key) ?? null,
+      home: homes.get(nameOf(key)) ?? null,
+      owner: owner.has(key) ? { reason: owner.get(key)!.reason ?? null } : null,
+      views: views.get(key) ?? 0,
     }));
     return answer;
   }
@@ -926,11 +1029,18 @@ export default async function setup(fx: PluginApi) {
   // Try again, after a setup that failed.
   fx.route("POST", "/setup", () => answer(async () => setUp(true)));
   fx.route("POST", "/rebuild", () => answer(async () => void image(true).catch(() => {})));
-  fx.route("POST", "/bots/:id/stop", (_, { id }) =>
+  // One computer, by its key: a bot's id, or a key a plugin that needs the computer lists. Another gets 404.
+  const one = (key: string, work: (computer: Computer & { name: string }) => Promise<unknown>) =>
     answer(async () => {
-      if (!isBot.test(id)) throw new Error("No such bot.");
-      last.delete(id);
-      await call("POST", `/containers/${nameOf(id)}/stop?t=5`, { timeout: 30_000 });
+      const computer = await known(key);
+      if (!computer) throw Object.assign(new Error("No such computer."), { status: 404 });
+      await work(computer);
+    });
+  fx.route("POST", "/computers/:key/stop", (_, { key }) =>
+    one(key, async () => {
+      last.delete(key);
+      marks.delete(key);
+      await call("POST", `/containers/${nameOf(key)}/stop?t=5`, { timeout: 30_000 });
     }),
   );
   fx.route("GET", "/shots/:id", (_, { id }) => {
@@ -938,23 +1048,38 @@ export default async function setup(fx: PluginApi) {
     return shot ? new Response(new Uint8Array(shot.bytes), { headers: { "content-type": shot.type, "cache-control": "max-age=86400" } }) : Response.json({ error: "That screenshot is gone." }, { status: 404 });
   });
   // One computer's state, without the engine's heavier status: for the Computer button and screen.
-  fx.route("GET", "/bots/:id/state", async (_, { id }) => {
-    if (!isBot.test(id) || engine.state !== "ready") return Response.json({ running: false, owner: null, views: 0, ready: engine.state === "ready" });
-    const info = await inspect(nameOf(id)).catch(() => null);
-    return Response.json({ ready: true, exists: Boolean(info), running: Boolean(info?.State?.Running), owner: owner.has(id) ? { reason: owner.get(id)!.reason ?? null } : null, views: views.get(id) ?? 0 });
+  fx.route("GET", "/computers/:key/state", async (_, { key }) => {
+    const computer = await known(key);
+    if (!computer || engine.state !== "ready") return Response.json({ name: computer?.name ?? null, shared: Boolean(computer?.by), running: false, owner: null, views: 0, ready: engine.state === "ready" });
+    const info = await inspect(nameOf(key)).catch(() => null);
+    const asked = owner.get(key);
+    const asker = asked?.bot ? ((await fx.bots.get(asked.bot).catch(() => null))?.name ?? null) : null;
+    return Response.json({
+      name: computer.name,
+      shared: Boolean(computer.by),
+      ready: true,
+      exists: Boolean(info),
+      running: Boolean(info?.State?.Running),
+      owner: asked ? { reason: asked.reason ?? null, bot: asker } : null,
+      views: views.get(key) ?? 0,
+    });
   });
-  fx.route("POST", "/bots/:id/start", (_, { id }) => answer(async () => (isBot.test(id) ? void (await open(id)) : Promise.reject(new Error("No such bot.")))));
-  // { on: true } gives the owner the mouse and keyboard, and pauses the bot's desktop and terminal tools; false hands back.
-  fx.route("POST", "/bots/:id/takeover", async (request, { id }) =>
-    answer(async () => {
-      if (!isBot.test(id)) throw new Error("No such bot.");
-      const { on } = (await request.json().catch(() => ({}))) as { on?: unknown };
-      if (on === true) owner.set(id, owner.get(id) ?? {});
-      else await handBack(id);
-    }),
-  );
-  fx.route("POST", "/bots/:id/reset", (_, { id }) => answer(async () => (isBot.test(id) ? remove(id) : Promise.reject(new Error("No such bot.")))));
-  fx.route("DELETE", "/computers", () => answer(async () => Promise.all((await computers()).map(({ bot }) => remove(bot)))));
+  // Where each bot last pointed, for the screen's arrows: from memory, with no call to the engine.
+  fx.route("GET", "/computers/:key/cursors", (_, { key }) => {
+    const [w, h] = screen().split("x").map(Number);
+    return Response.json({ screen: [w, h], marks: [...(marks.get(key) ?? [])].map(([bot, m]) => ({ bot, ...m })) });
+  });
+  fx.route("POST", "/computers/:key/start", (_, { key }) => one(key, async (computer) => void (await open(computer))));
+  // { on: true } gives the owner the mouse and keyboard, and pauses the bots' desktop and terminal tools; false hands back.
+  fx.route("POST", "/computers/:key/takeover", async (request, { key }) => {
+    const { on } = (await request.json().catch(() => ({}))) as { on?: unknown };
+    return one(key, async () => {
+      if (on === true) owner.set(key, owner.get(key) ?? {});
+      else await handBack(key);
+    });
+  });
+  fx.route("POST", "/computers/:key/reset", (_, { key }) => one(key, () => remove(key)));
+  fx.route("DELETE", "/computers", () => answer(async () => Promise.all((await computers()).map(({ key }) => remove(key)))));
 
   fx.on("settings", () => void check());
   // A plugin that needs the computer came, changed, or went: the image follows, in the background.

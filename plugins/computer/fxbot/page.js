@@ -13069,15 +13069,15 @@ function useStatus() {
 		act
 	};
 }
-function useComputer(bot, every) {
+function useComputer(key, every) {
 	const [state, setState] = (0, react.useState)(null);
-	const load = () => bot ? call(`bots/${bot}/state`).then(setState, () => {}) : Promise.resolve();
+	const load = () => key ? call(`computers/${key}/state`).then(setState, () => {}) : Promise.resolve();
 	(0, react.useEffect)(() => {
 		load();
-		if (!bot) return;
+		if (!key) return;
 		const timer = setInterval(() => document.visibilityState === "visible" && void load(), every);
 		return () => clearInterval(timer);
-	}, [bot, every]);
+	}, [key, every]);
 	return [state, load];
 }
 const size = (n) => n == null ? "" : n >= 1e9 ? `${(n / 1e9).toFixed(1)} GB` : n >= 1e6 ? `${Math.round(n / 1e6)} MB` : `${Math.ceil(n / 1e3)} kB`;
@@ -13089,8 +13089,127 @@ const Code = ({ children }) => /* @__PURE__ */ (0, react_jsx_runtime.jsx)("pre",
 	className: "overflow-x-auto rounded-md bg-muted px-3 py-2 font-mono text-xs whitespace-pre-wrap",
 	children
 });
-const screenOf = (bot) => `/computer/bots/${bot}`;
-const socketOf = (kind, bot) => `${location.protocol === "https:" ? "wss" : "ws"}://${location.host}/api/plugins/computer/${kind}/${bot}`;
+const screenOf = (key) => `/computer/computers/${key}`;
+const socketOf = (kind, key) => `${location.protocol === "https:" ? "wss" : "ws"}://${location.host}/api/plugins/computer/${kind}/${key}`;
+const colors = {
+	black: "#1f1f1f",
+	brown: "#9b6a3f",
+	red: "#e5484d",
+	orange: "#f06b2b",
+	amber: "#ec9a2e",
+	green: "#56bf73",
+	teal: "#4fb3a2",
+	blue: "#3b82f6",
+	purple: "#8b5cf6",
+	pink: "#e64ba0",
+	gray: "#9a9a9a"
+};
+const since = (at) => {
+	const s = Math.round((Date.now() - at) / 1e3);
+	return s < 60 ? `${Math.max(1, s)} s` : s < 3600 ? `${Math.round(s / 60)} min` : `${Math.round(s / 3600)} h`;
+};
+const pill = {
+	background: "rgba(20,20,20,.82)",
+	color: "#fff",
+	fontSize: 11,
+	lineHeight: "16px",
+	padding: "1px 6px",
+	borderRadius: 8,
+	whiteSpace: "nowrap"
+};
+function Cursors({ computer, hidden }) {
+	const box = (0, react.useRef)(null);
+	const [data, setData] = (0, react.useState)(null);
+	const [size, setSize] = (0, react.useState)(null);
+	const bots = (0, _fxbot_app.useBots)();
+	(0, react.useEffect)(() => {
+		if (hidden) return;
+		let stopped = false;
+		const read = () => document.visibilityState === "visible" && call(`computers/${computer}/cursors`).then((next) => !stopped && setData(next), () => {});
+		read();
+		const timer = setInterval(read, 1e3);
+		return () => (stopped = true, clearInterval(timer));
+	}, [computer, hidden]);
+	(0, react.useEffect)(() => {
+		const watch = new ResizeObserver(() => box.current && setSize([box.current.clientWidth, box.current.clientHeight]));
+		watch.observe(box.current);
+		return () => watch.disconnect();
+	}, []);
+	const marks = data?.marks ?? [];
+	const newest = Math.max(0, ...marks.map((m) => m.at));
+	const botOf = (id) => bots?.find((b) => b.id === id);
+	const [w, h] = data?.screen ?? [1, 1];
+	const scale = size ? Math.min(size[0] / w, size[1] / h) : 0;
+	return /* @__PURE__ */ (0, react_jsx_runtime.jsxs)("div", {
+		ref: box,
+		"aria-hidden": "true",
+		style: {
+			position: "absolute",
+			inset: 0,
+			pointerEvents: "none",
+			overflow: "hidden"
+		},
+		children: [size && marks.filter((m) => m.x !== void 0 && m.x !== null).map((m) => /* @__PURE__ */ (0, react_jsx_runtime.jsxs)("div", {
+			"data-bot": m.bot,
+			style: {
+				position: "absolute",
+				left: (size[0] - w * scale) / 2 + m.x * scale - 1,
+				top: (size[1] - h * scale) / 2 + m.y * scale - 1,
+				opacity: m.at === newest ? 1 : .45,
+				display: "flex",
+				gap: 2
+			},
+			children: [/* @__PURE__ */ (0, react_jsx_runtime.jsx)("svg", {
+				width: "18",
+				height: "18",
+				viewBox: "0 0 18 18",
+				style: {
+					display: "block",
+					flex: "none"
+				},
+				children: /* @__PURE__ */ (0, react_jsx_runtime.jsx)("path", {
+					d: "M1 1 L1 15 L5 11 L8 17 L10.5 16 L7.5 10 L13 10 Z",
+					fill: colors[botOf(m.bot)?.color] ?? "#3b82f6",
+					stroke: "#fff",
+					strokeWidth: "1.2",
+					strokeLinejoin: "round"
+				})
+			}), /* @__PURE__ */ (0, react_jsx_runtime.jsxs)("span", {
+				style: {
+					...pill,
+					marginTop: 12
+				},
+				children: [
+					botOf(m.bot)?.name ?? "A bot",
+					" · ",
+					m.what,
+					" · ",
+					since(m.at)
+				]
+			})]
+		}, m.bot)), /* @__PURE__ */ (0, react_jsx_runtime.jsx)("div", {
+			style: {
+				position: "absolute",
+				top: 6,
+				left: 6,
+				display: "flex",
+				gap: 4,
+				flexWrap: "wrap"
+			},
+			children: marks.filter((m) => m.x === void 0 || m.x === null).map((m) => /* @__PURE__ */ (0, react_jsx_runtime.jsxs)("span", {
+				style: {
+					...pill,
+					opacity: m.at === newest ? 1 : .6
+				},
+				children: [
+					botOf(m.bot)?.name ?? "A bot",
+					" · ",
+					m.what
+				]
+			}, m.bot))
+		})]
+	});
+}
 let novnc;
 const load = (url) => import(url);
 const loadRFB = () => novnc ??= load(new URL("/api/plugins/computer/novnc.js", location.href).href).then((module) => module.default);
@@ -13112,7 +13231,7 @@ const cover = {
 	color: "#ccc",
 	fontSize: 14
 };
-function Desktop({ bot, control, hidden, peek, onGone }) {
+function Desktop({ computer, control, hidden, peek, onGone, children }) {
 	const box = (0, react.useRef)(null);
 	const rfb = (0, react.useRef)(null);
 	const [problem, setProblem] = (0, react.useState)("Connecting…");
@@ -13122,7 +13241,7 @@ function Desktop({ bot, control, hidden, peek, onGone }) {
 		setProblem("Connecting…");
 		loadRFB().then((RFB) => {
 			if (gone) return;
-			const view = new RFB(box.current, socketOf("desktop", bot) + (peek ? "?peek" : ""));
+			const view = new RFB(box.current, socketOf("desktop", computer) + (peek ? "?peek" : ""));
 			view.viewOnly = !control;
 			view.scaleViewport = true;
 			view.resizeSession = false;
@@ -13136,7 +13255,7 @@ function Desktop({ bot, control, hidden, peek, onGone }) {
 			rfb.current?.disconnect();
 			rfb.current = null;
 		};
-	}, [bot, attempt]);
+	}, [computer, attempt]);
 	(0, react.useEffect)(() => {
 		if (rfb.current) rfb.current.viewOnly = !control;
 	}, [control]);
@@ -13149,24 +13268,28 @@ function Desktop({ bot, control, hidden, peek, onGone }) {
 			display: hidden ? "none" : "block"
 		},
 		"aria-label": peek ? "The computer's screen" : "The computer's desktop",
-		children: [/* @__PURE__ */ (0, react_jsx_runtime.jsx)("div", {
-			ref: box,
-			style: {
-				position: "absolute",
-				inset: 0
-			}
-		}), problem && !peek && /* @__PURE__ */ (0, react_jsx_runtime.jsxs)("div", {
-			style: cover,
-			children: [/* @__PURE__ */ (0, react_jsx_runtime.jsx)("span", { children: problem }), problem !== "Connecting…" && /* @__PURE__ */ (0, react_jsx_runtime.jsx)(_fxbot_app.ui.Button, {
-				size: "sm",
-				variant: "secondary",
-				onClick: () => setAttempt((n) => n + 1),
-				children: "Connect again"
-			})]
-		})]
+		children: [
+			/* @__PURE__ */ (0, react_jsx_runtime.jsx)("div", {
+				ref: box,
+				style: {
+					position: "absolute",
+					inset: 0
+				}
+			}),
+			!problem && children,
+			problem && !peek && /* @__PURE__ */ (0, react_jsx_runtime.jsxs)("div", {
+				style: cover,
+				children: [/* @__PURE__ */ (0, react_jsx_runtime.jsx)("span", { children: problem }), problem !== "Connecting…" && /* @__PURE__ */ (0, react_jsx_runtime.jsx)(_fxbot_app.ui.Button, {
+					size: "sm",
+					variant: "secondary",
+					onClick: () => setAttempt((n) => n + 1),
+					children: "Connect again"
+				})]
+			})
+		]
 	});
 }
-function TerminalView({ bot, hidden }) {
+function TerminalView({ computer, hidden }) {
 	const box = (0, react.useRef)(null);
 	const [problem, setProblem] = (0, react.useState)("");
 	(0, react.useEffect)(() => {
@@ -13179,7 +13302,7 @@ function TerminalView({ bot, hidden }) {
 		const fit = new import_addon_fit.FitAddon();
 		term.loadAddon(fit);
 		term.open(box.current);
-		const socket = new WebSocket(socketOf("terminal", bot));
+		const socket = new WebSocket(socketOf("terminal", computer));
 		socket.binaryType = "arraybuffer";
 		const resize = () => {
 			if (!box.current?.offsetWidth) return;
@@ -13201,7 +13324,7 @@ function TerminalView({ bot, hidden }) {
 			socket.close();
 			term.dispose();
 		};
-	}, [bot]);
+	}, [computer]);
 	return /* @__PURE__ */ (0, react_jsx_runtime.jsxs)("div", {
 		style: {
 			...pane,
@@ -13225,13 +13348,15 @@ function TerminalView({ bot, hidden }) {
 }
 function ComputerScreen({ params }) {
 	const { Button, Header } = _fxbot_app.ui;
-	const bot = (0, _fxbot_app.useBots)()?.find((b) => b.id === params.id);
-	const [state, reload] = useComputer(params.id, 3e3);
+	const key = params.key ?? params.id;
+	const bot = (0, _fxbot_app.useBots)()?.find((b) => b.id === key);
+	const [state, reload] = useComputer(key, 3e3);
 	const [tab, setTab] = (0, react.useState)("desktop");
 	const [error, setError] = (0, react.useState)("");
-	const act = (path, body) => call(`bots/${params.id}/${path}`, "POST", body).then(() => reload(), (e) => setError(e.message));
+	const act = (path, body) => call(`computers/${key}/${path}`, "POST", body).then(() => reload(), (e) => setError(e.message));
 	const owner = state?.owner;
-	const name = bot?.name ?? "This bot";
+	const name = state?.name ?? bot?.name ?? "This bot";
+	const asker = owner?.bot ?? name;
 	return /* @__PURE__ */ (0, react_jsx_runtime.jsxs)("div", {
 		style: {
 			display: "flex",
@@ -13257,23 +13382,16 @@ function ComputerScreen({ params }) {
 				padding: "0 12px 12px"
 			},
 			children: [
-				owner?.reason && /* @__PURE__ */ (0, react_jsx_runtime.jsxs)("p", {
+				owner?.reason && /* @__PURE__ */ (0, react_jsx_runtime.jsx)("p", {
 					className: "rounded-md border px-3 py-2 text-sm",
-					children: [
-						name,
-						" asked you: ",
-						owner.reason,
-						". Hand it back when you're done, and ",
-						name,
-						" carries on."
-					]
+					children: state?.shared ? `${asker} asked you: ${owner.reason}. Hand it back when you're done, then tell ${asker} to go on.` : `${name} asked you: ${owner.reason}. Hand it back when you're done, and ${name} carries on.`
 				}),
 				owner && !owner.reason && /* @__PURE__ */ (0, react_jsx_runtime.jsxs)("p", {
 					className: "text-sm text-muted-foreground",
 					children: [
 						"You have the mouse and keyboard. ",
-						name,
-						"'s desktop and terminal tools wait until you hand back."
+						state?.shared ? "The bots'" : `${name}'s`,
+						" desktop and terminal tools wait until you hand back."
 					]
 				}),
 				state && !state.ready && /* @__PURE__ */ (0, react_jsx_runtime.jsx)("p", {
@@ -13305,12 +13423,16 @@ function ComputerScreen({ params }) {
 						}, key))
 					}),
 					/* @__PURE__ */ (0, react_jsx_runtime.jsx)(Desktop, {
-						bot: params.id,
+						computer: key,
 						control: Boolean(owner),
-						hidden: tab !== "desktop"
+						hidden: tab !== "desktop",
+						children: /* @__PURE__ */ (0, react_jsx_runtime.jsx)(Cursors, {
+							computer: key,
+							hidden: tab !== "desktop"
+						})
 					}),
 					/* @__PURE__ */ (0, react_jsx_runtime.jsx)(TerminalView, {
-						bot: params.id,
+						computer: key,
 						hidden: tab !== "terminal"
 					})
 				] }),
@@ -13441,9 +13563,12 @@ function SettingsSection() {
 				children: status.computers.map((c) => /* @__PURE__ */ (0, react_jsx_runtime.jsxs)("li", {
 					className: "flex items-center gap-3 px-3 py-2",
 					children: [
-						/* @__PURE__ */ (0, react_jsx_runtime.jsx)("span", {
+						/* @__PURE__ */ (0, react_jsx_runtime.jsxs)("span", {
 							className: "min-w-0 flex-1 truncate font-medium",
-							children: c.name
+							children: [c.name, c.by && /* @__PURE__ */ (0, react_jsx_runtime.jsxs)("span", {
+								className: "font-normal text-muted-foreground",
+								children: [" · ", c.by]
+							})]
 						}),
 						/* @__PURE__ */ (0, react_jsx_runtime.jsx)("span", {
 							className: "text-muted-foreground",
@@ -13452,11 +13577,11 @@ function SettingsSection() {
 						/* @__PURE__ */ (0, react_jsx_runtime.jsx)(Button, {
 							size: "sm",
 							variant: "ghost",
-							onClick: () => (0, _fxbot_app.go)(screenOf(c.bot)),
+							onClick: () => (0, _fxbot_app.go)(screenOf(c.key)),
 							children: "Open"
 						})
 					]
-				}, c.bot))
+				}, c.key))
 			}),
 			ready && /* @__PURE__ */ (0, react_jsx_runtime.jsxs)("div", {
 				className: "flex flex-wrap gap-2",
@@ -13470,7 +13595,7 @@ function SettingsSection() {
 					size: "sm",
 					variant: "outline",
 					disabled: !status.computers.length,
-					onClick: () => confirm("Delete every bot's computer, with its home and what it installed?") && act("computers", "DELETE"),
+					onClick: () => confirm("Delete every computer, with its home and what it installed?") && act("computers", "DELETE"),
 					children: "Delete all computers"
 				})]
 			}),
@@ -13514,13 +13639,13 @@ function BotSection({ bot }) {
 					size: "sm",
 					variant: "outline",
 					disabled: !mine.running,
-					onClick: () => act(`bots/${bot.id}/stop`),
+					onClick: () => act(`computers/${bot.id}/stop`),
 					children: "Stop"
 				}), /* @__PURE__ */ (0, react_jsx_runtime.jsx)(Button, {
 					type: "button",
 					size: "sm",
 					variant: "outline",
-					onClick: () => confirm(`Reset ${bot.name}'s computer? Its home and what it installed are deleted.`) && act(`bots/${bot.id}/reset`),
+					onClick: () => confirm(`Reset ${bot.name}'s computer? Its home and what it installed are deleted.`) && act(`computers/${bot.id}/reset`),
 					children: "Reset"
 				})] })]
 			}),
@@ -13671,7 +13796,7 @@ function BotScreen({ bot }) {
 	const start = () => {
 		setStarting(true);
 		setError("");
-		call(`bots/${bot.id}/start`, "POST").then(() => reload(), (e) => setError(e.message)).finally(() => setStarting(false));
+		call(`computers/${bot.id}/start`, "POST").then(() => reload(), (e) => setError(e.message)).finally(() => setStarting(false));
 	};
 	const asking = state.owner?.reason;
 	const says = state.running ? state.owner ? asking ? "Needs you" : "Yours now" : "Running" : starting ? "Starting…" : "Idle";
@@ -13695,7 +13820,7 @@ function BotScreen({ bot }) {
 					background: "#1e1e1e"
 				},
 				children: state.running ? /* @__PURE__ */ (0, react_jsx_runtime.jsxs)(react_jsx_runtime.Fragment, { children: [/* @__PURE__ */ (0, react_jsx_runtime.jsx)(Desktop, {
-					bot: bot.id,
+					computer: bot.id,
 					peek: true,
 					onGone: reload
 				}), /* @__PURE__ */ (0, react_jsx_runtime.jsx)("button", {
@@ -13745,6 +13870,7 @@ function BotScreen({ bot }) {
 	});
 }
 function setup(app) {
+	app.route("/computers/:key", ComputerScreen);
 	app.route("/bots/:id", ComputerScreen);
 	app.botPanel(BotScreen);
 	app.settings(SettingsSection);
