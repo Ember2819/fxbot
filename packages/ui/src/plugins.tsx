@@ -28,7 +28,8 @@ import { Reply } from "./steps.tsx";
 // boundary. With no plugins, nothing here fetches or runs any code.
 
 export type ToolCall = Extract<Part, { type: "tool" }>;
-export type ComposerProps = { bot: Profile; setDraft: (text: string) => void; attach: (files: File[]) => void };
+// setDraft takes the new text, or a function from the draft to it, as React's setters do.
+export type ComposerProps = { bot: Profile; setDraft: (text: string | ((draft: string) => string)) => void; attach: (files: File[]) => void };
 type Nav = { label: string; path: string; icon?: ComponentType<{ className?: string }> };
 type Places = {
   routes: { path: string; parts: string[]; Component: ComponentType<{ params: Record<string, string> }> }[];

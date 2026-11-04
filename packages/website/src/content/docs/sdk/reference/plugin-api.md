@@ -183,7 +183,7 @@ A plugin names the plugins it needs, and what it asks of each, under `needs`:
 | `app.route(path, Component)` | The screen at `/<plugin><path>`. `path` may have `:name` parts, which `Component` gets as `params`. |
 | `app.sidebar(Component)` | A group in the sidebar, after the bots |
 | `app.nav({ label, path, icon? })` | A button in the sidebar's footer row, to `/<plugin><path>`. `icon` is a component; without one, the button shows the label's first letter. |
-| `app.composer(Component)` | A control beside the attach button. It gets `bot`, `setDraft(text)`, and `attach(files)`. |
+| `app.composer(Component)` | A control beside the attach button. It gets `bot`, `setDraft(text)`, and `attach(files)`. `setDraft` also takes a function from the draft to the new text. |
 | `app.toolView(tool, Component)` | How a call of `<plugin>_<tool>` shows in a reply. It gets `call`: `name`, `input`, `output`, `error`, and `done`. |
 | `app.settings(Component)` | A section in Settings |
 | `app.botSettings(Component)` | A section in a bot's settings. It gets `bot`. |
