@@ -2,7 +2,7 @@
 
 Adding the computer plugin is all an owner does. Today, Settings then shows a command to run on the machine as root, which makes the engine's user, its rootless podman or docker, and its firewall. With this phase, the machine does that by itself when the plugin is added, and Settings says so while it works.
 
-Status: planned on 2026-11-04, at the owner's word, for 0.4.0. The owner chose that the setup starts on **Add**, not on a button.
+Status: built on 2026-11-04, for 0.4.0, at the owner's word; the owner chose that the setup starts on **Add**, not on a button. Checked on this machine in a release install made for the check, beside the owner's real one, and on the owner's own dev install.
 
 ## Core or plugin
 
@@ -44,12 +44,12 @@ Both, kept small:
 
 ## Checklist
 
-- [ ] In a check release install (its own `COMPOSE_PROJECT_NAME`, `FXBOT_PORT`, `FXBOT_ROOT`, and `FXBOT_COMPUTER_NAME`), adding the computer sets up the engine with no command: the request, `fxbot apply`, the script from the release's files, the override, the restart, and a computer that runs.
-- [ ] Settings shows the setup while it works, and a failure's reason with **Try again**, which asks again.
-- [ ] A request for another job, or a body that isn't `on` or `off`, does nothing.
+- [x] In a check release install (its own `COMPOSE_PROJECT_NAME`, `FXBOT_PORT`, and `FXBOT_ROOT`, on an image of 0.4.0 built here, with the release's files served from this machine), adding the computer sets up the engine with no command: the request, `fxbot apply` run by hand in systemd's place, the script from the release's files, the override, the restart in 5 s, and a computer that runs. It shared the `fxbot-computer` engine the owner's dev install had set up, and each listed only its own computers.
+- [ ] Settings shows the setup while it works, and a failure's reason with **Try again**, which asks again. Half done: the status said `asked`, then `done`, and a failed download wrote `failed` with its reason. The page's **Try again** wasn't clicked.
+- [x] A request for another job, or a body that isn't `on` or `off`, does nothing. So does `off`, which only the owner runs.
 - [ ] A checkout run as root sets up by itself; one run as another user shows the command. Half done: the owner's dev install, a checkout run as root with the plugin from `FXBOT_PLUGIN_DIRS`, set itself up when the API restarted onto this change, and a bot's computer started on the new engine.
-- [ ] `sudo fxbot computer off` takes it all away, and the release runs on without the override.
-- [ ] Typecheck, build, build-site, `bash -n`, and `git diff --check` pass.
+- [ ] `sudo fxbot computer off` takes it all away, and the release runs on without the override. Not run: the check shared the owner's engine, which `off` would have removed. It runs the setup script's `--remove`, which the v2 checks ran.
+- [x] Typecheck, build, build-site, `bash -n`, and `git diff --check` pass.
 
 ## Open questions
 

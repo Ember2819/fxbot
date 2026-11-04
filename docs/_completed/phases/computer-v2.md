@@ -483,7 +483,7 @@ Checks use v1's harness: a disposable Postgres, the mock model making scripted t
 - [x] A computer someone watches doesn't stop when idle; one nobody watches does: with a 1-minute idle, watched for 100 s it ran, and closed it stopped 85 s later.
 - [x] At a phone's width, the desktop scales to fit and the terminal fits.
 - [x] The tool view shows a `computer_desktop` call's screenshot in the reply, when its line is opened, as every plugin's tool view shows.
-- [x] The screen works through `tailscale serve`: on the owner's dev install, once [the computer on Add](../../phases/computer-on-add.md) had set it up, a bot's desktop drew in 0.6 s, and its terminal showed `main`.
+- [x] The screen works through `tailscale serve`: on the owner's dev install, once [the computer on Add](computer-on-add.md) had set it up, a bot's desktop drew in 0.6 s, and its terminal showed `main`.
 
 **M5. One plugin**
 - [x] `plugins/browser` and its list entry are gone; the computer's page lists its three skills; the changelog says the browser is part of the computer.
