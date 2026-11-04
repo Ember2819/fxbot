@@ -17,6 +17,12 @@
       "description": "/fresh starts a bot's chat over toward what you write next, from a summary of it that keeps what matters.",
       "repo": "iammrduncan/fxbot",
       "path": "plugins/fresh"
+    },
+    {
+      "name": "chat-rooms-computer",
+      "description": "A computer for a chat room: its bots share one machine, taking turns, and you see where each last pointed.",
+      "repo": "iammrduncan/fxbot",
+      "path": "plugins/chat-rooms-computer"
     }
   ]
 }
