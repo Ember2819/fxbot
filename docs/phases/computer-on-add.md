@@ -47,7 +47,7 @@ Both, kept small:
 - [ ] In a check release install (its own `COMPOSE_PROJECT_NAME`, `FXBOT_PORT`, `FXBOT_ROOT`, and `FXBOT_COMPUTER_NAME`), adding the computer sets up the engine with no command: the request, `fxbot apply`, the script from the release's files, the override, the restart, and a computer that runs.
 - [ ] Settings shows the setup while it works, and a failure's reason with **Try again**, which asks again.
 - [ ] A request for another job, or a body that isn't `on` or `off`, does nothing.
-- [ ] A checkout run as root sets up by itself; one run as another user shows the command.
+- [ ] A checkout run as root sets up by itself; one run as another user shows the command. Half done: the owner's dev install, a checkout run as root with the plugin from `FXBOT_PLUGIN_DIRS`, set itself up when the API restarted onto this change, and a bot's computer started on the new engine.
 - [ ] `sudo fxbot computer off` takes it all away, and the release runs on without the override.
 - [ ] Typecheck, build, build-site, `bash -n`, and `git diff --check` pass.
 
