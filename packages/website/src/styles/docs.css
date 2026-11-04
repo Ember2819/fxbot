@@ -200,3 +200,72 @@ h1#_top,
   --c2: var(--d2);
   --c3: var(--d3);
 }
+
+/* The plugin directory (src/pages/plugins/): its search box, its cards, and a page's head. */
+.fxbot-plugin-search {
+  width: 100%;
+  margin-top: 1rem;
+  padding: 0.5rem 0.75rem;
+  font: inherit;
+  color: var(--sl-color-white);
+  background: transparent;
+  border: 1px solid var(--sl-color-hairline-light);
+  border-radius: 0.5rem;
+}
+.fxbot-plugins {
+  display: grid;
+  gap: 0.75rem;
+  margin: 1rem 0 0;
+  padding: 0;
+  list-style: none;
+}
+@media (min-width: 40rem) {
+  .fxbot-plugins {
+    grid-template-columns: 1fr 1fr;
+  }
+}
+.fxbot-plugins li[hidden] {
+  display: none;
+}
+.fxbot-plugins a {
+  display: flex;
+  gap: 0.75rem;
+  height: 100%;
+  padding: 1rem;
+  color: inherit;
+  text-decoration: none;
+  border: 1px solid var(--sl-color-hairline);
+  border-radius: 0.75rem;
+}
+.fxbot-plugins a:hover {
+  border-color: var(--sl-color-gray-4);
+}
+.fxbot-plugins a > span {
+  display: grid;
+  gap: 0.125rem;
+  min-width: 0;
+}
+.fxbot-plugin-name {
+  font-weight: 600;
+  color: var(--sl-color-white);
+}
+.fxbot-plugin-meta {
+  font-size: 0.8125rem;
+  color: var(--sl-color-gray-3);
+}
+.fxbot-plugin-about {
+  display: -webkit-box;
+  overflow: hidden;
+  font-size: 0.875rem;
+  color: var(--sl-color-gray-2);
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+}
+.fxbot-plugin-head {
+  display: flex;
+  gap: 1rem;
+  align-items: center;
+}
+.fxbot-plugin-head p {
+  margin: 0;
+}

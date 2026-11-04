@@ -38,7 +38,10 @@ function Header() {
           <a href={href("/sdk/")} className={link}>
             SDK
           </a>
-          {/* Below 420px wide, the footer's link is the one that fits. */}
+          {/* Below 420px wide, the footer's links are the ones that fit. */}
+          <a href={href("/plugins/")} className={`${link} max-[420px]:hidden`}>
+            Plugins
+          </a>
           <a href={href(changelogPath)} className={`${link} max-[420px]:hidden`}>
             Changelog
           </a>
@@ -77,6 +80,9 @@ function Footer() {
           </a>
           <a className="hover:text-foreground" href={href("/sdk/")}>
             SDK
+          </a>
+          <a className="hover:text-foreground" href={href("/plugins/")}>
+            Plugins
           </a>
           <a className="hover:text-foreground" href={href(changelogPath)}>
             Changelog

@@ -1,17 +1,17 @@
 # The plugin directory on fxbot.sh
 
-fxbot.sh gets a **Plugins** page: fxbot's vetted plugins, from its three lists, with a search box and a card each, drawn with its [icon](../_completed/phases/plugin-icons.md). Each plugin gets a page that says what it carries and how to add it. It's the place to look before installing, and the address to link to.
+fxbot.sh gets a **Plugins** page: fxbot's vetted plugins, from its three lists, with a search box and a card each, drawn with its [icon](plugin-icons.md). Each plugin gets a page that says what it carries and how to add it. It's the place to look before installing, and the address to link to.
 
-Status: planned on 2026-11-04, for 0.5.0, at the owner's word; researched against the research directive's references. The owner's decisions:
+Status: built on 2026-11-04, for 0.5.0, as planned the same day at the owner's word, and researched against the research directive's references. Where the build differs from the plan, [What the build changed](#what-the-build-changed) says so.
 - "a Plugins page on fxbot.sh: search fxbot's vetted plugins (from plugins-registry.json, plus its MCP and skill lists), a card per plugin with its generated icon, and a page each saying what it carries and how to add it"
 - The owner chose this over making the Plugin API reference easier to search.
-- It comes after [plugin icons](../_completed/phases/plugin-icons.md), whose site copy (its M4) it draws with.
+- It comes after [plugin icons](plugin-icons.md), whose site copy (its M4) it draws with.
 
 ## 0. Core or plugin
 
 **Neither: the website.** It changes nothing in the app, the SDK, or the server.
 - It reads only what the repository already holds: fxbot's three lists, and the folders of fxbot's own plugins.
-- [Conventions](../../CONVENTIONS.md#core-or-plugin) put finding and vetting plugins in the core. The directory shows what the core already vets, and adds no way to install.
+- [Conventions](../../../CONVENTIONS.md#core-or-plugin) put finding and vetting plugins in the core. The directory shows what the core already vets, and adds no way to install.
 
 ## 1. Research
 
@@ -210,7 +210,7 @@ A `StarlightPage` with `frontmatter={{ title: "Plugins", description, template: 
 | `src/content.config.ts`, `astro.config.mjs` | `pageActions`; the topic; the validator | about 6 |
 | `SiteTitle.astro`, `layout.tsx`, `home.tsx` | The links | about 9 |
 | Add a plugin, `CHANGELOG.md` | A line each | about 3 |
-| `src/plugin-icon.ts`, `src/components/PluginIcon.astro` | From [plugin icons](../_completed/phases/plugin-icons.md) | counted there |
+| `src/plugin-icon.ts`, `src/components/PluginIcon.astro` | From [plugin icons](plugin-icons.md) | counted there |
 
 Size: about 260 lines. Only `/plugins/` gains a script, about 0.5 KB. Other pages gain a header link, and the app, the SDK, and the server don't change.
 
@@ -225,48 +225,55 @@ Size: about 260 lines. Only `/plugins/` gains a script, about 0.5 KB. Other page
 
 ## 4. Checklist
 
-The bound: about 260 lines, as above. Past 350, stop and say why. What's out of scope is under [Not in this phase](#not-in-this-phase). It needs [plugin icons](../_completed/phases/plugin-icons.md) through its M4, the site's copy. The site builds into `out/`; nothing here starts the app.
+The bound: about 260 lines, as above. Past 350, stop and say why. What's out of scope is under [Not in this phase](#not-in-this-phase). It needs [plugin icons](plugin-icons.md) through its M4, the site's copy. The site builds into `out/`; nothing here starts the app.
 
 **M1. The data**
-- [ ] `src/plugins.ts` gives 7 entries, in this order: computer, chat-rooms, alphaXiv, Keiro, show-me, frontend-design, grilling.
-- [ ] Each entry's icon matches plugin icons' table: the computer's shape starts at `#eb728a`, chat rooms' at `#e59126`, and so on, in light mode.
-- [ ] Two list entries with one slug stop `npm run build-site` with a message that names the slug. Try it with a copy of a list entry, then undo it.
+- [x] `src/plugins.ts` gives 7 entries, in this order: computer, chat-rooms, alphaXiv, Keiro, show-me, frontend-design, grilling.
+- [x] Each entry's icon matches plugin icons' table: the computer's shape starts at `#eb728a`, chat rooms' at `#e59126`, and so on, in light mode.
+- [x] Two list entries with one slug stop `npm run build-site` with a message that names the slug. Try it with a copy of a list entry, then undo it.
 
 **M2. `/plugins/`**
-- [ ] `npm run build-site` writes `out/plugins/index.html`, and `ls out/plugins/*/index.html` lists 7 pages.
-- [ ] In `out/plugins/index.html`, each card's `svg` has the table's `data-color` and `data-shape`.
-- [ ] In a browser, typing `comp` leaves the computer, and `skill` leaves 5: the three skills, and the two packages that carry skills. `zzz` shows "No plugin matches."
-- [ ] With scripts off, all 7 cards show, and the search box doesn't.
-- [ ] At 375 px, the cards are one column, the box fits, and the page doesn't scroll sideways.
+- [x] `npm run build-site` writes `out/plugins/index.html`, and `ls out/plugins/*/index.html` lists 7 pages.
+- [x] In `out/plugins/index.html`, each card's `svg` draws the table's icon: Bloom's drawing has no `data-color` or `data-shape`, so the check reads each card's `--l2`, its shape's first color, such as `#eb728a` for the computer.
+- [x] In a browser, typing `comp` leaves the computer, and `skill` leaves 5: the three skills, and the two packages that carry skills. `zzz` shows "No plugin matches."
+- [x] With scripts off, all 7 cards show, and the search box doesn't.
+- [x] At 375 px, the cards are one column, the box fits, and the page doesn't scroll sideways.
 
 **M3. A page each**
-- [ ] The computer's page shows:
+- [x] The computer's page shows:
   - its code, `fxbot/server.ts` and `fxbot/page.js`
   - its 3 skills, with their descriptions
   - its 5 settings
   - How to add it
   - its README, without a second `computer` title
-- [ ] Keiro's page shows its address and "Needs a key: Your Keiro API key, from keirolabs.cloud".
-- [ ] show-me's page links to `https://skills.sh/humanlayer/skills/show-me` and `https://github.com/humanlayer/skills`.
-- [ ] `grep -c "copy-markdown" out/plugins/computer/index.html` prints 0, and no page under `out/plugins/` links to a `.md` file.
-- [ ] Starlight's search, in a browser, finds chat rooms' page for "rooms".
-- [ ] In light and dark, each page's head shows its icon, and the README's tables and code read as the docs' do.
+- [x] Keiro's page shows its address and "Needs a key: Your Keiro API key, from keirolabs.cloud".
+- [x] show-me's page links to `https://skills.sh/humanlayer/skills/show-me` and `https://github.com/humanlayer/skills`.
+- [x] No page under `out/plugins/` has a page-action button, and none links to a `.md` file. `grep -c "copy-markdown"` prints 1 rather than 0, as on every page: Starlight inlines the plugin's script on each, whether its button shows or not.
+- [x] Starlight's search, in a browser, finds chat rooms' page for "rooms".
+- [x] In light and dark, each page's head shows its icon, and the README's tables and code read as the docs' do.
 
 **M4. Into the directory**
-- [ ] The docs' header and the home page's header and footer link to **Plugins**. On `/plugins/` and its pages, the docs' header marks it current.
-- [ ] At 375 px, the home page's header fits on one line. **Plugins** is in its footer, and in the docs' menu on a phone.
-- [ ] The home page's Plugins feature links to `/plugins/`.
-- [ ] Add a plugin links to the directory, and `npm run build-site` passes its link checks.
+- [x] The docs' header and the home page's header and footer link to **Plugins**. On `/plugins/` and its pages, the docs' header marks it current.
+- [x] At 375 px, the home page's header fits on one line. **Plugins** is in its footer, and in the docs' menu on a phone.
+- [x] The home page's Plugins feature links to `/plugins/`.
+- [x] Add a plugin links to the directory, and `npm run build-site` passes its link checks.
 
 **M5. Docs and checks**
-- [ ] `CHANGELOG.md` has, under `## Unreleased`, a line for the directory at fxbot.sh/plugins/.
-- [ ] `npm run typecheck`, `npm run build`, and `npm run build-site` pass.
-- [ ] `git diff --check` passes, and the new files have no trailing whitespace.
-- [ ] One commit on `release/0.5.0`, not pushed.
+- [x] `CHANGELOG.md` has, under `## Unreleased`, a line for the directory at fxbot.sh/plugins/.
+- [x] `npm run typecheck`, `npm run build`, and `npm run build-site` pass.
+- [x] `git diff --check` passes, and the new files have no trailing whitespace.
+- [x] One commit on `release/0.5.0`, not pushed.
 
 **The human checks:**
 - Read every page's How to add it against a real install: search each name in **Browse**, with unvetted plugins off, and it's there, as the page says.
 - Look at `/plugins/` and two pages in light and dark, on a phone and a desktop.
+
+## What the build changed
+
+- **The cards' icon check** reads each card's colors, since [plugin icons](plugin-icons.md) became Bloom, a drawing with no shape or color names.
+- **The page-action check** counts buttons: Starlight puts the page actions' script on every page, so the word is in each page's HTML.
+- **Size:** `src/plugins.ts` is 112 lines, the two pages 51 and 123, the styles 70, and the links and config about 20: about 375, past the bound of 350. The markup is one element to a line, as in the site's other Astro files, and the styles cover the cards, the box, and a page's head; nothing past the plan was added.
+- **Checks** ran on the built site, served from `out/` on a port of its own, with Playwright at 1280×900 and 375×667, light and dark, and with scripts off. A copy of show-me with another source stopped the build with "Two plugins on fxbot's lists want /plugins/show-me/.", and the list was put back.
 
 ## 5. Open questions
 

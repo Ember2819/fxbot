@@ -1,0 +1,51 @@
+---
+// The plugin directory: fxbot's vetted plugins, a card each, with a search box (docs/phases/plugin-directory.md).
+import StarlightPage from "@astrojs/starlight/components/StarlightPage.astro";
+import PluginIcon from "../../components/PluginIcon.astro";
+import { listed } from "../../plugins.ts";
+
+const base = import.meta.env.BASE_URL;
+const description = "The plugins fxbot vets: code, MCP servers, and skills to add to your fxbot.";
+---
+
+<StarlightPage frontmatter={{ title: "Plugins", description, template: "splash", pageActions: false }}>
+  <p>
+    These are the plugins fxbot vets. <strong>Browse</strong>, in fxbot's <strong>Plugins</strong>, shows them while unvetted plugins are off, and each costs nothing until it's added.
+  </p>
+  <input type="search" id="plugin-search" class="fxbot-plugin-search" placeholder="Search plugins" aria-label="Search plugins" autocomplete="off" hidden />
+  <ul class="fxbot-plugins not-content">
+    {
+      listed.map((plugin) => (
+        <li data-search={[plugin.name, plugin.creator, plugin.description, plugin.carries].join(" ").toLowerCase()}>
+          <a href={`${base}plugins/${plugin.slug}/`}>
+            <PluginIcon iconKey={plugin.iconKey} size={40} />
+            <span>
+              <span class="fxbot-plugin-name">{plugin.name}</span>
+              <span class="fxbot-plugin-meta">
+                {plugin.creator} · {plugin.carries}
+              </span>
+              <span class="fxbot-plugin-about">{plugin.description}</span>
+            </span>
+          </a>
+        </li>
+      ))
+    }
+  </ul>
+  <p id="plugin-none" role="status" hidden>No plugin matches.</p>
+  <p>
+    To add one from anywhere else, see <a href={`${base}docs/how-to/add-a-plugin/`}>Add a plugin</a>. To make one, see <a href={`${base}sdk/how-to/write-a-plugin/`}>Write a plugin</a>.
+  </p>
+</StarlightPage>
+
+<script>
+  // A card shows when every word typed is in its name, creator, description, or what it carries.
+  const box = document.getElementById("plugin-search") as HTMLInputElement;
+  const none = document.getElementById("plugin-none")!;
+  const cards = [...document.querySelectorAll<HTMLElement>(".fxbot-plugins li")];
+  box.hidden = false;
+  box.addEventListener("input", () => {
+    const words = box.value.toLowerCase().split(/\s+/).filter(Boolean);
+    for (const card of cards) card.hidden = !words.every((word) => card.dataset.search!.includes(word));
+    none.hidden = cards.some((card) => !card.hidden);
+  });
+</script>

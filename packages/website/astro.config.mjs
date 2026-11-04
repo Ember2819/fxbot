@@ -105,12 +105,12 @@ export default defineConfig({
           topics.map((topic) => ({
             label: topic.label,
             link: `/${topic.id}/`,
-            icon: topic.id === "docs" ? "open-book" : "puzzle",
+            icon: topic.id === "docs" ? "open-book" : "laptop",
             items: [
               { label: "Overview", slug: topic.id },
               ...topic.groups.map((group) => ({ label: group.title, items: group.pages.map((page) => ({ label: page.label, slug: `${topic.id}/${page.slug}` })) })),
             ],
-          })),
+          })).concat([{ label: "Plugins", link: "/plugins/", icon: "puzzle" }]),
         ),
         // Copy page as Markdown, and open it in ChatGPT or Claude.
         starlightPageActions({ actions: { chatgpt: true, claude: true, markdown: true } }),
@@ -122,8 +122,8 @@ export default defineConfig({
             { label: "SDK", paths: ["sdk/**"], description: "building your own app or plugin on @fxbot/sdk" },
           ],
         }),
-        // The home page is an Astro page outside the docs.
-        starlightLinksValidator({ errorOnLocalLinks: false, exclude: [base] }),
+        // The home page and the plugin directory are Astro pages outside the docs. check-links.ts checks their links.
+        starlightLinksValidator({ errorOnLocalLinks: false, exclude: [base, `${base}plugins/`, `${base}plugins/**`] }),
       ],
     }),
   ],

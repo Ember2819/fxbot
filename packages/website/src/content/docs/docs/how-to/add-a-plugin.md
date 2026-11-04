@@ -8,7 +8,7 @@ A plugin gives your bots more, or changes fxbot itself. It carries any mix of th
 - **MCP servers**: tools from a remote service
 - **code**, which runs inside fxbot and can add a screen, a group in the sidebar, tools, and settings of its own
 
-By default, fxbot shows only the plugins it vets, tagged **fxbot**.
+By default, fxbot shows only the plugins it vets, tagged **fxbot**. Each has a page in the [plugin directory](/plugins/), which says what it carries.
 
 1. Open **Plugins**, the puzzle button at the bottom of the sidebar, and choose **Browse**. fxbot's picks are listed, each with what it carries beside its name. Each plugin's icon is drawn from who made it and its name, so it looks the same wherever it shows, here and on [fxbot.sh](https://fxbot.sh).
 2. Choose one to open its page. fxbot reads it at its newest version, and the page shows what it carries. For code, under **Runs inside fxbot**, choose **Read** to see each file: code runs with everything fxbot can reach.

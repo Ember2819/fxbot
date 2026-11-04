@@ -57,7 +57,7 @@ const features: { shape: Shape; color: Color; title: string; link: string; body:
     shape: "flower",
     color: "purple",
     title: "Plugins",
-    link: "/docs/explanation/core-and-plugins/",
+    link: "/plugins/",
     body: <>Each plugin carries skills, which bots read when a task needs them, remote MCP servers, with only the tools you allow, or code that changes the app itself, such as chat rooms. fxbot shows the ones it vets, and each costs nothing until you add it.</>,
   },
   {

@@ -1,12 +1,12 @@
 # Plugin icons
 
-Every plugin gets an icon that's its own: a soft shape on a tinted tile, in two hues, drawn from the plugin's creator and name. The same plugin looks the same everywhere: in **Plugins**, in Settings, in the sidebar, and on [fxbot.sh's directory](../../phases/plugin-directory.md). Nobody draws one, nothing is fetched, and there's no fixed list of looks: each key gets its own.
+Every plugin gets an icon that's its own: a soft shape on a tinted tile, in two hues, drawn from the plugin's creator and name. The same plugin looks the same everywhere: in **Plugins**, in Settings, in the sidebar, and on [fxbot.sh's directory](plugin-directory.md). Nobody draws one, nothing is fetched, and there's no fixed list of looks: each key gets its own.
 
 Status: built on 2026-11-04, for 0.5.0, as planned the same day at the owner's word, and researched against the research directive's references. Where the build differs from the plan, [What the build changed](#what-the-build-changed) says so. The owner's decisions:
 - "Plugins need icons, auto generated, in the clean style we are keeping, keyed off their name+creator or something."
 - Not a few fixed looks: "a nice dynamic generation… some unique color system that's super clean and easy on the eyes, but has a lot more variations and becomes almost a 'unique' signature of that plugin."
 - **Bloom**, picked from a mockup of three generated styles (Bloom, Aura, and Facet) on 2026-11-04. [The look](#the-look-bloom) describes it, and [the generator](#the-generator) is its exact code.
-- It's built before [the plugin directory](../../phases/plugin-directory.md), which draws the same icons.
+- It's built before [the plugin directory](plugin-directory.md), which draws the same icons.
 
 ## 0. Core or plugin
 
@@ -299,7 +299,7 @@ The keys are trimmed and lowercased first, so `IAMMRDUNCAN/Computer ` draws the 
 ### The site
 
 - **`packages/website/src/plugin-icon.ts`:** the copy.
-- **`packages/website/src/components/PluginIcon.astro`:** the same SVG as the app's, drawn at build time, with its ids from the seed and a counter. Its CSS picks the colors by Starlight's theme, `:root[data-theme="dark"] .plugin-icon`, since the site has a theme switch of its own. Nothing on the site draws it until [the directory](../../phases/plugin-directory.md).
+- **`packages/website/src/components/PluginIcon.astro`:** the same SVG as the app's, drawn at build time, with its ids from the seed and a counter. Its CSS picks the colors by Starlight's theme, `:root[data-theme="dark"] .plugin-icon`, since the site has a theme switch of its own. Nothing on the site draws it until [the directory](plugin-directory.md).
 
 ### Not in this phase
 

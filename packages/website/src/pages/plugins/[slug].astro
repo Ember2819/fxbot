@@ -1,0 +1,123 @@
+---
+// One of fxbot's vetted plugins: what it carries, how to add it, its source, and for one in this repository, its README
+// (docs/phases/plugin-directory.md).
+import StarlightPage from "@astrojs/starlight/components/StarlightPage.astro";
+import PluginIcon from "../../components/PluginIcon.astro";
+import { listed, type Listed } from "../../plugins.ts";
+
+export const getStaticPaths = () => listed.map((plugin) => ({ params: { slug: plugin.slug }, props: { plugin } }));
+const { plugin } = Astro.props as { plugin: Listed };
+const base = import.meta.env.BASE_URL;
+const where = plugin.source.replace(/^https:\/\//, "");
+---
+
+<StarlightPage frontmatter={{ title: plugin.name, description: plugin.description, template: "splash", pageActions: false }}>
+  <p><a href={`${base}plugins/`}>All plugins</a></p>
+  <div class="fxbot-plugin-head not-content">
+    <PluginIcon iconKey={plugin.iconKey} size={56} />
+    <div>
+      <p class="fxbot-plugin-meta">{plugin.creator} · {plugin.carries}</p>
+      <p>{plugin.description}</p>
+    </div>
+  </div>
+
+  <h2>What it carries</h2>
+  {
+    plugin.kind === "package" && (
+      <>
+        {plugin.code && plugin.code.length > 0 && (
+          <>
+            <h3>Runs inside fxbot</h3>
+            <ul>
+              {plugin.code.map((file) => (
+                <li>
+                  <code>{file}</code>
+                </li>
+              ))}
+            </ul>
+            <p>Its page in fxbot shows this code, to read before you add it. Code runs with everything fxbot can reach.</p>
+          </>
+        )}
+        {plugin.skills && plugin.skills.length > 0 && (
+          <>
+            <h3>Skills</h3>
+            <ul>
+              {plugin.skills.map((skill) => (
+                <li>
+                  <strong>{skill.name}</strong>: {skill.description}
+                </li>
+              ))}
+            </ul>
+          </>
+        )}
+        {plugin.servers && plugin.servers.length > 0 && (
+          <>
+            <h3>MCP servers</h3>
+            <ul>
+              {plugin.servers.map((name) => (
+                <li>{name}</li>
+              ))}
+            </ul>
+          </>
+        )}
+        {plugin.settings && plugin.settings.length > 0 && (
+          <>
+            <h3>Settings</h3>
+            <ul>
+              {plugin.settings.map((setting) => (
+                <li>
+                  <code>{setting.name}</code>: {setting.description}
+                </li>
+              ))}
+            </ul>
+          </>
+        )}
+        {!plugin.code && <p>A plugin, from {where}.</p>}
+      </>
+    )
+  }
+  {
+    plugin.kind === "mcp" && plugin.server && (
+      <ul>
+        <li>
+          An MCP server at <code>{plugin.server.url}</code>, which gives bots its tools.
+        </li>
+        {plugin.server.key && <li>Needs a key: {plugin.server.key}</li>}
+        {plugin.server.website && (
+          <li>
+            Its site: <a href={plugin.server.website}>{plugin.server.website.replace(/^https:\/\//, "")}</a>
+          </li>
+        )}
+      </ul>
+    )
+  }
+  {
+    plugin.kind === "skill" && (
+      <p>
+        A skill: instructions bots read when a task calls for them, from <a href={plugin.source}>{where}</a>. It's on <a href={plugin.skillsSh}>skills.sh</a> too.
+      </p>
+    )
+  }
+
+  <h2>How to add it</h2>
+  <ol>
+    <li>In fxbot, open <strong>Plugins</strong>, the puzzle button at the bottom of the sidebar, and choose <strong>Browse</strong>. fxbot's picks list {plugin.name}.</li>
+    <li>Choose it. Its page shows what it carries.{plugin.kind === "package" && plugin.code?.length ? " Read the code under Runs inside fxbot." : ""}</li>
+    <li>Choose <strong>Add</strong>.</li>
+  </ol>
+  {plugin.server?.key && <p>Its page asks for the key before you add it.</p>}
+  {plugin.settings && plugin.settings.length > 0 && <p>Its settings are under the pencil button on its row, in <strong>Installed</strong>.</p>}
+  <p>More in <a href={`${base}docs/how-to/add-a-plugin/`}>Add a plugin</a>.</p>
+
+  <h2>Source</h2>
+  <p><a href={plugin.source}>{where}</a></p>
+
+  {
+    plugin.readme && (
+      <>
+        <h2>README</h2>
+        <Fragment set:html={plugin.readme} />
+      </>
+    )
+  }
+</StarlightPage>
