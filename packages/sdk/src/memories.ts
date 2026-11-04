@@ -41,6 +41,20 @@ export function createMemories(sql: Sql, embeddings: Embeddings) {
     return { memory: toMemory(memory), existed: !made };
   }
 
+  // Saves a memory as the bot's own, as memory_save does: a new one, or with `replaces`, new text for that one.
+  // `existed`: the same text was saved already. `merged`: the replaced memory now said what another did, so it went
+  // into that one.
+  async function save(bot: string, { text, replaces }: { text?: unknown; replaces?: unknown }, messageId: string | null = null) {
+    if (replaces !== undefined && String(replaces).trim()) return { ...(await update(bot, replaces, text)), existed: false };
+    return { ...(await add(bot, text, "bot", messageId)), merged: false };
+  }
+  // One of the bot's memories, or null for one it doesn't have.
+  async function get(bot: string, id: unknown) {
+    const which = ref(id);
+    const [row] = which ? await sql<Row[]>`select ${fields(sql)} from memories where profile_id = ${bot} and id = ${which}` : [];
+    return row ? toMemory(row) : null;
+  }
+
   // New text for a memory. If another memory already says it, the two have merged: this one goes, and that one stays.
   async function update(bot: string, id: unknown, input: unknown) {
     const text = check(input);
@@ -111,11 +125,9 @@ export function createMemories(sql: Sql, embeddings: Embeddings) {
         const who = bot(call);
         if (!who) return "memory_save is unavailable in this chat.";
         try {
-          if (input.replaces !== undefined && String(input.replaces).trim()) {
-            const { memory, merged } = await update(who, input.replaces, input.text);
-            return merged ? `mem:${memory.id} already said that, so ${String(input.replaces).trim()} merged into it.` : `Saved mem:${memory.id}.`;
-          }
-          const { memory, existed } = await add(who, input.text, "bot", await turnMessage(who, call.sessionId));
+          const replacing = input.replaces !== undefined && String(input.replaces).trim();
+          const { memory, existed, merged } = await save(who, input, replacing ? null : await turnMessage(who, call.sessionId));
+          if (merged) return `mem:${memory.id} already said that, so ${String(input.replaces).trim()} merged into it.`;
           return existed ? `Already saved as mem:${memory.id}.` : `Saved mem:${memory.id}.`;
         } catch (error) {
           return said(error);
@@ -165,6 +177,8 @@ export function createMemories(sql: Sql, embeddings: Embeddings) {
 
   return {
     tools,
+    get,
+    save,
     // The bot's memories for its instructions, newest first, within `budget` bytes of UTF-8: the header alone when there
     // are none, and nothing when not even that fits.
     async section(who: string, budget: number) {

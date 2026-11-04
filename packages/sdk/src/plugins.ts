@@ -8,7 +8,7 @@ import postgres, { type Sql } from "postgres";
 import type { Dependent, Hook, HookEvents, PluginApi, PluginRoute, PluginSocket, PluginSocketHandler, PluginTool } from "./plugin-api.ts";
 import type { RepoFiles } from "./archive.ts";
 import { createSecrets } from "./secrets.ts";
-import { parseSkill, type CarriedSkill, type Row } from "./skills.ts";
+import { parseSkill, skillProblem, type CarriedSkill, type Row } from "./skills.ts";
 import { newId, type PluginRecord, type Store } from "./store.ts";
 import type { PluginMark, PackagePlugin, PluginPage, PackagePreview, RepoRef, PluginSetting, PackageSource, SkillFile } from "./types.ts";
 
@@ -67,8 +67,8 @@ type Loaded = {
   api?: Record<string, unknown>;
 };
 // `saved` holds the owner's settings, and `settings` those with the defaults, which the plugin reads.
-// `skills` are the ones it carries, read when it loads.
-type Package = { record: PackageRecord; loaded?: Loaded; error?: string; log: string[]; saved: Record<string, string>; settings: Record<string, string>; skills: Row[] };
+// `skills` are the ones it carries, read when it loads, and `given` those it gives each bot at runtime (fx.skills.set).
+type Package = { record: PackageRecord; loaded?: Loaded; error?: string; log: string[]; saved: Record<string, string>; settings: Record<string, string>; skills: Row[]; given: Map<string, Row[]> };
 type Archives = { head(repo: string): Promise<string>; files(repo: string, commit: string, fileLimit?: number): Promise<RepoFiles> };
 type Server = { name: string; url?: string; headers: string[]; transport?: "sse" };
 
@@ -166,7 +166,8 @@ function within<T>(run: () => T | Promise<T>, ms: number, what: string): Promise
 export type PluginHost = {
   bots: PluginApi["bots"];
   library: PluginApi["library"];
-  skills: PluginApi["skills"];
+  skills: Pick<PluginApi["skills"], "files">;
+  memories: PluginApi["memories"];
   machine: PluginApi["machine"];
   chats: {
     newSession(plugin: string, bot: string): Promise<string>;
@@ -202,7 +203,8 @@ export async function createPlugins(options: {
   // Settings, secret or not, are sealed together, as an MCP server's header values are.
   const secrets = createSecrets(store.sql, secretKey, "plugin_secrets");
   const plugins = new Map<string, Package>();
-  const add = (record: PackageRecord) => plugins.set(record.id, { record, log: [], saved: {}, settings: {}, skills: [] }).get(record.id)!;
+  const add = (record: PackageRecord) => plugins.set(record.id, { record, log: [], saved: {}, settings: {}, skills: [], given: new Map() }).get(record.id)!;
+  const anyGiven = () => [...plugins.values()].some((plugin) => plugin.given.size > 0);
   for (const record of await store.plugins.list()) if (record.kind === "package") add(record as PackageRecord);
   const on = new Map<string, Set<string>>();
   for (const { profileId, pluginId } of await store.plugins.on()) if (plugins.has(pluginId)) on.set(pluginId, (on.get(pluginId) ?? new Set()).add(profileId));
@@ -493,7 +495,28 @@ export async function createPlugins(options: {
         return (named(name)?.loaded?.api ?? null) as never;
       },
       library: host.library,
-      skills: host.skills,
+      skills: {
+        files: host.skills.files,
+        set(bot, list) {
+          const refuse = (message: string): never => {
+            throw Object.assign(new Error(message), { status: 400 });
+          };
+          if (!Array.isArray(list)) refuse("skills.set takes a list of skills.");
+          const rows = list.map((skill): Row => {
+            const problem = skillProblem(skill?.name, skill?.description);
+            if (problem) refuse(problem);
+            if (typeof skill.instructions !== "string" || Buffer.byteLength(skill.instructions) > 64 * 1024) refuse("A skill's instructions must be text, up to 64 KiB.");
+            return { pluginId: record.id, name: skill.name, description: skill.description.trim(), instructions: skill.instructions, resources: [], manual: false };
+          });
+          if (new Set(rows.map((row) => row.name)).size !== rows.length) refuse("Each skill needs a name of its own.");
+          const had = anyGiven();
+          if (rows.length) plugin.given.set(bot, rows);
+          else plugin.given.delete(bot);
+          // The skill tool comes and goes with the first skill and the last; the catalog is read at each turn.
+          if (had !== anyGiven()) onChange();
+        },
+      },
+      memories: host.memories,
       machine: host.machine,
       chats: {
         newSession: (bot) => host.chats.newSession(record.name, bot),
@@ -539,6 +562,7 @@ export async function createPlugins(options: {
     if (!loaded) return;
     plugin.loaded = undefined;
     plugin.skills = [];
+    plugin.given.clear();
     loaded.controller.abort();
     for (const socket of loaded.open) socket.close(1001, "The plugin stopped.");
     await within(() => loaded.cleanup?.(), limit, "Its cleanup").catch((error) => report(plugin, "Cleanup", error));
@@ -819,7 +843,10 @@ export async function createPlugins(options: {
     // The commands of the plugins that run for this bot, for its `/` list.
     commands: (bot: string) => [...plugins.values()].flatMap((plugin) => (applies(plugin, bot) ? (plugin.record.config.commands ?? []) : [])),
     carried: (): CarriedSkill[] =>
-      [...plugins.values()].flatMap((plugin) => plugin.skills.map((row) => ({ id: `${plugin.record.name}/${row.name}`, row, applies: (bot: string) => applies(plugin, bot) }))),
+      [...plugins.values()].flatMap((plugin) => [
+        ...plugin.skills.map((row) => ({ id: `${plugin.record.name}/${row.name}`, row, applies: (bot: string) => applies(plugin, bot) })),
+        ...[...plugin.given].flatMap(([bot, rows]) => rows.map((row) => ({ id: `${plugin.record.name}/${row.name}`, row, applies: (b: string) => b === bot && applies(plugin, b) }))),
+      ]),
 
     preview: async (ref: RepoRef) => (await look(ref)).page,
     // Writes the files the page showed, makes its schema, adds its remote servers, and loads it.

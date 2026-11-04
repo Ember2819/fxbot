@@ -1,5 +1,5 @@
 import type { Sql } from "postgres";
-import type { LibraryItem, Profile, Upload } from "./types.ts";
+import type { LibraryItem, Memory, Profile, Upload } from "./types.ts";
 
 // What a plugin's server code gets. A plugin's `server` module exports one function, which fxbot calls with this API
 // when the plugin loads, and which may return a cleanup for when it unloads. Plugin authors import these types from
@@ -108,6 +108,20 @@ export type PluginApi = {
   skills: {
     /** The files of the skill the bot sees by that name, besides SKILL.md. None when it has no such skill. */
     files(bot: string, name: string): { path: string; text: string }[];
+    /** The skills this plugin gives one bot, in place of those it gave before, each a SKILL.md's name, description,
+     * and body. They reach the bot's catalog, its skill tool, and its / list while the plugin is on for it, and go when
+     * the plugin unloads, so the plugin keeps them and sets them again in its setup. Since 0.5.0. */
+    set(bot: string, skills: { name: string; description: string; instructions: string }[]): void;
+  };
+  /** The bots' memories, kept as the bot's own, as its memory tools keep them. Since 0.5.0. */
+  memories: {
+    /** One of the bot's memories, or null when it has none by that id. */
+    get(bot: string, id: string): Promise<Memory | null>;
+    /** Saves a memory as the bot's, as memory_save does: with `replaces`, that memory's text changes. `existed`: the
+     * same text was saved already. `merged`: the replaced memory now said what another did, so it went into that one. */
+    save(bot: string, memory: { text: string; replaces?: string }): Promise<{ memory: Memory; existed: boolean; merged: boolean }>;
+    /** Deletes one. A missing one throws with status 404. */
+    remove(bot: string, id: string): Promise<void>;
   };
   /** The machine's fxbot command, for a job only root can do; null in a checkout, which has none. */
   machine: PluginMachine | null;

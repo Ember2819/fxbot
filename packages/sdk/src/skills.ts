@@ -28,6 +28,13 @@ const escape = (text: string) => text.replace(/&/g, "&amp;").replace(/</g, "&lt;
 
 // A SKILL.md's frontmatter, read as YAML, and its body. libfx's own loader reads a folded or quoted description, or a
 // file with Windows line ends, wrongly (libfx 0.0.16, checked by hand). The Agent Skills limits apply.
+// A skill's name and description, as the Agent Skills spec has them: what's wrong, or null.
+export function skillProblem(name: unknown, description: unknown) {
+  if (typeof name !== "string" || name.length > 64 || !/^[a-z0-9]+(-[a-z0-9]+)*$/.test(name)) return "Its name must be up to 64 lowercase letters, digits, and single hyphens.";
+  if (typeof description !== "string" || !description.trim() || description.length > 1024) return "Its description must be 1 to 1024 characters.";
+  return null;
+}
+
 export function parseSkill(text: string) {
   const found = /^﻿?---\r?\n([\s\S]*?)\r?\n---[ \t]*(?:\r?\n([\s\S]*))?$/.exec(text);
   if (!found) return { error: "Its SKILL.md has no frontmatter." };
@@ -39,8 +46,8 @@ export function parseSkill(text: string) {
   }
   if (!meta || typeof meta !== "object" || Array.isArray(meta)) return { error: "Its frontmatter isn't a map of fields." };
   const { name, description, license } = meta as Record<string, unknown>;
-  if (typeof name !== "string" || name.length > 64 || !/^[a-z0-9]+(-[a-z0-9]+)*$/.test(name)) return { error: "Its name must be up to 64 lowercase letters, digits, and single hyphens." };
-  if (typeof description !== "string" || !description.trim() || description.length > 1024) return { error: "Its description must be 1 to 1024 characters." };
+  const problem = skillProblem(name, description);
+  if (problem || typeof name !== "string" || typeof description !== "string") return { error: problem! };
   return {
     name,
     description: description.trim(),

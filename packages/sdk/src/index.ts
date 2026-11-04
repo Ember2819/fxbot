@@ -167,6 +167,12 @@ export async function createFxbot(options: FxbotOptions) {
         save: ({ bot, session, name, type, bytes }) => library.save({ profileId: bot, sessionId: session, origin: "generated", name, type, bytes }),
       },
       skills: { files: (bot, name) => skills.files(bot, name) },
+      // A bot's memories, kept as its own: an unknown bot is 404.
+      memories: {
+        get: async (bot, id) => (await get(bot), memories.get(bot, id)),
+        save: async (bot, memory) => (await get(bot), memories.save(bot, memory)),
+        remove: async (bot, id) => (await get(bot), memories.remove(bot, id)),
+      },
       machine: options.machine ?? null,
       chats: {
         async newSession(plugin, bot) {
