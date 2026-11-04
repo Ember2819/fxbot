@@ -65,6 +65,12 @@ export default async function setup(fx: PluginApi) {
     const members = await fx.sql<{ bot: string }[]>`select bot from members where room = ${id} order by position`;
     return { ...found, members: members.map((m) => m.bot) };
   }
+  // For plugins that need chat rooms, such as chat-rooms-computer: the room a session of ours is for, and every room.
+  // fxbot 0.4 has no provide, and then the room works as before.
+  fx.provide?.({
+    roomOf: async (session: string) => (roomOf.has(session) ? await room(roomOf.get(session)!) : null),
+    rooms: async () => (await Promise.all((await fx.sql<{ id: number }[]>`select id from rooms order by id`).map((r) => room(r.id)))).filter(Boolean),
+  });
   const messages = (id: number) => fx.sql<Message[]>`select id, author, text, at, chain from messages where room = ${id} order by id`;
   async function say(id: number, author: string, text: string, chain: number | null = null) {
     const [message] = await fx.sql<Message[]>`insert into messages (room, author, text, chain) values (${id}, ${author}, ${text}, ${chain})

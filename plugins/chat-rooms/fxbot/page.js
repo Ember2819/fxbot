@@ -10321,20 +10321,27 @@ function RoomScreen({ params }) {
 				title: room?.name ?? "Room",
 				children: room && (0, react_jsx_runtime.jsxs)("div", {
 					className: "flex items-center gap-1",
-					children: [room.members.map((member) => {
-						const bot = botOf(member);
-						return bot ? (0, react_jsx_runtime.jsx)(_fxbot_app.ui.Blob, {
-							shape: bot.shape,
-							color: bot.color,
-							size: 24,
-							busy: state.replying?.bot === member
-						}, member) : null;
-					}), (0, react_jsx_runtime.jsx)(_fxbot_app.ui.Button, {
-						variant: "ghost",
-						size: "sm",
-						onClick: () => setEditing(true),
-						children: "Edit"
-					})]
+					children: [
+						room.members.map((member) => {
+							const bot = botOf(member);
+							return bot ? (0, react_jsx_runtime.jsx)(_fxbot_app.ui.Blob, {
+								shape: bot.shape,
+								color: bot.color,
+								size: 24,
+								busy: state.replying?.bot === member
+							}, member) : null;
+						}),
+						_fxbot_app.Slot && (0, react_jsx_runtime.jsx)(_fxbot_app.Slot, {
+							name: "chat-rooms.room-header",
+							props: { room }
+						}),
+						(0, react_jsx_runtime.jsx)(_fxbot_app.ui.Button, {
+							variant: "ghost",
+							size: "sm",
+							onClick: () => setEditing(true),
+							children: "Edit"
+						})
+					]
 				})
 			}),
 			(0, react_jsx_runtime.jsx)("main", {

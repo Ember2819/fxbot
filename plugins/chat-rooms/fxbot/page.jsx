@@ -1,7 +1,7 @@
 // The rooms in the app: a Rooms group in the sidebar, each room with its bots' avatars, + to make one, and a screen for
 // each room, where the owner tags bots with @ and each reply shows as it's written. Built into page.js; see the README.
 import { useEffect, useRef, useState } from "react";
-import { api, client, go, ui, useBots } from "@fxbot/app";
+import { api, client, go, ui, useBots, Slot } from "@fxbot/app";
 import { Composer } from "./composer.jsx";
 import { Chip, Stack } from "./faces.jsx";
 import { tokens } from "./mentions.ts";
@@ -361,6 +361,8 @@ function RoomScreen({ params }) {
                 const bot = botOf(member);
                 return bot ? <ui.Blob key={member} shape={bot.shape} color={bot.color} size={24} busy={state.replying?.bot === member} /> : null;
               })}
+              {/* A place for plugins that need chat rooms, such as chat-rooms-computer's button. fxbot 0.4 has no Slot. */}
+              {Slot && <Slot name="chat-rooms.room-header" props={{ room }} />}
               <ui.Button variant="ghost" size="sm" onClick={() => setEditing(true)}>
                 Edit
               </ui.Button>
