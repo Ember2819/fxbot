@@ -9,6 +9,7 @@ import { client } from "./client.ts";
 import { Preview, Thumb } from "./library.tsx";
 import { BotMemories } from "./memories.tsx";
 import { follow } from "./nav.ts";
+import { Place } from "./plugins.tsx";
 
 type Tab = "details" | "library" | "memories";
 
@@ -45,9 +46,10 @@ export function usePanel() {
 // turn ends, so the Library tab reads the list again and shows what the bot saved.
 export function BotPanel({ profile, profiles, panel, version }: { profile: Profile; profiles: Profile[] | null; panel: ReturnType<typeof usePanel>; version: number }) {
   const mobile = useIsMobile();
-  // The bot is the one picked in the sidebar, so the panel goes straight to its tabs.
+  // The bot is the one picked in the sidebar, so the panel goes straight to its tabs, under what plugins put above them.
   const body = (
     <Tabs value={panel.tab} onValueChange={(tab) => panel.setTab(tab as Tab)} className="min-h-0 flex-1 px-4 pt-[calc(0.75rem+env(safe-area-inset-top))]">
+      <Place pick={(places) => places.botPanel} props={{ bot: profile }} />
       <div className="flex items-center gap-2">
         <TabsList className="flex-1">
           <TabsTrigger value="details">Details</TabsTrigger>

@@ -3,6 +3,7 @@
 // - a Settings section with the engine, the image, and each bot's computer, and a section in each bot's settings
 // - a view of computer_desktop's calls in a reply, with the screenshot each one returned
 // - a Computer button beside the message box, which adds $computer to the message
+// - the computer's screen, small, in each bot's panel
 // Built into page.js, and noVNC into novnc.js, which the plugin serves; see the README.
 import { useEffect, useRef, useState } from "react";
 import { api, client, go, ui, useBots } from "@fxbot/app";
@@ -67,8 +68,9 @@ const loadRFB = () => (novnc ??= load(new URL("/api/plugins/computer/novnc.js", 
 const pane = { position: "relative", flex: 1, minHeight: 0, background: "#1e1e1e", borderRadius: 8, overflow: "hidden" };
 const cover = { position: "absolute", inset: 0, display: "grid", placeContent: "center", gap: 8, justifyItems: "center", color: "#ccc", fontSize: 14 };
 
-// The desktop, view-only unless `control`, scaled to fit, at the computer's own size.
-function Desktop({ bot, control, hidden }) {
+// The desktop, view-only unless `control`, scaled to fit, at the computer's own size. A `peek` only looks, at a computer
+// that runs, without keeping it from stopping; when it stops, `onGone`.
+function Desktop({ bot, control, hidden, peek, onGone }) {
   const box = useRef(null);
   const rfb = useRef(null);
   const [problem, setProblem] = useState("Connecting…");
@@ -79,13 +81,13 @@ function Desktop({ bot, control, hidden }) {
     loadRFB().then(
       (RFB) => {
         if (gone) return;
-        const view = new RFB(box.current, socketOf("desktop", bot));
+        const view = new RFB(box.current, socketOf("desktop", bot) + (peek ? "?peek" : ""));
         view.viewOnly = !control;
         view.scaleViewport = true;
         view.resizeSession = false;
         view.background = "#1e1e1e";
         view.addEventListener("connect", () => setProblem(""));
-        view.addEventListener("disconnect", (event) => !gone && setProblem(event.detail?.clean ? "Disconnected." : "The connection dropped."));
+        view.addEventListener("disconnect", (event) => !gone && (peek ? onGone?.() : setProblem(event.detail?.clean ? "Disconnected." : "The connection dropped.")));
         rfb.current = view;
       },
       (error) => setProblem(`The desktop's viewer didn't load: ${error.message}`),
@@ -100,9 +102,9 @@ function Desktop({ bot, control, hidden }) {
     if (rfb.current) rfb.current.viewOnly = !control;
   }, [control]);
   return (
-    <div style={{ ...pane, display: hidden ? "none" : "block" }} aria-label="The computer's desktop">
+    <div style={{ ...(peek ? { position: "absolute", inset: 0 } : pane), display: hidden ? "none" : "block" }} aria-label={peek ? "The computer's screen" : "The computer's desktop"}>
       <div ref={box} style={{ position: "absolute", inset: 0 }} />
-      {problem && (
+      {problem && !peek && (
         <div style={cover}>
           <span>{problem}</span>
           {problem !== "Connecting…" && (
@@ -422,8 +424,69 @@ function ComputerButton({ bot, setDraft }) {
   );
 }
 
+const Play = () => (
+  <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+    <path d="M7 4.5v15a1 1 0 0 0 1.5.86l12.5-7.5a1 1 0 0 0 0-1.72L8.5 3.64A1 1 0 0 0 7 4.5Z" />
+  </svg>
+);
+
+// In a bot's panel, above its tabs, for bots the computer is on for: its screen, small and live, which opens the
+// Computer screen; or, while the computer doesn't run, Idle and a button that starts it. Looking here doesn't keep a
+// computer from stopping when idle.
+function BotScreen({ bot }) {
+  const [on, setOn] = useState(false);
+  useEffect(() => void onFor(bot.id).then(setOn, () => {}), [bot.id]);
+  const [state, reload] = useComputer(on ? bot.id : null, 5000);
+  const [starting, setStarting] = useState(false);
+  const [error, setError] = useState("");
+  if (!on || !state?.ready) return null;
+  const start = () => {
+    setStarting(true);
+    setError("");
+    call(`bots/${bot.id}/start`, "POST")
+      .then(() => reload(), (e) => setError(e.message))
+      .finally(() => setStarting(false));
+  };
+  const asking = state.owner?.reason;
+  const says = state.running ? (state.owner ? (asking ? "Needs you" : "Yours now") : "Running") : starting ? "Starting…" : "Idle";
+  return (
+    <section aria-label={`${bot.name}'s computer`} className="grid gap-1.5">
+      <div className="flex items-center justify-between text-xs text-muted-foreground">
+        <span>Computer</span>
+        <span className={asking ? "text-amber-600" : undefined}>{says}</span>
+      </div>
+      <div style={{ position: "relative", aspectRatio: "16 / 10", borderRadius: 8, overflow: "hidden", background: "#1e1e1e" }}>
+        {state.running ? (
+          <>
+            <Desktop bot={bot.id} peek onGone={reload} />
+            <button
+              type="button"
+              onClick={() => go(screenOf(bot.id))}
+              aria-label={`Open ${bot.name}'s computer`}
+              title="Open the computer"
+              style={{ position: "absolute", inset: 0, background: "transparent", border: 0, cursor: "pointer" }}
+            />
+          </>
+        ) : (
+          <div style={{ ...cover, padding: 12, textAlign: "center", fontSize: 13 }}>
+            <span>{starting ? "Starting… The first start makes its image, which takes a minute or two." : "Idle"}</span>
+            {!starting && (
+              <ui.Button type="button" size="icon-sm" variant="secondary" className="rounded-full" aria-label={`Start ${bot.name}'s computer`} title="Start the computer" onClick={start}>
+                <Play />
+              </ui.Button>
+            )}
+          </div>
+        )}
+      </div>
+      {asking && <p className="text-xs text-amber-600">{bot.name} needs you: {asking}</p>}
+      {error && <p className="text-xs text-destructive">{error}</p>}
+    </section>
+  );
+}
+
 export default function setup(app) {
   app.route("/bots/:id", ComputerScreen);
+  app.botPanel(BotScreen);
   app.settings(SettingsSection);
   app.botSettings(BotSection);
   app.toolView("desktop", DesktopCall);

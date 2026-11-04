@@ -783,27 +783,32 @@ export default function setup(fx: PluginApi) {
       if (owner.has(bot)) void handBack(bot);
     }
   }
-  // A view of a bot's computer: it starts the computer, then carries the exec's streams to and from the page.
+  // A view of a bot's computer: it starts the computer, then carries the exec's streams to and from the page. A peek,
+  // `?peek`, such as the small screen in a bot's panel, only looks at a computer that runs: it doesn't start one, keep
+  // one from stopping when idle, or end a take-over when it closes.
   function view(path: string, connect: (name: string) => Promise<{ id: string; stream: import("node:net").Socket; tty: boolean }>, control?: (id: string, text: string) => void) {
-    fx.socket(path, async (page, _request, { bot }) => {
+    fx.socket(path, async (page, request, { bot }) => {
       let closed = false;
       page.onclose = () => void (closed = true);
       if (!isBot.test(bot) || !(await fx.bots.get(bot).catch(() => null))) return page.close(1008, "No such bot.");
-      watching(bot, 1);
+      const peek = new URL(request.url).searchParams.has("peek");
+      const watch = (by: number) => peek || watching(bot, by);
+      watch(1);
       let attached: Awaited<ReturnType<typeof connect>> | null = null;
       const leave = () => {
         if (closed && !attached) return;
         attached?.stream.destroy();
         attached = null;
         page.close();
-        watching(bot, -1);
+        watch(-1);
       };
       page.onclose = () => ((closed = true), leave());
       try {
-        attached = await connect(await open(bot));
+        if (peek && !(await inspect(nameOf(bot)))?.State?.Running) return page.close(1013, "The computer is stopped.");
+        attached = await connect(peek ? nameOf(bot) : await open(bot));
       } catch (error) {
         page.close(1011, (error as Error).message.slice(0, 120));
-        return watching(bot, -1);
+        return watch(-1);
       }
       if (closed) return leave();
       const { id, stream, tty } = attached;

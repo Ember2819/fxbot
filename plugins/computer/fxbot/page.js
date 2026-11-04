@@ -13112,7 +13112,7 @@ const cover = {
 	color: "#ccc",
 	fontSize: 14
 };
-function Desktop({ bot, control, hidden }) {
+function Desktop({ bot, control, hidden, peek, onGone }) {
 	const box = (0, react.useRef)(null);
 	const rfb = (0, react.useRef)(null);
 	const [problem, setProblem] = (0, react.useState)("Connecting…");
@@ -13122,13 +13122,13 @@ function Desktop({ bot, control, hidden }) {
 		setProblem("Connecting…");
 		loadRFB().then((RFB) => {
 			if (gone) return;
-			const view = new RFB(box.current, socketOf("desktop", bot));
+			const view = new RFB(box.current, socketOf("desktop", bot) + (peek ? "?peek" : ""));
 			view.viewOnly = !control;
 			view.scaleViewport = true;
 			view.resizeSession = false;
 			view.background = "#1e1e1e";
 			view.addEventListener("connect", () => setProblem(""));
-			view.addEventListener("disconnect", (event) => !gone && setProblem(event.detail?.clean ? "Disconnected." : "The connection dropped."));
+			view.addEventListener("disconnect", (event) => !gone && (peek ? onGone?.() : setProblem(event.detail?.clean ? "Disconnected." : "The connection dropped.")));
 			rfb.current = view;
 		}, (error) => setProblem(`The desktop's viewer didn't load: ${error.message}`));
 		return () => {
@@ -13142,17 +13142,20 @@ function Desktop({ bot, control, hidden }) {
 	}, [control]);
 	return /* @__PURE__ */ (0, react_jsx_runtime.jsxs)("div", {
 		style: {
-			...pane,
+			...peek ? {
+				position: "absolute",
+				inset: 0
+			} : pane,
 			display: hidden ? "none" : "block"
 		},
-		"aria-label": "The computer's desktop",
+		"aria-label": peek ? "The computer's screen" : "The computer's desktop",
 		children: [/* @__PURE__ */ (0, react_jsx_runtime.jsx)("div", {
 			ref: box,
 			style: {
 				position: "absolute",
 				inset: 0
 			}
-		}), problem && /* @__PURE__ */ (0, react_jsx_runtime.jsxs)("div", {
+		}), problem && !peek && /* @__PURE__ */ (0, react_jsx_runtime.jsxs)("div", {
 			style: cover,
 			children: [/* @__PURE__ */ (0, react_jsx_runtime.jsx)("span", { children: problem }), problem !== "Connecting…" && /* @__PURE__ */ (0, react_jsx_runtime.jsx)(_fxbot_app.ui.Button, {
 				size: "sm",
@@ -13649,8 +13652,101 @@ function ComputerButton({ bot, setDraft }) {
 		})]
 	});
 }
+const Play = () => /* @__PURE__ */ (0, react_jsx_runtime.jsx)("svg", {
+	xmlns: "http://www.w3.org/2000/svg",
+	width: "16",
+	height: "16",
+	viewBox: "0 0 24 24",
+	fill: "currentColor",
+	"aria-hidden": "true",
+	children: /* @__PURE__ */ (0, react_jsx_runtime.jsx)("path", { d: "M7 4.5v15a1 1 0 0 0 1.5.86l12.5-7.5a1 1 0 0 0 0-1.72L8.5 3.64A1 1 0 0 0 7 4.5Z" })
+});
+function BotScreen({ bot }) {
+	const [on, setOn] = (0, react.useState)(false);
+	(0, react.useEffect)(() => void onFor(bot.id).then(setOn, () => {}), [bot.id]);
+	const [state, reload] = useComputer(on ? bot.id : null, 5e3);
+	const [starting, setStarting] = (0, react.useState)(false);
+	const [error, setError] = (0, react.useState)("");
+	if (!on || !state?.ready) return null;
+	const start = () => {
+		setStarting(true);
+		setError("");
+		call(`bots/${bot.id}/start`, "POST").then(() => reload(), (e) => setError(e.message)).finally(() => setStarting(false));
+	};
+	const asking = state.owner?.reason;
+	const says = state.running ? state.owner ? asking ? "Needs you" : "Yours now" : "Running" : starting ? "Starting…" : "Idle";
+	return /* @__PURE__ */ (0, react_jsx_runtime.jsxs)("section", {
+		"aria-label": `${bot.name}'s computer`,
+		className: "grid gap-1.5",
+		children: [
+			/* @__PURE__ */ (0, react_jsx_runtime.jsxs)("div", {
+				className: "flex items-center justify-between text-xs text-muted-foreground",
+				children: [/* @__PURE__ */ (0, react_jsx_runtime.jsx)("span", { children: "Computer" }), /* @__PURE__ */ (0, react_jsx_runtime.jsx)("span", {
+					className: asking ? "text-amber-600" : void 0,
+					children: says
+				})]
+			}),
+			/* @__PURE__ */ (0, react_jsx_runtime.jsx)("div", {
+				style: {
+					position: "relative",
+					aspectRatio: "16 / 10",
+					borderRadius: 8,
+					overflow: "hidden",
+					background: "#1e1e1e"
+				},
+				children: state.running ? /* @__PURE__ */ (0, react_jsx_runtime.jsxs)(react_jsx_runtime.Fragment, { children: [/* @__PURE__ */ (0, react_jsx_runtime.jsx)(Desktop, {
+					bot: bot.id,
+					peek: true,
+					onGone: reload
+				}), /* @__PURE__ */ (0, react_jsx_runtime.jsx)("button", {
+					type: "button",
+					onClick: () => (0, _fxbot_app.go)(screenOf(bot.id)),
+					"aria-label": `Open ${bot.name}'s computer`,
+					title: "Open the computer",
+					style: {
+						position: "absolute",
+						inset: 0,
+						background: "transparent",
+						border: 0,
+						cursor: "pointer"
+					}
+				})] }) : /* @__PURE__ */ (0, react_jsx_runtime.jsxs)("div", {
+					style: {
+						...cover,
+						padding: 12,
+						textAlign: "center",
+						fontSize: 13
+					},
+					children: [/* @__PURE__ */ (0, react_jsx_runtime.jsx)("span", { children: starting ? "Starting… The first start makes its image, which takes a minute or two." : "Idle" }), !starting && /* @__PURE__ */ (0, react_jsx_runtime.jsx)(_fxbot_app.ui.Button, {
+						type: "button",
+						size: "icon-sm",
+						variant: "secondary",
+						className: "rounded-full",
+						"aria-label": `Start ${bot.name}'s computer`,
+						title: "Start the computer",
+						onClick: start,
+						children: /* @__PURE__ */ (0, react_jsx_runtime.jsx)(Play, {})
+					})]
+				})
+			}),
+			asking && /* @__PURE__ */ (0, react_jsx_runtime.jsxs)("p", {
+				className: "text-xs text-amber-600",
+				children: [
+					bot.name,
+					" needs you: ",
+					asking
+				]
+			}),
+			error && /* @__PURE__ */ (0, react_jsx_runtime.jsx)("p", {
+				className: "text-xs text-destructive",
+				children: error
+			})
+		]
+	});
+}
 function setup(app) {
 	app.route("/bots/:id", ComputerScreen);
+	app.botPanel(BotScreen);
 	app.settings(SettingsSection);
 	app.botSettings(BotSection);
 	app.toolView("desktop", DesktopCall);

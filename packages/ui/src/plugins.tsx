@@ -39,11 +39,12 @@ type Places = {
   toolViews: Map<string, ComponentType<{ call: ToolCall }>>;
   settings: ComponentType[];
   botSettings: ComponentType<{ bot: Profile }>[];
+  botPanel: ComponentType<{ bot: Profile }>[];
 };
 // `key` is the URLs it loaded from, which change with its files.
 type Loaded = { name: string; key: string; css?: HTMLLinkElement; places: Places };
 
-const emptyPlaces = (): Places => ({ routes: [], sidebar: [], nav: [], composer: [], toolViews: new Map(), settings: [], botSettings: [] });
+const emptyPlaces = (): Places => ({ routes: [], sidebar: [], nav: [], composer: [], toolViews: new Map(), settings: [], botSettings: [], botPanel: [] });
 
 // The loaded plugins, by name. A change makes a new array, which the places read through usePlugins.
 let loaded: Loaded[] = [];
@@ -114,6 +115,7 @@ async function run(name: string, version: string, url: string): Promise<Places> 
     toolView: (tool: string, Component: ComponentType<{ call: ToolCall }>) => places.toolViews.set(`${name}_${tool}`, Component),
     settings: (Component: ComponentType) => places.settings.push(Component),
     botSettings: (Component: ComponentType<{ bot: Profile }>) => places.botSettings.push(Component),
+    botPanel: (Component: ComponentType<{ bot: Profile }>) => places.botPanel.push(Component),
   });
   return places;
 }
