@@ -92,8 +92,8 @@ packages/website/
 ├── src/components/SiteTitle.astro   Plugins in the docs' header
 ├── src/layout.tsx                   Plugins in the home page's header and footer
 ├── src/home.tsx                     the Plugins feature links to /plugins/
-├── src/blob.tsx                     PluginIcon, from plugin icons
-└── src/plugin-icon.ts               pluginIcon, from plugin icons
+├── src/components/PluginIcon.astro  the drawing, from plugin icons
+└── src/plugin-icon.ts               the generator, copied, from plugin icons
 ```
 
 ### The data: `src/plugins.ts`
@@ -105,7 +105,7 @@ export type Listed = {
   kind: "package" | "mcp" | "skill";
   name: string; // as Browse shows it: plugin.json's name, a server's title, or a skill's name
   creator: string; // the repository's owner, or the registry's namespace
-  icon: { shape: Shape; color: Color }; // pluginIcon(creator, name), keyed as plugin icons says
+  iconKey: string; // creator/name, keyed as plugin icons says, which PluginIcon draws
   description: string;
   carries: string; // as the app writes it: "Code · 3 skills", "MCP server", or "Skill"
   source: string; // where it comes from: its folder or repository on GitHub
@@ -154,7 +154,7 @@ A `StarlightPage` with `frontmatter={{ title: "Plugins", description, template: 
 - **A line** at the top: these are the plugins fxbot vets, which **Browse** in fxbot shows while unvetted plugins are off, and each costs nothing until it's added.
 - **The search box,** an `<input type="search">` labelled "Search plugins". It's `hidden` until the script runs, so without the script every card shows and no dead box does.
 - **The cards,** a `<ul class="fxbot-plugins not-content">`. Each `<li>` has `data-search`: the name, the creator, the description, and `carries`, lowercased. Its link to `/plugins/<slug>/` holds:
-  - `<PluginIcon {...icon} size={40} />`
+  - `<PluginIcon iconKey={iconKey} size={40} />`
   - the name
   - the creator and `carries`, as `iammrduncan · Code · 3 skills`
   - the description, at most two lines
@@ -166,7 +166,7 @@ A `StarlightPage` with `frontmatter={{ title: "Plugins", description, template: 
 
 `getStaticPaths()` returns one path per `listed` entry, with the entry as its props. A `StarlightPage` with `frontmatter={{ title: name, description, template: "splash", pageActions: false }}`, then:
 - **"All plugins"**, a link back to `/plugins/`.
-- **The head:** `<PluginIcon {...icon} size={56} />`, the creator and `carries`, and the description.
+- **The head:** `<PluginIcon iconKey={iconKey} size={56} />`, the creator and `carries`, and the description.
 - **What it carries:**
   - **A package:**
     - **Runs inside fxbot:** its code files, and a line that its page in fxbot shows the code to read before you add it.
@@ -210,7 +210,7 @@ A `StarlightPage` with `frontmatter={{ title: "Plugins", description, template: 
 | `src/content.config.ts`, `astro.config.mjs` | `pageActions`; the topic; the validator | about 6 |
 | `SiteTitle.astro`, `layout.tsx`, `home.tsx` | The links | about 9 |
 | Add a plugin, `CHANGELOG.md` | A line each | about 3 |
-| `src/plugin-icon.ts`, `src/blob.tsx` | From [plugin icons](plugin-icons.md) | counted there |
+| `src/plugin-icon.ts`, `src/components/PluginIcon.astro` | From [plugin icons](plugin-icons.md) | counted there |
 
 Size: about 260 lines. Only `/plugins/` gains a script, about 0.5 KB. Other pages gain a header link, and the app, the SDK, and the server don't change.
 
@@ -229,7 +229,7 @@ The bound: about 260 lines, as above. Past 350, stop and say why. What's out of 
 
 **M1. The data**
 - [ ] `src/plugins.ts` gives 7 entries, in this order: computer, chat-rooms, alphaXiv, Keiro, show-me, frontend-design, grilling.
-- [ ] Each entry's icon is plugin icons' table's pick for it: amber egg for the computer, brown flower for chat rooms, and so on.
+- [ ] Each entry's icon matches plugin icons' table: the computer's shape starts at `#eb728a`, chat rooms' at `#e59126`, and so on, in light mode.
 - [ ] Two list entries with one slug stop `npm run build-site` with a message that names the slug. Try it with a copy of a list entry, then undo it.
 
 **M2. `/plugins/`**
