@@ -19,7 +19,7 @@ A room holds you and several of your bots. Tag a bot with `@` to ask it. A bot c
 
 A bot that tags another in its reply hands the conversation on: that bot answers after it, and sees what was said. When a reply tags no one, the bots stop, and it's your turn. A bot can tag at most three bots in one reply.
 
-Each room limits the bot replies to one message of yours: 10 unless you change it. At the limit, a note says the bots paused. Tag a bot to go on.
+Each room limits the bot replies to one message of yours: 10 unless you change it. At the limit, bots stop tagging each other, and a note says they paused. The bots already asked still answer, so everyone gets to wrap up, and a round can end a reply or two past the limit. Tag a bot to go on.
 
 While bots answer, the room shows who's writing and who's next. **Stop** ends the reply being written and drops the rest. A message you send meanwhile drops the bots waiting their turn too.
 

@@ -440,6 +440,7 @@ Checks use v1's harness: a disposable Postgres, the mock model making scripted r
 - **The sidebar hears who's writing from the room.** The app reads its bots again only while one is busy, so a room turn that starts while none is wouldn't show. The room list says who's writing, and the open room's stream keeps it current.
 - **The room keeps a Send button,** since Enter is a new line on a phone's keyboard.
 - **The lead's skill is sent once each start.** Which sessions have had it is kept in memory, so after a restart the lead's next untagged turn carries it again.
+- **The limit lets the bots already asked answer.** A reply just under the limit can tag up to three bots, and all of them answer, so a round can end up to two replies past it. The owner chose that, so everyone gets to wrap up. Past the limit, no reply tags anyone in.
 - **A bot can't tag everyone.** Only the owner's **Everyone** chip makes `<@all>`; a bot's `@everyone` stays text.
 - **ProseMirror is pinned to releases at least two weeks old,** so `prosemirror-view` is 1.42.6.
 

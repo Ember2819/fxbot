@@ -8,7 +8,7 @@ A plugin for [fxbot](https://fxbot.sh): rooms where several of your bots talk wi
 - **Handing on:** a reply that tags another bot wakes that bot next. A reply that tags no one ends the round.
 - **Limits:**
   - at most 3 bots tagged per reply
-  - the room's limit of bot replies to one message, 10 by default
+  - the room's limit of bot replies to one message, 10 by default: past it, bots stop tagging each other, and the ones already asked still answer
   - **Stop**, which ends the reply being written and drops the rest
 - **What a bot is sent:** each bot answers in a session of its own for the room, so a room stays out of the bot's own chat. Each turn it's sent:
   - who it is, and who else is in the room
