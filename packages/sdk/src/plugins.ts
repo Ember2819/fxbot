@@ -254,8 +254,9 @@ export async function createPlugins(options: {
       const same = [...plugins.values()].find((p) => p.record.name === manifest.name);
       if (same && folderOf(same.record) !== folder) throw new Error(`a plugin named ${manifest.name} is added already`);
       if (same) {
-        same.record = { ...same.record, config: manifest };
-        await store.plugins.update(same.record.id, { config: manifest });
+        const config = { ...manifest, servers: same.record.config.servers };
+        same.record = { ...same.record, config };
+        await store.plugins.update(same.record.id, { config });
         continue;
       }
       const record: PackageRecord = { id: newId(), kind: "package", name: manifest.name, source: { local: folder }, config: manifest, approvedHash: "", enabled: true, bots: "all", allowed: null, status: null };

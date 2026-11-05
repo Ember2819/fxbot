@@ -4,6 +4,7 @@ Each release of fxbot, newest first. A release that adds migrations, bumps libfx
 
 ## Unreleased
 
+- **For plugins:** a plugin in `FXBOT_PLUGIN_DIRS` keeps its MCP servers when fxbot starts again. Before, they came loose from it, showing as plugins of their own, and stayed when it was removed.
 - **Set up with your AI agent.** The home page offers a line to give your agent, which sets fxbot up from [agent-setup.txt](https://fxbot.sh/agent-setup.txt): it checks the machine, asks before it installs anything, and leaves your keys and sign-ins to you. **Copy all docs**, on each page of the docs, copies them all in one go, and [Set up with your AI agent](https://fxbot.sh/docs/tutorials/set-up-with-an-agent/) lists `llms.txt` and `llms-full.txt`, as the home page's footer does.
 - **Reach it over SSH.** [Reach it from other devices](https://fxbot.sh/docs/how-to/reach-it/#over-ssh) has a way in for a machine with no screen.
 
