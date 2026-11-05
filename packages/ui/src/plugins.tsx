@@ -37,7 +37,7 @@ type Places = {
   sidebar: ComponentType[];
   nav: Nav[];
   composer: ComponentType<ComposerProps>[];
-  toolViews: Map<string, ComponentType<{ call: ToolCall }>>;
+  toolViews: Map<string, { View: ComponentType<{ call: ToolCall }>; open: boolean }>;
   settings: ComponentType[];
   botSettings: ComponentType<{ bot: Profile }>[];
   botPanel: ComponentType<{ bot: Profile }>[];
@@ -120,7 +120,7 @@ async function run(name: string, version: string, url: string): Promise<Places> 
     sidebar: (Component: ComponentType) => places.sidebar.push(Component),
     nav: (nav: Nav) => places.nav.push(nav),
     composer: (Component: ComponentType<ComposerProps>) => places.composer.push(Component),
-    toolView: (tool: string, Component: ComponentType<{ call: ToolCall }>) => places.toolViews.set(`${name}_${tool}`, Component),
+    toolView: (tool: string, Component: ComponentType<{ call: ToolCall }>, options?: { open?: boolean }) => places.toolViews.set(`${name}_${tool}`, { View: Component, open: Boolean(options?.open) }),
     settings: (Component: ComponentType) => places.settings.push(Component),
     botSettings: (Component: ComponentType<{ bot: Profile }>) => places.botSettings.push(Component),
     botPanel: (Component: ComponentType<{ bot: Profile }>) => places.botPanel.push(Component),
@@ -207,12 +207,12 @@ export function usePluginScreen(path: string): ReactNode | undefined {
   return undefined;
 }
 
-// How a plugin's tool call shows in a reply, if its plugin drew one.
+// How a plugin's tool call shows in a reply, if its plugin drew one. An `open` one stays in sight, below the folded steps.
 export function usePluginToolView(tool: string) {
   const plugins = usePlugins();
   for (const { name, places } of plugins) {
-    const View = places.toolViews.get(tool);
-    if (View) return { plugin: name, View };
+    const view = places.toolViews.get(tool);
+    if (view) return { plugin: name, ...view };
   }
   return undefined;
 }

@@ -35,26 +35,47 @@ function Steps({ steps, working }: { steps: Step[]; working: boolean }) {
   const rows = steps.map((step, i) =>
     step.type === "reasoning" ? <Thinking key={i} text={step.text} running={working && i === steps.length - 1} /> : <ToolCall key={step.id} call={step} />,
   );
-  if (steps.length === 1) return <Trace>{rows}</Trace>;
   const tools = steps.filter((s): s is Tool => s.type === "tool");
+  const cards = tools.map((call) => <ToolCard key={call.id} call={call} />);
+  if (steps.length === 1)
+    return (
+      <>
+        <Trace>{rows}</Trace>
+        {cards}
+      </>
+    );
   const failed = tools.filter(failedCall).length;
   const thought = steps.some((s) => s.type === "reasoning");
   const title = working ? "Working" : !tools.length ? "Thought" : `${thought ? "Thought and used" : "Used"} ${tools.length} tool${tools.length === 1 ? "" : "s"}`;
   return (
-    <Trace>
-      <TraceCollapsible open={open ?? working} onOpenChange={setOpen}>
-        <TraceCollapsibleTrigger>
-          <TraceLine status={working ? "running" : failed ? "error" : undefined}>
-            <TraceIcon>{working ? <LoaderCircleIcon className="animate-spin" /> : failed ? <CircleAlertIcon /> : <CircleCheckIcon />}</TraceIcon>
-            <TraceTitle>{title}</TraceTitle>
-            <TraceDescription>{failed ? `${failed} failed` : `${steps.length} steps`}</TraceDescription>
-          </TraceLine>
-        </TraceCollapsibleTrigger>
-        <TraceCollapsibleContent>
-          <Trace>{rows}</Trace>
-        </TraceCollapsibleContent>
-      </TraceCollapsible>
-    </Trace>
+    <>
+      <Trace>
+        <TraceCollapsible open={open ?? working} onOpenChange={setOpen}>
+          <TraceCollapsibleTrigger>
+            <TraceLine status={working ? "running" : failed ? "error" : undefined}>
+              <TraceIcon>{working ? <LoaderCircleIcon className="animate-spin" /> : failed ? <CircleAlertIcon /> : <CircleCheckIcon />}</TraceIcon>
+              <TraceTitle>{title}</TraceTitle>
+              <TraceDescription>{failed ? `${failed} failed` : `${steps.length} steps`}</TraceDescription>
+            </TraceLine>
+          </TraceCollapsibleTrigger>
+          <TraceCollapsibleContent>
+            <Trace>{rows}</Trace>
+          </TraceCollapsibleContent>
+        </TraceCollapsible>
+      </Trace>
+      {cards}
+    </>
+  );
+}
+
+// A plugin's card for a call the owner should see, such as a routine just made. It stays out of the folds.
+function ToolCard({ call }: { call: Tool }) {
+  const view = usePluginToolView(call.name);
+  if (!view?.open) return null;
+  return (
+    <PluginPart plugin={view.plugin}>
+      <view.View call={call} />
+    </PluginPart>
   );
 }
 
@@ -114,7 +135,7 @@ function ToolCall({ call }: { call: Tool }) {
         </TraceLine>
       </TraceCollapsibleTrigger>
       <TraceCollapsibleContent className="grid gap-2">
-        {view ? (
+        {view && !view.open ? (
           <PluginPart plugin={view.plugin}>
             <view.View call={call} />
           </PluginPart>
