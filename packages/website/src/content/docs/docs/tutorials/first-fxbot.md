@@ -7,7 +7,7 @@ In this tutorial you install fxbot on a Debian or Ubuntu machine, open it on you
 
 You need:
 
-- a Debian 13 or Ubuntu 24.04 machine, or newer, with systemd, where you can use `sudo`. On Debian 12 or Ubuntu 22.04, first [install Docker](https://docs.docker.com/engine/install/) from Docker's repository.
+- a Debian or Ubuntu machine, or one on a distro built on them, with systemd, where you can use `sudo`
 - [Tailscale](https://tailscale.com/download) on that machine and on your phone, in the same tailnet, with [HTTPS turned on](https://tailscale.com/kb/1153/enabling-https). This tutorial uses it to reach fxbot from your phone, the recommended way; fxbot itself doesn't need it.
 - a ChatGPT plan, or an API key from OpenAI or OpenRouter
 
@@ -19,7 +19,7 @@ On the machine, run:
 curl -fsSL https://fxbot.sh/setup.sh | sudo bash
 ```
 
-The script names each step in bold as it goes: the container engine, the fxbot user and its key, the release, and the services. fxbot runs as three containers: the app, its database, and the local embedder for memory search. The script uses podman, or docker when only docker is installed, and installs podman when neither is. Downloading the three images can take a few minutes, and the embedder downloads its model, 310 MB, on its first start. It ends with:
+The script names each step in bold as it goes: the container engine, the fxbot user and its key, the release, and the services. fxbot runs as three containers: the app, its database, and the local embedder for memory search. The script uses podman, or docker when only docker is installed. With neither, it installs podman, or docker where the distro's podman is too old. Downloading the three images can take a few minutes, and the embedder downloads its model, 310 MB, on its first start. It ends with:
 
 ```
 fxbot <version> runs on http://127.0.0.1:8787
