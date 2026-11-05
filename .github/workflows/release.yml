@@ -1,7 +1,7 @@
 name: release
 
 # A release is a version in package.json that has no tag yet, on main. It is tagged and published only after it
-# typechecks and builds, and its image is on ghcr.io, with its section of CHANGELOG.md as the notes; a version such as
+# typechecks and builds, and its image is on ghcr.io, with docs/releases/<version>.md as the notes; a version such as
 # 0.3.0-rc.1 is published as a prerelease. Every other push to main does nothing, and release branches, where work
 # happens, never run it.
 on:
@@ -67,19 +67,23 @@ jobs:
             exit 1
           fi
 
-      - name: Cut the notes
+      - name: Read the notes
         id: notes
         if: steps.version.outputs.release == 'true'
         env:
           TAG: ${{ steps.version.outputs.tag }}
         run: |
           version="${TAG#v}"
-          notes=$(awk -v head="## $version" 'index($0, head " ") == 1 || $0 == head { found = 1; next } /^## / { found = 0 } found' CHANGELOG.md | sed '/./,$!d')
-          if [ -z "$(printf '%s' "$notes" | tr -d '[:space:]')" ]; then
+          notes=docs/releases/$version.md
+          if ! grep -Eq "^## $version( |$)" CHANGELOG.md; then
             echo "CHANGELOG.md has no section for $version."
             exit 1
           fi
-          { echo "notes<<FXBOT_NOTES"; printf '%s\n' "$notes"; echo "FXBOT_NOTES"; } >> "$GITHUB_OUTPUT"
+          if [ "$(head -n 1 "$notes" 2>/dev/null)" != "fxbot $TAG is out!" ]; then
+            echo "$notes must exist, and open with: fxbot $TAG is out!"
+            exit 1
+          fi
+          { echo "notes<<FXBOT_NOTES"; printf '%s\n' "$(cat "$notes")"; echo "FXBOT_NOTES"; } >> "$GITHUB_OUTPUT"
 
   # fxbot's image for amd64 and arm64, tagged x.y.z, x.y, and latest for a stable version. The page is built on the
   # runner's own CPU (see the Dockerfile), so QEMU runs only the last stage's apt-get.

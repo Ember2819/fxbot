@@ -32,7 +32,7 @@ function repositoryFiles() {
     const about = changelog.split("\n\n")[0].replace(/\s+/g, " ");
     write(
       "src/content/docs/docs/reference/changelog.md",
-      `---\ntitle: Changelog\ndescription: ${JSON.stringify(about)}\n---\n\n${changelog.trim()}\n\nEach release is also on [GitHub Releases](${repo}/releases), with its section here as its notes.\n`,
+      `---\ntitle: Changelog\ndescription: ${JSON.stringify(about)}\n---\n\n${changelog.trim()}\n\nEach release is also on [GitHub Releases](${repo}/releases), with a short version of its section here.\n`,
     );
     mkdirSync(new URL("public", here), { recursive: true });
     for (const list of ["mcp-registry.json", "skills-registry.json", "plugins-registry.json"]) copyFileSync(new URL(`packages/sdk/src/${list}`, root), new URL(`public/${list}`, here));

@@ -9,9 +9,9 @@ fxbot gives people a version to stay on, while its owner keeps working on the ne
 
 One version covers the whole repository. Work happens on a branch named for the next release, and `npm run dev` runs from it. When it is ready, it merges into `main`, which holds releases only.
 
-The release workflow runs on `main`. When the version in `package.json` has no tag yet, it typechecks and builds, checks that no shipped migration changed, and builds fxbot's image for amd64 and arm64 and pushes it to ghcr.io. Only then does it tag the version and publish the release, with its section of the [changelog](/docs/reference/changelog/) as the notes. No tag points at a build that failed, and Settings never offers a release without an image.
+The release workflow runs on `main`. When the version in `package.json` has no tag yet, it typechecks and builds, checks that no shipped migration changed, and builds fxbot's image for amd64 and arm64 and pushes it to ghcr.io. Only then does it tag the version and publish the release, with its notes from `docs/releases/`. No tag points at a build that failed, and Settings never offers a release without an image.
 
-The changelog is written by hand. A release that adds migrations, bumps libfx, or needs a step by hand opens with **Before upgrading**, so its notes say so before anything else.
+The [changelog](/docs/reference/changelog/) and each release's notes are written by hand: the changelog in full, and the notes as a short post, for GitHub, Settings, and anywhere else. A release that adds migrations, bumps libfx, or needs a step by hand opens its changelog section with **Before upgrading**, and its notes say so above their list of changes, so Settings shows it before anything else.
 
 ## Installs stay where they are
 

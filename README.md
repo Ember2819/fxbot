@@ -216,12 +216,13 @@ An app installed from that address is the development page, so every change show
 ```sh
 npm version 0.2.0 --no-git-tag-version     # package.json and the lockfile
 # CHANGELOG.md: rename "## Unreleased" to "## 0.2.0 (<date>)", with a Before upgrading list if it adds migrations
-git commit -am "Release 0.2.0"
+# docs/releases/0.2.0.md: the release's notes, shaped like the last one's
+git add docs/releases && git commit -am "Release 0.2.0"
 git switch main && git merge --ff-only release/0.2.0 && git push
 git switch -c release/0.3.0 && git push -u origin release/0.3.0
 ```
 
-The [release workflow](.github/workflows/release.yml) typechecks and builds the new version, checks that no shipped migration changed, builds fxbot's image for amd64 and arm64 and pushes it to ghcr.io, then tags it and publishes a GitHub Release with its changelog section. GitHub makes a new package private: after the first release with an image, make it public once, in the package's settings (**Change visibility**). It runs only on `main`: release branches are for work, and never publish. A prerelease, such as `0.3.0-rc.1`, is published only when you merge one into `main`. A fix to a release goes on `release/0.2.1` from `main`, and is merged into the open release branch after.
+The [release workflow](.github/workflows/release.yml) typechecks and builds the new version, checks that no shipped migration changed, builds fxbot's image for amd64 and arm64 and pushes it to ghcr.io, then tags it and publishes a GitHub Release with `docs/releases/<version>.md` as its notes. Those notes are a short post, to paste anywhere, and they're what Settings shows above **Update**, so a release with a **Before upgrading** says so above its list of changes. GitHub makes a new package private: after the first release with an image, make it public once, in the package's settings (**Change visibility**). It runs only on `main`: release branches are for work, and never publish. A prerelease, such as `0.3.0-rc.1`, is published only when you merge one into `main`. A fix to a release goes on `release/0.2.1` from `main`, and is merged into the open release branch after.
 
 ## Status
 
