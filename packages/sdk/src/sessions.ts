@@ -57,7 +57,8 @@ async function bootstrap(sql: postgres.Sql, options: MigrateOptions & { backedUp
   if (was === by) return;
   const [{ used }] = await sql<{ used: boolean }[]>`select exists (select 1 from profiles) as used`;
   if (used && !options.backedUp) await backup(options, `world-postgres-${version}`);
-  await run(process.execPath, [join(home, "bin", "setup.js")], { cwd: home, env: { PATH: process.env.PATH, WORKFLOW_POSTGRES_URL: options.databaseUrl } }).catch(
+  // HOME too: its config loader reads the home folder, and a container's numeric user has no other, on Docker.
+  await run(process.execPath, [join(home, "bin", "setup.js")], { cwd: home, env: { PATH: process.env.PATH, HOME: process.env.HOME, WORKFLOW_POSTGRES_URL: options.databaseUrl } }).catch(
     (error: { stderr?: string; message: string }) => {
       throw new Error(`Cannot set up the tables for chats: ${error.stderr?.trim() || error.message}`);
     },
