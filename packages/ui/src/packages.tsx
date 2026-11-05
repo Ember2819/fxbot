@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import type { McpPlugin, Plugin, PackagePlugin, PackagePreview, PackageSearch } from "@fxbot/sdk/client";
-import { Details, heading, hint } from "./mcp-add.tsx";
+import { AddedFooter, Details, heading, hint } from "./mcp-add.tsx";
 import { PluginIcon } from "./plugin-icon.tsx";
 import { client } from "./client.ts";
 
@@ -73,8 +73,9 @@ function Readable({ paths, texts, sizes }: { paths: string[]; texts: Record<stri
   );
 }
 
-// What a plugin's page shows, before Add and before an update: what runs inside fxbot, and the rest it carries.
-function Contents({ page }: { page: PackagePreview }) {
+// What a plugin's page shows, before Add, before an update, and once added: what runs inside fxbot, and the rest it
+// carries.
+function Contents({ page, added = false }: { page: PackagePreview; added?: boolean }) {
   const sizes = Object.fromEntries(page.files.map((f) => [f.path, f.size]));
   return (
     <>
@@ -92,7 +93,7 @@ function Contents({ page }: { page: PackagePreview }) {
       {page.code.length > 0 && (
         <section className="grid gap-2">
           <h3 className={heading}>Runs inside fxbot</h3>
-          <p className="text-sm">This plugin's code runs inside fxbot, with everything fxbot can reach. Read it before you add it.</p>
+          <p className="text-sm">This plugin's code runs inside fxbot, with everything fxbot can reach.{added ? "" : " Read it before you add it."}</p>
           <Readable paths={page.code} texts={page.texts} sizes={sizes} />
         </section>
       )}
@@ -141,20 +142,31 @@ function Contents({ page }: { page: PackagePreview }) {
 }
 
 // A plugin's page, from its repository's current commit, and the consent to add it. Nothing is saved before Add, and a
-// plugin that changed since is shown again.
-export function PluginDialog({ target, onAdded, onClose }: { target: PluginTarget; onAdded: (addon: Plugin) => void; onClose: () => void }) {
+// plugin that changed since is shown again. An installed plugin's page is read from the files it runs, with its settings
+// in place of Add.
+export function PluginDialog({
+  target,
+  installed,
+  onAdded,
+  onClose,
+}: {
+  target: PluginTarget;
+  installed?: { id: string; onSettings: () => void };
+  onAdded?: (addon: Plugin) => void;
+  onClose: () => void;
+}) {
   const [page, setPage] = useState<PackagePreview | null>(null);
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
   const ref = { repo: target.ref, from: target.from };
-  const look = () => (setPage(null), setError(""), client.plugins.preview(ref).then(setPage, (e: Error) => setError(e.message)));
+  const look = () => (setPage(null), setError(""), (installed ? client.plugins.contents(installed.id) : client.plugins.preview(ref)).then(setPage, (e: Error) => setError(e.message)));
   useEffect(() => void look(), []);
 
   async function add() {
     setBusy(true);
     setError("");
     try {
-      onAdded(await client.plugins.add(ref, page!.hash));
+      onAdded?.(await client.plugins.add(ref, page!.hash));
     } catch (e) {
       setError((e as Error).message);
       if ((e as Error).message.includes("changed since")) await look();
@@ -181,21 +193,30 @@ export function PluginDialog({ target, onAdded, onClose }: { target: PluginTarge
           )}
           {error && <p role="alert" className="text-sm text-destructive">{error}</p>}
           {page?.error && <p className="text-sm text-destructive">{page.error}</p>}
-          {page && !page.error && <Contents page={page} />}
+          {page && !page.error && <Contents page={page} added={Boolean(installed)} />}
           {page && (
             <section className="grid gap-2">
               <h3 className={heading}>Information</h3>
               <Details
-                rows={[
-                  ["Repository", <span key="repo">{repoLink(page.source.repo, page.source.path, page.source.commit)}, at {page.source.commit.slice(0, 7)}</span>],
-                  ["Version", page.version || undefined],
-                  ["Source", fromText[target.from]],
-                ]}
+                rows={
+                  "repo" in page.source
+                    ? [
+                        ["Repository", <span key="repo">{repoLink(page.source.repo, page.source.path, page.source.commit)}, at {page.source.commit.slice(0, 7)}</span>],
+                        ["Version", page.version || undefined],
+                        ["Source", fromText[page.source.from]],
+                      ]
+                    : [
+                        ["Folder", <span key="folder" className="font-mono text-xs break-all">{page.source.local}</span>],
+                        ["Version", page.version || undefined],
+                        ["Source", "FXBOT_PLUGIN_DIRS"],
+                      ]
+                }
               />
             </section>
           )}
         </div>
-        {page?.hash && (
+        {installed && <AddedFooter onSettings={installed.onSettings} />}
+        {!installed && page?.hash && (
           <div className="border-t pt-3">
             <Button onClick={add} disabled={busy || page.needs.some((need) => !need.added)}>
               {busy && <LoaderCircleIcon className="animate-spin" />}

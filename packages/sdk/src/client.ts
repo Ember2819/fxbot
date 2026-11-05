@@ -219,6 +219,8 @@ export function createClient({ baseUrl = "", onVersion }: ClientOptions = {}) {
       configure: (id: string, settings: Record<string, string>) => call<PackagePlugin>(`/plugins/${id}/settings`, "PUT", settings),
       // A plugin's recent log lines and errors.
       log: (id: string) => call<{ lines: string[] }>(`/plugins/${id}/log`).then((r) => r.lines),
+      // An installed package's page, from the files it runs, as Browse shows one before Add.
+      contents: (id: string) => call<PackagePreview>(`/plugins/${id}/contents`),
       // The running packages' page code and CSS, for the page to load.
       pages: () => call<PluginPage[]>("/plugins/pages"),
     },

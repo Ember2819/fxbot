@@ -165,6 +165,7 @@ Until Settings' `unvetted` is true, search answers only from fxbot's own lists a
 | `plugins.check()` | Runs the hourly check of the skills' and packages' repositories now | nothing |
 | `plugins.configure(id, settings)` | A package's settings: a value for each one named, or `""` for its default. Secrets are write-only. | `PackagePlugin` |
 | `plugins.log(id)` | Synchronous. A package's recent log lines and errors | `string[]` |
+| `plugins.contents(id)` | An installed package's page, read from the files it runs: its commit's for one from GitHub, its folder for a local one, whose `source` is `{ local }`. It throws 404 for an id that isn't a package. Since 0.5.0. | `PackagePreview` |
 | `plugins.pages()` | The running packages' page code and CSS, by URL, for the page | `PluginPage[]` |
 | `plugins.file(name, path)` | A running package's page code or CSS, and nothing else of its files. `pinned` says its URL names a commit. | `{ type, data, pinned }` |
 | `plugins.handle(name, request, path)` | Answers a request to `/api/plugins/<name>/<path>` with the package's route | `Response` |

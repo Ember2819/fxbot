@@ -10,14 +10,14 @@ import { SidebarTrigger } from "@/components/ui/sidebar";
 import { Switch } from "@/components/ui/switch";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import type { Plugin, McpCard, PluginMark, McpPreview, McpPlugin, OAuthAttempt, OAuthStatus, PackagePlugin, Profile, SkillCard } from "@fxbot/sdk/client";
-import { AddressDialog, bearer, EntryDialog, heading, hint, hostOf, Information, label, Results, signsIn, useSearch } from "./mcp-add.tsx";
+import { AddressDialog, bearer, EntryDialog, heading, hint, hostOf, Information, InstalledServer, label, Results, signsIn, useSearch } from "./mcp-add.tsx";
 import { PluginIcon } from "./plugin-icon.tsx";
 import { Blob } from "./blob.tsx";
 import { client } from "./client.ts";
 import { follow } from "./nav.ts";
 import { PluginDialog, PluginSettings, RepoForm, usePackageSearch, type PluginTarget } from "./packages.tsx";
 import { loadPlugins } from "./plugins.tsx";
-import { SkillDialog, SkillResults, SkillSettings, useSkillSearch } from "./skills.tsx";
+import { InstalledSkill, SkillDialog, SkillResults, SkillSettings, useSkillSearch } from "./skills.tsx";
 
 // Past this many, the page says how many tools reach the bots: each one's schema rides along with every message.
 const toolBudget = 40;
@@ -48,11 +48,19 @@ const markText: Record<Plugin["kind"], Record<PluginMark["kind"], string>> = {
 type Tab = "installed" | "browse";
 // A card in fxbot's picks: a plugin from one of its three lists.
 type Card = { key: string; name: string; iconKey: string; carries: string; description: string; added: boolean; open: () => void };
+// What an installed package's page reads first: where it comes from, as Browse names it.
+const targetOf = (addon: PackagePlugin): PluginTarget => ({
+  ref: "repo" in addon.source ? `${addon.source.repo}${addon.source.path ? `/${addon.source.path}` : ""}` : addon.source.local,
+  from: "repo" in addon.source ? addon.source.from : "fxbot",
+  name: addon.name,
+  iconKey: addon.iconKey,
+  description: addon.description,
+});
 
-// One list of plugins. Installed has one row each, with a switch and an edit button that opens its settings; a
-// package's MCP servers show in its settings. Browse shows fxbot's picks, the plugins it vets; with unvetted plugins on
-// in Settings, it also searches the public MCP registries and skills.sh, and adds a server by address or a package
-// from GitHub.
+// One list of plugins. Installed has one row each: its name opens its page, as Browse shows one, and a switch and an
+// edit button that opens its settings; a package's MCP servers show in its settings. Browse shows fxbot's picks, the
+// plugins it vets, leaving out those added; with unvetted plugins on in Settings, it also searches the public MCP
+// registries and skills.sh, and adds a server by address or a package from GitHub.
 export function PluginsPage({ profiles }: { profiles: Profile[] | null }) {
   const [addons, setAddons] = useState<Plugin[] | null>(null);
   const [unvetted, setUnvetted] = useState(false);
@@ -65,6 +73,7 @@ export function PluginsPage({ profiles }: { profiles: Profile[] | null }) {
   const [plugin, setPlugin] = useState<PluginTarget | null>(null);
   const [byAddress, setByAddress] = useState(false);
   const [openId, setOpenId] = useState<string | null>(null);
+  const [infoId, setInfoId] = useState<string | null>(null);
   const [signingIn, setSigningIn] = useState<McpPlugin | null>(null);
   const search = useSearch(query, everything);
   const skillSearch = useSkillSearch(query);
@@ -83,6 +92,8 @@ export function PluginsPage({ profiles }: { profiles: Profile[] | null }) {
   const packages = (addons ?? []).flatMap((a) => (a.kind === "package" ? [`${a.id}:${a.enabled}:${a.bots}:${a.on.join()}:${a.version}:${a.parts.page}:${a.error ?? ""}`] : [])).join(" ");
   useEffect(() => void (addons && (loadPlugins(), load())), [packages]);
   const open = addons?.find((a) => a.id === openId);
+  const info = addons?.find((a) => a.id === infoId);
+  const settingsOf = (id: string) => () => (setInfoId(null), setOpenId(id));
   // A package's servers follow it, and show in its settings rather than as rows.
   const owned = new Map((addons ?? []).flatMap((a) => (a.kind === "package" ? a.servers.map((id) => [id, a] as const) : [])));
   const servers = (addons ?? []).flatMap((a) => (a.kind === "mcp" ? [a] : []));
@@ -101,13 +112,15 @@ export function PluginsPage({ profiles }: { profiles: Profile[] | null }) {
   );
   const added = new Set(servers.flatMap((a) => [a.url, ...(a.source ? [a.source.registry] : [])]));
   const skillsAdded = new Set((addons ?? []).flatMap((a) => (a.kind === "skill" ? [a.source.skill] : [])));
-  const packagesAdded = new Set((addons ?? []).flatMap((a) => (a.kind === "package" && "repo" in a.source ? [`${a.source.repo}${a.source.path ? `/${a.source.path}` : ""}`] : [])));
-  // fxbot's picks from its three lists, as one list: packages, then servers, then skills.
-  const picks: Card[] = [
-    ...(packageSearch.result?.cards ?? []).map((c) => ({ key: `p:${c.ref}`, name: c.name, iconKey: c.iconKey, carries: "", description: c.description, added: packagesAdded.has(c.ref), open: () => setPlugin({ ref: c.ref, from: "fxbot", name: c.name, iconKey: c.iconKey, description: c.description }) })),
+  // A package by its name: no two added share one, and a local plugin has no repository to match.
+  const packagesAdded = new Set((addons ?? []).flatMap((a) => (a.kind === "package" ? [a.name] : [])));
+  // fxbot's picks from its three lists, as one list: packages, then servers, then skills, without those added.
+  const listed: Card[] = [
+    ...(packageSearch.result?.cards ?? []).map((c) => ({ key: `p:${c.ref}`, name: c.name, iconKey: c.iconKey, carries: "", description: c.description, added: packagesAdded.has(c.name), open: () => setPlugin({ ref: c.ref, from: "fxbot", name: c.name, iconKey: c.iconKey, description: c.description }) })),
     ...(search.result?.cards ?? []).filter((c) => c.from === "fxbot").map((c) => ({ key: `m:${c.name}`, name: c.title || c.name, iconKey: c.iconKey, carries: "MCP server", description: c.description, added: added.has(c.name), open: () => setEntry(c) })),
     ...(skillSearch.result?.cards ?? []).filter((c) => c.from === "fxbot").map((c) => ({ key: `s:${c.id}`, name: c.name, iconKey: c.iconKey, carries: "Skill", description: c.description ?? "", added: skillsAdded.has(c.id), open: () => setSkill(c) })),
   ];
+  const picks = listed.filter((pick) => !pick.added);
   const publicServers = { ...search, result: search.result && { ...search.result, cards: search.result.cards.filter((c) => c.from !== "fxbot") } };
   const publicSkills = { ...skillSearch, result: skillSearch.result && { ...skillSearch.result, cards: skillSearch.result.cards.filter((c) => c.from !== "fxbot") } };
   const onAdded = (addon: Plugin) => {
@@ -173,7 +186,9 @@ export function PluginsPage({ profiles }: { profiles: Profile[] | null }) {
                   <PluginIcon iconKey={addon.iconKey} size={32} />
                   <div className="min-w-0 flex-1">
                     <p className="flex min-w-0 items-baseline gap-2">
-                      <span className="truncate font-medium">{addon.name}</span>
+                      <button type="button" className="truncate font-medium underline-offset-4 outline-none hover:underline focus-visible:underline" onClick={() => setInfoId(addon.id)}>
+                        {addon.name}
+                      </button>
                       {addon.mark && <span className={`shrink-0 text-xs ${addon.mark.kind === "update" ? "text-muted-foreground" : "text-destructive"}`}>{markText[addon.kind][addon.mark.kind]}</span>}
                     </p>
                     <p className="truncate text-sm text-muted-foreground">{summary(addon, profiles)}</p>
@@ -211,12 +226,13 @@ export function PluginsPage({ profiles }: { profiles: Profile[] | null }) {
                       {pick.description && <span className="line-clamp-2 text-sm text-muted-foreground">{pick.description}</span>}
                       <span className="mt-0.5 flex items-center gap-2 text-xs text-muted-foreground">
                         <Badge>fxbot</Badge>
-                        {pick.added && <span className="text-foreground">Added</span>}
                       </span>
                     </span>
                   </button>
                 ))}
-                {picks.length === 0 && <p className="text-sm text-muted-foreground">{words ? "None of fxbot's picks match." : "Loading fxbot's picks…"}</p>}
+                {picks.length === 0 && (
+                  <p className="text-sm text-muted-foreground">{words ? "None of fxbot's picks you haven't added match." : listed.length ? "You've added all of fxbot's picks." : "Loading fxbot's picks…"}</p>
+                )}
                 {!unvetted && (
                   <p className="text-sm text-muted-foreground">
                     These are the plugins fxbot vets. To browse public registries, and add any plugin by its address or repository, turn on{" "}
@@ -282,6 +298,9 @@ export function PluginsPage({ profiles }: { profiles: Profile[] | null }) {
           onClose={() => setOpenId(null)}
         />
       )}
+      {info?.kind === "package" && <PluginDialog target={targetOf(info)} installed={{ id: info.id, onSettings: settingsOf(info.id) }} onClose={() => setInfoId(null)} />}
+      {info?.kind === "skill" && <InstalledSkill addon={info} onSettings={settingsOf(info.id)} onClose={() => setInfoId(null)} />}
+      {info?.kind === "mcp" && <InstalledServer addon={info} onSettings={settingsOf(info.id)} onClose={() => setInfoId(null)} />}
       {signingIn && <SignIn addon={signingIn} onClose={() => (setSigningIn(null), void load())} />}
     </>
   );

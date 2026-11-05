@@ -207,7 +207,8 @@ export type PackagePreview = {
   iconKey: string;
   version: string;
   description: string;
-  source: { repo: string; path: string; commit: string; from: "fxbot" | "github" };
+  /** Where its files are: a repository at a commit, or, for an installed local plugin, its folder. */
+  source: PackageSource;
   files: SkillFile[];
   skipped: { path: string; why: string }[];
   /** The files that run inside fxbot: its server and page code. */

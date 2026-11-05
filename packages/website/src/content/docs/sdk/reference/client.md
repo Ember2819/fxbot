@@ -123,6 +123,7 @@ A file itself is read through its item's `url`, `/api/library/<id>/file`.
 | `plugins.searchPackages(q)` | `GET /api/plugins/search?q=&kind=package` | `PackageSearch` |
 | `plugins.configure(id, settings)` | `PUT /api/plugins/<id>/settings` | `PackagePlugin` |
 | `plugins.log(id)` | `GET /api/plugins/<id>/log` | `string[]` |
+| `plugins.contents(id)` | `GET /api/plugins/<id>/contents` | `PackagePreview` |
 | `plugins.pages()` | `GET /api/plugins/pages` | `PluginPage[]` |
 | `oauth.get(attemptId)` | `GET /api/oauth/attempts/<attemptId>` | `OAuthStatus` |
 | `oauth.paste(attemptId, address)` | `POST /api/oauth/attempts/<attemptId>/paste` | `OAuthStatus` |

@@ -10,9 +10,9 @@ A plugin gives your bots more, or changes fxbot itself. It carries any mix of th
 
 By default, fxbot shows only the plugins it vets, tagged **fxbot**. Each has a page in the [plugin directory](/plugins/), which says what it carries.
 
-1. Open **Plugins**, the puzzle button at the bottom of the sidebar, and choose **Browse**. fxbot's picks are listed, each with what it carries beside its name. Each plugin's icon is drawn from who made it and its name, so it looks the same wherever it shows, here and on [fxbot.sh](https://fxbot.sh).
+1. Open **Plugins**, the puzzle button at the bottom of the sidebar, and choose **Browse**. fxbot's picks you haven't added are listed, each with what it carries beside its name. Each plugin's icon is drawn from who made it and its name, so it looks the same wherever it shows, here and on [fxbot.sh](https://fxbot.sh).
 2. Choose one to open its page. fxbot reads it at its newest version, and the page shows what it carries. For code, under **Runs inside fxbot**, choose **Read** to see each file: code runs with everything fxbot can reach.
-3. Choose the **Add** button, which names the plugin. fxbot shows it under **Installed**, with what it carries, and what it adds to the app shows at once.
+3. Choose the **Add** button, which names the plugin. fxbot shows it under **Installed**, with what it carries, and what it adds to the app shows at once. Its name there opens its page again, read from the files it runs, with **Settings** in place of **Add**.
 4. To change its settings, choose the pencil button on its row. A secret setting is sealed, and the page never shows it again. A plugin's MCP servers are listed there too, each with its own sign-in or key and tools.
 5. To give it to some bots only, choose **Choose** under **Bots**, and switch it on for each bot that should have it. Its servers follow, and its screens are for everyone.
 

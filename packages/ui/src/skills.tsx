@@ -4,7 +4,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import type { Plugin, SkillPlugin, SkillCard, SkillFile, SkillPreview, SkillSearch } from "@fxbot/sdk/client";
-import { Details, heading, hint } from "./mcp-add.tsx";
+import { AddedFooter, Details, heading, hint } from "./mcp-add.tsx";
 import { PluginIcon } from "./plugin-icon.tsx";
 import { client } from "./client.ts";
 
@@ -42,15 +42,16 @@ export function useSkillSearch(query: string) {
   return { result, error, busy };
 }
 
-// Unvetted skills on Browse: skills.sh's results. `added` holds the ids of installed skills.
+// Unvetted skills on Browse: skills.sh's results. `added` holds the ids of installed skills, which it leaves out.
 export function SkillResults({ search, words, added, onOpen }: { search: ReturnType<typeof useSkillSearch>; words: string; added: Set<string>; onOpen: (card: SkillCard) => void }) {
   const { result, error } = search;
+  const cards = result?.cards.filter((card) => !added.has(card.id));
   return (
     <div className="grid gap-2">
       {!words && <p className="text-sm text-muted-foreground">Type above to search skills.sh.</p>}
       {error && <p role="alert" className="text-sm text-destructive">{error}</p>}
       {result?.error && <p className="text-sm text-destructive">{result.error}</p>}
-      {result?.cards.map((card) => (
+      {cards?.map((card) => (
         <button
           key={card.id}
           type="button"
@@ -67,12 +68,11 @@ export function SkillResults({ search, words, added, onOpen }: { search: ReturnT
             {card.description && <span className="line-clamp-2 text-sm text-muted-foreground">{card.description}</span>}
             <span className="mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-muted-foreground">
               <Badge variant={card.from === "fxbot" ? "default" : "outline"}>{card.from}</Badge>
-              {added.has(card.id) && <span className="text-foreground">Added</span>}
             </span>
           </span>
         </button>
       ))}
-      {result && words.length >= 2 && result.cards.length === 0 && !result.error && <p className="text-sm text-muted-foreground">No skill on skills.sh matches.</p>}
+      {result && words.length >= 2 && cards?.length === 0 && !result.error && <p className="text-sm text-muted-foreground">No skill on skills.sh matches.</p>}
     </div>
   );
 }
@@ -184,6 +184,42 @@ export function SkillDialog({ card, onAdded, onClose }: { card: SkillCard; onAdd
             </Button>
           </div>
         )}
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+// An installed skill's page, as Browse shows one: its files, all readable now, and where it came from.
+export function InstalledSkill({ addon, onSettings, onClose }: { addon: SkillPlugin; onSettings: () => void; onClose: () => void }) {
+  return (
+    <Dialog open onOpenChange={(open) => !open && onClose()}>
+      <DialogContent className="flex max-h-[90dvh] flex-col sm:max-w-xl">
+        <DialogHeader>
+          <div className="flex min-w-0 items-center gap-2 pr-6">
+            <PluginIcon iconKey={addon.iconKey} />
+            <DialogTitle className="truncate">{addon.name}</DialogTitle>
+          </div>
+          {addon.description && <DialogDescription>{addon.description}</DialogDescription>}
+        </DialogHeader>
+        <div className="-mx-4 grid min-h-0 flex-1 grid-cols-1 content-start gap-4 overflow-y-auto px-4">
+          {addon.manual && <Manual />}
+          <section className="grid gap-2">
+            <h3 className={heading}>Skill</h3>
+            <Files files={addon.files} read={(path) => client.plugins.readSkill(addon.id, path)} />
+            <p className={`text-xs ${hint}`}>Nothing in a skill runs: bots read its files as text.</p>
+          </section>
+          <section className="grid gap-2">
+            <h3 className={heading}>Information</h3>
+            <Details
+              rows={[
+                ["Repository", <span key="repo">{repoLink(addon.source.skill, addon.source.commit)}, at {addon.source.commit.slice(0, 7)}</span>],
+                ["License", addon.license],
+                ["Source", fromText[addon.source.from]],
+              ]}
+            />
+          </section>
+        </div>
+        <AddedFooter onSettings={onSettings} />
       </DialogContent>
     </Dialog>
   );

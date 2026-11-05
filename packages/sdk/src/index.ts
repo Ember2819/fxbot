@@ -715,6 +715,8 @@ export async function createFxbot(options: FxbotOptions) {
       },
       // A plugin's recent log lines and errors.
       log: (id: string) => packages.log(id),
+      // An installed package's page, from the files it runs.
+      contents: (id: string) => packages.contents(id),
       // A plugin's settings. Secrets are write-only.
       configure: (id: string, settings: Record<string, unknown>) => packages.configure(id, settings),
       // One of an installed skill's files, to read on its page.

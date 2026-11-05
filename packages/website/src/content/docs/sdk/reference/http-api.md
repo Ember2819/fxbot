@@ -60,6 +60,7 @@ For typed calls from a page or a script, use [the client](/sdk/reference/client/
 | `POST` | `/api/plugins/<id>/sign-in` | | 201 and `OAuthAttempt`. The request's `Origin` is where the sign-in comes back to. |
 | `PUT` | `/api/plugins/<id>/settings` | A package's settings, name to value, `""` for its default | `PackagePlugin`. Secrets never come back. |
 | `GET` | `/api/plugins/<id>/log` | | `{ "lines": [...] }`, a package's recent log |
+| `GET` | `/api/plugins/<id>/contents` | | `PackagePreview`, an installed package's page, from the files it runs |
 | `GET` | `/api/plugins/pages` | | `PluginPage[]`: each running package's page code and CSS, by URL |
 | `GET` | `/api/plugins/<name>/files/<path>` | | A package's page code or CSS, and nothing else of its files. A pinned package's is kept for good, under its commit. |
 | Any | `/api/plugins/<name>/<path>` | | The package's own route. See [Plugin API](/sdk/reference/plugin-api/#routes). |

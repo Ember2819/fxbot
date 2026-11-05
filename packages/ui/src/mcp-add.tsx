@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
-import type { Plugin, McpCard, RegistryFrom, RegistryInfo, McpPreview, PluginRef, McpSearch } from "@fxbot/sdk/client";
+import type { Plugin, McpCard, McpPlugin, RegistryFrom, RegistryInfo, McpPreview, PluginRef, McpSearch } from "@fxbot/sdk/client";
 import { client } from "./client.ts";
 
 export const label = "grid gap-1.5 text-sm font-medium";
@@ -48,9 +48,10 @@ export function useSearch(query: string, everything: boolean) {
 }
 
 // Unvetted MCP servers on Browse: GitHub's registry as cards, the switch to search everything, and adding by address.
-// `added` holds the names and addresses of what is installed.
+// `added` holds the names and addresses of what is installed, which it leaves out.
 export function Results({ search, everything, onEverything, added, onOpen, onAddress }: { search: ReturnType<typeof useSearch>; everything: boolean; onEverything: (on: boolean) => void; added: Set<string>; onOpen: (card: McpCard) => void; onAddress: () => void }) {
   const { result, error } = search;
+  const cards = result?.cards.filter((card) => !added.has(card.name) && !(card.url !== undefined && added.has(card.url)));
   return (
     <div className="grid gap-2">
       <div className="flex flex-wrap items-center justify-between gap-2">
@@ -66,8 +67,8 @@ export function Results({ search, everything, onEverything, added, onOpen, onAdd
       {result && !result.syncedAt && <p className="text-sm text-muted-foreground">fxbot hasn't read GitHub's registry yet{result.error ? `: ${result.error}` : ". It does within a minute of starting."}</p>}
       {result?.syncedAt && result.error && <p className="text-sm text-muted-foreground">The last sync failed ({result.error}), so these are from {new Date(result.syncedAt).toLocaleString()}.</p>}
       {result?.everythingError && <p className="text-sm text-destructive">{result.everythingError}</p>}
-      {result?.cards.map((card) => <Card key={`${card.from}:${card.name}`} card={card} added={added.has(card.name) || (card.url !== undefined && added.has(card.url))} onOpen={() => onOpen(card)} />)}
-      {result?.syncedAt && result.cards.length === 0 && (
+      {cards?.map((card) => <Card key={`${card.from}:${card.name}`} card={card} onOpen={() => onOpen(card)} />)}
+      {result?.syncedAt && cards?.length === 0 && (
         <p className="text-sm text-muted-foreground">No server matches{everything ? "." : " in GitHub's registry. Search everything to look in the official one."}</p>
       )}
     </div>
@@ -76,12 +77,11 @@ export function Results({ search, everything, onEverything, added, onOpen, onAdd
 
 
 // What a card says under its description: where it runs, what it needs, and anything to be wary of.
-function facts(card: McpCard, added: boolean) {
+function facts(card: McpCard) {
   return [
     <Badge key="from" variant={card.from === "fxbot" ? "default" : "outline"}>
       {fromLabel[card.from]}
     </Badge>,
-    added && <span key="added" className="text-foreground">Added</span>,
     card.host && (card.hostMatches === false ? <span key="host" className="text-destructive">{card.host}, not on {card.domain}</span> : <span key="host">{card.host}</span>),
     card.local && <span key="local">Runs on this machine</span>,
     card.needs === "key" && <span key="key">Needs a key</span>,
@@ -89,7 +89,7 @@ function facts(card: McpCard, added: boolean) {
   ].filter(Boolean);
 }
 
-function Card({ card, added, onOpen }: { card: McpCard; added: boolean; onOpen: () => void }) {
+function Card({ card, onOpen }: { card: McpCard; onOpen: () => void }) {
   return (
     <button type="button" onClick={onOpen} className="flex w-full min-w-0 gap-3 rounded-lg border p-3 text-left transition-colors outline-none hover:bg-muted/50 focus-visible:ring-3 focus-visible:ring-ring/50">
       <PluginIcon iconKey={card.iconKey} />
@@ -100,7 +100,7 @@ function Card({ card, added, onOpen }: { card: McpCard; added: boolean; onOpen: 
           {card.stars !== undefined && <span className="ml-auto shrink-0 text-xs text-muted-foreground tabular-nums">★ {compact(card.stars)}</span>}
         </span>
         {card.description && <span className="line-clamp-2 text-sm text-muted-foreground">{card.description}</span>}
-        <span className="mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-muted-foreground">{facts(card, added)}</span>
+        <span className="mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-muted-foreground">{facts(card)}</span>
       </span>
     </button>
   );
@@ -136,6 +136,56 @@ export function Information({ info }: { info: RegistryInfo }) {
     ["Source", fromText[info.from]],
   ];
   return <Details rows={rows} />;
+}
+
+// Where an installed plugin's page has Add on Browse: that it's added, and its settings.
+export function AddedFooter({ onSettings }: { onSettings: () => void }) {
+  return (
+    <div className="flex items-center gap-3 border-t pt-3">
+      <Button variant="outline" onClick={onSettings}>
+        Settings
+      </Button>
+      <span className="text-sm text-muted-foreground">Added</span>
+    </div>
+  );
+}
+
+// An installed server's page, as Browse shows an entry's: the server, then where it came from.
+export function InstalledServer({ addon, onSettings, onClose }: { addon: McpPlugin; onSettings: () => void; onClose: () => void }) {
+  const readOnly = addon.tools.filter((t) => t.readOnly).length;
+  return (
+    <Dialog open onOpenChange={(open) => !open && onClose()}>
+      <DialogContent className="flex max-h-[90dvh] flex-col sm:max-w-xl">
+        <DialogHeader>
+          <div className="flex min-w-0 items-center gap-2 pr-6">
+            <PluginIcon iconKey={addon.iconKey} />
+            <DialogTitle className="truncate">{addon.info?.title || addon.name}</DialogTitle>
+          </div>
+          {addon.info?.description && <DialogDescription>{addon.info.description}</DialogDescription>}
+        </DialogHeader>
+        <div className="-mx-4 grid min-h-0 flex-1 content-start gap-4 overflow-y-auto px-4">
+          <section className="grid gap-2">
+            <h3 className={heading}>MCP server</h3>
+            <div className="rounded-lg border p-3 text-sm">
+              <p className="font-medium">{addon.name}</p>
+              <p className="text-muted-foreground">
+                {hostOf(addon.url)} · {signsIn[addon.auth]} · {addon.tools.length ? `${addon.tools.length} tools, ${readOnly} read-only` : "lists no tools yet"}
+              </p>
+            </div>
+          </section>
+          <section className="grid gap-2">
+            <h3 className={heading}>Information</h3>
+            {addon.info && addon.source ? (
+              <Information info={{ ...addon.info, version: addon.source.version }} />
+            ) : (
+              <Details rows={[["Address", <span key="url" className="break-all">{addon.url}</span>], ["Source", "Added by its address"]]} />
+            )}
+          </section>
+        </div>
+        <AddedFooter onSettings={onSettings} />
+      </DialogContent>
+    </Dialog>
+  );
 }
 
 // A registry entry's page, and the consent to add it. It looks at the server first; nothing is saved before Add, and

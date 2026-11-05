@@ -315,44 +315,9 @@ export async function createPlugins(options: {
     const inside = (p: string) => !path || p.startsWith(`${path}/`);
     const relative = (p: string) => (path ? p.slice(path.length + 1) : p);
     const files = [...all.text].filter(([p]) => inside(p)).map(([p, t]) => [relative(p), t] as [string, string]).sort(([a], [b]) => (a < b ? -1 : 1));
-    const page: PackagePreview = {
-      hash: "",
-      name: "",
-      iconKey: "",
-      version: "",
-      description: "",
-      source: { repo, path, commit: at, from: ref.from === "fxbot" ? "fxbot" : "github" },
-      files: files.map(([p, t]) => ({ path: p, size: Buffer.byteLength(t), hash: sha(t).slice(0, 12) })),
-      skipped: [...all.skipped].filter(([p]) => inside(p)).map(([p, why]) => ({ path: relative(p), why })),
-      code: [],
-      texts: {},
-      settings: [],
-      migrations: [],
-      skills: [],
-      needs: [],
-      servers: [],
-    };
-    const byPath = new Map(files);
-    const where = `${repo}${path ? `/${path}` : ""}`;
-    if (!byPath.has("plugin.json")) return { page: { ...page, error: `${where} has no plugin.json at ${at.slice(0, 7)}.` }, files };
-    page.texts["plugin.json"] = byPath.get("plugin.json")!;
-    let manifest: Manifest;
-    try {
-      manifest = parseManifest(byPath.get("plugin.json")!);
-    } catch (error) {
-      return { page: { ...page, error: said(error) }, files };
-    }
-    Object.assign(page, { name: manifest.name, iconKey: `${repo.split("/")[0]}/${manifest.name}`, version: manifest.version, description: manifest.description, settings: manifest.settings });
-    page.needs = Object.keys(manifest.needs).map((name) => ({ name, added: Boolean(named(name)) }));
-    page.code = [manifest.server, manifest.page].filter((p): p is string => Boolean(p));
-    const missing = [...page.code, manifest.css].filter((p) => p && !byPath.has(p));
-    if (missing.length) return { page: { ...page, error: `plugin.json names ${missing.join(" and ")}, which ${where} doesn't have.` }, files };
-    page.migrations = manifest.migrations ? files.map(([p]) => p).filter((p) => p.startsWith(`${manifest.migrations}/`) && p.endsWith(".sql")) : [];
-    for (const p of [...page.code, ...(manifest.css ? [manifest.css] : []), ...page.migrations]) page.texts[p] = byPath.get(p)!;
-    page.skills = files.flatMap(([p, t]) => (/^skills\/[^/]+\/SKILL\.md$/.test(p) ? [((parsed) => ("error" in parsed ? `${p.split("/")[1]} (${parsed.error})` : parsed.name))(parseSkill(t))] : []));
-    page.servers = serversIn(byPath.get("mcp.json")).map(({ name, url }) => ({ name, ...(url ? { url } : {}), used: Boolean(url) }));
-    if (page.files.reduce((n, f) => n + f.size, 0) > maxPlugin) return { page: { ...page, error: `It is over ${maxPlugin / 1000 / 1000} MB.` }, files };
-    page.hash = sha(JSON.stringify(files));
+    const skipped = [...all.skipped].filter(([p]) => inside(p)).map(([p, why]) => ({ path: relative(p), why }));
+    const { page, manifest } = pageOf(files, skipped, { repo, path, commit: at, from: ref.from === "fxbot" ? "fxbot" : "github" }, `${repo}${path ? `/${path}` : ""}`);
+    if (page.error) return { page, files };
     // An installed plugin's page says what an update changes.
     const installed = [...plugins.values()].find(({ record: r }) => "repo" in r.source && r.source.repo === repo && r.source.path === path);
     if (installed?.record.config.files) {
@@ -365,6 +330,75 @@ export async function createPlugins(options: {
       ];
     }
     return { page, files, manifest };
+  }
+
+  // A plugin's page from its files: what it is, what runs inside fxbot, and the rest it carries. `where` names it in
+  // errors: its repository and folder, or its folder on this machine.
+  function pageOf(files: [string, string][], skipped: PackagePreview["skipped"], source: PackageSource, where: string): { page: PackagePreview; manifest?: Manifest } {
+    const page: PackagePreview = {
+      hash: "",
+      name: "",
+      iconKey: "",
+      version: "",
+      description: "",
+      source,
+      files: files.map(([p, t]) => ({ path: p, size: Buffer.byteLength(t), hash: sha(t).slice(0, 12) })),
+      skipped,
+      code: [],
+      texts: {},
+      settings: [],
+      migrations: [],
+      skills: [],
+      needs: [],
+      servers: [],
+    };
+    const byPath = new Map(files);
+    if (!byPath.has("plugin.json")) return { page: { ...page, error: `${where} has no plugin.json${"commit" in source ? ` at ${source.commit.slice(0, 7)}` : ""}.` } };
+    page.texts["plugin.json"] = byPath.get("plugin.json")!;
+    let manifest: Manifest;
+    try {
+      manifest = parseManifest(byPath.get("plugin.json")!);
+    } catch (error) {
+      return { page: { ...page, error: said(error) } };
+    }
+    const owner = "repo" in source ? source.repo.split("/")[0] : "local";
+    Object.assign(page, { name: manifest.name, iconKey: `${owner}/${manifest.name}`, version: manifest.version, description: manifest.description, settings: manifest.settings });
+    page.needs = Object.keys(manifest.needs).map((name) => ({ name, added: Boolean(named(name)) }));
+    page.code = [manifest.server, manifest.page].filter((p): p is string => Boolean(p));
+    const missing = [...page.code, manifest.css].filter((p) => p && !byPath.has(p));
+    if (missing.length) return { page: { ...page, error: `plugin.json names ${missing.join(" and ")}, which ${where} doesn't have.` } };
+    page.migrations = manifest.migrations ? files.map(([p]) => p).filter((p) => p.startsWith(`${manifest.migrations}/`) && p.endsWith(".sql")) : [];
+    for (const p of [...page.code, ...(manifest.css ? [manifest.css] : []), ...page.migrations]) page.texts[p] = byPath.get(p)!;
+    page.skills = files.flatMap(([p, t]) => (/^skills\/[^/]+\/SKILL\.md$/.test(p) ? [((parsed) => ("error" in parsed ? `${p.split("/")[1]} (${parsed.error})` : parsed.name))(parseSkill(t))] : []));
+    page.servers = serversIn(byPath.get("mcp.json")).map(({ name, url }) => ({ name, ...(url ? { url } : {}), used: Boolean(url) }));
+    if (page.files.reduce((n, f) => n + f.size, 0) > maxPlugin) return { page: { ...page, error: `It is over ${maxPlugin / 1000 / 1000} MB.` } };
+    page.hash = sha(JSON.stringify(files));
+    return { page, manifest };
+  }
+
+  // An installed plugin's files, from its folder: text up to maxFile each, leaving out dot folders and node_modules.
+  async function folderFiles(root: string) {
+    const files: [string, string][] = [];
+    const skipped: PackagePreview["skipped"] = [];
+    const utf8 = new TextDecoder("utf-8", { fatal: true });
+    async function walk(dir: string) {
+      for (const entry of await readdir(join(root, dir), { withFileTypes: true })) {
+        const path = dir ? `${dir}/${entry.name}` : entry.name;
+        if (entry.isDirectory()) {
+          if (!entry.name.startsWith(".") && entry.name !== "node_modules") await walk(path);
+        } else if (!entry.isFile()) skipped.push({ path, why: "a link" });
+        else if ((await stat(join(root, path))).size > maxFile) skipped.push({ path, why: `over ${maxFile / 1024} KiB` });
+        else {
+          try {
+            files.push([path, utf8.decode(await readFile(join(root, path)))]);
+          } catch {
+            skipped.push({ path, why: "not text" });
+          }
+        }
+      }
+    }
+    await walk("");
+    return { files: files.sort(([a], [b]) => (a < b ? -1 : 1)), skipped };
   }
 
   async function writeFiles(folder: string, files: [string, string][]) {
@@ -849,6 +883,13 @@ export async function createPlugins(options: {
       ]),
 
     preview: async (ref: RepoRef) => (await look(ref)).page,
+    // An installed plugin's page, from the files it runs: its commit's for one from GitHub, its folder's for a local one.
+    async contents(id: string) {
+      const { record } = get(id);
+      const { files, skipped } = await folderFiles(folderOf(record)).catch((error: Error) => fail(404, `Its files can't be read: ${error.message}`));
+      const { page } = pageOf(files, skipped, record.source, "repo" in record.source ? `${record.source.repo}${record.source.path ? `/${record.source.path}` : ""}` : record.source.local);
+      return { ...page, iconKey: iconKeyOf(record) };
+    },
     // Writes the files the page showed, makes its schema, adds its remote servers, and loads it.
     async add(ref: RepoRef, hash: unknown) {
       const { page, files, manifest } = await look(ref);
@@ -901,7 +942,7 @@ export async function createPlugins(options: {
         plugin.record = before;
         await load(plugin);
         if (folderOf(next) !== folderOf(before)) await rm(folderOf(next), { recursive: true, force: true });
-        return fail(400, `${page.source.commit.slice(0, 7)} didn't load, so ${before.name} stays at ${before.source.commit.slice(0, 7)}: ${error}`);
+        return fail(400, `${("commit" in page.source ? page.source.commit : "").slice(0, 7)} didn't load, so ${before.name} stays at ${before.source.commit.slice(0, 7)}: ${error}`);
       }
       await store.plugins.update(id, { source: next.source, config: next.config, approvedHash: next.approvedHash });
       if (folderOf(next) !== folderOf(before)) await rm(folderOf(before), { recursive: true, force: true });

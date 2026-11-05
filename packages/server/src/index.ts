@@ -160,6 +160,7 @@ async function api(req: IncomingMessage, res: ServerResponse, url: URL) {
       if (action === "secrets" && method === "PUT") return json(res, 200, await fxbot.plugins.setSecrets(id, await body(req)));
       if (action === "skills" && method === "GET") return json(res, 200, { text: fxbot.plugins.readSkill(id, url.searchParams.get("file") ?? undefined) });
       if (action === "log" && method === "GET") return json(res, 200, { lines: fxbot.plugins.log(id) });
+      if (action === "contents" && method === "GET") return json(res, 200, await fxbot.plugins.contents(id));
       if (action === "settings" && method === "PUT") return json(res, 200, await fxbot.plugins.configure(id, await body(req)));
       // The checked origin is where the sign-in comes back to.
       if (action === "sign-in" && method === "POST") return json(res, 201, await fxbot.oauth.start(id, req.headers.origin));
