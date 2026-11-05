@@ -23,6 +23,12 @@
       "description": "A computer for a chat room: its bots share one machine, taking turns, and you see where each last pointed.",
       "repo": "iammrduncan/fxbot",
       "path": "plugins/chat-rooms-computer"
+    },
+    {
+      "name": "dreams",
+      "description": "Each night, a bot goes over its day: it saves what's worth remembering, and writes a way of working down as a skill. A journal shows each change, with Undo.",
+      "repo": "iammrduncan/fxbot",
+      "path": "plugins/dreams"
     }
   ]
 }
