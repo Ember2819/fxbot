@@ -27,7 +27,7 @@ Only `plugin.json` is required, and only the paths it names count.
 | --- | --- |
 | `name` | Required. Up to 40 lowercase letters, digits, and dashes. Its tools are `<name>_<tool>`, its routes are under `/api/plugins/<name>/`, its page paths under `/<name>/`, and its schema is `plugin_<name>`, with `_` for `-`. It can't be `chat`, `memory`, `library`, or `skill`, or an MCP server's prefix, nor a name fxbot uses itself: `pages`, `preview`, `search`, `addons`, `plugins`, `settings`, `profiles`, or 12 hex characters, which is a plugin's id. It and the repository's owner make the plugin's icon. |
 | `version` | Shown on its row. Default `0.0.0` |
-| `description` | Shown on its page and its row |
+| `description` | Shown whole on its page. Its rows in **Plugins** show its first sentence, up to 100 characters and two lines, so write one sentence that fits. |
 | `extensions["sh.fxbot"].server` | Its server code, a path inside the folder |
 | `extensions["sh.fxbot"].page` | Its page code |
 | `extensions["sh.fxbot"].css` | Its CSS |

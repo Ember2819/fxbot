@@ -1,7 +1,7 @@
 {
   "name": "chat-rooms-computer",
   "version": "0.1.0",
-  "description": "A computer for a chat room: its bots share one machine, taking turns, and you see where each last pointed.",
+  "description": "A computer a chat room's bots share, taking turns, with an arrow where each one last pointed.",
   "license": "Apache-2.0",
   "extensions": {
     "sh.fxbot": {

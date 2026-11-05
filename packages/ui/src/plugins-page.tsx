@@ -17,6 +17,7 @@ import { client } from "./client.ts";
 import { follow } from "./nav.ts";
 import { PluginDialog, PluginSettings, RepoForm, usePackageSearch, type PluginTarget } from "./packages.tsx";
 import { loadPlugins } from "./plugins.tsx";
+import { blurb } from "@/lib/utils";
 import { InstalledSkill, SkillDialog, SkillResults, SkillSettings, useSkillSearch } from "./skills.tsx";
 
 // Past this many, the page says how many tools reach the bots: each one's schema rides along with every message.
@@ -191,7 +192,10 @@ export function PluginsPage({ profiles }: { profiles: Profile[] | null }) {
                       </button>
                       {addon.mark && <span className={`shrink-0 text-xs ${addon.mark.kind === "update" ? "text-muted-foreground" : "text-destructive"}`}>{markText[addon.kind][addon.mark.kind]}</span>}
                     </p>
-                    <p className="truncate text-sm text-muted-foreground">{summary(addon, profiles)}</p>
+                    {blurb(addon.kind === "mcp" ? addon.info?.description : addon.description) && (
+                      <p className="line-clamp-2 text-sm text-muted-foreground">{blurb(addon.kind === "mcp" ? addon.info?.description : addon.description)}</p>
+                    )}
+                    <p className="truncate text-xs text-muted-foreground">{summary(addon, profiles)}</p>
                   </div>
                   <Button variant="ghost" size="icon-sm" aria-label={`Edit ${addon.name}`} onClick={() => setOpenId(addon.id)}>
                     <PencilIcon />
@@ -223,7 +227,7 @@ export function PluginsPage({ profiles }: { profiles: Profile[] | null }) {
                         <span className="truncate font-medium">{pick.name}</span>
                         {pick.carries && <span className="shrink-0 text-xs text-muted-foreground">{pick.carries}</span>}
                       </span>
-                      {pick.description && <span className="line-clamp-2 text-sm text-muted-foreground">{pick.description}</span>}
+                      {pick.description && <span className="line-clamp-2 text-sm text-muted-foreground">{blurb(pick.description)}</span>}
                       <span className="mt-0.5 flex items-center gap-2 text-xs text-muted-foreground">
                         <Badge>fxbot</Badge>
                       </span>

@@ -8,25 +8,25 @@
     },
     {
       "name": "chat-rooms",
-      "description": "Rooms where several of your bots talk with you, each answering in turn.",
+      "description": "Rooms where several of your bots talk with you: tag a bot with @, and bots hand work to each other.",
       "repo": "iammrduncan/fxbot",
       "path": "plugins/chat-rooms"
     },
     {
       "name": "fresh",
-      "description": "/fresh starts a bot's chat over toward what you write next, from a summary of it that keeps what matters.",
+      "description": "/fresh starts a bot's chat over toward what you write next, from a summary that keeps what matters.",
       "repo": "iammrduncan/fxbot",
       "path": "plugins/fresh"
     },
     {
       "name": "chat-rooms-computer",
-      "description": "A computer for a chat room: its bots share one machine, taking turns, and you see where each last pointed.",
+      "description": "A computer a chat room's bots share, taking turns, with an arrow where each one last pointed.",
       "repo": "iammrduncan/fxbot",
       "path": "plugins/chat-rooms-computer"
     },
     {
       "name": "dreams",
-      "description": "Each night, a bot goes over its day: it saves what's worth remembering, and writes a way of working down as a skill. A journal shows each change, with Undo.",
+      "description": "Each night, a bot goes over its day and keeps what it learned as memories and skills, with Undo.",
       "repo": "iammrduncan/fxbot",
       "path": "plugins/dreams"
     }

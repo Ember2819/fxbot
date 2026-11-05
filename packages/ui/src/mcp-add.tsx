@@ -8,6 +8,7 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } f
 import { Input } from "@/components/ui/input";
 import type { Plugin, McpCard, McpPlugin, RegistryFrom, RegistryInfo, McpPreview, PluginRef, McpSearch } from "@fxbot/sdk/client";
 import { client } from "./client.ts";
+import { blurb } from "@/lib/utils";
 
 export const label = "grid gap-1.5 text-sm font-medium";
 export const hint = "font-normal text-muted-foreground";
@@ -99,7 +100,7 @@ function Card({ card, onOpen }: { card: McpCard; onOpen: () => void }) {
           <span className="min-w-0 truncate font-mono text-xs text-muted-foreground">{card.name}</span>
           {card.stars !== undefined && <span className="ml-auto shrink-0 text-xs text-muted-foreground tabular-nums">★ {compact(card.stars)}</span>}
         </span>
-        {card.description && <span className="line-clamp-2 text-sm text-muted-foreground">{card.description}</span>}
+        {card.description && <span className="line-clamp-2 text-sm text-muted-foreground">{blurb(card.description)}</span>}
         <span className="mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-muted-foreground">{facts(card)}</span>
       </span>
     </button>

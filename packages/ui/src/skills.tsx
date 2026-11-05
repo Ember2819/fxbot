@@ -7,6 +7,7 @@ import type { Plugin, SkillPlugin, SkillCard, SkillFile, SkillPreview, SkillSear
 import { AddedFooter, Details, heading, hint } from "./mcp-add.tsx";
 import { PluginIcon } from "./plugin-icon.tsx";
 import { client } from "./client.ts";
+import { blurb } from "@/lib/utils";
 
 const compact = (n: number) => new Intl.NumberFormat("en", { notation: "compact" }).format(n);
 const size = (n: number) => (n < 1024 ? `${n} B` : `${(n / 1024).toFixed(1)} KB`);
@@ -65,7 +66,7 @@ export function SkillResults({ search, words, added, onOpen }: { search: ReturnT
               <span className="min-w-0 truncate font-mono text-xs text-muted-foreground">{card.repository}</span>
               {card.installs !== undefined && <span className="ml-auto shrink-0 text-xs text-muted-foreground tabular-nums">{compact(card.installs)} installs</span>}
             </span>
-            {card.description && <span className="line-clamp-2 text-sm text-muted-foreground">{card.description}</span>}
+            {card.description && <span className="line-clamp-2 text-sm text-muted-foreground">{blurb(card.description)}</span>}
             <span className="mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-muted-foreground">
               <Badge variant={card.from === "fxbot" ? "default" : "outline"}>{card.from}</Badge>
             </span>

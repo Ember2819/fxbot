@@ -1,7 +1,7 @@
 {
   "name": "fresh",
   "version": "0.1.0",
-  "description": "/fresh starts a bot's chat over toward what you write next, from a summary of it that keeps what matters.",
+  "description": "/fresh starts a bot's chat over toward what you write next, from a summary that keeps what matters.",
   "license": "Apache-2.0",
   "extensions": {
     "sh.fxbot": {

@@ -1,7 +1,7 @@
 {
   "name": "dreams",
   "version": "0.1.0",
-  "description": "Each night, a bot goes over its day: it saves what's worth remembering, and writes down a way of working as a skill. A journal shows each change, with Undo.",
+  "description": "Each night, a bot goes over its day and keeps what it learned as memories and skills, with Undo.",
   "license": "Apache-2.0",
   "extensions": {
     "sh.fxbot": {
