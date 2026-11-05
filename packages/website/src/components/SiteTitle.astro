@@ -1,11 +1,11 @@
 ---
-// The header's start, as on the home page: fxbot, then the site's five places.
+// The header's start, as on the home page: fxbot, then the site's four places.
 import { Blob } from "../blob.tsx";
 import { changelogPath } from "../site.ts";
 
 const base = import.meta.env.BASE_URL;
 const path = Astro.url.pathname;
-const section = path.startsWith(`${base}${changelogPath}`) ? "changelog" : path.startsWith(`${base}sdk/`) ? "sdk" : path.startsWith(`${base}docs/`) ? "docs" : path.startsWith(`${base}plugins/`) ? "plugins" : path.startsWith(`${base}agents/`) ? "agents" : undefined;
+const section = path.startsWith(`${base}${changelogPath}`) ? "changelog" : path.startsWith(`${base}sdk/`) ? "sdk" : path.startsWith(`${base}docs/`) ? "docs" : path.startsWith(`${base}plugins/`) ? "plugins" : undefined;
 ---
 
 <a href={base} class="fxbot-title"><Blob shape="circle" color="black" size={26} />fxbot</a>
@@ -14,5 +14,4 @@ const section = path.startsWith(`${base}${changelogPath}`) ? "changelog" : path.
   <a href={`${base}sdk/`} aria-current={section === "sdk" ? "page" : undefined}>SDK</a>
   <a href={`${base}plugins/`} aria-current={section === "plugins" ? "page" : undefined}>Plugins</a>
   <a href={`${base}${changelogPath}`} aria-current={section === "changelog" ? "page" : undefined}>Changelog</a>
-  <a href={`${base}agents/`} aria-current={section === "agents" ? "page" : undefined}>Agents</a>
 </nav>

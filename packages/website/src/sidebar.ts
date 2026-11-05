@@ -13,7 +13,10 @@ export const topics: Topic[] = [
       {
         title: "Tutorials",
         about: "A guided first run, from a fresh machine to a chat.",
-        pages: [{ slug: "tutorials/first-fxbot", label: "Your first fxbot" }],
+        pages: [
+          { slug: "tutorials/first-fxbot", label: "Your first fxbot" },
+          { slug: "tutorials/set-up-with-an-agent", label: "Set up with your AI agent" },
+        ],
       },
       {
         title: "How-to guides",

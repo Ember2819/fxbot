@@ -4,7 +4,7 @@ Each release of fxbot, newest first. A release that adds migrations, bumps libfx
 
 ## Unreleased
 
-- **Agents on fxbot.sh.** The home page offers a line to give your AI agent, which sets fxbot up from [agent-setup.txt](https://fxbot.sh/agent-setup.txt): it checks the machine, asks before it installs anything, and leaves your keys and sign-ins to you. [Agents](https://fxbot.sh/agents/), in the header, has that, `llms.txt`, and `llms-full.txt`, and **Copy all docs**, on each page of the docs, copies them all in one go.
+- **Set up with your AI agent.** The home page offers a line to give your agent, which sets fxbot up from [agent-setup.txt](https://fxbot.sh/agent-setup.txt): it checks the machine, asks before it installs anything, and leaves your keys and sign-ins to you. **Copy all docs**, on each page of the docs, copies them all in one go, and [Set up with your AI agent](https://fxbot.sh/docs/tutorials/set-up-with-an-agent/) lists `llms.txt` and `llms-full.txt`, as the home page's footer does.
 - **Reach it over SSH.** [Reach it from other devices](https://fxbot.sh/docs/how-to/reach-it/#over-ssh) has a way in for a machine with no screen.
 
 ## 0.5.0 (2026-11-05)

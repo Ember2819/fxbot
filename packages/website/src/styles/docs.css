@@ -85,7 +85,7 @@
 :root:not([data-has-sidebar]) .fxbot-page-title .fxbot-copy-docs {
     display: none;
 }
-/* Copy all docs sits in the row of page actions, and looks like them. It's for a desktop: on a phone, /agents/ has it. */
+/* Copy all docs sits in the row of page actions, and looks like them. It's for a computer: there's no room on a phone. */
 .fxbot-page-title {
     display: flex;
     flex-wrap: wrap;
@@ -116,32 +116,6 @@
 @media (max-width: 424px) {
     .fxbot-page-title .fxbot-copy-docs {
         display: none;
-    }
-}
-.fxbot-agent-files {
-    display: grid;
-    gap: 0.75rem;
-    margin-top: 1.25rem;
-    padding: 0;
-    list-style: none;
-}
-.fxbot-agent-files li {
-    display: grid;
-    grid-template-columns: 9.5rem minmax(0, 1fr);
-    gap: 0.25rem 1rem;
-    align-items: baseline;
-}
-.fxbot-agent-files a {
-    font-family: var(--__sl-font-mono);
-    font-size: var(--sl-text-sm);
-    color: var(--sl-color-white);
-}
-.fxbot-agent-files span {
-    color: var(--sl-color-gray-2);
-}
-@media (max-width: 30rem) {
-    .fxbot-agent-files li {
-        grid-template-columns: minmax(0, 1fr);
     }
 }
 site-search button[data-open-modal] {

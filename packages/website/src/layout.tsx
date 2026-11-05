@@ -45,9 +45,6 @@ function Header() {
           <a href={href(changelogPath)} className={`${link} max-[480px]:hidden`}>
             Changelog
           </a>
-          <a href={href("/agents/")} className={`${link} max-[560px]:hidden`}>
-            Agents
-          </a>
         </nav>
         <div className="ml-auto flex items-center sm:gap-1">
           <a href={discord} className={buttonVariants({ variant: "ghost", size: "icon" })} aria-label="Join the Hackers in the Loop community on Discord" title="Join the Hackers in the Loop community on Discord">
@@ -79,8 +76,11 @@ function Footer() {
             .
           </p>
           <p>
-            For agents:{" "}
-            {agentFiles.map(({ file }, i) => (
+            <a className="underline underline-offset-4 hover:text-foreground" href={href("/docs/tutorials/set-up-with-an-agent/")}>
+              For agents
+            </a>
+            :{" "}
+            {agentFiles.map((file, i) => (
               <span key={file}>
                 {i > 0 && " · "}
                 <a className="underline underline-offset-4 hover:text-foreground" href={href(file)}>
@@ -102,9 +102,6 @@ function Footer() {
           </a>
           <a className="hover:text-foreground" href={href(changelogPath)}>
             Changelog
-          </a>
-          <a className="hover:text-foreground" href={href("/agents/")}>
-            Agents
           </a>
           <a className="hover:text-foreground" href={repo}>
             GitHub

@@ -8,11 +8,7 @@ export const installCommand = "curl -fsSL https://fxbot.sh/setup.sh | sudo bash"
 // What to tell an AI agent to set fxbot up, and the plain text it reads: public/agent-setup.txt, and the docs in
 // llms.txt and llms-full.txt, which starlight-llms-txt writes.
 export const agentPrompt = "Set up fxbot on this computer for me: follow https://fxbot.sh/agent-setup.txt";
-export const agentFiles = [
-  { file: "agent-setup.txt", about: "The steps for an agent to install fxbot." },
-  { file: "llms.txt", about: "A short index of the docs, to start from." },
-  { file: "llms-full.txt", about: "All the docs in one file, about 400 KB." },
-];
+export const agentFiles = ["agent-setup.txt", "llms.txt", "llms-full.txt"];
 
 // The changelog page, generated from CHANGELOG.md (astro.config.mjs).
 export const changelogPath = "docs/reference/changelog/";
