@@ -4,9 +4,14 @@ Each release of fxbot, newest first. A release that adds migrations, bumps libfx
 
 ## Unreleased
 
+**Before upgrading.** Migration `0009_time_zone` adds a `time_zone` column to `settings`. A time zone set in dreams moves to **Settings** › **General**: the first browser to open fxbot sets it there, so check it if yours should be another.
+
+- **Routines,** from the new routines plugin, on fxbot's list. Ask a bot "every weekday at 8, summarize my calendar", and it saves a routine, which runs on time in a session of its own with everything the bot has: its computer, MCP servers, skills, memories, and library. It tells you in its chat, with the files it saved, and stays quiet when there's nothing to say. Each bot's settings list its routines and their runs, with a switch, **Run now**, **Stop**, and **Remove**, and **Settings** › **Routines** has the limits, such as how long a run takes. See [Give a bot a routine](https://fxbot.sh/docs/how-to/give-a-bot-a-routine/).
+- **A time zone** in **Settings** › **General**, which the first browser to open fxbot sets, and plugins use.
+- **Dreams 0.2.0** uses that time zone, in place of a setting of its own. Update it from **Plugins**.
 - **Each plugin has a tab in Settings.** Everything about a plugin is on one page: its switch, bots, settings, log, updates, and **Remove**, with a plugin's MCP servers and their tools right there. The pencil on each row in **Plugins** is gone, along with the dialogs it opened: a plugin's name still opens its page, whose **Settings** goes to its tab. For plugins: `app.settings` now draws at the top of that tab, which every plugin has.
 - **Computer 0.3.1:** its part of Settings drops a heading its tab now has. Update it from **Plugins**.
-- **For plugins:** a plugin in `FXBOT_PLUGIN_DIRS` keeps its MCP servers when fxbot starts again. Before, they came loose from it, showing as plugins of their own, and stayed when it was removed.
+- **For plugins:** `fx.timeZone()` answers the owner's time zone, `fx.bots.on(bot)` says whether the plugin is on for a bot, and `fx.library.list(bot, session)` answers what one chat saved. `fx.chats.send` takes `shown`, what the chat shows in place of the text the model gets, and tool calls and the tool hooks carry the `messageId` of their turn. A plugin in `FXBOT_PLUGIN_DIRS` keeps its MCP servers when fxbot starts again. Before, they came loose from it, showing as plugins of their own, and stayed when it was removed.
 - **Set up with your AI agent.** The home page offers a line to give your agent, which sets fxbot up from [agent-setup.txt](https://fxbot.sh/agent-setup.txt): it checks the machine, asks before it installs anything, and leaves your keys and sign-ins to you. **Copy all docs**, on each page of the docs, copies them all in one go, and [Set up with your AI agent](https://fxbot.sh/docs/tutorials/set-up-with-an-agent/) lists `llms.txt` and `llms-full.txt`, as the home page's footer does.
 - **Reach it over SSH.** [Reach it from other devices](https://fxbot.sh/docs/how-to/reach-it/#over-ssh) has a way in for a machine with no screen.
 

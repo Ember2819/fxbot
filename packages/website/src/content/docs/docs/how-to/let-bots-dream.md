@@ -6,7 +6,7 @@ description: "The dreams plugin has each bot go over its day at night: it saves 
 The dreams plugin gives each bot a pass over its day at night. The bot saves what will matter in later chats as memories, citing the turns they came from, and when the day showed a way of doing a kind of task that worked, it writes it down as a skill. Each change is in a journal in the bot's settings, where **Undo** takes it back.
 
 1. Add **dreams** from **Plugins**, on **Browse**, where fxbot's picks list it. It needs fxbot 0.5.0 or newer.
-2. Open **Settings** › **Dreams**, and set when bots dream: `hour`, 3 by default, in `timeZone`. With no time zone, the hour is the server's, and a bot's **Dreams** section offers your browser's.
+2. Open **Settings** › **Dreams**, and set when bots dream: `hour`, 3 by default. It's in the time zone in **Settings** › **General**, which the first browser to open fxbot set.
 3. Chat as usual. A bot dreams at that hour once it has 6 turns since its last dream, which `minTurns` changes.
 
 To see a dream now, open a bot's settings, then **Dream now** under **Dreams**. It reads the turns since the last dream, and takes as long as a long reply.

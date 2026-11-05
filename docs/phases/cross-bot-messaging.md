@@ -16,7 +16,7 @@ The stub: "Bots message each other with one verb, `send`. A reply is a send back
 
 **A plugin**, `messages` ([Core or plugin](../../CONVENTIONS.md#core-or-plugin)). Not every bot needs it, and an owner with one bot has no use for it.
 
-`fx.chats` starts turns already. The plugin API widens by three small pieces, about 15 lines, which [routines](routines.md) needs too. Whichever phase is built first adds them:
+`fx.chats` starts turns already. The plugin API widens by three small pieces, about 15 lines, which [routines](../_completed/phases/routines.md) needs too. Whichever phase is built first adds them:
 - **`messageId` on tool calls and the tool hooks:** the turn a call belongs to. This is what lets the server stamp a hop, and it's the only thing here that can't be done without core.
 - **`shown` on `fx.chats.send`:** what the chat shows in place of the text the model gets, so an answer reads "Bob answered" and not the whole frame.
 - **`fx.bots.on(bot)`:** whether this plugin is on for a bot, so a send can be refused before a turn starts.
@@ -136,7 +136,7 @@ plugins/messages/
 
 ### The core pieces
 
-[Routines](routines.md#the-core-pieces) specifies them, with what was checked against libfx. A phase built second finds them done.
+[Routines](../_completed/phases/routines.md#the-core-pieces) specifies them, with what was checked against libfx. A phase built second finds them done.
 - `fx.bots.on(bot)`
 - `shown` on `fx.chats.send`
 - `messageId` on `tool.before`, `tool.after`, and the call a tool's `execute` gets
@@ -383,7 +383,7 @@ Nov 4 17:12   Eve → Bob      Failed: It ran past 10 minutes, and was stopped.
 
 ### What changes
 
-If [routines](routines.md) is built first, the three core rows are done.
+If [routines](../_completed/phases/routines.md) is built first, the three core rows are done.
 
 | Part | Change | Lines |
 | --- | --- | --- |
@@ -415,7 +415,7 @@ Nothing reaches a real model. Confirm a restarted check server's old process exi
 - **Out of scope:** [Not in this phase](#not-in-this-phase).
 - **If it must be cut,** the screen's **Older** goes first, then **Stop**. The guards and the failure notices stay.
 
-**M1. The plugin API** (skip what [routines](routines.md) built)
+**M1. The plugin API** (skip what [routines](../_completed/phases/routines.md) built)
 - [ ] `fx.bots.on(bot)` is true for a bot the plugin is on for, and false after it's switched off for that bot.
 - [ ] `fx.chats.send(bot, { text, shown })`: the chat shows `shown` under "From <plugin>", live and after a reload. The mock's request log and `chat_history` have `text`. Without `shown`, messages show as before.
 - [ ] `tool.before`, `tool.after`, and a plugin tool's `execute` get the `messageId` of the prompt that started the turn: in the bot's own chat, in a plugin's session, for two messages queued on one chat, and after the server is killed mid-turn.
@@ -480,7 +480,7 @@ Nothing reaches a real model. Confirm a restarted check server's old process exi
 - [ ] **`CHANGELOG.md`,** under `## Unreleased`: the plugin, and that it adds no core migration.
 - [ ] `npm run typecheck`, `npm run build`, `npm run build-site`, and `git diff --check` pass. The new files are checked for whitespace too.
 - [ ] The core and plugin line counts are within the bound.
-- [ ] This doc's Status says built, with what the build changed. It moves to `docs/_completed/phases/`, and `AGENTS.md` lists it. Its links to [routines](routines.md) still work.
+- [ ] This doc's Status says built, with what the build changed. It moves to `docs/_completed/phases/`, and `AGENTS.md` lists it. Its links to [routines](../_completed/phases/routines.md) still work.
 - [ ] The work is committed on the open release branch, the core, the plugin, and the docs in separate commits, and not pushed.
 
 **The human runs these:**
@@ -496,6 +496,6 @@ Each has a default that the build follows unless the owner changes it.
 
 1. **Who may message whom.** *Default:* any bot the plugin is on for can reach any other, as OpenClaw and Hermes allow, and the owner narrows it with the plugin's switch for each bot. The risk is OpenClaw's: "Send-only access is permission to ask the target agent to act." A bot that reads the web, talked into it by a page, could ask a bot with a computer to run something, and only the framing stands in the way. OpenBot's directed grants, off by default, close that, at about 60 lines: a table, a list of bots in each bot's settings, and one more step before anything works. Pick this if any bot reads untrusted things and another can act on the world.
 2. **One hop.** *Default:* one, as OpenBot's default, with rooms for anything longer. Going deeper means an answer can land in a plugin's session, and a real hop count. Say so if bots should pass work along a line, such as Alice to Bob to Eve.
-3. **Turns that get an answer.** *Default:* the sender's tools stay on, except sending. [Routines](routines.md#telling-the-owner) turn them off for its told turn, since a routine's report isn't something the bot asked for mid-task. A bot's answer is, but it's still another bot's words reaching the chat's full tools.
+3. **Turns that get an answer.** *Default:* the sender's tools stay on, except sending. [Routines](../_completed/phases/routines.md#telling-the-owner) turn them off for its told turn, since a routine's report isn't something the bot asked for mid-task. A bot's answer is, but it's still another bot's words reaching the chat's full tools.
 4. **The rate.** *Default:* 20 an hour for each pair, as a backstop. It's one constant.
-5. **Which release.** *Default:* the next open release after 0.5.0, after [routines](routines.md), which it can share core work with. It doesn't depend on routines, and the plugin needs only the core pieces.
+5. **Which release.** *Default:* the next open release after 0.5.0, after [routines](../_completed/phases/routines.md), which it can share core work with. It doesn't depend on routines, and the plugin needs only the core pieces.

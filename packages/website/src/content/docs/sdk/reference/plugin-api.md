@@ -59,12 +59,15 @@ export default async function setup(fx: PluginApi) {
 | `fx.sql` | A [postgres](https://github.com/porsager/postgres) client in the plugin's own schema, with two connections at most |
 | `fx.settings` | Its settings, with defaults, and secrets opened. The same object, kept up to date. |
 | `fx.bots.list()`, `fx.bots.get(id)` | The bots, as [the fxbot object](/sdk/reference/server-api/) lists them |
+| `fx.bots.on(id)` | Whether this plugin is on for the bot. Since 0.6.0. |
+| `fx.timeZone()` | The owner's time zone, such as `Europe/Berlin`: **Settings** › **General**'s, or the machine's. Read it at each use. Since 0.6.0. |
 | `fx.chats` | Sessions and turns of its own. See [Turns](#turns). |
 | `fx.dependents()` | The added plugins that need this one: `{ name, version, needs, api }` each, where `needs` is its object for this plugin, and `api` what it provides, or null while it isn't running |
 | `fx.provide(api)` | Offers an object to the plugins that need this one, which get it with `fx.need`. Since 0.5.0. See [Plugins that need others](#plugins-that-need-others). |
 | `fx.need(name)` | What a plugin this one names under `needs` provides, or null while it isn't running. It throws for a plugin `needs` doesn't name. Since 0.5.0. |
 | `fx.library.read(bot, id)` | A library item's `name`, `type`, and `bytes`, if it's tagged for the bot; otherwise it throws |
 | `fx.library.save({ bot, session, name, type, bytes })` | Saves an image, or UTF-8 text, to the bot's library, tagged for the chat, through the library's checks. It answers the item. |
+| `fx.library.list(bot, session)` | The items saved in one chat of the bot, newest first. Since 0.6.0. |
 | `fx.skills.files(bot, name)` | The files besides `SKILL.md` of the skill the bot sees by that name, as `{ path, text }`. None when it has no such skill. |
 | `fx.skills.set(bot, skills)` | The skills the plugin gives one bot, in place of those it gave before, each `{ name, description, instructions }`, as a `SKILL.md`'s name, description, and body. They join the bot's catalog, its `skill` tool, and its `/` list while the plugin is on for it, and go when the plugin unloads, so a plugin keeps them and sets them again in its setup. It throws with status 400 for a bad name, a description over 1,024 characters, a name twice, or instructions over 64 KiB. Since 0.5.0. |
 | `fx.memories.get(bot, id)` | One of the bot's memories, with `savedBy`, `bot` or `owner`, or null when the bot has none by that id. Since 0.5.0. |
@@ -84,7 +87,7 @@ Handlers run in the order the plugins were added, and change the event's fields 
 | --- | --- | --- | --- |
 | `message` | Before a message runs, after the chat is known | `bot`, `session`, `text`, `files`, `from` | Change `text` and `files`; answer `{ handled: true }`, and no turn runs; or answer `{ startOver: { ask } }`, and the message goes to a new chat |
 | `instructions` | Each time a chat opens | `bot`, `session`, `instructions`, a list | Add, change, or remove entries |
-| `tool.before` | Before every tool call: fxbot's, MCP servers', skills', and plugins' | `bot`, `session`, `tool`, `input` | Change `input`, or answer `{ block: reason }`, which the model gets as a failed call |
+| `tool.before` | Before every tool call: fxbot's, MCP servers', skills', and plugins' | `bot`, `session`, `messageId`, the message whose turn it's in, since 0.6.0, `tool`, `input` | Change `input`, or answer `{ block: reason }`, which the model gets as a failed call |
 | `tool.after` | After it | the same, with `result`, or `error` when it failed | Change `result` |
 | `turn.start` | Once libfx stores the prompt | `bot`, `session`, `messageId`, `text`, `from` | Observe |
 | `turn.end` | When the turn ends | the same, with `reply`, and `error` when it failed, as when the provider answered with an error | Observe |
@@ -115,7 +118,7 @@ fx.tool({
 | `description` | What the model reads |
 | `inputSchema` | A JSON Schema object for the input |
 | `idempotent` | Whether running a call twice is harmless, so a call cut off by a crash runs again |
-| `execute(input, call)` | Runs one call. `call` has the `bot` and `session` of the chat, and a `signal` that aborts with the turn. A string goes to the model as it is, and anything else as JSON, but for `{ type: "libfx.tool-result", text, images }`, whose images, up to 8, the model sees. |
+| `execute(input, call)` | Runs one call. `call` has the `bot` and `session` of the chat, the `messageId` of the message whose turn it's in, since 0.6.0, and a `signal` that aborts with the turn. A string goes to the model as it is, and anything else as JSON, but for `{ type: "libfx.tool-result", text, images }`, whose images, up to 8, the model sees. |
 
 Adding a tool makes fxbot's agents again. A call from a bot the plugin isn't on for fails, and so does a result over 64 KiB.
 
@@ -165,7 +168,7 @@ A plugin's turns run as the owner's do, with the same hooks, history, library, a
 | Call | What it does |
 | --- | --- |
 | `fx.chats.newSession(bot)` | A session of the plugin's own for the bot, on the bot's provider now. Keep its id. |
-| `fx.chats.send(bot, { text, files?, session?, messageId? })` | A message. Without `session`, it goes to the bot's own chat, which shows it as "From <plugin>". With one, it stays out of the bot's chat, its earlier chats, and its preview, and `chat_history` still finds it. `messageId` defaults to a new UUID. |
+| `fx.chats.send(bot, { text, shown?, files?, session?, messageId? })` | A message. `shown`, since 0.6.0, is what the chat shows of it, when that isn't `text`, which the model gets. Without `session`, it goes to the bot's own chat, which shows it as "From <plugin>". With one, it stays out of the bot's chat, its earlier chats, and its preview, and `chat_history` still finds it. `messageId` defaults to a new UUID. |
 | `fx.chats.stream(bot, session, cursor?)` | That session's lines, as NDJSON, from `cursor` on, then each new one. The same lines as [`fxbot.stream`](/sdk/how-to/stream-replies/). |
 | `fx.chats.cancel(bot, session)` | Stops the turn running in one of the plugin's own sessions, if one runs. It ends `cancelled`, and the session's stream says so. Since 0.4.1. |
 
@@ -214,7 +217,7 @@ The computer and chat rooms provide objects of their own: see [the computer's](/
 | `app.nav({ label, path, icon? })` | A button in the sidebar's footer row, to `/<plugin><path>`. `icon` is a component; without one, the button shows the plugin's icon. |
 | `app.botPanel(Component)` | Above the tabs of a bot's panel, beside its chat. It gets `bot`. |
 | `app.composer(Component)` | A control beside the attach button. It gets `bot`, `setDraft(text)`, and `attach(files)`. `setDraft` also takes a function from the draft to the new text. |
-| `app.toolView(tool, Component)` | How a call of `<plugin>_<tool>` shows in a reply. It gets `call`: `name`, `input`, `output`, `error`, and `done`. |
+| `app.toolView(tool, Component, { open? })` | How a call of `<plugin>_<tool>` shows in a reply. With `open`, since 0.6.0, it stays in sight below the folded steps, for what the owner shouldn't miss. It gets `call`: `name`, `input`, `output`, `error`, and `done`. |
 | `app.settings(Component)` | A part of the plugin's tab in Settings, at `/settings/plugins/<plugin>`, above its bots and settings. Every plugin has that tab, and several calls stack in it. Before 0.6.0, only a plugin that called this had a tab, and before 0.5.0, it was a section of Settings' one page. |
 | `app.botSettings(Component)` | A section in a bot's settings. It gets `bot`. |
 | `app.slot(name, Component)` | A part in a place another plugin's page leaves with `Slot`, which gets that `Slot`'s `props`. Several stack in order. Since 0.5.0. |

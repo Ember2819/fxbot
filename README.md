@@ -45,7 +45,7 @@ In order of execution priority. Checked phases are built. Each is marked **core*
 - [ ] [Permissions](docs/phases/permissions.md) (plugin, on a core hook): ask, auto, and yolo modes for tool calls
 - [x] [Chat rooms](docs/_completed/phases/chat-rooms.md) (plugin, with two core hooks; 0.4.1): rooms of the owner and several bots, with `@` chips, bots tagging each other within limits, a Stop, and skills for working in a room
 - [ ] [Cross-bot messaging](docs/phases/cross-bot-messaging.md) (plugin): bots message each other
-- [ ] [Routines](docs/phases/routines.md) (plugin): saved tasks a bot runs on a schedule
+- [x] [Routines](docs/_completed/phases/routines.md) (plugin, with a core time zone; 0.6.0): saved tasks a bot runs on a schedule, with everything it has, telling the owner in its chat
 - [ ] [Triggers](docs/phases/triggers.md) (plugins): webhooks and new email start a bot's turn
 - [ ] [Soul](docs/phases/soul.md) (plugin): a written persona behind each bot's system prompt
 - [ ] [Context management](docs/phases/context-management.md) (core): one never-ending chat that fits the model's context window, past the compaction libfx does

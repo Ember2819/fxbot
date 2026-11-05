@@ -6,7 +6,7 @@
 - **The owner hears the result in the bot's chat,** with the files the run saved. A run with nothing to say stays quiet.
 - **The owner stays in charge.** Each bot's settings list its routines, with a switch, **Run now**, **Stop**, **Remove**, and the last runs.
 
-Status: planned on 2026-11-05, at the owner's word, and researched against the research directive's references and OpenClaw, Hermes Agent, and Letta Code. Updated the same day with the owner's answers, and checked on a disposable server, with a real computer, from a session like a run's. Not built. It's for 0.6.0.
+Status: built on 2026-11-05, for 0.6.0, as planned the same day at the owner's word, and researched against the research directive's references and OpenClaw, Hermes Agent, and Letta Code. Where the build differs from the plan, [What the build changed](#what-the-build-changed) says so. The checklist's boxes are what ran here, against a mock model and a real computer. The human checks are still the owner's.
 
 ## What the owner asked
 
@@ -21,11 +21,11 @@ After reading the plan, on 2026-11-05:
 
 ## 0. Core or plugin
 
-**A plugin**, `routines`, with one core setting ([Core or plugin](../../CONVENTIONS.md#core-or-plugin)). A schedule isn't what every bot needs, what plugins plug into, or what fxbot needs to run. [Plugins](../_completed/phases/plugins.md) named it as one, and the conventions list "start a bot's turn, for a schedule" among the things a plugin does.
+**A plugin**, `routines`, with one core setting ([Core or plugin](../../../CONVENTIONS.md#core-or-plugin)). A schedule isn't what every bot needs, what plugins plug into, or what fxbot needs to run. [Plugins](plugins.md) named it as one, and the conventions list "start a bot's turn, for a schedule" among the things a plugin does.
 
 **The time zone is core.** Where the owner lives is true of the whole install, and plugins plug into it: dreams has a clock already, and routines is the second. Each with a setting of its own means setting it twice, and forgetting one runs on the server's zone, which is UTC in a release. Dreams did that to the owner's dev install: 03:00 was about 9 in the evening.
 
-`fx.chats` starts turns already. The plugin API widens by five small pieces. The first three, about 15 lines, are ones [cross-bot messaging](cross-bot-messaging.md) needs too, and whichever phase is built first adds them:
+`fx.chats` starts turns already. The plugin API widens by five small pieces. The first three, about 15 lines, are ones [cross-bot messaging](../../phases/cross-bot-messaging.md) needs too, and whichever phase is built first adds them:
 - **`fx.bots.on(bot)`:** whether this plugin is on for a bot. Today a plugin finds out only by whether its `instructions` hook reached a session, after a turn has started.
 - **`shown` on `fx.chats.send`:** what the chat shows in place of the text the model gets.
 - **`messageId` on tool calls and the tool hooks:** the turn a call belongs to, so a plugin can treat its own turns differently.
@@ -134,8 +134,8 @@ The systems with tools give a scheduled run nearly all of them by default, and t
 - **No Stop in the own chat.** `fx.chats.cancel` serves only a plugin's own sessions (`packages/sdk/src/index.ts:195`), and the app has no Stop button.
 - **Nothing reaches a chat without a turn.** A chat is libfx's stream, and `FxSession` has only `prompt`, `resume`, `stream`, `steer`, `cancel`, and `checkpoint`. Dreams left this open: "a core way to post a note to a bot's chat without starting a turn".
 - **What a chat shows of a plugin's message** comes from the `sent` table, which replaces libfx's `input` (`withSent`, `index.ts:329`), so showing other words than the model gets is a small change.
-- **No push notifications** ([pwa](../_completed/phases/pwa.md#5-open-questions) left them for a phase of their own).
-- **Dreams** has the patterns to copy: a tick, a session of the plugin's own, the end from `turn.end`, a time limit with `fx.chats.cancel`, and a section in the bot's settings ([dreams](../_completed/phases/dreams.md)).
+- **No push notifications** ([pwa](pwa.md#5-open-questions) left them for a phase of their own).
+- **Dreams** has the patterns to copy: a tick, a session of the plugin's own, the end from `turn.end`, a time limit with `fx.chats.cancel`, and a section in the bot's settings ([dreams](dreams.md)).
 - **Time zones:** core has none. Dreams has a `timeZone` setting, and core tells a bot neither the time nor the zone.
 - **The clock:** `Intl.DateTimeFormat` with `timeZone` reads wall-clock time in any zone. New York's clocks went 01:59 to 03:00 on 2026-03-08, and 01:30 came twice on 2026-11-01, checked with Node.
 - **A session's size:** one session with two tool calls took 128 KB of local files, block-rounded, in a check on libfx's `local()`. What it takes in Postgres isn't measured. The plugin API has no call that deletes a session.
@@ -151,7 +151,7 @@ The systems with tools give a scheduled run nearly all of them by default, and t
 - `computer_shell` ran on the bot's computer, and its first use took 58 seconds, with the image's layers cached. A new machine takes longer.
 - `computer_write_file` and `computer_to_library` put a file in the library, tagged with the run's session.
 - `computer_ask_owner` ended the turn without waiting. The desktop tool then answered that the owner had the computer, the shell still worked, and handing it back started a turn in the bot's own chat.
-- `fx.chats.cancel` took 6 milliseconds, and the turn ended at once, in the middle of a long command. That the command itself stopped is read from the code, not seen: the check for it came back empty, so M4 proves it.
+- `fx.chats.cancel` took 6 milliseconds, and the turn ended at once, in the middle of a long command. That the command itself stopped was read from the code, and M4 later saw it.
 - A turn of 5 minutes 30 seconds finished, so a longer limit works.
 - A library item sent again with `files` showed in the chat, kept one copy, and reached the model as text.
 
@@ -173,7 +173,7 @@ The systems with tools give a scheduled run nearly all of them by default, and t
 14. **A run is the whole bot.** Nothing narrows it: not a tool list, not a mode. What a bot can do in its chat, a routine can do on a schedule, with the computer, an MCP server, a skill, or a plugin that doesn't exist yet. It costs no code, since a session has it all already, and the checks above saw it work. So Hermes's and OpenClaw's list per job isn't needed yet.
 15. **No one is watching, so the rules change, not the tools.** The computer's own rule says to ask the owner before sending, buying, signing in, or deleting, and a run has no one to ask. So the task is the owner's say-so for what it names, and for nothing else: what it doesn't name stays undone, and the run says so.
 16. **A login stops a run, and doesn't fail it.** `computer_ask_owner` already does the right thing unattended: the run ends with what it needs, the owner reads that in the chat, takes the computer, and hands it back, and the bot goes on in its own chat with the result in front of it.
-17. **What a run saves comes back with its result.** A report is a file as often as a message. `files` carries it to the chat, so the owner opens it there. A future [page](pages.md) is a library item too, so a page tool works in a run with nothing added here.
+17. **What a run saves comes back with its result.** A report is a file as often as a message. `files` carries it to the chat, so the owner opens it there. A future [page](../../phases/pages.md) is a library item too, so a page tool works in a run with nothing added here.
 18. **One time zone, in core, set by itself.** OpenClaw, Hermes, and Grok all have one. Most owners never open Settings › General, so the page sets it from the browser the first time it opens, as Grok's **Auto-detect** does.
 19. **Limits are settings.** The owner tunes how long a run goes and how much it does, on the plugin's tab in Settings. A computer task can need far longer than a summary, and a model can't change any of them.
 
@@ -197,7 +197,7 @@ plugins/routines/
 
 ### The core pieces
 
-The first three are the same in [cross-bot messaging](cross-bot-messaging.md#the-core-pieces). A phase built second finds them done. The last two are this phase's.
+The first three are the same in [cross-bot messaging](../../phases/cross-bot-messaging.md#the-core-pieces). A phase built second finds them done. The last two are this phase's.
 
 **`fx.bots.on(bot)`**, in `PluginApi` (`plugin-api.ts`), built in `plugins.ts:521` as `bots: { ...host.bots, on: (bot) => applies(plugin, bot) }`:
 
@@ -341,7 +341,7 @@ run(routine, run):
     the owner's Stop:   fx.chats.cancel, state stopped
     too long:           fx.chats.cancel, state failed, "It ran past 15 minutes, and was stopped."
     an error:           state failed, with it
-    an empty reply, or exactly (no reply): state quiet, failures 0
+    no text, or (no reply): state quiet, failures 0
     else:               state done, reply kept, failures 0, and tell the owner
   a failure: failures + 1. Tell the owner on the 1st; at 10, pause it and tell them
   forget the session
@@ -361,7 +361,7 @@ Everything the bot has, because a run's session is one of the bot's sessions and
 | Memories, the library, `chat_history`, skills | Yes |
 | Each plugin's tools, such as the computer's | Yes, while the plugin is on for the bot |
 | MCP servers | Yes, the tools the owner allowed, for the bots they allowed |
-| A plugin not built yet, such as [pages](pages.md) | Yes: its tools join the same list |
+| A plugin not built yet, such as [pages](../../phases/pages.md) | Yes: its tools join the same list |
 | `routines_add`, `routines_change`, `routines_remove` | No: the bot's own chat only. `routines_list` works |
 | Any tool, in the turn that tells the owner | No: those turns only pass on a result |
 
@@ -421,7 +421,7 @@ Good morning. Three things today: …
 - **The files** are what `fx.library.list(bot, session)` finds, read with `fx.library.read` and sent as `files`, so they show under the message and open from the library. At most 5 go, inside the limits a message has, with text files under 100 KB, since the model reads them. The rest are named in `text`, as `report.md (library:abc)`, and every one stays in the bot's library. A quiet run sends none.
 - **Tools are off** in these turns: `tool.before` blocks every call whose `messageId` starts `routine-told-`, with "This turn only passes on a routine's result." So a page the run read can't reach the own chat's tools through the result, and the bot can't run the task again.
 - **A busy chat** queues it, behind the owner's turn. A chat starting over holds it until it's done.
-- **A failed send** keeps the run's reply, and the section says the chat couldn't be reached. A provider that's down fails both, and the section is where it shows.
+- **A failed send,** or a told turn that fails at the model, keeps the run's reply and sets `untold`, and the section says the chat couldn't be reached. A provider that's down fails both, and the section is where it shows.
 
 ### The tools
 
@@ -496,6 +496,8 @@ create table runs (
   started_at timestamptz not null default now(),
   ended_at timestamptz,
   reply text not null default '',               -- what it said, or why it failed
+  files jsonb not null default '[]',            -- what it saved: each file's name and url
+  untold boolean not null default false,        -- its result couldn't reach the bot's chat
   unique (routine, slot)
 );
 ```
@@ -579,7 +581,7 @@ every hour at :00 · paused after 10 failures
 - **A run's files** link to the library.
 - **Its parts** are `ui.Button`, `ui.Switch`, and `ui.Dialog`. Every button is `type="button"`, since the section renders inside the bot's form.
 
-**`app.toolView("add", …)`:** a call of `routines_add` shows as a card in the reply: the line the tool answered, and **Remove**. A routine a bot was talked into is one click from gone, at the moment it's made.
+**`app.toolView("add", …, { open: true })`:** a call of `routines_add` shows as a card in the reply, in sight below the folded steps: the line the tool answered, and **Remove**. A routine a bot was talked into is one click from gone, at the moment it's made.
 
 ### Cost
 
@@ -590,7 +592,7 @@ every hour at :00 · paused after 10 failures
 - **Idle:** one indexed read every 30 seconds.
 - **A run:** one turn of the bot's own model, with its instructions, memories, and catalog, and no chat history, and as many tool calls as the task takes, up to `calls`. A routine on the computer holds it awake, and a stopped one starts for the run.
 - **Telling the owner:** one turn in the own chat at that chat's full context, cached where the provider caches, plus any text files it carries. A quiet run costs none. So a morning summary is two turns a day, and an hourly watch that rarely speaks is about 24 small ones.
-- **Storage:** the newest `keepRuns` of a routine's runs, and one session a run, which stays in Postgres, since the plugin API has no call that deletes a session. A daily routine makes 365 a year. One every 15 minutes makes about 35,000, so M4 measures a run's bytes, and the README says.
+- **Storage:** the newest `keepRuns` of a routine's runs, and one session a run, which stays in Postgres, since the plugin API has no call that deletes a session. A daily routine makes 365 a year, and one every 15 minutes about 35,000. A small run and its told turn took about 44 KB in Postgres, measured over 20 runs, so that's about 16 MB and 1.5 GB a year. The README says so.
 
 ### Not in this phase
 
@@ -601,7 +603,7 @@ every hour at :00 · paused after 10 failures
 - **Running in the own chat, or in a chat room.** One path.
 - **Cheap gates,** like OpenClaw's condition script and Hermes's `monitor`, which skip the model when nothing changed.
 - **A time zone per routine.** One setting, in core.
-- **A list of tools per routine,** like Hermes's `enabled_toolsets` and OpenClaw's `toolsAllow`. A run is the whole bot. With a [permissions](permissions.md) plugin, `tool.before` narrows runs like anything else.
+- **A list of tools per routine,** like Hermes's `enabled_toolsets` and OpenClaw's `toolsAllow`. A run is the whole bot. With a [permissions](../../phases/permissions.md) plugin, `tool.before` narrows runs like anything else.
 - **A lock on the computer** between a run and the chat.
 - **Waiting for the owner inside a run.** A run ends with what it needs, and the bot goes on in its own chat.
 - **Telling bots the time in every chat.** Core still doesn't, and the time would break the prompt cache. `routines_list` has it.
@@ -650,79 +652,79 @@ Nothing reaches a real model. Confirm a restarted check server's old process exi
 - **If it must be cut,** the card goes first, then **Stop**, then one-time routines.
 
 **M1. The plugin API**
-- [ ] `fx.bots.on(bot)` is true for a bot the plugin is on for, and false after it's switched off for that bot.
-- [ ] `fx.chats.send(bot, { text, shown })`:
+- [x] `fx.bots.on(bot)` is true for a bot the plugin is on for, and false after it's switched off for that bot.
+- [x] `fx.chats.send(bot, { text, shown })`:
   - the chat shows `shown` under "From <plugin>", live and after a reload
   - the mock's request log has `text`
   - `chat_history` finds `text`
   - with a file attached, it shows `shown` too
   - after a start-over, the earlier chat shows `shown`
   - without `shown`, messages show as before
-- [ ] `tool.before`, `tool.after`, and a plugin tool's `execute` get the `messageId` of the prompt that started the turn:
+- [x] `tool.before`, `tool.after`, and a plugin tool's `execute` get the `messageId` of the prompt that started the turn:
   - in the bot's own chat, and in a plugin's session
   - two messages queued on one chat each see their own
   - after the server is killed mid-turn, the resumed turn's next call sees the original
-- [ ] `fx.library.list(bot, session)` answers what that chat saved, newest first, and nothing from another chat or bot.
-- [ ] `npm run typecheck` passes.
+- [x] `fx.library.list(bot, session)` answers what that chat saved, newest first, and nothing from another chat or bot.
+- [x] `npm run typecheck` passes.
 
 **M2. The time zone**
-- [ ] Migration `0009_time_zone` runs, and `settings.update` saves a zone, refuses "Mars/Base" with 400, and clears with "".
-- [ ] `fx.timeZone()` answers the setting, or the machine's when it's empty, and a change reaches it without a restart.
-- [ ] Settings › General shows the row, and a pick saves.
-- [ ] A first load with no zone saves the browser's, and a load with one set, from a browser in another zone, leaves it.
-- [ ] **Dreams 0.2.0:** it dreams by the core zone, its settings have no `timeZone`, and its section names the zone and General. On an older fxbot, it loads, on the machine's zone.
+- [x] Migration `0009_time_zone` runs, and `settings.update` saves a zone, refuses "Mars/Base" with 400, and clears with "".
+- [x] `fx.timeZone()` answers the setting, or the machine's when it's empty, and a change reaches it without a restart.
+- [x] Settings › General shows the row, and a pick saves.
+- [x] A first load with no zone saves the browser's, and a load with one set, from a browser in another zone, leaves it.
+- [x] **Dreams 0.2.0:** it dreams by the core zone, its settings have no `timeZone`, and its section names the zone and General. On an older fxbot, it loads, on the machine's zone.
 
 **M3. The schedule** (a script, on `schedule.ts`)
-- [ ] Parsing takes `*`, numbers, `a-b`, `*/n`, `a-b/n`, and lists, and refuses six fields, `MON`, a minute of 60, and a day of 0, each with a reason.
-- [ ] Day of week 0 and 7 are both Sunday. With both day fields limited, either matches.
-- [ ] `next` is right in UTC, Europe/Berlin, America/New_York, and Asia/Kolkata (a half-hour offset), across a month's end and a year's end.
-- [ ] `0 0 29 2 *` finds the next leap day, and `0 0 31 2 *` answers null.
-- [ ] **The clocks** in America/New_York: `30 2 * * *` skips 2026-03-08, and `30 1 * * *` comes up twice on 2026-11-01, of which the key lets one run.
-- [ ] At 15 minutes, the floor refuses `*/10 * * * *` and `0,5 * * * *`, and takes `*/15 * * * *`. At 5, it takes `*/5 * * * *`.
-- [ ] `describe` gives each line of its table.
-- [ ] `at` in Europe/Berlin and in America/New_York lands on the right instant.
+- [x] Parsing takes `*`, numbers, `a-b`, `*/n`, `a-b/n`, and lists, and refuses six fields, `MON`, a minute of 60, and a day of 0, each with a reason.
+- [x] Day of week 0 and 7 are both Sunday. With both day fields limited, either matches.
+- [x] `next` is right in UTC, Europe/Berlin, America/New_York, and Asia/Kolkata (a half-hour offset), across a month's end and a year's end.
+- [x] `0 0 29 2 *` finds the next leap day, and `0 0 31 2 *` answers null.
+- [x] **The clocks** in America/New_York: `30 2 * * *` skips 2026-03-08, and `30 1 * * *` comes up twice on 2026-11-01, of which the key lets one run.
+- [x] At 15 minutes, the floor refuses `*/10 * * * *` and `0,5 * * * *`, and takes `*/15 * * * *`. At 5, it takes `*/5 * * * *`.
+- [x] `describe` gives each line of its table.
+- [x] `at` in Europe/Berlin and in America/New_York lands on the right instant.
 
 **M4. A run**
-- [ ] With a cron for the next minute, a run starts within 40 seconds of it, in a new session, and a new routine doesn't run before its time.
-- [ ] **What the mock is sent:** the rules, as an entry in the instructions, and the message with the task. The bot's own chat turns carry no rules.
-- [ ] A run's turn stays out of the bot's chat, its earlier chats, and its preview, and `chat_history` finds it.
-- [ ] Runs of a bot go on while its own chat answers the owner, and neither waits for the other.
-- [ ] Four due at once: three run, and the fourth starts when one ends.
-- [ ] **The time limit:** with `minutes` at 1 and a mock that never answers, the run is cancelled and `failed`.
-- [ ] **The time limit on a computer:** with `minutes` at 1 and `computer_shell` running `sleep 300`, the run is `failed`, and `pgrep sleep` on the computer finds nothing.
-- [ ] **The call limit:** with `calls` at 3 and a mock that keeps calling, the 4th is blocked with its sentence, and the run ends.
-- [ ] **Long runs:** with `minutes` at 10, a run of 6 minutes finishes `done`.
-- [ ] **Overlap:** a run still going at its next time records `skipped`.
-- [ ] **A restart:**
+- [x] With a cron for the next minute, a run starts within 40 seconds of it, in a new session, and a new routine doesn't run before its time.
+- [x] **What the mock is sent:** the rules, as an entry in the instructions, and the message with the task. The bot's own chat turns carry no rules.
+- [x] A run's turn stays out of the bot's chat, its earlier chats, and its preview, and `chat_history` finds it.
+- [x] Runs of a bot go on while its own chat answers the owner, and neither waits for the other.
+- [x] Four due at once: three run, and the fourth starts when one ends.
+- [x] **The time limit:** with `minutes` at 1 and a mock that never answers, the run is cancelled and `failed`.
+- [x] **The time limit on a computer:** with `minutes` at 1 and `computer_shell` running `sleep 300`, the run is `failed`, and `pgrep sleep` on the computer finds nothing.
+- [x] **The call limit:** with `calls` at 3 and a mock that keeps calling, the 4th is blocked with its sentence, and the run ends.
+- [x] **Long runs:** with `minutes` at 10, a run of 6 minutes finishes `done`.
+- [x] **Overlap:** a run still going at its next time records `skipped`.
+- [x] **A restart:**
   - stopped mid-run, it comes back `stopped`, and doesn't run again
   - down across a firing within the grace, it fires late, once
   - down past the grace, it records one `missed`, however many times passed
   - down across a one-time routine's time, it runs within 24 hours
-- [ ] A bot the plugin is off for makes no session and no request, and its next time moves on.
-- [ ] A bot with no provider records `failed` with the reason.
-- [ ] **Storage:** measure the Postgres bytes a run adds, and put the number in the README.
-- [ ] **Each setting:** a value outside its range means its default, with a line in the log. `atOnce`, `failures`, `keepRuns`, and `routines` each change what they say they change.
+- [x] A bot the plugin is off for makes no session and no request, and its next time moves on.
+- [x] A bot with no provider records `failed` with the reason.
+- [x] **Storage:** measure the Postgres bytes a run adds, and put the number in the README.
+- [x] **Each setting:** a value outside its range means its default, with a line in the log. `atOnce`, `failures`, `keepRuns`, and `routines` each change what they say they change.
 
 **M5. A run is the whole bot** (on a real computer, with a mock model)
-- [ ] The mock's request for a run lists the same tools as one from the bot's own chat, and carries its instructions, skill catalog, and the computer's rule.
-- [ ] In a run, each of these runs and answers: `memory_save`, `library_save`, `chat_history`, `skill`, an MCP tool, and another plugin's tool.
-- [ ] `computer_shell` runs on the bot's own computer, starting it if it's stopped.
-- [ ] A tool of a plugin that's off for the bot refuses in a run, and an MCP tool not allowed for it isn't there.
-- [ ] `computer_ask_owner` in a run ends it as `done`, the chat shows what the bot needs, and handing the computer back starts a turn in the bot's own chat, with the result in its context.
-- [ ] A run of a bot that's also in a room with a computer uses the bot's own computer.
+- [x] The mock's request for a run lists the same tools as one from the bot's own chat, and carries its instructions, skill catalog, and the computer's rule.
+- [x] In a run, each of these runs and answers: `memory_save`, `library_save`, `chat_history`, `skill`, an MCP tool, and another plugin's tool.
+- [x] `computer_shell` runs on the bot's own computer, starting it if it's stopped.
+- [x] A tool of a plugin that's off for the bot refuses in a run, and an MCP tool not allowed for it isn't there.
+- [x] `computer_ask_owner` in a run ends it as `done`, the chat shows what the bot needs, and handing the computer back starts a turn in the bot's own chat, with the result in its context.
+- [x] A run of a bot that's also in a room with a computer uses the bot's own computer.
 
 **M6. Telling the owner**
-- [ ] A finished run puts one turn in the bot's own chat: "From routines", the routine's name, and the bot's reply. The sidebar's preview follows.
-- [ ] A follow-up from the owner finds the result in the chat's context.
-- [ ] `(no reply)`, and an empty reply, record `quiet`, with nothing in the chat and no request to the own chat.
-- [ ] A tool call in the told turn is blocked, with its sentence.
-- [ ] A busy chat takes it after the owner's turn. A start-over in progress holds it.
-- [ ] **Files:**
+- [x] A finished run puts one turn in the bot's own chat: "From routines", the routine's name, and the bot's reply. The sidebar's preview follows.
+- [x] A follow-up from the owner finds the result in the chat's context.
+- [x] `(no reply)`, and an empty reply, record `quiet`, with nothing in the chat and no request to the own chat.
+- [x] A tool call in the told turn is blocked, with its sentence.
+- [x] A busy chat takes it after the owner's turn. A start-over in progress holds it.
+- [x] **Files:**
   - a file a run saved shows under the told message, and opens from the library, which keeps one copy
   - a file made on the computer with `computer_to_library` does too
   - a sixth file, and a text file over 100 KB, are named in the text, not attached
   - a quiet run sends none, and its files stay in the library
-- [ ] **Failures:**
+- [x] **Failures:**
   - the 1st tells the owner, and the 2nd to the 9th don't
   - the 10th pauses it and tells the owner
   - a `done` or `quiet` run sets `failures` to 0
@@ -730,34 +732,34 @@ Nothing reaches a real model. Confirm a restarted check server's old process exi
   - a provider that's down fails both, and the section shows the failure
 
 **M7. The tools**
-- [ ] `routines_add` makes each kind, and answers its words and first run. Each refusal in its list answers its sentence.
-- [ ] `routines_list` answers the time, and each routine's words, next run, and last run.
-- [ ] `routines_change` changes each field, and a new schedule sets `next_at`. `paused: false` clears `failures`.
-- [ ] `routines_remove` removes it, cancels a run going, and a second call says so.
-- [ ] One bot can't see or change another's routine.
-- [ ] In a run, in a chat room, and in another plugin's session, `routines_add`, `routines_change`, and `routines_remove` refuse, and `routines_list` works.
-- [ ] A changed time zone moves every `cron` routine's next time within a tick.
+- [x] `routines_add` makes each kind, and answers its words and first run. Each refusal in its list answers its sentence.
+- [x] `routines_list` answers the time, and each routine's words, next run, and last run.
+- [x] `routines_change` changes each field, and a new schedule sets `next_at`. `paused: false` clears `failures`.
+- [x] `routines_remove` removes it, cancels a run going, and a second call says so.
+- [x] One bot can't see or change another's routine.
+- [x] In a run, in a chat room, and in another plugin's session, `routines_add`, `routines_change`, and `routines_remove` refuse, and `routines_list` works.
+- [x] A changed time zone moves every `cron` routine's next time within a tick.
 
 **M8. The section**
-- [ ] It lists each routine with its words, next time, task, and runs, and its buttons don't submit the bot's form.
-- [ ] The switch pauses and resumes. **Run now** runs at once and leaves the next time alone, and a second press while it runs is refused. **Stop** ends a run as `stopped`. **Remove** removes it.
-- [ ] **Show** opens what a run said.
-- [ ] It names the time zone and General, and a run's files link to the library.
-- [ ] The card in a reply shows the routine with **Remove**, and **Remove** works.
-- [ ] At 375 pixels wide there's no sideways scroll, and the page logs no errors. Load 5173 as well as the build.
+- [x] It lists each routine with its words, next time, task, and runs, and its buttons don't submit the bot's form.
+- [x] The switch pauses and resumes. **Run now** runs at once and leaves the next time alone, and a second press while it runs is refused. **Stop** ends a run as `stopped`. **Remove** removes it.
+- [x] **Show** opens what a run said.
+- [x] It names the time zone and General, and a run's files link to the library.
+- [x] The card in a reply shows the routine with **Remove**, and **Remove** works.
+- [x] At 375 pixels wide there's no sideways scroll, and the page logs no errors. Load 5173 as well as the build.
 
 **M9. Package, docs, and checks**
-- [ ] `plugins/routines/README.md` says what it does, its settings, its tables, its cost, and how to build its page. `page.js` is built by its command and committed.
-- [ ] `packages/sdk/src/plugins-registry.json` lists `routines`, with the same description as `plugin.json`, and Browse shows it tagged fxbot.
-- [ ] **The website:**
-  - the [Plugin API](../../packages/website/src/content/docs/sdk/reference/plugin-api.md) has `fx.bots.on`, `shown`, `messageId`, `fx.timeZone`, and `fx.library.list`, each with its "Since"
+- [x] `plugins/routines/README.md` says what it does, its settings, its tables, its cost, and how to build its page. `page.js` is built by its command and committed.
+- [x] `packages/sdk/src/plugins-registry.json` lists `routines`, with the same description as `plugin.json`, and Browse shows it tagged fxbot.
+- [x] **The website:**
+  - the [Plugin API](../../../packages/website/src/content/docs/sdk/reference/plugin-api.md) has `fx.bots.on`, `shown`, `messageId`, `fx.timeZone`, and `fx.library.list`, each with its "Since"
   - a how-to, "Give a bot a routine", is in `src/sidebar.ts`, and says what a skipped clock time does, how a run uses the computer, and that a login stops it
   - "Let bots dream" says the zone is in Settings › General
-- [ ] **`CHANGELOG.md`,** under `## Unreleased`: the plugin, the time zone, dreams 0.2.0, and the five pieces of plugin API. **Before upgrading** names migration `0009_time_zone`, and that a zone set in dreams moves to General.
-- [ ] `npm run typecheck`, `npm run build`, `npm run build-site`, and `git diff --check` pass. The new files are checked for whitespace too.
-- [ ] The core and plugin line counts are within the bound.
-- [ ] This doc's Status says built, with what the build changed. It moves to `docs/_completed/phases/`, and `AGENTS.md` lists it.
-- [ ] The work is committed on the open release branch, the core, the plugin, and the docs in separate commits, and not pushed.
+- [x] **`CHANGELOG.md`,** under `## Unreleased`: the plugin, the time zone, dreams 0.2.0, and the five pieces of plugin API. **Before upgrading** names migration `0009_time_zone`, and that a zone set in dreams moves to General.
+- [x] `npm run typecheck`, `npm run build`, `npm run build-site`, and `git diff --check` pass. The new files are checked for whitespace too.
+- [x] The core and plugin line counts are within the bound.
+- [x] This doc's Status says built, with what the build changed. It moves to `docs/_completed/phases/`, and `AGENTS.md` lists it.
+- [x] The work is committed on the open release branch, the core, the plugin, and the docs in separate commits, and not pushed.
 
 **The human runs these:**
 - **A week with a real model:** a morning summary every day. It arrives before you open the app, reads well, and a follow-up question works.
@@ -772,10 +774,19 @@ Nothing reaches a real model. Confirm a restarted check server's old process exi
 
 **Decided by the owner on 2026-11-05:**
 - **Which release:** 0.6.0.
-- **Routines a bot makes:** on at once, with the card's **Remove**. With a [permissions](permissions.md) plugin, this becomes one of its rules.
+- **Routines a bot makes:** on at once, with the card's **Remove**. With a [permissions](../../phases/permissions.md) plugin, this becomes one of its rules.
 - **One time zone:** a core setting in Settings › General, and plugins use it.
 - **How often:** a setting, `everyMinutes`, 15 by default.
 
 **Left,** with a default the build follows unless the owner changes it:
 1. **Telling the owner outside the app.** *Default:* the bot's chat only, since fxbot has no push. A routine is the first feature that wants push: a result the owner doesn't know is there, and a run that stopped for a sign-in.
 2. **A zone set by itself.** *Default:* the first browser to open fxbot sets it, and General changes it. The other way is to leave it empty until the owner picks one, which keeps today's trap.
+
+## What the build changed
+
+- **A sixth piece of core.** `app.toolView` takes `{ open: true }`. The card was folded inside "Ran routines_add", so a routine a bot was talked into wasn't one click from gone. Now it stays in sight below the steps, and the fold keeps the raw input and output.
+- **A turn with no text.** libfx gives one the reply "Done.", so a run with nothing to say would have told the owner that. The plugin reads it as quiet, along with `(no reply)` as chat rooms reads it: `no reply`, in any case, with or without its brackets and a full stop. A run that really says only "Done." stays quiet too.
+- **`runs` has two more columns,** `files`, for what a run saved, and `untold`, which also catches a told turn that fails at the model, after the send went through.
+- **`atOnce` counts a run from the moment it starts,** before it has a session. The first build counted it after, so four due at once all started.
+- **A plugin in `FXBOT_PLUGIN_DIRS` keeps its MCP servers across a restart.** A check of Settings' plugin tabs found that each start dropped them, in a commit of its own.
+- **The size:** a net 75 core lines, 765 of the plugin, and 26 fewer in dreams.
