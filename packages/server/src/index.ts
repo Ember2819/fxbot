@@ -358,11 +358,18 @@ function adapt(ws: WebSocket): PluginSocket {
 
 server.listen(port, host, () => console.log(`fxbot server on http://${host}:${port}`));
 
-// Stop taking requests, then let libfx finish the turns this process started.
+// Stop taking requests, then let libfx finish the turns this process started, for 30 seconds at most. libfx stores each
+// step of a turn, so one still running then goes on where it stopped when fxbot starts again. Until this process exits,
+// its queue worker takes sessions' messages it can no longer run, so it must not linger.
+const drain = 30_000;
 async function shutdown() {
   server.close();
   server.closeAllConnections();
   for (const ws of sockets.clients) ws.terminate();
+  setTimeout(() => {
+    console.log(`Stopped after ${drain / 1000} seconds with turns still running. They go on when fxbot starts again.`);
+    process.exit(0);
+  }, drain);
   await fxbot.close();
   process.exit(0);
 }

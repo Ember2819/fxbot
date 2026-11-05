@@ -128,7 +128,7 @@ Open the address on each device and install the app from it: Install in Settings
 
 ## Update
 
-When a newer release is out, Settings shows its notes and an **Update** button. The app asks the machine, and the `fxbot` command there downloads the release, starts it, and waits until it answers. Running chats finish first, and the database keeps running. From a shell:
+When a newer release is out, Settings shows its notes and an **Update** button. The app asks the machine, and the `fxbot` command there downloads the release, starts it, and waits until it answers. Running chats get 30 seconds to finish first, and one still running goes on in the new release. The database keeps running. From a shell:
 
 ```sh
 sudo fxbot update            # the newest release, or name one: sudo fxbot update 0.3.1

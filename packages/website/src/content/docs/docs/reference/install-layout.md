@@ -42,7 +42,7 @@ The compose project is `fxbot`, with three services:
 | Setting | Value |
 | --- | --- |
 | Restarts | After a crash (`restart: unless-stopped`) |
-| Stops | The app gets 90 seconds for running chats to finish, and the database a minute |
+| Stops | The app gives running chats 30 seconds to finish, and one still running goes on when it starts again. The container is stopped after 90 seconds at most, and the database after a minute |
 | Health | The app when its port answers, which it opens after its migrations. The database when `pg_isready` answers. The embedder when its `/health` answers. The app doesn't wait for the embedder, and searches by words until it answers. |
 | Log | `sudo fxbot logs`, or one container's, such as `sudo fxbot logs fxbot`, `sudo fxbot logs db`, or `sudo fxbot logs embed` |
 

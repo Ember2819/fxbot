@@ -29,7 +29,8 @@ services:
     # seconds kept an idle machine busy. podman ignores start_interval: the fxbot command runs the checks itself while
     # it waits.
     healthcheck: { test: [ CMD, fxbot-health ], interval: 30s, timeout: 2s, retries: 3, start_period: 2m, start_interval: 2s }
-    # Running chats finish before it stops, as they did under systemd.
+    # fxbot gives running chats 30 seconds to finish, and one still running goes on at the next start. Past this,
+    # podman or docker stops it anyway.
     stop_grace_period: 90s
     restart: unless-stopped
   # Reached only by the app, by its name: no port on the machine.

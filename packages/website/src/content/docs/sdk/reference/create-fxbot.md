@@ -110,6 +110,6 @@ An `Error` without a `status` is unexpected. fxbot's server answers it with 500.
 
 ## Stopping
 
-`close()` stops the timers, closes the MCP connections, and closes each provider's agent, which waits for the turns this process started. It waits for their replies to be saved, then ends the Postgres connection.
+`close()` closes each provider's agent, which waits for the turns this process started, with the plugins, MCP servers, and skills they use still there. It waits for their replies to be saved, then stops the plugins, the timers, and the MCP connections, and ends the Postgres connection. It waits as long as the turns take: fxbot's own server waits 30 seconds at most, then exits, and a turn it left goes on where it stopped at the next start, since libfx stores each step.
 
 Before 0.4.0, `close()` didn't wait for the save of a reply that just finished, so a script that called it right after a turn could crash with `CONNECTION_ENDED`.

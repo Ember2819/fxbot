@@ -201,7 +201,7 @@ A server's `allowed` starts as its read-only tools. A header value is one line, 
 | Call | What it does | Returns |
 | --- | --- | --- |
 | `release()` | Synchronous. The running `version`, and `latest`, the newest stable release when it is newer, or `null` | `{ version, latest }` |
-| `close()` | Stops the timers and MCP connections, closes the agents, which waits for their running turns, waits for their replies to be saved, then ends the Postgres connection. See [Stopping](/sdk/reference/create-fxbot/#stopping). | nothing |
+| `close()` | Closes the agents, which waits for their running turns, and waits for their replies to be saved, then stops the plugins, the timers, and the MCP connections, and ends the Postgres connection. See [Stopping](/sdk/reference/create-fxbot/#stopping). | nothing |
 
 ## Tools every bot gets
 

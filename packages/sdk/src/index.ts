@@ -737,16 +737,17 @@ export async function createFxbot(options: FxbotOptions) {
     // The running version, and the newest stable release when it is newer.
     release: releases.get,
 
-    // Waits for the turns this process started and the saves of their replies, then lets Postgres go.
+    // Waits for the turns this process started and the saves of their replies, with the plugins, MCP servers, and
+    // skills they use still there, then stops those and lets Postgres go.
     async close() {
+      await providers.close();
+      await Promise.all(saving);
       await packages.close();
       embeddings.close();
       releases.close();
       registry.close();
       skills.close();
       await mcp.close();
-      await providers.close();
-      await Promise.all(saving);
       await sessions.close();
       await store.close();
     },

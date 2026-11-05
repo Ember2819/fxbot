@@ -51,7 +51,7 @@ Moves to the newest stable release, or the one named, such as `0.3.1` or `0.4.0-
 2. writes the new version into `/opt/fxbot/.env`, and puts the new files in place
 3. recreates the containers that changed, and waits up to 5 minutes for the app to be healthy. The new app backs up and migrates the database as it starts.
 
-Running chats get 90 seconds to finish, and the database keeps running. Each step goes to `/var/lib/fxbot/control/status.json`, which Settings shows. Another update waits for the one running.
+Running chats get 30 seconds to finish, and one still running goes on in the new release. The database keeps running. Each step goes to `/var/lib/fxbot/control/status.json`, which Settings shows. Another update waits for the one running.
 
 It refuses, and changes nothing, when:
 
