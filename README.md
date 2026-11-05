@@ -44,7 +44,7 @@ In order of execution priority. Checked phases are built. Each is marked **core*
 - [x] [Computer v2](docs/_completed/phases/computer-v2.md) (plugin, with one core hook): a whole computer in one plugin: a desktop the owner watches and takes over, a shared terminal, a browser on the desktop, and the tools to drive them by pixels, accessibility trees, and text
 - [ ] [Permissions](docs/phases/permissions.md) (plugin, on a core hook): ask, auto, and yolo modes for tool calls
 - [x] [Chat rooms](docs/_completed/phases/chat-rooms.md) (plugin, with two core hooks; 0.4.1): rooms of the owner and several bots, with `@` chips, bots tagging each other within limits, a Stop, and skills for working in a room
-- [ ] [Cross-bot messaging](docs/phases/cross-bot-messaging.md) (plugin): bots message each other
+- [ ] [Cross-bot messaging](docs/phases/cross-bot-messaging.md) (plugin): bots message each other in their own chats, where the owner watches them work together
 - [x] [Routines](docs/_completed/phases/routines.md) (plugin, with a core time zone; 0.6.0): saved tasks a bot runs on a schedule, with everything it has, telling the owner in its chat
 - [ ] [Triggers](docs/phases/triggers.md) (plugins): webhooks and new email start a bot's turn
 - [ ] [Soul](docs/phases/soul.md) (plugin): a written persona behind each bot's system prompt
