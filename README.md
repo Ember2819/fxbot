@@ -213,7 +213,7 @@ An app installed from that address is the development page, so every change show
 
 ## Releasing
 
-`main` holds releases only, and every commit on it is one. Work happens on `release/<next version>`, made from `main` after each release; `npm run dev` runs from that branch. When the branch is ready:
+`main` holds releases, and updates to the site between them. Work happens on `release/<next version>`, made from `main` after each release; `npm run dev` runs from that branch. When the branch is ready:
 
 ```sh
 npm version 0.2.0 --no-git-tag-version     # package.json and the lockfile
@@ -224,7 +224,7 @@ git switch main && git merge --ff-only release/0.2.0 && git push
 git switch -c release/0.3.0 && git push -u origin release/0.3.0
 ```
 
-The [release workflow](.github/workflows/release.yml) typechecks and builds the new version, checks that no shipped migration changed, builds fxbot's image for amd64 and arm64 and pushes it to ghcr.io, then tags it and publishes a GitHub Release with `docs/releases/<version>.md` as its notes. Those notes are a short post, to paste anywhere, and they're what Settings shows above **Update**, so a release with a **Before upgrading** says so above its list of changes. GitHub makes a new package private: after the first release with an image, make it public once, in the package's settings (**Change visibility**). It runs only on `main`: release branches are for work, and never publish. A prerelease, such as `0.3.0-rc.1`, is published only when you merge one into `main`. A fix to a release goes on `release/0.2.1` from `main`, and is merged into the open release branch after.
+The [release workflow](.github/workflows/release.yml) typechecks and builds the new version, checks that no shipped migration changed, builds fxbot's image for amd64 and arm64 and pushes it to ghcr.io, then tags it and publishes a GitHub Release with `docs/releases/<version>.md` as its notes. Those notes are a short post, to paste anywhere, and they're what Settings shows above **Update**, so a release with a **Before upgrading** says so above its list of changes. GitHub makes a new package private: after the first release with an image, make it public once, in the package's settings (**Change visibility**). It runs only on `main`: release branches are for work, and never publish. A prerelease, such as `0.3.0-rc.1`, is published only when you merge one into `main`. A fix to a release goes on `release/0.2.1` from `main`, and is merged into the open release branch after. An update to the site alone goes to `main` with no new version: the workflow finds that version tagged and does nothing, and the site deploys, so installs see no change.
 
 ## Status
 

@@ -7,7 +7,7 @@ fxbot gives people a version to stay on, while its owner keeps working on the ne
 
 ## A release is a merge into main
 
-One version covers the whole repository. Work happens on a branch named for the next release, and `npm run dev` runs from it. When it is ready, it merges into `main`, which holds releases only.
+One version covers the whole repository. Work happens on a branch named for the next release, and `npm run dev` runs from it. When it is ready, it merges into `main`, which holds releases, and updates to the site between them.
 
 The release workflow runs on `main`. When the version in `package.json` has no tag yet, it typechecks and builds, checks that no shipped migration changed, and builds fxbot's image for amd64 and arm64 and pushes it to ghcr.io. Only then does it tag the version and publish the release, with its notes from `docs/releases/`. No tag points at a build that failed, and Settings never offers a release without an image.
 

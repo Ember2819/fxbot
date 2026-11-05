@@ -52,6 +52,7 @@ The [release workflow](.github/workflows/release.yml) then typechecks and builds
 
 - **A prerelease,** such as `0.3.0-rc.1`, is the same steps with that version. It is published as a prerelease, and its image gets only its own tag, `0.3.0-rc.1`.
 - **A fix to a release** goes on `release/0.2.1`, made from `main`, and is merged into the open release branch after.
+- **An update to the site alone** goes to `main` with no new version. The workflow finds that version tagged and does nothing, and the site deploys, so installs see no change. Only do this while the branch holds nothing but the site and docs.
 
 How versions, tags, and migrations fit together is in [Releases and updates](/docs/explanation/releases/).
 
