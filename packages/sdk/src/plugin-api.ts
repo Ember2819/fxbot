@@ -12,9 +12,9 @@ export type HookEvents = {
   /** Each time a chat opens: add, change, or remove entries. */
   instructions: { bot: string; session: string; instructions: string[] };
   /** Before every tool call: change `input`, or answer `{ block: reason }`, which the model gets as a failed call. */
-  "tool.before": { bot: string; session: string; tool: string; input: unknown };
+  "tool.before": { bot: string; session: string; messageId: string; tool: string; input: unknown };
   /** After it: change `result`. A call that failed has `error` instead. */
-  "tool.after": { bot: string; session: string; tool: string; input: unknown; result?: unknown; error?: string };
+  "tool.after": { bot: string; session: string; messageId: string; tool: string; input: unknown; result?: unknown; error?: string };
   /** Once libfx accepts the prompt. Only observes. */
   "turn.start": { bot: string; session: string; messageId: string; text: string; from?: string };
   /** When the turn ends, with its reply, or `error` when it failed. Only observes. */
@@ -29,14 +29,15 @@ export type HookEvents = {
 export type HookAnswers = { message: { handled: true } | { startOver: { ask: string } }; "tool.before": { block: string } };
 export type Hook<E extends keyof HookEvents> = (event: HookEvents[E]) => unknown;
 
-// A tool for bots, named `<plugin>_<name>` when they see it. `bot` and `session` are the chat's that called it.
+// A tool for bots, named `<plugin>_<name>` when they see it. `bot` and `session` are the chat's that called it, and
+// `messageId` the message whose turn it's in.
 export type PluginTool = {
   name: string;
   description: string;
   inputSchema: Record<string, unknown>;
   /** Running a call twice is harmless, so a call cut off by a crash runs again. */
   idempotent: boolean;
-  execute: (input: any, call: { bot: string; session: string; signal: AbortSignal }) => unknown;
+  execute: (input: any, call: { bot: string; session: string; messageId: string; signal: AbortSignal }) => unknown;
 };
 
 // A plugin that needs this one, with what it asked of it: its block under `needs` in its plugin.json. `api` is what it
@@ -80,12 +81,18 @@ export type PluginApi = {
   sql: Sql;
   /** Its settings, with secrets opened. Kept up to date in place. */
   settings: Record<string, string>;
-  bots: { list(): Promise<Profile[]>; get(id: string): Promise<Profile> };
+  bots: {
+    list(): Promise<Profile[]>;
+    get(id: string): Promise<Profile>;
+    /** Whether this plugin is on for the bot. Since 0.6.0. */
+    on(id: string): boolean;
+  };
   chats: {
     /** A session of the plugin's own for a bot, on its current provider. */
     newSession(bot: string): Promise<string>;
-    /** A message, as the owner's are sent, marked as the plugin's. Without `session`, it goes to the bot's own chat. */
-    send(bot: string, message: { text: string; files?: Upload[]; session?: string; messageId?: string }): Promise<{ messageId: string; sessionId: string }>;
+    /** A message, as the owner's are sent, marked as the plugin's. Without `session`, it goes to the bot's own chat.
+     * `shown` is what the chat shows of it, when that isn't `text`, which the model gets. Since 0.6.0. */
+    send(bot: string, message: { text: string; shown?: string; files?: Upload[]; session?: string; messageId?: string }): Promise<{ messageId: string; sessionId: string }>;
     /** A session's lines as NDJSON, from `cursor` on, then each new one. */
     stream(bot: string, session: string, cursor?: number): Promise<ReadableStream<Uint8Array>>;
     /** Stops the turn running in one of the plugin's own sessions, if one runs: it ends `cancelled`. */
@@ -104,6 +111,8 @@ export type PluginApi = {
     read(bot: string, id: string): Promise<{ name: string; type: string; bytes: Buffer }>;
     /** Saves to the bot's library, tagged for the chat, through the library's checks: an image, or UTF-8 text. */
     save(item: { bot: string; session: string; name: string; type: string; bytes: Buffer }): Promise<LibraryItem>;
+    /** The items saved in one chat of the bot, newest first. Since 0.6.0. */
+    list(bot: string, session: string): Promise<LibraryItem[]>;
   };
   skills: {
     /** The files of the skill the bot sees by that name, besides SKILL.md. None when it has no such skill. */
@@ -123,6 +132,8 @@ export type PluginApi = {
     /** Deletes one. A missing one throws with status 404. */
     remove(bot: string, id: string): Promise<void>;
   };
+  /** The owner's time zone, such as Europe/Berlin: Settings › General's, or the machine's. Read it at each use. Since 0.6.0. */
+  timeZone(): string;
   /** The machine's fxbot command, for a job only root can do; null in a checkout, which has none. */
   machine: PluginMachine | null;
   /** Writes to the plugin's log, which shows on its row in Plugins. */

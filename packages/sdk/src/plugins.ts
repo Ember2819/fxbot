@@ -164,7 +164,8 @@ function within<T>(run: () => T | Promise<T>, ms: number, what: string): Promise
 
 // What fxbot's core gives plugins: its bots, and turns marked as the plugin's.
 export type PluginHost = {
-  bots: PluginApi["bots"];
+  bots: Omit<PluginApi["bots"], "on">;
+  timeZone: PluginApi["timeZone"];
   library: PluginApi["library"];
   skills: Pick<PluginApi["skills"], "files">;
   memories: PluginApi["memories"];
@@ -519,7 +520,8 @@ export async function createPlugins(options: {
       },
       sql: undefined as never,
       settings: plugin.settings,
-      bots: host.bots,
+      bots: { ...host.bots, on: (bot) => applies(plugin, bot) },
+      timeZone: host.timeZone,
       dependents: () => dependentsOf(record.name),
       provide(offer) {
         if (!offer || typeof offer !== "object") throw new Error("provide takes an object.");
@@ -646,8 +648,8 @@ export async function createPlugins(options: {
       ...tool,
       async execute(input, context) {
         if (!hooked("tool.before") && !hooked("tool.after")) return execute(input, context);
-        const bot = (context.context as { bot?: string } | undefined)?.bot ?? "";
-        const call = { bot, session: context.sessionId, tool: tool.name, input };
+        const { bot = "", messageId = "" } = (context.context ?? {}) as { bot?: string; messageId?: string };
+        const call = { bot, session: context.sessionId, messageId, tool: tool.name, input };
         const answer = await run("tool.before", call);
         if (answer?.block) throw new Error(answer.block);
         const after: HookEvents["tool.after"] & { bot: string } = { ...call };
@@ -672,9 +674,9 @@ export async function createPlugins(options: {
       inputSchema: tool.inputSchema as FxAgentHostTool["inputSchema"],
       idempotent: tool.idempotent,
       async execute(input, context) {
-        const bot = (context.context as { bot?: string } | undefined)?.bot;
+        const { bot, messageId = "" } = (context.context ?? {}) as { bot?: string; messageId?: string };
         if (!bot || !applies(plugin, bot)) throw new Error(`${plugin.record.name} is off for this bot.`);
-        return tool.execute(input, { bot, session: context.sessionId, signal: context.signal });
+        return tool.execute(input, { bot, session: context.sessionId, messageId, signal: context.signal });
       },
     }));
   }

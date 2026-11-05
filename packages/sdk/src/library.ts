@@ -82,7 +82,7 @@ export function createLibrary(sql: Sql) {
 
   // Ordered by each item's newest tag among those the query covers, then by id, so `before` pages without repeats.
   async function list(query: LibraryQuery = {}): Promise<LibraryPage> {
-    const { q = "", profileId, kind, before, limit = 60 } = query ?? {};
+    const { q = "", profileId, sessionId, kind, before, limit = 60 } = query ?? {};
     if (typeof q !== "string" || q.length > 500) fail(400, "q must be at most 500 characters");
     if (profileId !== undefined && !isId(String(profileId))) fail(400, "profile must be a bot id");
     if (kind !== undefined && !itemKinds.includes(kind)) fail(400, `kind must be one of ${itemKinds.join(", ")}`);
@@ -91,7 +91,7 @@ export function createLibrary(sql: Sql) {
     const words = tsquery(q);
     // `::text` first: Postgres.js sends a timestamptz parameter through a JS Date, which keeps only milliseconds.
     const rows = await sql<Row[]>`select ${listed} from library l join library_tags t on t.item_id = l.id
-      where ${profileId ? sql`t.profile_id = ${profileId}` : sql`true`} and ${kind ? sql`l.kind = ${kind}` : sql`true`}
+      where ${profileId ? sql`t.profile_id = ${profileId}` : sql`true`} and ${sessionId ? sql`t.session_id = ${sessionId}` : sql`true`} and ${kind ? sql`l.kind = ${kind}` : sql`true`}
         and ${words ? sql`l.tsv @@ to_tsquery('simple', ${words})` : sql`true`}
       group by l.id ${cursor ? sql`having (max(t.created_at), l.id) < (${cursor[1]}::text::timestamptz, ${cursor[2]})` : sql``}
       order by max(t.created_at) desc, l.id desc limit ${limit + 1}`;

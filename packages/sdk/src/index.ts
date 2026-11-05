@@ -150,6 +150,8 @@ export async function createFxbot(options: FxbotOptions) {
   // A plugin that starts turns from its setup is told to wait: the agents come after it.
   let ready = false;
   const started = () => ready || fail(400, "fxbot is still starting. Start turns after setup.");
+  // The owner's time zone, kept here so plugins read it without a query. Empty is the machine's.
+  let { timeZone } = await store.settings.get();
   const packages = await createPlugins({
     store,
     databaseUrl,
@@ -165,6 +167,7 @@ export async function createFxbot(options: FxbotOptions) {
       library: {
         read: (bot, id) => library.readFor(bot, id),
         save: ({ bot, session, name, type, bytes }) => library.save({ profileId: bot, sessionId: session, origin: "generated", name, type, bytes }),
+        list: async (bot, session) => (await library.list({ profileId: bot, sessionId: session, limit: 100 })).items,
       },
       skills: { files: (bot, name) => skills.files(bot, name) },
       // A bot's memories, kept as its own: an unknown bot is 404.
@@ -174,6 +177,7 @@ export async function createFxbot(options: FxbotOptions) {
         remove: async (bot, id) => (await get(bot), memories.remove(bot, id)),
       },
       machine: options.machine ?? null,
+      timeZone: () => timeZone || Intl.DateTimeFormat().resolvedOptions().timeZone,
       chats: {
         async newSession(plugin, bot) {
           started();
@@ -183,8 +187,8 @@ export async function createFxbot(options: FxbotOptions) {
           await store.sql`insert into plugin_sessions (id, profile_id, provider, plugin) values (${id}, ${bot}, ${profile.provider}, ${plugin})`;
           return id;
         },
-        send: async (plugin, bot, { text, files, session, messageId = crypto.randomUUID() }) =>
-          (started(), deliver(bot, { text, files, messageId }, { session, from: plugin })),
+        send: async (plugin, bot, { text, shown, files, session, messageId = crypto.randomUUID() }) =>
+          (started(), deliver(bot, { text, files, messageId }, { session, from: plugin, shown })),
         async stream(plugin, bot, session, cursor = 0) {
           started();
           const profile = await get(bot);
@@ -238,7 +242,7 @@ export async function createFxbot(options: FxbotOptions) {
   // characters a token, or 8,000 characters each when the window is unknown. libfx takes at most 64 KiB in all, so the
   // memories get no more than what the rest leaves. They change only when a memory does, so the prompt cache holds.
   // Plugins' instructions hooks change the list last.
-  async function open(profile: StoredProfile, sessionId: string) {
+  async function open(profile: StoredProfile, sessionId: string, messageId?: string) {
     const model = await modelFor(profile);
     const agent = await providers.agentFor(profile.provider, model);
     const window = await providers.contextWindow(profile.provider, model).catch(() => undefined);
@@ -252,7 +256,7 @@ export async function createFxbot(options: FxbotOptions) {
       await packages.run("instructions", event);
       instructions = (Array.isArray(event.instructions) ? event.instructions : []).filter((entry) => typeof entry === "string" && entry);
     }
-    return agent.session(sessionId, { model: model || undefined, instructions, context: { bot: profile.id } });
+    return agent.session(sessionId, { model: model || undefined, instructions, context: { bot: profile.id, messageId } });
   }
 
   async function get(id: string) {
@@ -271,7 +275,7 @@ export async function createFxbot(options: FxbotOptions) {
   // bot and its chat. The record is saved before the prompt, so the stream finds it when the turn starts.
   // A message with files or named skills is blocks: its text, each skill's instructions, then each file. What it sent
   // is kept, since libfx's stream shows only a plain-text prompt.
-  async function attach(profile: StoredProfile, sessionId: string, text: string, messageId: string, files: Upload[], skilled: ReturnType<typeof skills.invoked>, from?: string): Promise<FxSessionPromptInput> {
+  async function attach(profile: StoredProfile, sessionId: string, text: string, messageId: string, files: Upload[], skilled: ReturnType<typeof skills.invoked>, from?: string, shown?: string): Promise<FxSessionPromptInput> {
     const checked = files.map(({ name, type, data }) => {
       if (typeof name !== "string" || typeof type !== "string" || typeof data !== "string") return fail(400, "each file needs a name, a type, and base64 data");
       const bytes = Buffer.from(data, "base64");
@@ -287,7 +291,7 @@ export async function createFxbot(options: FxbotOptions) {
       blocks.push(kind === "image" ? { type: "image", mimeType: type, data: bytes.toString("base64"), sourceRef: `library:${item.id}` } : { type: "text", text: `File: ${name}\n${content}` });
       sent.push({ name, type, url: item.url });
     }
-    await store.sent.save(profile.id, messageId, { input: text, files: sent, plugin: from });
+    await store.sent.save(profile.id, messageId, { input: shown ?? text, files: sent, plugin: from });
     return blocks;
   }
 
@@ -456,8 +460,9 @@ export async function createFxbot(options: FxbotOptions) {
   }
 
   // A message to a bot's own chat, or to a plugin's session for it. Resolves once libfx has stored the prompt; the reply
-  // arrives on the stream. libfx takes at most 8 images, 3.75 MiB each and 6 MiB together. A plugin's message names it.
-  async function deliver(id: string, { text, messageId, files = [] }: Message, { session, from }: { session?: string; from?: string } = {}) {
+  // arrives on the stream. libfx takes at most 8 images, 3.75 MiB each and 6 MiB together. A plugin's message names it,
+  // and can show other words in the chat than the model gets.
+  async function deliver(id: string, { text, messageId, files = [] }: Message, { session, from, shown }: { session?: string; from?: string; shown?: string } = {}) {
     // A message to the bot's own chat waits for a start-over of it.
     if (!session) while (moving.has(id)) await moving.get(id);
     let profile = await get(id);
@@ -506,12 +511,12 @@ export async function createFxbot(options: FxbotOptions) {
     if (!text.trim() && !files.length) return { messageId, sessionId, handled: true as const };
     // A skill named as $name, or /name at the start, goes with the message, so the bot has it without asking.
     const skilled = skills.invoked(id, text);
-    const input = files.length || skilled.length ? await attach(profile, sessionId, text, messageId, files, skilled, from) : text;
-    if (from && input === text) await store.sent.save(id, messageId, { input: text, files: [], plugin: from });
+    const input = files.length || skilled.length ? await attach(profile, sessionId, text, messageId, files, skilled, from, shown) : text;
+    if (from && input === text) await store.sent.save(id, messageId, { input: shown ?? text, files: [], plugin: from });
     if (from) byPlugin.add(`${id}:${messageId}`);
     try {
       // A messageId the session already accepted runs nothing new and resolves to the same ids.
-      const turn = (await open(profile, sessionId)).prompt(input, { messageId });
+      const turn = (await open(profile, sessionId, messageId)).prompt(input, { messageId });
       const accepted = await turn.accepted;
       const names = files.length ? `\n[files: ${files.map((f) => f.name).join(", ")}]` : "";
       await history.record(id, accepted.sessionId, messageId, "user", text + names);
@@ -603,6 +608,18 @@ export async function createFxbot(options: FxbotOptions) {
           if (typeof input.defaultProfile !== "string") fail(400, "defaultProfile must be a string");
           if (input.defaultProfile) await get(input.defaultProfile);
           await store.settings.save({ defaultProfile: input.defaultProfile });
+        }
+        // The owner's time zone, which plugins read. An empty one is the machine's.
+        if (input.timeZone !== undefined) {
+          if (typeof input.timeZone !== "string") fail(400, "timeZone must be a string");
+          const zone = input.timeZone.trim();
+          try {
+            if (zone) new Intl.DateTimeFormat("en", { timeZone: zone });
+          } catch {
+            fail(400, "That isn't a time zone.");
+          }
+          await store.settings.save({ timeZone: zone });
+          timeZone = zone;
         }
         // Showing unvetted plugins fills the mirror of GitHub's registry for search.
         if (input.unvetted !== undefined) {

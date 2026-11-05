@@ -26,6 +26,8 @@ const core: Tab[] = [
 const about: Tab = { tab: "about", label: "About", Icon: InfoIcon };
 // A plugin's tab is named for it: computer is Computer, and chat-rooms is Chat rooms. A server's name is its address.
 const labelOf = (addon: Plugin) => (addon.kind === "mcp" ? addon.name : addon.name.charAt(0).toUpperCase() + addon.name.slice(1).replace(/-/g, " "));
+// Every zone the browser knows, and the one set, should the browser not list it.
+const zones = (set: string) => [...new Set([...(set ? [set] : []), ...Intl.supportedValuesOf("timeZone")])].sort();
 const repository = "https://github.com/iammrduncan/fxbot";
 const links = [
   ["fxbot.sh", "https://fxbot.sh"],
@@ -70,6 +72,19 @@ export function SettingsScreen({ tab, profiles }: { tab: string; profiles: Profi
               ))}
             </NativeSelect>
             <span className="font-normal text-muted-foreground">fxbot opens to this bot's chat when it starts at its address.</span>
+          </label>
+        )}
+        {settings && (
+          <label className="grid gap-1.5 text-sm font-medium">
+            Time zone
+            <NativeSelect value={settings.timeZone} onChange={(e) => save({ timeZone: e.target.value })} className="w-full">
+              {zones(settings.timeZone).map((zone) => (
+                <NativeSelectOption key={zone} value={zone}>
+                  {zone}
+                </NativeSelectOption>
+              ))}
+            </NativeSelect>
+            <span className="font-normal text-muted-foreground">Bots' schedules use this.</span>
           </label>
         )}
       </>

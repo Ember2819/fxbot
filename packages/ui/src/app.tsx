@@ -102,6 +102,11 @@ export function App() {
 
   // Plugins' page code, once; the Plugins page loads it again after a change.
   useEffect(() => void loadPlugins(), []);
+  // The owner's time zone, from the first browser that opens fxbot. After that, only Settings › General changes it.
+  useEffect(() => {
+    const { timeZone } = Intl.DateTimeFormat().resolvedOptions();
+    void client.settings.get().then((settings) => (settings.timeZone ? settings : client.settings.update({ timeZone }))).catch(() => {});
+  }, []);
   const pluginScreen = usePluginScreen(path);
 
   const [creating, setCreating] = useState(false);

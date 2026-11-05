@@ -70,15 +70,16 @@ export async function createStore({ databaseUrl, dataDir, backupsDir }: MigrateO
     },
     // The default provider and bot. Memory search's fields are embeddings.ts's.
     settings: {
-      get: async (): Promise<Pick<Settings, "defaultProvider" | "defaultProfile" | "unvetted">> => {
-        const row = one(await sql<{ defaultProvider: string | null; defaultProfile: string | null; unvetted: boolean }[]>`select default_provider, default_profile, unvetted from settings`);
-        return { defaultProvider: row?.defaultProvider ?? "", defaultProfile: row?.defaultProfile ?? "", unvetted: row?.unvetted ?? false };
+      get: async (): Promise<Pick<Settings, "defaultProvider" | "defaultProfile" | "unvetted" | "timeZone">> => {
+        const row = one(await sql<{ defaultProvider: string | null; defaultProfile: string | null; unvetted: boolean; timeZone: string | null }[]>`select default_provider, default_profile, unvetted, time_zone from settings`);
+        return { defaultProvider: row?.defaultProvider ?? "", defaultProfile: row?.defaultProfile ?? "", unvetted: row?.unvetted ?? false, timeZone: row?.timeZone ?? "" };
       },
-      save: async (fields: Partial<Pick<Settings, "defaultProvider" | "defaultProfile" | "unvetted">>) => {
+      save: async (fields: Partial<Pick<Settings, "defaultProvider" | "defaultProfile" | "unvetted" | "timeZone">>) => {
         const values = {
           ...(fields.defaultProvider !== undefined ? { defaultProvider: fields.defaultProvider || null } : {}),
           ...(fields.defaultProfile !== undefined ? { defaultProfile: fields.defaultProfile || null } : {}),
           ...(fields.unvetted !== undefined ? { unvetted: fields.unvetted } : {}),
+          ...(fields.timeZone !== undefined ? { timeZone: fields.timeZone || null } : {}),
         };
         await sql`insert into settings ${sql({ id: 1, ...values })} on conflict (id) do update set ${sql(values)}`;
       },
