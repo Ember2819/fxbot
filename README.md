@@ -72,7 +72,7 @@ curl -fsSL https://fxbot.sh/setup.sh | sudo bash
 curl -fsSL https://fxbot.sh/setup.sh | sudo bash -s -- v0.3.0
 ```
 
-fxbot runs as containers: the app, its database in pgvector's Postgres image, and the local embedder for memory search, from one compose file. `setup.sh` uses podman, or docker when only docker is installed. When neither is, it installs podman and Compose v2, on Debian 13 or Ubuntu 24.04 and newer; on older releases, install Docker from Docker's repository first. Then:
+fxbot runs as containers: the app, its database in pgvector's Postgres image, and the local embedder for memory search, from one compose file. `setup.sh` reads the versions the machine has and sets up what's missing: podman 4 or newer, or docker, and Compose 2.26 or newer, from the distro or from Compose's own release. Then:
 - the `fxbot` user, and a key in `/etc/fxbot/secret.key` that only `fxbot` reads
 - `/opt/fxbot`: the release's `compose.yaml`, an `.env` with its version and a random database password, and the `fxbot` command, also at `/usr/local/bin/fxbot`
 - `/etc/fxbot/fxbot.env` for the app's settings, with plugins' files in `/var/lib/fxbot/data`, backups in `/var/lib/fxbot/backups`, and the app's update requests in `/var/lib/fxbot/control`
@@ -181,7 +181,7 @@ The server reads these from the environment, or from an uncommitted `.env` in th
 One-time setup, for a checkout you run as yourself. Its database and local embedder run in containers of their own, on ports 5433 and 8081, and its names stay clear of a release install's (`fxbot`, `/etc/fxbot`, port 8787), so both can run on one machine. For everyday use, install a release instead.
 
 ```sh
-sudo apt install podman docker-compose postgresql-client-17     # or Docker; the client is for backups
+sudo apt install podman docker-compose postgresql-client-17     # or Docker; the client is for backups. On Ubuntu: docker-compose-v2, not docker-compose, which is v1
 sudo install -d -o "$USER" -m 700 /etc/fxbot-dev
 openssl rand -base64 32 > /etc/fxbot-dev/secret.key && chmod 400 /etc/fxbot-dev/secret.key
 pw=$(openssl rand -hex 16)

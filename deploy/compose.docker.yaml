@@ -1,0 +1,7 @@
+# For Docker 25 and newer, beside compose.yaml: a check every 2 seconds while a service starts, so fxbot is up in seconds
+# and not a minute. The fxbot command adds it. Compose refuses start_interval on older Docker, and on podman.
+services:
+  fxbot:
+    healthcheck: { start_interval: 2s }
+  db:
+    healthcheck: { start_interval: 2s }

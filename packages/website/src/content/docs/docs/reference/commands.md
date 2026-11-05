@@ -10,7 +10,12 @@ curl -fsSL https://fxbot.sh/setup.sh | sudo bash
 curl -fsSL https://fxbot.sh/setup.sh | sudo bash -s -- <tag>
 ```
 
-Installs fxbot on Debian or Ubuntu as containers, as root. It uses podman, or docker when only docker is installed. When neither is, it installs podman and Compose v2, on Debian 13 or Ubuntu 24.04 and newer. What it creates is in [What setup.sh creates](/docs/reference/install-layout/).
+Installs fxbot on Debian, Ubuntu, or a distro built on them, as containers, as root. It reads the versions the machine has, and sets up what's missing:
+
+- **The engine:** podman 4 or newer, or docker when that's what's installed. With neither, it installs podman, or docker where the distro's podman is older than 4, such as Ubuntu 22.04.
+- **Compose:** 2.26 or newer. When the machine's is older, or is v1, or `podman compose` would run one of those, it installs the distro's package if that's new enough, and otherwise downloads Compose's own release into `/opt/fxbot` and checks it against its hash. podman-compose isn't used: it can't wait for health.
+
+What it creates is in [What setup.sh creates](/docs/reference/install-layout/).
 
 | Input | What it is |
 | --- | --- |
@@ -18,22 +23,24 @@ Installs fxbot on Debian or Ubuntu as containers, as root. It uses podman, or do
 | `FXBOT_FILES` | Where each release's `deploy/` files are downloaded from, by tag. Default `https://raw.githubusercontent.com/iammrduncan/fxbot` |
 | `FXBOT_IMAGE` | The app's image, without its tag. Default `ghcr.io/iammrduncan/fxbot` |
 | `FXBOT_RELEASES_URL` | Where the newest release is read, in the shape of GitHub's `releases/latest`. Default `https://api.github.com/repos/iammrduncan/fxbot/releases/latest` |
+| `FXBOT_COMPOSE_FILES` | Where Compose's own release is downloaded from, when the machine needs it. Default `https://github.com/docker/compose/releases/download` |
 
 `FXBOT_FILES`, `FXBOT_IMAGE`, and `FXBOT_RELEASES_URL` point an install at a fork or a mirror. When set, they are kept in `/opt/fxbot/.env`, for updates.
 
-- Run again, it finishes an install that stopped, and leaves a working one alone, on the release it has.
+- Run again, it finishes an install that stopped, and leaves a working one alone, on the release it has. An install that stopped before its first start has nothing to keep, so it starts over from the newest release, with its old settings left as `/opt/fxbot/.env.stopped`.
 - On an install of 0.2, it moves it into containers: see [Update from 0.2](/docs/how-to/update/#from-02).
-- It stops, and says why, when the machine has no Compose v2 package and no Docker (Debian 12 and Ubuntu 22.04: install Docker from Docker's repository first), when another program listens on port 8787, or when fxbot doesn't start.
+- It stops, and says why, when docker doesn't answer, when it can't get a Compose new enough, when another program listens on port 8787, or when fxbot doesn't start.
 - On a machine without systemd, it installs everything and prints the command that starts fxbot.
 
 ## fxbot
 
-The command for an install made by `setup.sh`: `/opt/fxbot/fxbot`, linked as `/usr/local/bin/fxbot`. Run it as root. It runs `podman compose` or `docker compose`, as `FXBOT_ENGINE` in `/opt/fxbot/.env` says, in `/opt/fxbot`.
+The command for an install made by `setup.sh`: `/opt/fxbot/fxbot`, linked as `/usr/local/bin/fxbot`. Run it as root. It runs `podman compose` or `docker compose`, as `FXBOT_ENGINE` in `/opt/fxbot/.env` says, in `/opt/fxbot`, or the binary `FXBOT_COMPOSE` names there, when `setup.sh` found those too old.
 
 | Command | What it does |
 | --- | --- |
 | `sudo fxbot status` | The version, the engine, the local embedder, and the containers. After a move from 0.2, it also prints the commands that remove what 0.2 left. |
 | `sudo fxbot logs [<service>]` | Follows the containers' logs, from the last 100 lines. `<service>` is `fxbot`, `db`, or `embed`. |
+| `sudo fxbot compose <args>` | Compose itself, on this install's files, with its engine and profile, such as `sudo fxbot compose ps`. |
 | `sudo fxbot update [<version>]` | Moves to the newest stable release, or the one named. See below. |
 | `sudo fxbot up` | Starts the containers, and waits up to 5 minutes until the app is healthy. The embedder may still be downloading its model. `fxbot.service` runs it at boot. |
 | `sudo fxbot down` | Stops and removes the containers. The database's volume stays. |
@@ -47,7 +54,7 @@ The command for an install made by `setup.sh`: `/opt/fxbot/fxbot`, linked as `/u
 
 Moves to the newest stable release, or the one named, such as `0.3.1` or `0.4.0-rc.1`. In order, it:
 
-1. downloads the release's `compose.yaml`, its GPU file for the engine, and its `fxbot` command, and pulls the images it doesn't have yet
+1. downloads the release's `compose.yaml`, its GPU file for the engine, its `fxbot` command, and on Docker its `compose.docker.yaml`, and pulls the images it doesn't have yet
 2. writes the new version into `/opt/fxbot/.env`, and puts the new files in place
 3. recreates the containers that changed, and waits up to 5 minutes for the app to be healthy. The new app backs up and migrates the database as it starts.
 

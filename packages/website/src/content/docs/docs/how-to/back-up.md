@@ -5,21 +5,21 @@ description: "fxbot backs itself up before a release's migrations run, into /var
 
 fxbot backs itself up before a release's migrations run, into `/var/lib/fxbot/backups`, and keeps the last five. To keep a copy of your own, off the machine, back up three things: the database, which holds the chats, the data folder, and the key.
 
-These steps are for an install made by `setup.sh`. Run them in a folder only you can read, since the database holds every chat. They use podman. If `/opt/fxbot/.env` says `FXBOT_ENGINE=docker`, write `docker compose` in place of `podman compose`.
+These steps are for an install made by `setup.sh`. Run them in a folder only you can read, since the database holds every chat.
 
 ## Back up
 
 1. Stop the app, and leave its database running, so the database and the data folder match:
 
    ```sh
-   sudo podman compose --project-directory /opt/fxbot stop fxbot
+   sudo fxbot compose stop fxbot
    ```
 
 2. Copy the database, in pg_dump's custom format, and the data folder, into a folder of their own:
 
    ```sh
    mkdir fxbot-backup
-   sudo podman compose --project-directory /opt/fxbot exec -T db pg_dump -U fxbot -Fc fxbot > fxbot-backup/database.dump
+   sudo fxbot compose exec -T db pg_dump -U fxbot -Fc fxbot > fxbot-backup/database.dump
    sudo tar -czf fxbot-backup/data.tar.gz -C /var/lib/fxbot/data .
    ```
 
