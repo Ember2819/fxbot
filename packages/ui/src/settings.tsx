@@ -3,19 +3,20 @@ import { BrainIcon, InfoIcon, KeyRoundIcon, PuzzleIcon, SlidersHorizontalIcon } 
 import { Button, buttonVariants } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
 import { NativeSelect, NativeSelectOption } from "@/components/ui/native-select";
-import type { Profile, Settings } from "@fxbot/sdk/client";
+import type { Plugin, Profile, Settings } from "@fxbot/sdk/client";
 import { client } from "./client.ts";
 import { Header } from "./header.tsx";
 import { MemorySearch } from "./memory-search.tsx";
 import { follow } from "./nav.ts";
 import { PluginIcon } from "./plugin-icon.tsx";
 import { PluginPart, usePluginSettings } from "./plugins.tsx";
+import { PluginTab, pluginTab, useInstalled } from "./plugins-page.tsx";
 import { Providers } from "./providers.tsx";
 import { install, standalone, useInstall } from "./pwa.ts";
 import { Version } from "./release.tsx";
 
 type Tab = { tab: string; label: string; Icon?: ComponentType; iconKey?: string };
-// The core's tabs. Each plugin that draws in Settings gets one after Plugins, and About comes last.
+// The core's tabs. Each installed plugin gets one after Plugins, and About comes last.
 const core: Tab[] = [
   { tab: "", label: "General", Icon: SlidersHorizontalIcon },
   { tab: "providers", label: "Providers", Icon: KeyRoundIcon },
@@ -23,8 +24,8 @@ const core: Tab[] = [
   { tab: "plugins", label: "Plugins", Icon: PuzzleIcon },
 ];
 const about: Tab = { tab: "about", label: "About", Icon: InfoIcon };
-// A plugin's tab is named for it: computer is Computer, and chat-rooms is Chat rooms.
-const labelOf = (name: string) => name.charAt(0).toUpperCase() + name.slice(1).replace(/-/g, " ");
+// A plugin's tab is named for it: computer is Computer, and chat-rooms is Chat rooms. A server's name is its address.
+const labelOf = (addon: Plugin) => (addon.kind === "mcp" ? addon.name : addon.name.charAt(0).toUpperCase() + addon.name.slice(1).replace(/-/g, " "));
 const repository = "https://github.com/iammrduncan/fxbot";
 const links = [
   ["fxbot.sh", "https://fxbot.sh"],
@@ -35,21 +36,23 @@ const links = [
 
 // Settings, in tabs, each at its own address: /settings is General, a plugin's is /settings/plugins/<plugin>, and
 // About is last. `tab` is what follows /settings/. An address no tab has shows the tabs over an empty pane, as a
-// plugin's does until its page code loads.
+// plugin's does until the list of plugins loads.
 export function SettingsScreen({ tab, profiles }: { tab: string; profiles: Profile[] | null }) {
   const [settings, setSettings] = useState<Settings | null>(null);
   const [error, setError] = useState("");
   useEffect(() => void client.settings.get().then(setSettings, (e: Error) => setError(e.message)), []);
   const save = (fields: Partial<Settings>) => client.settings.update(fields).then(setSettings, (e: Error) => setError(e.message));
-  const plugins = usePluginSettings();
-  const tabs: Tab[] = [...core, ...plugins.map(({ name, iconKey }) => ({ tab: `plugins/${name}`, label: labelOf(name), iconKey })), about];
+  const installed = useInstalled();
+  const drawn = usePluginSettings();
+  const plugins = (installed.addons ?? []).filter((addon) => !installed.owned.has(addon.id));
+  const tabs: Tab[] = [...core, ...plugins.map((addon) => ({ tab: pluginTab(addon), label: labelOf(addon), iconKey: addon.iconKey })), about];
 
   // On a phone the tabs are a row that scrolls sideways, kept with the open one in view. Newer browsers' scrollIntoView
   // returns a promise, which an effect must not.
   const nav = useRef<HTMLElement>(null);
   useEffect(() => void nav.current?.querySelector('[aria-current="page"]')?.scrollIntoView({ block: "nearest", inline: "nearest" }), [tab, plugins.length]);
 
-  const plugin = plugins.find(({ name }) => tab === `plugins/${name}`);
+  const plugin = plugins.find((addon) => tab === pluginTab(addon));
   let content: ReactNode = null;
   if (tab === "")
     content = (
@@ -90,21 +93,27 @@ export function SettingsScreen({ tab, profiles }: { tab: string; profiles: Profi
           fxbot shows the plugins it vets, tagged fxbot. Turn this on to also browse GitHub's MCP registry and skills.sh, and to add any MCP server by its address or any plugin by its repository. fxbot doesn't vet those: read what each one does before you add it.
         </p>
         <p className="text-sm text-muted-foreground">
-          Add, update, and remove plugins in{" "}
+          Add plugins in{" "}
           <a href="/plugins" onClick={follow} className="text-foreground underline underline-offset-4">
             Plugins
           </a>
-          .
+          . Each one you add gets a tab here, with its settings.
         </p>
       </section>
     );
   else if (tab === "about") content = <About />;
   else if (plugin)
-    content = plugin.parts.map((Part, i) => (
-      <PluginPart key={i} plugin={plugin.name}>
-        <Part />
-      </PluginPart>
-    ));
+    content = (
+      <PluginTab key={plugin.id} addon={plugin} installed={installed} profiles={profiles}>
+        {drawn
+          .find(({ name }) => name === plugin.name)
+          ?.parts.map((Part, i) => (
+            <PluginPart key={i} plugin={plugin.name}>
+              <Part />
+            </PluginPart>
+          ))}
+      </PluginTab>
+    );
 
   return (
     <>
@@ -126,7 +135,7 @@ export function SettingsScreen({ tab, profiles }: { tab: string; profiles: Profi
         </nav>
         <main className="min-w-0 flex-1 overflow-y-auto px-4 py-6">
           <div className="mx-auto grid max-w-xl gap-5">
-            {error && <p role="alert" className="rounded-lg bg-destructive/10 px-3 py-2 text-sm text-destructive">{error}</p>}
+            {(error || installed.error) && <p role="alert" className="rounded-lg bg-destructive/10 px-3 py-2 text-sm text-destructive">{error || installed.error}</p>}
             {content}
           </div>
         </main>

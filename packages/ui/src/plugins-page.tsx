@@ -1,9 +1,9 @@
-import { useEffect, useState, type FormEvent } from "react";
-import { ExternalLinkIcon, LoaderCircleIcon, PencilIcon, PuzzleIcon, SearchIcon } from "lucide-react";
+import { useEffect, useState, type FormEvent, type ReactNode } from "react";
+import { ExternalLinkIcon, LoaderCircleIcon, PuzzleIcon, SearchIcon } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/dialog";
 import { Empty, EmptyContent, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from "@/components/ui/empty";
 import { Input } from "@/components/ui/input";
 import { SidebarTrigger } from "@/components/ui/sidebar";
@@ -14,7 +14,7 @@ import { AddressDialog, bearer, EntryDialog, heading, hint, hostOf, Information,
 import { PluginIcon } from "./plugin-icon.tsx";
 import { Blob } from "./blob.tsx";
 import { client } from "./client.ts";
-import { follow } from "./nav.ts";
+import { follow, go } from "./nav.ts";
 import { PluginDialog, PluginSettings, RepoForm, usePackageSearch, type PluginTarget } from "./packages.tsx";
 import { loadPlugins } from "./plugins.tsx";
 import { blurb } from "@/lib/utils";
@@ -58,30 +58,16 @@ const targetOf = (addon: PackagePlugin): PluginTarget => ({
   description: addon.description,
 });
 
-// One list of plugins. Installed has one row each: its name opens its page, as Browse shows one, and a switch and an
-// edit button that opens its settings; a package's MCP servers show in its settings. Browse shows fxbot's picks, the
-// plugins it vets, leaving out those added; with unvetted plugins on in Settings, it also searches the public MCP
-// registries and skills.sh, and adds a server by address or a package from GitHub.
-export function PluginsPage({ profiles }: { profiles: Profile[] | null }) {
+// A plugin's tab in Settings, after /settings/: a package's by its name, which is unique, and any other's by its id.
+export const pluginTab = (addon: Plugin) => `plugins/${addon.kind === "package" ? addon.name : addon.id}`;
+
+// The installed plugins, kept up to date, for the Plugins screen and Settings' tabs. `owned` maps each MCP server a
+// package brought to that package: it follows it, and shows in its tab rather than as a row or a tab of its own.
+export function useInstalled() {
   const [addons, setAddons] = useState<Plugin[] | null>(null);
-  const [unvetted, setUnvetted] = useState(false);
   const [error, setError] = useState("");
-  const [query, setQuery] = useState("");
-  const [everything, setEverything] = useState(false);
-  const [chosen, setChosen] = useState<Tab | null>(null);
-  const [entry, setEntry] = useState<McpCard | null>(null);
-  const [skill, setSkill] = useState<SkillCard | null>(null);
-  const [plugin, setPlugin] = useState<PluginTarget | null>(null);
-  const [byAddress, setByAddress] = useState(false);
-  const [openId, setOpenId] = useState<string | null>(null);
-  const [infoId, setInfoId] = useState<string | null>(null);
-  const [signingIn, setSigningIn] = useState<McpPlugin | null>(null);
-  const search = useSearch(query, everything);
-  const skillSearch = useSkillSearch(query);
-  const packageSearch = usePackageSearch(query);
   const load = () => client.plugins.list().then((list) => (setAddons(list), setError("")), (e: Error) => setError(e.message));
   useEffect(() => void load(), []);
-  useEffect(() => void client.settings.get().then((settings) => setUnvetted(settings.unvetted), () => {}), []);
   // A server's status changes by itself while it connects.
   useEffect(() => {
     if (!addons?.some((a) => a.status === "Connecting")) return;
@@ -92,14 +78,34 @@ export function PluginsPage({ profiles }: { profiles: Profile[] | null }) {
   // A package added, removed, turned on or off, or updated changes what the page loads, and its servers' state.
   const packages = (addons ?? []).flatMap((a) => (a.kind === "package" ? [`${a.id}:${a.enabled}:${a.bots}:${a.on.join()}:${a.version}:${a.parts.page}:${a.error ?? ""}`] : [])).join(" ");
   useEffect(() => void (addons && (loadPlugins(), load())), [packages]);
-  const open = addons?.find((a) => a.id === openId);
-  const info = addons?.find((a) => a.id === infoId);
-  const settingsOf = (id: string) => () => (setInfoId(null), setOpenId(id));
-  // A package's servers follow it, and show in its settings rather than as rows.
   const owned = new Map((addons ?? []).flatMap((a) => (a.kind === "package" ? a.servers.map((id) => [id, a] as const) : [])));
+  return { addons, setAddons, error, setError, load, replace, owned };
+}
+
+// One list of plugins. Installed has one row each: its name opens its page, as Browse shows one, with a switch, and
+// its settings are in its tab in Settings. Browse shows fxbot's picks, the plugins it vets, leaving out those added;
+// with unvetted plugins on in Settings, it also searches the public MCP registries and skills.sh, and adds a server by
+// address or a package from GitHub.
+export function PluginsPage({ profiles }: { profiles: Profile[] | null }) {
+  const { addons, setAddons, error, setError, load, replace, owned } = useInstalled();
+  const [unvetted, setUnvetted] = useState(false);
+  const [query, setQuery] = useState("");
+  const [everything, setEverything] = useState(false);
+  const [chosen, setChosen] = useState<Tab | null>(null);
+  const [entry, setEntry] = useState<McpCard | null>(null);
+  const [skill, setSkill] = useState<SkillCard | null>(null);
+  const [plugin, setPlugin] = useState<PluginTarget | null>(null);
+  const [byAddress, setByAddress] = useState(false);
+  const [infoId, setInfoId] = useState<string | null>(null);
+  const [signingIn, setSigningIn] = useState<McpPlugin | null>(null);
+  const search = useSearch(query, everything);
+  const skillSearch = useSkillSearch(query);
+  const packageSearch = usePackageSearch(query);
+  useEffect(() => void client.settings.get().then((settings) => setUnvetted(settings.unvetted), () => {}), []);
+  const info = addons?.find((a) => a.id === infoId);
+  const settingsOf = (addon: Plugin) => () => go(`/settings/${pluginTab(addon)}`);
   const servers = (addons ?? []).flatMap((a) => (a.kind === "mcp" ? [a] : []));
   const reaching = servers.filter((a) => a.enabled).reduce((n, a) => n + a.tools.filter((t) => a.allowed.includes(t.name)).length, 0);
-  const signIn = (addon: McpPlugin) => (setOpenId(null), setSigningIn(addon));
   // Installed first when there is anything installed, else Browse.
   const tab = chosen ?? (addons?.length ? "installed" : "browse");
   const words = query.trim().toLowerCase();
@@ -132,9 +138,8 @@ export function PluginsPage({ profiles }: { profiles: Profile[] | null }) {
     setAddons((all) => [...(all ?? []), addon]);
     setQuery("");
     setChosen("installed");
-    if (addon.kind === "mcp" && addon.auth === "oauth") signIn(addon);
+    if (addon.kind === "mcp" && addon.auth === "oauth") setSigningIn(addon);
   };
-  const removed = (id: string) => (setOpenId(null), void load(), setAddons((all) => all?.filter((a) => a.id !== id) ?? null));
 
   return (
     <>
@@ -197,9 +202,6 @@ export function PluginsPage({ profiles }: { profiles: Profile[] | null }) {
                     )}
                     <p className="truncate text-xs text-muted-foreground">{summary(addon, profiles)}</p>
                   </div>
-                  <Button variant="ghost" size="icon-sm" aria-label={`Edit ${addon.name}`} onClick={() => setOpenId(addon.id)}>
-                    <PencilIcon />
-                  </Button>
                   <Switch aria-label={`Use ${addon.name}`} checked={addon.enabled} onCheckedChange={(enabled) => client.plugins.change(addon.id, { enabled }).then(replace, (e: Error) => setError(e.message))} />
                 </li>
               ))}
@@ -207,7 +209,7 @@ export function PluginsPage({ profiles }: { profiles: Profile[] | null }) {
           )}
           {tab === "installed" && reaching > toolBudget && (
             <p className="text-sm text-muted-foreground">
-              {reaching} tools reach your bots. Past {toolBudget}, every message carries more, since each tool's description goes with it. Allow fewer in each server's settings.
+              {reaching} tools reach your bots. Past {toolBudget}, every message carries more, since each tool's description goes with it. Allow fewer in each server's tab in Settings.
             </p>
           )}
           {tab === "browse" && (
@@ -277,41 +279,44 @@ export function PluginsPage({ profiles }: { profiles: Profile[] | null }) {
       {skill && <SkillDialog card={skill} onAdded={onAdded} onClose={() => setSkill(null)} />}
       {byAddress && <AddressDialog onAdded={onAdded} onClose={() => setByAddress(false)} />}
       {plugin && <PluginDialog target={plugin} onAdded={onAdded} onClose={() => setPlugin(null)} />}
-      {open?.kind === "mcp" && (
-        <ServerSettings
-          addon={open}
-          owner={owned.get(open.id)}
-          profiles={profiles}
-          onChange={replace}
-          onSignIn={() => signIn(open)}
-          onRemoved={() => removed(open.id)}
-          onClose={() => setOpenId(owned.get(open.id)?.id ?? null)}
-        />
-      )}
-      {open?.kind === "skill" && (
-        <SkillSettings addon={open} bots={<BotsChoice addon={open} profiles={profiles} onChange={replace} />} onChange={replace} onRemoved={() => removed(open.id)} onClose={() => setOpenId(null)} />
-      )}
-      {open?.kind === "package" && (
-        <PluginSettings
-          addon={open}
-          bots={<BotsChoice addon={open} profiles={profiles} onChange={replace} />}
-          servers={servers.filter((server) => open.servers.includes(server.id))}
-          onOpenServer={setOpenId}
-          onChange={replace}
-          onRemoved={() => removed(open.id)}
-          onClose={() => setOpenId(null)}
-        />
-      )}
-      {info?.kind === "package" && <PluginDialog target={targetOf(info)} installed={{ id: info.id, onSettings: settingsOf(info.id) }} onClose={() => setInfoId(null)} />}
-      {info?.kind === "skill" && <InstalledSkill addon={info} onSettings={settingsOf(info.id)} onClose={() => setInfoId(null)} />}
-      {info?.kind === "mcp" && <InstalledServer addon={info} onSettings={settingsOf(info.id)} onClose={() => setInfoId(null)} />}
+      {info?.kind === "package" && <PluginDialog target={targetOf(info)} installed={{ id: info.id, onSettings: settingsOf(info) }} onClose={() => setInfoId(null)} />}
+      {info?.kind === "skill" && <InstalledSkill addon={info} onSettings={settingsOf(info)} onClose={() => setInfoId(null)} />}
+      {info?.kind === "mcp" && <InstalledServer addon={info} onSettings={settingsOf(info)} onClose={() => setInfoId(null)} />}
+      {signingIn && <SignIn addon={signingIn} onClose={() => (setSigningIn(null), void load())} />}
+    </>
+  );
+}
+
+// A plugin's tab in Settings: all of it on one page, its switch, what it draws in Settings, then what its kind has.
+export function PluginTab({ addon, installed, profiles, children }: { addon: Plugin; installed: ReturnType<typeof useInstalled>; profiles: Profile[] | null; children?: ReactNode }) {
+  const { addons, load, replace, owned, setError } = installed;
+  const [signingIn, setSigningIn] = useState<McpPlugin | null>(null);
+  const removed = () => (go("/settings/plugins"), void load());
+  const description = addon.kind === "mcp" ? addon.info?.description : addon.description;
+  const bots = <BotsChoice addon={addon} profiles={profiles} onChange={replace} />;
+  const server = (one: McpPlugin) => <ServerSettings key={one.id} addon={one} owner={owned.get(one.id)} profiles={profiles} onChange={replace} onSignIn={() => setSigningIn(one)} onRemoved={removed} />;
+  const servers = addon.kind === "package" ? (addons ?? []).flatMap((a) => (a.kind === "mcp" && addon.servers.includes(a.id) ? [server(a)] : [])) : [];
+  return (
+    <>
+      <div className="flex items-center gap-3">
+        <PluginIcon iconKey={addon.iconKey} />
+        <div className="min-w-0 flex-1">
+          <h2 className="truncate font-medium">{addon.name}</h2>
+          {blurb(description) && <p className="text-sm text-muted-foreground">{blurb(description)}</p>}
+        </div>
+        <Switch aria-label={`Use ${addon.name}`} checked={addon.enabled} onCheckedChange={(enabled) => client.plugins.change(addon.id, { enabled }).then(replace, (e: Error) => setError(e.message))} />
+      </div>
+      {children}
+      {addon.kind === "mcp" && server(addon)}
+      {addon.kind === "skill" && <SkillSettings addon={addon} bots={bots} onChange={replace} onRemoved={removed} />}
+      {addon.kind === "package" && <PluginSettings addon={addon} bots={bots} servers={servers.length ? servers : null} onChange={replace} onRemoved={removed} />}
       {signingIn && <SignIn addon={signingIn} onClose={() => (setSigningIn(null), void load())} />}
     </>
   );
 }
 
 // One server: its sign-in or key, which bots have it, and which of its tools they get. Changes save as they are made.
-// A package's server follows the package's switch and bots, and goes with it.
+// A package's server follows the package's switch and bots, and goes with it: it shows in the package's tab, named.
 function ServerSettings({
   addon,
   owner,
@@ -319,7 +324,6 @@ function ServerSettings({
   onChange,
   onSignIn,
   onRemoved,
-  onClose,
 }: {
   addon: McpPlugin;
   owner?: PackagePlugin;
@@ -327,7 +331,6 @@ function ServerSettings({
   onChange: (addon: Plugin) => void;
   onSignIn: () => void;
   onRemoved: () => void;
-  onClose: () => void;
 }) {
   const [keys, setKeys] = useState<Record<string, string> | null>(null);
   const [error, setError] = useState("");
@@ -345,86 +348,80 @@ function ServerSettings({
   }
 
   return (
-    <Dialog open onOpenChange={(open) => !open && onClose()}>
-      <DialogContent className="flex max-h-[90dvh] flex-col">
-        <DialogHeader>
-          <DialogTitle className="truncate pr-6">{addon.name}</DialogTitle>
-          <DialogDescription>
-            {hostOf(addon.url)} · {addon.status}
-          </DialogDescription>
-        </DialogHeader>
-        <div className="-mx-4 grid min-h-0 flex-1 content-start gap-5 overflow-y-auto px-4">
-          {addon.auth !== "none" && keys === null && (
-            <div className="flex items-center justify-between gap-3">
-              <p className={heading}>
-                {addon.auth === "oauth" ? "Sign-in" : "Key"} <span className={hint}>{addon.signedIn ? (addon.auth === "oauth" ? "Signed in" : "Saved") : "Not set"}</span>
-              </p>
-              <Button size="sm" variant={addon.signedIn ? "outline" : "default"} onClick={addon.auth === "oauth" ? onSignIn : () => setKeys(Object.fromEntries(addon.headers.map((h) => [h, ""])))}>
-                {addon.auth === "oauth" ? (addon.signedIn ? "Sign in again" : "Sign in") : addon.signedIn ? "Replace" : "Add key"}
+    <div className={owner ? "grid gap-5 rounded-xl border p-3" : "grid gap-5"}>
+      <p className="text-sm text-muted-foreground">
+        {owner && <span className="font-medium text-foreground">{addon.name} · </span>}
+        {hostOf(addon.url)} · {addon.status}
+      </p>
+      {addon.auth !== "none" && keys === null && (
+        <div className="flex items-center justify-between gap-3">
+          <p className={heading}>
+            {addon.auth === "oauth" ? "Sign-in" : "Key"} <span className={hint}>{addon.signedIn ? (addon.auth === "oauth" ? "Signed in" : "Saved") : "Not set"}</span>
+          </p>
+          <Button size="sm" variant={addon.signedIn ? "outline" : "default"} onClick={addon.auth === "oauth" ? onSignIn : () => setKeys(Object.fromEntries(addon.headers.map((h) => [h, ""])))}>
+            {addon.auth === "oauth" ? (addon.signedIn ? "Sign in again" : "Sign in") : addon.signedIn ? "Replace" : "Add key"}
+          </Button>
+        </div>
+      )}
+      {keys && (
+        <form onSubmit={saveKeys} className="grid gap-2">
+          {Object.keys(keys).map((name, i) => (
+            <Input key={name} type="password" autoComplete="off" autoFocus={i === 0} aria-label={name} placeholder={name === "Authorization" ? "API key" : name} value={keys[name]} onChange={(e) => setKeys({ ...keys, [name]: e.target.value })} />
+          ))}
+          <div className="flex gap-2">
+            <Button type="submit" size="sm" disabled={!Object.values(keys).some((v) => v.trim())}>
+              Save
+            </Button>
+            <Button type="button" size="sm" variant="ghost" onClick={() => setKeys(null)}>
+              Cancel
+            </Button>
+          </div>
+        </form>
+      )}
+
+      {addon.source && <FromRegistry addon={addon} onChange={onChange} />}
+
+      {owner ? <p className="text-sm text-muted-foreground">Part of {owner.name}: it follows its switch and its bots.</p> : <BotsChoice addon={addon} profiles={profiles} onChange={onChange} />}
+
+      <section className="grid gap-2">
+        <div className="flex items-center justify-between gap-3">
+          <h3 className={heading}>
+            Tools {addon.tools.length > 0 && <span className={hint}>{allowed} of {addon.tools.length} allowed</span>}
+          </h3>
+          {addon.tools.length > 0 && (
+            <div className="flex">
+              <Button size="xs" variant="ghost" onClick={() => change({ allowed: addon.tools.map((t) => t.name) })}>
+                All
+              </Button>
+              <Button size="xs" variant="ghost" onClick={() => change({ allowed: [] })}>
+                None
               </Button>
             </div>
           )}
-          {keys && (
-            <form onSubmit={saveKeys} className="grid gap-2">
-              {Object.keys(keys).map((name, i) => (
-                <Input key={name} type="password" autoComplete="off" autoFocus={i === 0} aria-label={name} placeholder={name === "Authorization" ? "API key" : name} value={keys[name]} onChange={(e) => setKeys({ ...keys, [name]: e.target.value })} />
-              ))}
-              <div className="flex gap-2">
-                <Button type="submit" size="sm" disabled={!Object.values(keys).some((v) => v.trim())}>
-                  Save
-                </Button>
-                <Button type="button" size="sm" variant="ghost" onClick={() => setKeys(null)}>
-                  Cancel
-                </Button>
-              </div>
-            </form>
-          )}
-
-          {addon.source && <FromRegistry addon={addon} onChange={onChange} />}
-
-          {owner ? <p className="text-sm text-muted-foreground">Part of {owner.name}: it follows its switch and its bots.</p> : <BotsChoice addon={addon} profiles={profiles} onChange={onChange} />}
-
-          <section className="grid gap-2">
-            <div className="flex items-center justify-between gap-3">
-              <h3 className={heading}>
-                Tools {addon.tools.length > 0 && <span className={hint}>{allowed} of {addon.tools.length} allowed</span>}
-              </h3>
-              {addon.tools.length > 0 && (
-                <div className="flex">
-                  <Button size="xs" variant="ghost" onClick={() => change({ allowed: addon.tools.map((t) => t.name) })}>
-                    All
-                  </Button>
-                  <Button size="xs" variant="ghost" onClick={() => change({ allowed: [] })}>
-                    None
-                  </Button>
-                </div>
-              )}
-            </div>
-            {addon.tools.length === 0 && <p className="text-sm text-muted-foreground">{addon.signedIn || addon.auth === "none" ? "It lists no tools yet." : "Its tools show once it is signed in."}</p>}
-            <ul className="grid">
-              {addon.tools.map((tool) => (
-                <li key={tool.name}>
-                  <label className="flex items-start gap-3 rounded-md py-1.5 text-sm">
-                    <Checkbox className="mt-0.5" checked={addon.allowed.includes(tool.name)} onCheckedChange={(on) => allow(tool.name, on === true)} />
-                    <span className="min-w-0 flex-1">
-                      <span className="font-mono text-[0.8rem]">{tool.name}</span>
-                      {tool.readOnly && <span className="text-muted-foreground"> · read-only</span>}
-                      {tool.description && <span className="line-clamp-1 block text-muted-foreground">{tool.description}</span>}
-                    </span>
-                  </label>
-                </li>
-              ))}
-            </ul>
-          </section>
         </div>
-        {error && <p role="alert" className="text-sm text-destructive">{error}</p>}
-        {!owner && (
-          <Button variant="ghost" size="sm" className="justify-self-start self-start text-destructive" onClick={remove}>
-            Remove
-          </Button>
-        )}
-      </DialogContent>
-    </Dialog>
+        {addon.tools.length === 0 && <p className="text-sm text-muted-foreground">{addon.signedIn || addon.auth === "none" ? "It lists no tools yet." : "Its tools show once it is signed in."}</p>}
+        <ul className="grid">
+          {addon.tools.map((tool) => (
+            <li key={tool.name}>
+              <label className="flex items-start gap-3 rounded-md py-1.5 text-sm">
+                <Checkbox className="mt-0.5" checked={addon.allowed.includes(tool.name)} onCheckedChange={(on) => allow(tool.name, on === true)} />
+                <span className="min-w-0 flex-1">
+                  <span className="font-mono text-[0.8rem]">{tool.name}</span>
+                  {tool.readOnly && <span className="text-muted-foreground"> · read-only</span>}
+                  {tool.description && <span className="line-clamp-1 block text-muted-foreground">{tool.description}</span>}
+                </span>
+              </label>
+            </li>
+          ))}
+        </ul>
+      </section>
+      {error && <p role="alert" className="text-sm text-destructive">{error}</p>}
+      {!owner && (
+        <Button variant="ghost" size="sm" className="justify-self-start self-start text-destructive" onClick={remove}>
+          Remove
+        </Button>
+      )}
+    </div>
   );
 }
 

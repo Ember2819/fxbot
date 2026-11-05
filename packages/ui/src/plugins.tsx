@@ -183,7 +183,7 @@ export function Place<P extends object>({ pick, props }: { pick: (places: Places
   );
 }
 
-// Each loaded plugin that draws in Settings, with its parts, in load order: a tab each.
+// Each loaded plugin that draws in Settings, with its parts, in load order: what its tab there shows first.
 export function usePluginSettings() {
   return usePlugins().flatMap(({ name, iconKey, places }) => (places.settings.length ? [{ name, iconKey, parts: places.settings }] : []));
 }

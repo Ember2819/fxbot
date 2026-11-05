@@ -228,7 +228,7 @@ export function InstalledSkill({ addon, onSettings, onClose }: { addon: SkillPlu
 
 // An installed skill: which bots have it, its files to read, and its repository, with Update when its skill changed
 // there, which shows what changed and needs the owner's Update before anything moves.
-export function SkillSettings({ addon, bots, onChange, onRemoved, onClose }: { addon: SkillPlugin; bots: ReactNode; onChange: (addon: Plugin) => void; onRemoved: () => void; onClose: () => void }) {
+export function SkillSettings({ addon, bots, onChange, onRemoved }: { addon: SkillPlugin; bots: ReactNode; onChange: (addon: Plugin) => void; onRemoved: () => void }) {
   const [next, setNext] = useState<SkillPreview | null>(null);
   const [looking, setLooking] = useState(false);
   const [error, setError] = useState("");
@@ -253,69 +253,61 @@ export function SkillSettings({ addon, bots, onChange, onRemoved, onClose }: { a
     : [];
 
   return (
-    <Dialog open onOpenChange={(open) => !open && onClose()}>
-      <DialogContent className="flex max-h-[90dvh] flex-col">
-        <DialogHeader>
-          <DialogTitle className="truncate pr-6">{addon.name}</DialogTitle>
-          <DialogDescription>{addon.description}</DialogDescription>
-        </DialogHeader>
-        <div className="-mx-4 grid min-h-0 flex-1 grid-cols-1 content-start gap-5 overflow-y-auto px-4">
-          {addon.manual && <Manual />}
-          {bots}
-          <section className="grid gap-2">
-            <h3 className={heading}>Files</h3>
-            <Files files={addon.files} read={(path) => client.plugins.readSkill(addon.id, path)} />
-          </section>
-          <section className="grid gap-2">
-            <h3 className={heading}>From its repository</h3>
-            {addon.mark?.kind === "removed" && <p className="text-sm text-destructive">Its repository no longer has it. It still works as added.</p>}
-            <Details
-              rows={[
-                ["Repository", <span key="repo">{repoLink(addon.source.skill, addon.source.commit)}, at {addon.source.commit.slice(0, 7)}</span>],
-                ["License", addon.license],
-                ["Source", fromText[addon.source.from]],
-              ]}
-            />
-            {addon.mark?.kind === "update" && !next && (
-              <Button size="sm" variant="outline" className="justify-self-start" disabled={looking} onClick={look}>
-                {looking && <LoaderCircleIcon className="animate-spin" />}
-                Update to {addon.mark.version}
-              </Button>
+    <>
+      {addon.manual && <Manual />}
+      {bots}
+      <section className="grid gap-2">
+        <h3 className={heading}>Files</h3>
+        <Files files={addon.files} read={(path) => client.plugins.readSkill(addon.id, path)} />
+      </section>
+      <section className="grid gap-2">
+        <h3 className={heading}>From its repository</h3>
+        {addon.mark?.kind === "removed" && <p className="text-sm text-destructive">Its repository no longer has it. It still works as added.</p>}
+        <Details
+          rows={[
+            ["Repository", <span key="repo">{repoLink(addon.source.skill, addon.source.commit)}, at {addon.source.commit.slice(0, 7)}</span>],
+            ["License", addon.license],
+            ["Source", fromText[addon.source.from]],
+          ]}
+        />
+        {addon.mark?.kind === "update" && !next && (
+          <Button size="sm" variant="outline" className="justify-self-start" disabled={looking} onClick={look}>
+            {looking && <LoaderCircleIcon className="animate-spin" />}
+            Update to {addon.mark.version}
+          </Button>
+        )}
+        {next && (
+          <div className="grid gap-2 rounded-lg border p-3 text-sm">
+            {next.error ? (
+              <p className="text-destructive">{next.error}</p>
+            ) : (
+              <>
+                <p className="font-medium">What changes</p>
+                <ul className="grid gap-1 text-muted-foreground">
+                  {(changes.length ? changes : ["Nothing in its files"]).map((change) => (
+                    <li key={change} className="font-mono text-xs">
+                      {change}
+                    </li>
+                  ))}
+                </ul>
+                <div className="flex gap-2">
+                  <Button size="sm" onClick={update}>
+                    Update
+                  </Button>
+                  <Button size="sm" variant="ghost" onClick={() => setNext(null)}>
+                    Cancel
+                  </Button>
+                </div>
+              </>
             )}
-            {next && (
-              <div className="grid gap-2 rounded-lg border p-3 text-sm">
-                {next.error ? (
-                  <p className="text-destructive">{next.error}</p>
-                ) : (
-                  <>
-                    <p className="font-medium">What changes</p>
-                    <ul className="grid gap-1 text-muted-foreground">
-                      {(changes.length ? changes : ["Nothing in its files"]).map((change) => (
-                        <li key={change} className="font-mono text-xs">
-                          {change}
-                        </li>
-                      ))}
-                    </ul>
-                    <div className="flex gap-2">
-                      <Button size="sm" onClick={update}>
-                        Update
-                      </Button>
-                      <Button size="sm" variant="ghost" onClick={() => setNext(null)}>
-                        Cancel
-                      </Button>
-                    </div>
-                  </>
-                )}
-              </div>
-            )}
-          </section>
-        </div>
-        {error && <p role="alert" className="text-sm text-destructive">{error}</p>}
-        <Button variant="ghost" size="sm" className="justify-self-start self-start text-destructive" onClick={remove}>
-          Remove
-        </Button>
-      </DialogContent>
-    </Dialog>
+          </div>
+        )}
+      </section>
+      {error && <p role="alert" className="text-sm text-destructive">{error}</p>}
+      <Button variant="ghost" size="sm" className="justify-self-start self-start text-destructive" onClick={remove}>
+        Remove
+      </Button>
+    </>
   );
 }
 

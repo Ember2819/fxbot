@@ -9,7 +9,7 @@ Give your bots a skill: instructions for a kind of task, which a bot reads only 
 2. To find another, turn on **Show unvetted plugins** in **Settings** › **Plugins**, then type in the search above the tabs. Results under **Skills** come from skills.sh, with how many times each was installed.
 3. Choose a skill to open its page. fxbot reads its repository and shows its description, its files, the repository and commit it comes from, and its license. Choose **Read** to see its `SKILL.md`.
 4. Choose the **Add** button, which names the skill. fxbot shows it under **Installed**, for all bots.
-5. To give it to some bots only, choose the pencil button on its row, then **Choose** under **Bots**, and switch it on for each bot that should have it.
+5. To give it to some bots only, open its tab in **Settings**, then **Choose** under **Bots**, and switch it on for each bot that should have it.
 
 Each bot sees a short list of its skills, and reads one when a task matches it. In the chat, that shows as **Read a skill**, with the skill's name.
 
@@ -22,7 +22,7 @@ To be sure a bot uses a skill, name it. In the chat, type `$`, or `/` at the sta
 - **The page says it can't be added.** The skill's `SKILL.md` lacks a name or a description, or breaks the [Agent Skills](https://agentskills.io/specification) limits. The page says which.
 - **The page says it is only called by name.** Its author meant a person to start it, as `show-me` is. Bots don't see it in their list: type `$show-me` in your message, or pick it after `$`.
 - **A file is passed over.** Images, links, and files over 256 KiB aren't kept. Bots read only text.
-- **Its row says Update available.** The skill's files changed in its repository. Open it with the pencil button and choose **Update to**: fxbot shows which files changed, and moves only when you choose **Update**.
+- **Its row says Update available.** The skill's files changed in its repository. Open its tab in **Settings** and choose **Update to**: fxbot shows which files changed, and moves only when you choose **Update**.
 - **The search shows nothing from skills.sh.** Turn on unvetted plugins in Settings › Plugins, and type 2 characters or more. Each search then sends its words to skills.sh.
 
 Nothing in a skill runs: bots read its scripts as text. Why that matters: see [Security model](/docs/explanation/security/#skills).

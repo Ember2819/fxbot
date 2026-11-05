@@ -150,7 +150,7 @@ Each file runs once, in name order, in a transaction. Add a new file for each ch
 
 2. Read them as `fx.settings.greeting`. The object stays up to date, and `fx.on("settings", …)` hears a change.
 
-The owner sets them in the plugin's settings in **Plugins**. A secret one is sealed, and the page never gets it back.
+The owner sets them on the plugin's tab in **Settings**. A secret one is sealed, and the page never gets it back.
 
 ## 6. Need another plugin
 

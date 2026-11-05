@@ -13,7 +13,7 @@ By default, fxbot shows only the plugins it vets, tagged **fxbot**. Each has a p
 1. Open **Plugins**, the puzzle button at the bottom of the sidebar, and choose **Browse**. fxbot's picks you haven't added are listed, each with what it carries beside its name. Each plugin's icon is drawn from who made it and its name, so it looks the same wherever it shows, here and on [fxbot.sh](https://fxbot.sh).
 2. Choose one to open its page. fxbot reads it at its newest version, and the page shows what it carries. For code, under **Runs inside fxbot**, choose **Read** to see each file: code runs with everything fxbot can reach.
 3. Choose the **Add** button, which names the plugin. fxbot shows it under **Installed**, with what it carries, and what it adds to the app shows at once. Its name there opens its page again, read from the files it runs, with **Settings** in place of **Add**.
-4. To change its settings, choose the pencil button on its row. A secret setting is sealed, and the page never shows it again. A plugin's MCP servers are listed there too, each with its own sign-in or key and tools.
+4. To change its settings, open its tab in **Settings**. Each plugin has one, with its bots, settings, log, updates, and **Remove**. A secret setting is sealed, and the page never shows it again. A plugin's MCP servers are on its tab too, each with its own sign-in or key and tools.
 5. To give it to some bots only, choose **Choose** under **Bots**, and switch it on for each bot that should have it. Its servers follow, and its screens are for everyone.
 
 ## A plugin that needs another
@@ -36,11 +36,11 @@ fxbot doesn't vet any of these. Read what each one does before you add it. While
 
 ## When it goes differently
 
-- **Its row says Off, with a reason.** Its code failed to load, or its folder is gone. The rest of fxbot runs. The plugin's settings show its log.
-- **Its row says Update available.** Its files changed in its repository. Open it with the pencil button and choose **Update to**: fxbot shows what changes, with the code to read, and moves only when you choose **Update**. If new code doesn't load, the old version keeps running.
+- **Its row says Off, with a reason.** Its code failed to load, or its folder is gone. The rest of fxbot runs. Its tab in **Settings** shows its log.
+- **Its row says Update available.** Its files changed in its repository. Open its tab in **Settings** and choose **Update to**: fxbot shows what changes, with the code to read, and moves only when you choose **Update**. If new code doesn't load, the old version keeps running.
 - **A server it carries isn't added.** A plugin's remote MCP servers are added with it, under the same rules as any other server: from GitHub, an address on this machine or your network isn't added. Its log says why. A server that runs a command on this machine isn't used yet.
 - **A file is passed over.** Files over 2 MiB, and files that aren't text, aren't kept.
 
-**Remove**, in its settings, runs the plugin's own cleanup, then removes its tables, its settings, its files, and the servers it added.
+**Remove**, on its tab in **Settings**, runs the plugin's own cleanup, then removes its tables, its settings, its files, and the servers it added.
 
 To write a plugin, see [Write a plugin](/sdk/how-to/write-a-plugin/) in the SDK's pages.

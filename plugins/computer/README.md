@@ -18,7 +18,7 @@ A computer starts on its bot's first call and stops when it sits idle, unless so
 
 Plugins that need the computer add programs to every computer with setup steps, in `needs.computer.setup` in their `plugin.json`.
 
-Add it from **Plugins**, where fxbot's list has it. It runs inside fxbot: read its code there before you add it. Like every plugin, it's on for every bot once added; choose its bots in its settings.
+Add it from **Plugins**, where fxbot's list has it. It runs inside fxbot: read its code there before you add it. Like every plugin, it's on for every bot once added; choose its bots in **Settings** › **Computer**.
 
 ## Computers for other plugins
 

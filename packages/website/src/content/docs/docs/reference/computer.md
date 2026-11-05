@@ -85,7 +85,7 @@ type ComputerProvider = {
 
 ## Settings
 
-In the plugin's settings in **Plugins**:
+On its tab in **Settings**:
 
 | Setting | Default | What it is |
 | --- | --- | --- |

@@ -13,7 +13,7 @@ Give your bots the tools of a remote MCP server: a plugin that carries one serve
 4. For a server that needs a key, paste it into the field the page names.
 5. Choose the **Add** button, which names the server. fxbot shows it under **Installed**.
 6. For a server that signs in with OAuth, choose **Sign in** and approve fxbot on the page that opens.
-7. Choose the pencil button on its row. Under **Bots**, keep **All bots**, or choose **Choose** and switch it on for each bot that should have it.
+7. Open its tab in **Settings**. Under **Bots**, keep **All bots**, or choose **Choose** and switch it on for each bot that should have it.
 8. Under **Tools**, allow the ones bots may call. Only the read-only tools are allowed at first.
 
 ## By its address
@@ -39,6 +39,6 @@ A bot's **Edit** page lists the servers too, in its **Plugins** section. A serve
 
 ## Update a server
 
-A server added from the registry says **Update available** on its row when the registry has a newer version. Open it with the pencil button and choose **Update to**: fxbot shows what the new version changes, and moves to it only when you choose **Update**. A row may also say **Deprecated** or **Removed from the registry**; the server keeps working as added.
+A server added from the registry says **Update available** on its row when the registry has a newer version. Open its tab in **Settings** and choose **Update to**: fxbot shows what the new version changes, and moves to it only when you choose **Update**. A row may also say **Deprecated** or **Removed from the registry**; the server keeps working as added.
 
 Why only read-only tools to start: see [Security model](/docs/explanation/security/#mcp-servers).

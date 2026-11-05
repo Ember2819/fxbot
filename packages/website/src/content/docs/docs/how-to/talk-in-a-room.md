@@ -46,6 +46,6 @@ A bot's tools work in a room as in its own chat.
 
 ## When it goes differently
 
-- **A bot didn't answer.** It may have had nothing to add: a bot can stay quiet. If a note says the bot has chat rooms off, switch it on for that bot in **Plugins**.
+- **A bot didn't answer.** It may have had nothing to add: a bot can stay quiet. If a note says the bot has chat rooms off, switch it on for that bot in **Settings** › **Chat rooms**.
 - **The bots stopped tagging each other.** The room reached its replies per message. Tag a bot to go on, or raise the limit in **Edit**.
 - **Stop let the reply finish.** fxbot older than 0.4.1 can't cancel a reply that's being written, so **Stop** only drops the bots waiting.

@@ -71,7 +71,7 @@ export default async function setup(fx: PluginApi) {
 | `fx.memories.save(bot, { text, replaces? })` | Saves a memory as the bot's, as `memory_save` does, or with `replaces`, changes that one's text. It answers `{ memory, existed, merged }`: `existed` when the same text was saved already, and `merged` when the changed memory now said what another did, and went into that one. It throws with status 400 for text over 1,000 characters, and 404 for a `replaces` the bot doesn't have. Since 0.5.0. |
 | `fx.memories.remove(bot, id)` | Deletes one of the bot's memories. A missing one throws with status 404. Since 0.5.0. |
 | `fx.machine` | In an install made by `setup.sh`, the machine's `fxbot` command, for a job only root can do; `null` in a checkout. `ask("computer")` asks it to set up the computer plugin's engine, and `status("computer")` says how that went: `{ state, error? }`, with `state` `asked`, `working`, `done`, or `failed`, or `null` when nothing asked. `computer` is its only job. |
-| `fx.log(...parts)` | A line in its log, which its settings in **Plugins** show |
+| `fx.log(...parts)` | A line in its log, which its tab in **Settings** shows |
 | `fx.signal` | An `AbortSignal` that aborts when the plugin unloads |
 
 Setup gets 10 seconds. A setup that throws or runs late leaves the plugin added but off, with its error on its row. fxbot starts either way. Turns can start only after fxbot has: not from setup itself.
@@ -154,7 +154,7 @@ fx.socket("/desktop/:bot", (socket, request, { bot }) => {
 
 ## Settings
 
-- The owner sets them in the plugin's settings in **Plugins**. Each is text, up to 8 KiB. Clearing one brings back its default.
+- The owner sets them on the plugin's tab in **Settings**. Each is text, up to 8 KiB. Clearing one brings back its default.
 - They're sealed together in Postgres. A secret one is never shown again, and its row says only that it's set.
 - `fx.settings` has them. `fx.on("settings", …)` hears a change.
 
@@ -215,7 +215,7 @@ The computer and chat rooms provide objects of their own: see [the computer's](/
 | `app.botPanel(Component)` | Above the tabs of a bot's panel, beside its chat. It gets `bot`. |
 | `app.composer(Component)` | A control beside the attach button. It gets `bot`, `setDraft(text)`, and `attach(files)`. `setDraft` also takes a function from the draft to the new text. |
 | `app.toolView(tool, Component)` | How a call of `<plugin>_<tool>` shows in a reply. It gets `call`: `name`, `input`, `output`, `error`, and `done`. |
-| `app.settings(Component)` | A tab of its own in Settings, named for the plugin, at `/settings/plugins/<plugin>`. Several calls stack in that tab. Before 0.5.0, a section of Settings' one page. |
+| `app.settings(Component)` | A part of the plugin's tab in Settings, at `/settings/plugins/<plugin>`, above its bots and settings. Every plugin has that tab, and several calls stack in it. Before 0.6.0, only a plugin that called this had a tab, and before 0.5.0, it was a section of Settings' one page. |
 | `app.botSettings(Component)` | A section in a bot's settings. It gets `bot`. |
 | `app.slot(name, Component)` | A part in a place another plugin's page leaves with `Slot`, which gets that `Slot`'s `props`. Several stack in order. Since 0.5.0. |
 

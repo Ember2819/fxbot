@@ -4,6 +4,8 @@ Each release of fxbot, newest first. A release that adds migrations, bumps libfx
 
 ## Unreleased
 
+- **Each plugin has a tab in Settings.** Everything about a plugin is on one page: its switch, bots, settings, log, updates, and **Remove**, with a plugin's MCP servers and their tools right there. The pencil on each row in **Plugins** is gone, along with the dialogs it opened: a plugin's name still opens its page, whose **Settings** goes to its tab. For plugins: `app.settings` now draws at the top of that tab, which every plugin has.
+- **Computer 0.3.1:** its part of Settings drops a heading its tab now has. Update it from **Plugins**.
 - **For plugins:** a plugin in `FXBOT_PLUGIN_DIRS` keeps its MCP servers when fxbot starts again. Before, they came loose from it, showing as plugins of their own, and stayed when it was removed.
 - **Set up with your AI agent.** The home page offers a line to give your agent, which sets fxbot up from [agent-setup.txt](https://fxbot.sh/agent-setup.txt): it checks the machine, asks before it installs anything, and leaves your keys and sign-ins to you. **Copy all docs**, on each page of the docs, copies them all in one go, and [Set up with your AI agent](https://fxbot.sh/docs/tutorials/set-up-with-an-agent/) lists `llms.txt` and `llms-full.txt`, as the home page's footer does.
 - **Reach it over SSH.** [Reach it from other devices](https://fxbot.sh/docs/how-to/reach-it/#over-ssh) has a way in for a machine with no screen.

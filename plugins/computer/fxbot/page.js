@@ -13529,10 +13529,6 @@ function SettingsSection() {
 		className: "grid gap-3",
 		"aria-label": "Computer",
 		children: [
-			/* @__PURE__ */ (0, react_jsx_runtime.jsx)("h2", {
-				className: "font-medium",
-				children: "Computer"
-			}),
 			status && /* @__PURE__ */ (0, react_jsx_runtime.jsx)(Engine, {
 				status,
 				act

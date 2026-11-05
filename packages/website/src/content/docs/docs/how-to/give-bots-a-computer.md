@@ -9,7 +9,7 @@ You need fxbot on Debian 13 or Ubuntu 24.04, with podman or docker: a release in
 
 1. Open **Plugins**, choose **Browse**, and choose **computer**. Read what runs inside fxbot, then choose **Add computer**.
 2. The machine sets up the computer's engine by itself, in a minute or two: this machine's podman or docker, run rootless for a user of its own, `fxbot-computer`, with a firewall that keeps its computers to the internet. fxbot starts again when it's done. **Settings** › **Computer** shows it working, then names the engine, such as `podman 5.4.2, rootless`.
-3. The computer is on for every bot once added. To give it to some bots only, open **Plugins**, choose the pencil button on its row, and under **Bots** choose **Choose**, then switch it on for each bot that should have one.
+3. The computer is on for every bot once added. To give it to some bots only, open **Settings** › **Computer**, and under **Bots** choose **Choose**, then switch it on for each bot that should have one.
 4. Ask a bot to do something on its computer, such as "make a chart of these numbers with Python and save it to the library", or "find the opening hours on the library's site". To point it at the computer, choose the screen button beside the message box, which adds `$computer` to the message.
 
 A bot's first call makes the image its computers share, which takes a minute or two. After that a computer and its desktop start in about a second, and stop after 15 minutes without a call. Its home, `/root`, is kept, with the browser's sign-ins; programs a bot installs last until the computer is made again from a new image.

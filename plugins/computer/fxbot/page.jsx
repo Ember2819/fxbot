@@ -351,7 +351,6 @@ function SettingsSection() {
   const ready = status?.engine.state === "ready";
   return (
     <section className="grid gap-3" aria-label="Computer">
-      <h2 className="font-medium">Computer</h2>
       {status && <Engine status={status} act={act} />}
       {ready && (
         <div className="grid gap-1.5 text-sm">

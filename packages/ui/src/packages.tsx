@@ -3,7 +3,7 @@ import { LoaderCircleIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
-import type { McpPlugin, Plugin, PackagePlugin, PackagePreview, PackageSearch } from "@fxbot/sdk/client";
+import type { Plugin, PackagePlugin, PackagePreview, PackageSearch } from "@fxbot/sdk/client";
 import { AddedFooter, Details, heading, hint } from "./mcp-add.tsx";
 import { PluginIcon } from "./plugin-icon.tsx";
 import { client } from "./client.ts";
@@ -229,25 +229,10 @@ export function PluginDialog({
   );
 }
 
-// An installed plugin: which bots it reaches, its settings, what it added to fxbot, its log, and its source, with
-// Update when its files changed there, which shows what changed and needs the owner's Update before anything moves.
-export function PluginSettings({
-  addon,
-  bots,
-  servers,
-  onOpenServer,
-  onChange,
-  onRemoved,
-  onClose,
-}: {
-  addon: PackagePlugin;
-  bots: ReactNode;
-  servers: McpPlugin[];
-  onOpenServer: (id: string) => void;
-  onChange: (addon: Plugin) => void;
-  onRemoved: () => void;
-  onClose: () => void;
-}) {
+// An installed plugin, in its tab in Settings: which bots it reaches, its settings, what it added to fxbot, its MCP
+// servers, its log, and its source, with Update when its files changed there, which shows what changed and needs the
+// owner's Update before anything moves.
+export function PluginSettings({ addon, bots, servers, onChange, onRemoved }: { addon: PackagePlugin; bots: ReactNode; servers: ReactNode; onChange: (addon: Plugin) => void; onRemoved: () => void }) {
   const [values, setValues] = useState<Record<string, string>>({});
   const [log, setLog] = useState<string[] | null>(null);
   const [next, setNext] = useState<PackagePreview | null>(null);
@@ -281,134 +266,119 @@ export function PluginSettings({
   ];
 
   return (
-    <Dialog open onOpenChange={(open) => !open && onClose()}>
-      <DialogContent className="flex max-h-[90dvh] flex-col">
-        <DialogHeader>
-          <DialogTitle className="truncate pr-6">{addon.name}</DialogTitle>
-          <DialogDescription>{addon.description}</DialogDescription>
-        </DialogHeader>
-        <div className="-mx-4 grid min-h-0 flex-1 grid-cols-1 content-start gap-5 overflow-y-auto px-4">
-          {addon.error && <p className="text-sm text-destructive">Off: {addon.error}</p>}
-          {bots}
-          {addon.settings.length > 0 && (
-            <form onSubmit={save} className="grid gap-3">
-              <h3 className={heading}>Settings</h3>
-              {addon.settings.map((s) => (
-                <label key={s.name} className="grid gap-1.5 text-sm font-medium">
-                  <span>
-                    {s.name}
-                    {s.description && <span className="font-normal text-muted-foreground">: {s.description}</span>}
-                  </span>
-                  <Input
-                    type={s.isSecret ? "password" : "text"}
-                    autoComplete="off"
-                    value={values[s.name] ?? (s.isSecret ? "" : (s.value ?? ""))}
-                    placeholder={s.isSecret ? (s.set ? "Set. Type to replace it." : "Not set") : (s.default ?? "")}
-                    onChange={(e) => setValues({ ...values, [s.name]: e.target.value })}
-                  />
-                </label>
-              ))}
-              <Button type="submit" size="sm" className="justify-self-start" disabled={!Object.keys(values).length}>
-                Save settings
-              </Button>
-            </form>
-          )}
-          <section className="grid gap-1.5">
-            <h3 className={heading}>What it adds</h3>
-            {parts.length ? (
-              <ul className="grid gap-1 font-mono text-xs text-muted-foreground">
-                {parts.map((p) => (
-                  <li key={p}>{p}</li>
-                ))}
-              </ul>
+    <>
+      {addon.error && <p className="text-sm text-destructive">Off: {addon.error}</p>}
+      {bots}
+      {addon.settings.length > 0 && (
+        <form onSubmit={save} className="grid gap-3">
+          <h3 className={heading}>Settings</h3>
+          {addon.settings.map((s) => (
+            <label key={s.name} className="grid gap-1.5 text-sm font-medium">
+              <span>
+                {s.name}
+                {s.description && <span className="font-normal text-muted-foreground">: {s.description}</span>}
+              </span>
+              <Input
+                type={s.isSecret ? "password" : "text"}
+                autoComplete="off"
+                value={values[s.name] ?? (s.isSecret ? "" : (s.value ?? ""))}
+                placeholder={s.isSecret ? (s.set ? "Set. Type to replace it." : "Not set") : (s.default ?? "")}
+                onChange={(e) => setValues({ ...values, [s.name]: e.target.value })}
+              />
+            </label>
+          ))}
+          <Button type="submit" size="sm" className="justify-self-start" disabled={!Object.keys(values).length}>
+            Save settings
+          </Button>
+        </form>
+      )}
+      <section className="grid gap-1.5">
+        <h3 className={heading}>What it adds</h3>
+        {parts.length ? (
+          <ul className="grid gap-1 font-mono text-xs text-muted-foreground">
+            {parts.map((p) => (
+              <li key={p}>{p}</li>
+            ))}
+          </ul>
+        ) : (
+          <p className="text-sm text-muted-foreground">{addon.enabled && !addon.error ? "No tools, hooks, or routes." : "Nothing while it's off."}</p>
+        )}
+      </section>
+      {servers && (
+        <section className="grid gap-4">
+          <div className="grid gap-0.5">
+            <h3 className={heading}>Its MCP servers</h3>
+            <p className={`text-xs ${hint}`}>They follow this plugin's switch and bots, and go when it does.</p>
+          </div>
+          {servers}
+        </section>
+      )}
+      <section className="grid gap-2">
+        <h3 className={heading}>Log</h3>
+        {log === null ? (
+          <Button size="sm" variant="outline" className="justify-self-start" onClick={() => client.plugins.log(addon.id).then(setLog, (e: Error) => setError(e.message))}>
+            Show the log
+          </Button>
+        ) : (
+          <Text text={log.length ? log.join("\n") : "Nothing yet."} />
+        )}
+      </section>
+      <section className="grid gap-2">
+        <h3 className={heading}>Source</h3>
+        {addon.mark?.kind === "removed" && <p className="text-sm text-destructive">Its repository no longer has it. It still works as added.</p>}
+        <Details
+          rows={
+            "repo" in source
+              ? [
+                  ["Repository", <span key="repo">{repoLink(source.repo, source.path, source.commit)}, at {source.commit.slice(0, 7)}</span>],
+                  ["Version", addon.version],
+                  ["Source", fromText[source.from]],
+                  ["Needs", addon.needs.join(", ") || undefined],
+                ]
+              : [
+                  ["Folder", <span key="folder" className="font-mono text-xs break-all">{source.local}</span>],
+                  ["Version", addon.version],
+                  ["Needs", addon.needs.join(", ") || undefined],
+                ]
+          }
+        />
+        {!fromGitHub && <p className={`text-xs ${hint}`}>A local plugin, from FXBOT_PLUGIN_DIRS. fxbot reads it again when it starts.</p>}
+        {addon.mark?.kind === "update" && !next && (
+          <Button size="sm" variant="outline" className="justify-self-start" disabled={busy} onClick={look}>
+            {busy && <LoaderCircleIcon className="animate-spin" />}
+            Update to {addon.mark.version}
+          </Button>
+        )}
+        {next && (
+          <div className="grid gap-3 rounded-lg border p-3 text-sm">
+            {next.error ? (
+              <p className="text-destructive">{next.error}</p>
             ) : (
-              <p className="text-sm text-muted-foreground">Nothing while it's off.</p>
-            )}
-          </section>
-          {servers.length > 0 && (
-            <section className="grid gap-2">
-              <h3 className={heading}>Its MCP servers</h3>
-              <p className={`text-xs ${hint}`}>They follow this plugin's switch and bots, and go when it does.</p>
-              {servers.map((server) => (
-                <div key={server.id} className="flex min-w-0 items-center gap-3 text-sm">
-                  <span className="min-w-0 flex-1 truncate">
-                    {server.name} <span className="text-muted-foreground">· {server.status || "Off"}</span>
-                  </span>
-                  <Button size="xs" variant="outline" onClick={() => onOpenServer(server.id)}>
-                    Settings
+              <>
+                <p className="font-medium">What changes</p>
+                <ul className="grid gap-1 font-mono text-xs text-muted-foreground">
+                  {(next.changed?.length ? next.changed.map((c) => `${c.change[0].toUpperCase()}${c.change.slice(1)} ${c.path}`) : ["Nothing in its files"]).map((line) => (
+                    <li key={line}>{line}</li>
+                  ))}
+                </ul>
+                <Contents page={next} />
+                <div className="flex gap-2">
+                  <Button size="sm" onClick={update} disabled={busy}>
+                    Update
+                  </Button>
+                  <Button size="sm" variant="ghost" onClick={() => setNext(null)}>
+                    Cancel
                   </Button>
                 </div>
-              ))}
-            </section>
-          )}
-          <section className="grid gap-2">
-            <h3 className={heading}>Log</h3>
-            {log === null ? (
-              <Button size="sm" variant="outline" className="justify-self-start" onClick={() => client.plugins.log(addon.id).then(setLog, (e: Error) => setError(e.message))}>
-                Show the log
-              </Button>
-            ) : (
-              <Text text={log.length ? log.join("\n") : "Nothing yet."} />
+              </>
             )}
-          </section>
-          <section className="grid gap-2">
-            <h3 className={heading}>Source</h3>
-            {addon.mark?.kind === "removed" && <p className="text-sm text-destructive">Its repository no longer has it. It still works as added.</p>}
-            <Details
-              rows={
-                "repo" in source
-                  ? [
-                      ["Repository", <span key="repo">{repoLink(source.repo, source.path, source.commit)}, at {source.commit.slice(0, 7)}</span>],
-                      ["Version", addon.version],
-                      ["Source", fromText[source.from]],
-                      ["Needs", addon.needs.join(", ") || undefined],
-                    ]
-                  : [
-                      ["Folder", <span key="folder" className="font-mono text-xs break-all">{source.local}</span>],
-                      ["Version", addon.version],
-                      ["Needs", addon.needs.join(", ") || undefined],
-                    ]
-              }
-            />
-            {!fromGitHub && <p className={`text-xs ${hint}`}>A local plugin, from FXBOT_PLUGIN_DIRS. fxbot reads it again when it starts.</p>}
-            {addon.mark?.kind === "update" && !next && (
-              <Button size="sm" variant="outline" className="justify-self-start" disabled={busy} onClick={look}>
-                {busy && <LoaderCircleIcon className="animate-spin" />}
-                Update to {addon.mark.version}
-              </Button>
-            )}
-            {next && (
-              <div className="grid gap-3 rounded-lg border p-3 text-sm">
-                {next.error ? (
-                  <p className="text-destructive">{next.error}</p>
-                ) : (
-                  <>
-                    <p className="font-medium">What changes</p>
-                    <ul className="grid gap-1 font-mono text-xs text-muted-foreground">
-                      {(next.changed?.length ? next.changed.map((c) => `${c.change[0].toUpperCase()}${c.change.slice(1)} ${c.path}`) : ["Nothing in its files"]).map((line) => (
-                        <li key={line}>{line}</li>
-                      ))}
-                    </ul>
-                    <Contents page={next} />
-                    <div className="flex gap-2">
-                      <Button size="sm" onClick={update} disabled={busy}>
-                        Update
-                      </Button>
-                      <Button size="sm" variant="ghost" onClick={() => setNext(null)}>
-                        Cancel
-                      </Button>
-                    </div>
-                  </>
-                )}
-              </div>
-            )}
-          </section>
-        </div>
-        {error && <p role="alert" className="text-sm text-destructive">{error}</p>}
-        <Button variant="ghost" size="sm" className="justify-self-start self-start text-destructive" onClick={remove}>
-          Remove
-        </Button>
-      </DialogContent>
-    </Dialog>
+          </div>
+        )}
+      </section>
+      {error && <p role="alert" className="text-sm text-destructive">{error}</p>}
+      <Button variant="ghost" size="sm" className="justify-self-start self-start text-destructive" onClick={remove}>
+        Remove
+      </Button>
+    </>
   );
 }
