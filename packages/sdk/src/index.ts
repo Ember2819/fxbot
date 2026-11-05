@@ -303,16 +303,20 @@ export async function createFxbot(options: FxbotOptions) {
   // learns its messageId from its events, and one with nothing left open has none. Plugins hear the end either way.
   async function saveReply(id: string, sessionId: string, turn: FxTurn | FxResumeTurn, sent: { text: string; from?: string }) {
     let reply = "";
+    let failed: string | undefined;
     count(id, 1);
     try {
       for await (const event of turn) if (event.type === "text_delta") reply += event.delta;
+      // A turn libfx ends as failed, or as refused, which is how a provider's HTTP error ends one, with the error as its text.
+      const end = await turn.result;
+      if (end.stopReason === "error" || end.stopReason === "refused") failed = ("error" in end && end.error?.message) || reply.trim() || `The turn ended as ${end.stopReason}.`;
     } catch (error) {
       if (turn.messageId) packages.observe("turn.end", { bot: id, session: sessionId, messageId: turn.messageId, ...sent, reply, error: (error as Error).message });
       return;
     } finally {
       count(id, -1);
     }
-    if (turn.messageId) packages.observe("turn.end", { bot: id, session: sessionId, messageId: turn.messageId, ...sent, reply });
+    if (turn.messageId) packages.observe("turn.end", { bot: id, session: sessionId, messageId: turn.messageId, ...sent, reply, ...(failed ? { error: failed } : {}) });
     if (!reply.trim() || !turn.messageId) return;
     await history.record(id, sessionId, turn.messageId, "assistant", reply);
     // A reply in a plugin's session isn't the bot's own chat's.
