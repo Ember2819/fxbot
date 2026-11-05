@@ -9,6 +9,16 @@ fxbot listens on 127.0.0.1:8787 and has no login of its own. This guide shows th
 
 Open `http://127.0.0.1:8787` in a browser on that machine. Everything works there, installing the app included, and nothing else can reach it.
 
+## Over SSH
+
+For a machine with no screen, such as a VPS, run this on a computer that reaches it by SSH:
+
+```sh
+ssh -N -L 8787:127.0.0.1:8787 <user>@<machine>
+```
+
+While it runs, fxbot is at `http://127.0.0.1:8787` on that computer, and on nothing else. For a phone, use Tailscale.
+
 ## With Tailscale (recommended)
 
 [Tailscale](https://tailscale.com) gives fxbot an HTTPS address that only your own devices reach. On the machine, with Tailscale running and [HTTPS turned on](https://tailscale.com/kb/1153/enabling-https) for your tailnet:

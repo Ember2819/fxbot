@@ -81,8 +81,68 @@
     }
 }
 /* The 404 page, the one page without a sidebar, has no Markdown to copy. */
-:root:not([data-has-sidebar]) .actions-container {
+:root:not([data-has-sidebar]) .actions-container,
+:root:not([data-has-sidebar]) .fxbot-page-title .fxbot-copy-docs {
     display: none;
+}
+/* Copy all docs sits in the row of page actions, and looks like them. It's for a desktop: on a phone, /agents/ has it. */
+.fxbot-page-title {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.5rem;
+}
+.fxbot-page-title h1 {
+    flex-basis: 100%;
+}
+.fxbot-page-title .actions-container,
+.fxbot-page-title .fxbot-copy-docs {
+    margin-top: 1rem;
+}
+.fxbot-copy-docs {
+    display: inline-flex;
+    align-items: center;
+    height: 2rem;
+    padding: 0 0.75rem;
+    border: 1px solid var(--sl-color-gray-5);
+    border-radius: 0.25rem;
+    background-color: var(--sl-color-gray-6);
+    color: var(--sl-color-white);
+    font-size: 0.875rem;
+    font-weight: 500;
+    line-height: 1;
+    text-decoration: none;
+}
+@media (max-width: 424px) {
+    .fxbot-page-title .fxbot-copy-docs {
+        display: none;
+    }
+}
+.fxbot-agent-files {
+    display: grid;
+    gap: 0.75rem;
+    margin-top: 1.25rem;
+    padding: 0;
+    list-style: none;
+}
+.fxbot-agent-files li {
+    display: grid;
+    grid-template-columns: 9.5rem minmax(0, 1fr);
+    gap: 0.25rem 1rem;
+    align-items: baseline;
+}
+.fxbot-agent-files a {
+    font-family: var(--__sl-font-mono);
+    font-size: var(--sl-text-sm);
+    color: var(--sl-color-white);
+}
+.fxbot-agent-files span {
+    color: var(--sl-color-gray-2);
+}
+@media (max-width: 30rem) {
+    .fxbot-agent-files li {
+        grid-template-columns: minmax(0, 1fr);
+    }
 }
 site-search button[data-open-modal] {
     border-radius: 0.5rem;

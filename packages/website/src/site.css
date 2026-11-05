@@ -113,6 +113,9 @@
     .code pre {
         @apply overflow-x-auto py-3.5 pl-4 leading-6;
     }
+    .code-wrap pre {
+        @apply wrap-anywhere whitespace-pre-wrap;
+    }
     .code code {
         @apply bg-transparent p-0 text-[0.8125rem] text-foreground;
     }

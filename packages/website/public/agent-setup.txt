@@ -1,0 +1,143 @@
+# Set up fxbot: instructions for an AI agent
+
+You are an AI agent helping a person set up fxbot on a Linux machine. fxbot is their own bot: an
+app they run on a machine of theirs, with bots, chats, memories, and plugins, on hosted models or
+local ones. Its documentation is https://fxbot.sh/docs/, and all of it in one file is
+https://fxbot.sh/llms-full.txt.
+
+Follow these steps in order. Run the commands yourself where you can, say what each one does
+before you run it, and stop to ask the person when a step needs their choice or their hands.
+
+## Rules while you work
+
+- Get the person's yes before you install anything. setup.sh runs as root and changes the machine
+  (step 2).
+- Never read, print, copy, or paste a key, token, or password: not into this chat, not into a
+  file, not into a command line. Keys and sign-ins go into fxbot's Settings, by the person's own
+  hand (step 6). Leave these files closed: /etc/fxbot/secret.key, /etc/fxbot/fxbot.env, and
+  /opt/fxbot/.env.
+- fxbot has no login of its own, and whoever reaches it can use all of it: every bot, chat, and
+  provider. Keep it on 127.0.0.1:8787. Never open port 8787 to a network or forward it from a
+  router. To reach it from other devices, see step 5.
+- Install the release, as below. Don't build fxbot from source unless the person asks: that is
+  for contributors.
+
+## 1. Check the machine
+
+fxbot needs:
+
+- Debian, Ubuntu, or a distro built on them, with systemd, on x86_64 or arm64. It doesn't run on
+  macOS or Windows. If that is what you are on, ask the person which Linux machine to use, such as
+  a home server or a small VPS, and how you can reach it.
+- curl, an internet connection, and sudo. In a root shell with no sudo, leave `sudo` out below.
+- About 1 GB of available memory (the `available` column of `free -h`) and 5 GB of free disk. Its
+  images and a model take about 2 GB.
+- Port 8787 free.
+
+```sh
+cat /etc/os-release
+uname -m
+ps -p 1 -o comm=
+free -h
+df -h /
+ss -ltn 'sport = :8787'
+command -v sudo curl
+command -v fxbot
+```
+
+`ps` prints `systemd`. `ss` prints only its header when the port is free. If `command -v fxbot`
+prints a path, fxbot is installed already: tell the person, and go to step 4.
+
+If something is missing, tell the person what, and stop.
+
+## 2. Tell the person what will change
+
+Read the script: https://fxbot.sh/setup.sh. Then tell the person that it:
+
+- uses podman 4 or newer, or docker, if the machine has one. With neither, it installs podman, or
+  docker where the distro's podman is older than 4. It also installs a Compose new enough, if the
+  machine's isn't.
+- on podman, installs netavark, aardvark-dns, and nftables, and turns on `podman.socket`.
+- adds an `fxbot` user, and a key in /etc/fxbot that only that user reads.
+- puts fxbot in /opt/fxbot and its data in /var/lib/fxbot, and adds the `fxbot` command.
+- adds `fxbot.service`, which runs fxbot as three containers, from boot, on 127.0.0.1:8787, and
+  `fxbot-control.path`, which carries out, as root, the updates the person asks for in the app.
+
+Ask for their yes.
+
+## 3. Install fxbot
+
+```sh
+curl -fsSL https://fxbot.sh/setup.sh | sudo bash
+```
+
+If sudo wants a password, don't ask for it: give the person this command to run themselves, and
+carry on when it's done.
+
+It names each step as it goes, and can take several minutes while it downloads, so let it finish.
+Near its end it prints `fxbot <version> runs on http://127.0.0.1:8787`.
+
+If it stops, it says why, after `fxbot setup stopped:`. Fix what it names, asking first if the fix
+changes the machine, then run the command again. Running it again finishes an install that
+stopped, and leaves a working one alone.
+
+## 4. Check that it runs
+
+```sh
+curl -s http://127.0.0.1:8787/api/health
+sudo fxbot status
+```
+
+The first answers `{"ok":true,"version":"<version>"}`. The second names the version, the engine,
+and where the local embedder runs, then lists three services, `fxbot`, `db`, and `embed`, each Up.
+On podman, a line starting `>>>> Executing external compose provider` is podman's own note, and
+harmless. `embed` downloads a 310 MB model on its first start, and memory search uses words alone
+until it answers, so it needn't be ready for you to go on.
+
+If fxbot doesn't answer, read its log, and tell the person what it says:
+
+```sh
+sudo fxbot compose logs --tail 50 fxbot
+```
+
+`sudo fxbot logs` follows the log and doesn't exit, so don't use it here.
+
+## 5. Ask how the person will reach it
+
+Ask where they'll use it. A machine with no screen, such as a VPS, needs one of the last two.
+
+- **On this machine:** open http://127.0.0.1:8787 in a browser here.
+- **From their own computer, over SSH:** give them this to run on their computer, and keep it
+  running. fxbot is then at http://127.0.0.1:8787 on that computer, and on nothing else:
+
+  ```sh
+  ssh -N -L 8787:127.0.0.1:8787 <user>@<machine>
+  ```
+
+- **From other devices, such as a phone:** Tailscale is the recommended way. It needs Tailscale on
+  this machine and on their devices, in one tailnet, with HTTPS turned on. Ask before you install
+  it, and leave its sign-in to the person. Then:
+
+  ```sh
+  sudo tailscale serve --bg 8787
+  ```
+
+  It prints the address, `https://<machine>.<tailnet>.ts.net`, which only their own devices reach.
+- **Anything else** in front of fxbot, such as a proxy of their own, must add its own login. See
+  https://fxbot.sh/docs/how-to/reach-it/
+
+## 6. Hand it over
+
+The rest is for the person, in the app, because it takes their sign-ins. Tell them to:
+
+1. Open **Settings** › **Providers**, choose **Add provider…**, and sign in to an account with a
+   device code, paste a key, or point at a local model server such as Ollama. See
+   https://fxbot.sh/docs/how-to/add-a-provider/
+2. Make a bot and say hello. See https://fxbot.sh/docs/tutorials/first-fxbot/#make-a-bot
+
+Then tell them what you did: the version, the address, and what the machine now has. Point them at:
+
+- **Updates:** Settings shows each new release, with an Update button. Or `sudo fxbot update`.
+- **Plugins:** https://fxbot.sh/plugins/
+- **Commands:** https://fxbot.sh/docs/reference/commands/
+- **Help:** the Hackers in the Loop community on Discord, https://discord.gg/3Qs2uejUf9

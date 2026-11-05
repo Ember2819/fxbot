@@ -7,7 +7,7 @@ import { Command } from "./code.tsx";
 import { buttonVariants } from "./components/ui/button.tsx";
 import { latest } from "./release.ts";
 import { Shell } from "./layout.tsx";
-import { changelogPath, href, installCommand, repo } from "./site.ts";
+import { agentPrompt, changelogPath, href, installCommand, repo } from "./site.ts";
 
 // Bob, Fernando, and Securely from the screenshot, and a few friends. One is busy, as a bot is during a turn.
 const crowd: { shape: Shape; color: Color; size: number; busy?: boolean }[] = [
@@ -133,6 +133,8 @@ export function Home() {
           </p>
           <div className="mt-8 max-w-2xl">
             <Command>{installCommand}</Command>
+            <p className="mt-4 mb-2 text-sm text-muted-foreground">Or ask your AI agent to set it up:</p>
+            <Command wrap>{agentPrompt}</Command>
           </div>
           <p className="mt-3 text-sm text-muted-foreground">
             {latest.version && (

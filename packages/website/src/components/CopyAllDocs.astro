@@ -1,0 +1,25 @@
+---
+// All the docs in one go, to paste into an AI chat: it copies llms-full.txt. Where it can't, or without JavaScript, it
+// opens the file.
+const base = import.meta.env.BASE_URL;
+---
+
+<a class="fxbot-copy-docs" href={`${base}llms-full.txt`} data-copy-docs>Copy all docs</a>
+
+<script>
+  for (const link of document.querySelectorAll<HTMLAnchorElement>("[data-copy-docs]")) {
+    const idle = link.textContent;
+    link.addEventListener("click", async (event) => {
+      event.preventDefault();
+      try {
+        // A promise, not the text: Safari allows the write only during the click.
+        const text = fetch(link.href).then((res) => (res.ok ? res.text() : Promise.reject(new Error(`${res.status}`))));
+        await navigator.clipboard.write([new ClipboardItem({ "text/plain": text.then((all) => new Blob([all], { type: "text/plain" })) })]);
+        link.textContent = "Copied";
+        setTimeout(() => (link.textContent = idle), 3000);
+      } catch {
+        location.href = link.href;
+      }
+    });
+  }
+</script>

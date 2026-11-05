@@ -10,10 +10,10 @@ export function CopyButton() {
   );
 }
 
-// A command or code to copy.
-export function Command({ children }: { children: string }) {
+// A command or code to copy. A sentence wraps, so all of it shows on a phone.
+export function Command({ children, wrap }: { children: string; wrap?: boolean }) {
   return (
-    <div className="code" data-code>
+    <div className={wrap ? "code code-wrap" : "code"} data-code>
       <pre>
         <code>{children}</code>
       </pre>

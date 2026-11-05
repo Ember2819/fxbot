@@ -1,0 +1,12 @@
+---
+// A page's title and its actions, from starlight-page-actions, with Copy all docs in their row.
+import PageTitle from "starlight-page-actions/overrides/PageTitle.astro";
+import CopyAllDocs from "./CopyAllDocs.astro";
+
+const { pageActions } = Astro.locals.starlightRoute.entry.data as { pageActions?: boolean };
+---
+
+<div class="fxbot-page-title">
+  <PageTitle />
+  {pageActions !== false && <CopyAllDocs />}
+</div>

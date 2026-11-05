@@ -2,7 +2,7 @@ import { Moon, Sun } from "lucide-react";
 import type { ReactNode } from "react";
 import { Blob } from "./blob.tsx";
 import { buttonVariants } from "./components/ui/button.tsx";
-import { changelogPath, discord, href, repo } from "./site.ts";
+import { agentFiles, changelogPath, discord, href, repo } from "./site.ts";
 
 // GitHub's mark, which Lucide no longer ships.
 function GitHubMark() {
@@ -38,12 +38,15 @@ function Header() {
           <a href={href("/sdk/")} className={link}>
             SDK
           </a>
-          {/* Below 420px wide, the footer's links are the ones that fit. */}
-          <a href={href("/plugins/")} className={`${link} max-[420px]:hidden`}>
+          {/* On a phone, the footer's links are the ones that fit. */}
+          <a href={href("/plugins/")} className={`${link} max-[480px]:hidden`}>
             Plugins
           </a>
-          <a href={href(changelogPath)} className={`${link} max-[420px]:hidden`}>
+          <a href={href(changelogPath)} className={`${link} max-[480px]:hidden`}>
             Changelog
+          </a>
+          <a href={href("/agents/")} className={`${link} max-[560px]:hidden`}>
+            Agents
           </a>
         </nav>
         <div className="ml-auto flex items-center sm:gap-1">
@@ -67,14 +70,27 @@ function Footer() {
   return (
     <footer className="border-t border-border/70">
       <div className="mx-auto flex max-w-6xl flex-col gap-4 px-4 py-8 text-sm text-muted-foreground sm:flex-row sm:items-center sm:justify-between sm:px-6">
-        <p>
-          fxbot is open source, under the <a className="underline underline-offset-4 hover:text-foreground" href={`${repo}/blob/main/LICENSE`}>Apache License 2.0</a>. It runs on{" "}
-          <a className="underline underline-offset-4 hover:text-foreground" href="https://fx.sh/docs/lib">
-            libfx
-          </a>
-          .
-        </p>
-        <nav aria-label="Footer" className="flex gap-4">
+        <div className="grid gap-1">
+          <p>
+            fxbot is open source, under the <a className="underline underline-offset-4 hover:text-foreground" href={`${repo}/blob/main/LICENSE`}>Apache License 2.0</a>. It runs on{" "}
+            <a className="underline underline-offset-4 hover:text-foreground" href="https://fx.sh/docs/lib">
+              libfx
+            </a>
+            .
+          </p>
+          <p>
+            For agents:{" "}
+            {agentFiles.map(({ file }, i) => (
+              <span key={file}>
+                {i > 0 && " · "}
+                <a className="underline underline-offset-4 hover:text-foreground" href={href(file)}>
+                  {file}
+                </a>
+              </span>
+            ))}
+          </p>
+        </div>
+        <nav aria-label="Footer" className="flex flex-wrap gap-x-4 gap-y-1">
           <a className="hover:text-foreground" href={href("/docs/")}>
             Docs
           </a>
@@ -86,6 +102,9 @@ function Footer() {
           </a>
           <a className="hover:text-foreground" href={href(changelogPath)}>
             Changelog
+          </a>
+          <a className="hover:text-foreground" href={href("/agents/")}>
+            Agents
           </a>
           <a className="hover:text-foreground" href={repo}>
             GitHub

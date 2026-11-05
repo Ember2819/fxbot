@@ -72,6 +72,8 @@ curl -fsSL https://fxbot.sh/setup.sh | sudo bash
 curl -fsSL https://fxbot.sh/setup.sh | sudo bash -s -- v0.3.0
 ```
 
+Or ask your AI agent to set it up: `Set up fxbot on this computer for me: follow https://fxbot.sh/agent-setup.txt`. [fxbot.sh/agents](https://fxbot.sh/agents/) has that, and all the docs as plain text.
+
 fxbot runs as containers: the app, its database in pgvector's Postgres image, and the local embedder for memory search, from one compose file. `setup.sh` reads the versions the machine has and sets up what's missing: podman 4 or newer, or docker, and Compose 2.26 or newer, from the distro or from Compose's own release. Then:
 - the `fxbot` user, and a key in `/etc/fxbot/secret.key` that only `fxbot` reads
 - `/opt/fxbot`: the release's `compose.yaml`, an `.env` with its version and a random database password, and the `fxbot` command, also at `/usr/local/bin/fxbot`

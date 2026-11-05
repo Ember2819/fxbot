@@ -1,0 +1,35 @@
+---
+// What an AI agent reads: its steps for setting fxbot up, and the docs as plain text.
+import { Code } from "@astrojs/starlight/components";
+import StarlightPage from "@astrojs/starlight/components/StarlightPage.astro";
+import CopyAllDocs from "../components/CopyAllDocs.astro";
+import { agentFiles, agentPrompt } from "../site.ts";
+
+const base = import.meta.env.BASE_URL;
+const description = "Have your AI agent set fxbot up, or give it all the docs as plain text.";
+---
+
+<StarlightPage frontmatter={{ title: "Agents", description, template: "splash", pageActions: false }}>
+  <p>Have your AI agent set fxbot up, or give it all the docs as plain text.</p>
+
+  <h2>Set up fxbot</h2>
+  <p>On the machine you want fxbot on, tell your agent:</p>
+  <Code code={agentPrompt} lang="text" wrap />
+  <p>It checks the machine, asks before it installs anything, and leaves your keys and sign-ins to you.</p>
+
+  <h2>Give it the docs</h2>
+  <div class="not-content"><CopyAllDocs /></div>
+  <ul class="fxbot-agent-files not-content">
+    {
+      agentFiles.map(({ file, about }) => (
+        <li>
+          <a href={`${base}${file}`}>{file}</a>
+          <span>{about}</span>
+        </li>
+      ))
+    }
+  </ul>
+  <p>
+    Every page has a Markdown twin too, at its address with <code>.md</code> in place of the last slash, such as <a href={`${base}docs/how-to/update.md`}>/docs/how-to/update.md</a>. <strong>Copy Markdown</strong>, at the top of each page, copies it.
+  </p>
+</StarlightPage>

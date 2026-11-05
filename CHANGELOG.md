@@ -2,6 +2,11 @@
 
 Each release of fxbot, newest first. A release that adds migrations, bumps libfx, or needs a step by hand opens with **Before upgrading**. Lines for the next release collect under Unreleased. GitHub Releases and Settings show a short version of each section.
 
+## Unreleased
+
+- **Agents on fxbot.sh.** The home page offers a line to give your AI agent, which sets fxbot up from [agent-setup.txt](https://fxbot.sh/agent-setup.txt): it checks the machine, asks before it installs anything, and leaves your keys and sign-ins to you. [Agents](https://fxbot.sh/agents/), in the header, has that, `llms.txt`, and `llms-full.txt`, and **Copy all docs**, on each page of the docs, copies them all in one go.
+- **Reach it over SSH.** [Reach it from other devices](https://fxbot.sh/docs/how-to/reach-it/#over-ssh) has a way in for a machine with no screen.
+
 ## 0.5.0 (2026-11-05)
 
 **Before upgrading.** Migration `0008_default_bot` adds a `default_profile` column to `settings`. The update starts the database container again once, with your data, because its health check changed. On Docker, a start takes about a minute: until your next update on Docker 25 and newer, and always below 25. If `setup.sh` stopped on your machine, run it again.

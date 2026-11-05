@@ -94,7 +94,7 @@ export default defineConfig({
       ],
       editLink: { baseUrl: `${repo}/edit/main/packages/website/` },
       customCss: ["@fontsource-variable/geist", "./src/styles/docs.css"],
-      components: { SiteTitle: "./src/components/SiteTitle.astro" },
+      components: { SiteTitle: "./src/components/SiteTitle.astro", PageTitle: "./src/components/PageTitle.astro" },
       tableOfContents: { minHeadingLevel: 2, maxHeadingLevel: 3 },
       expressiveCode: {
         themes: ["github-dark-default", "github-light-default"],
@@ -110,20 +110,25 @@ export default defineConfig({
               { label: "Overview", slug: topic.id },
               ...topic.groups.map((group) => ({ label: group.title, items: group.pages.map((page) => ({ label: page.label, slug: `${topic.id}/${page.slug}` })) })),
             ],
-          })).concat([{ label: "Plugins", link: "/plugins/", icon: "puzzle" }]),
+          })).concat([
+            { label: "Plugins", link: "/plugins/", icon: "puzzle" },
+            { label: "Agents", link: "/agents/", icon: "rocket" },
+          ]),
         ),
-        // Copy page as Markdown, and open it in ChatGPT or Claude.
+        // Copy page as Markdown, and open it in ChatGPT or Claude. components/PageTitle.astro adds Copy all docs.
         starlightPageActions({ actions: { chatgpt: true, claude: true, markdown: true } }),
         starlightLlmsTxt({
           projectName: "fxbot",
           description: "fxbot is your bot, built and configured how you want it: a lean, local-first core, on libfx, that works with local models and grows with the plugins you pick.",
+          details: `To set fxbot up on a machine, follow [agent-setup.txt](${site}${base}agent-setup.txt).`,
           customSets: [
             { label: "Docs", paths: ["docs/**"], description: "running fxbot: install, providers, plugins, updates, and how it works" },
             { label: "SDK", paths: ["sdk/**"], description: "building your own app or plugin on @fxbot/sdk" },
           ],
         }),
-        // The home page and the plugin directory are Astro pages outside the docs. check-links.ts checks their links.
-        starlightLinksValidator({ errorOnLocalLinks: false, exclude: [base, `${base}plugins/`, `${base}plugins/**`] }),
+        // The home page, the plugin directory, and /agents/ are Astro pages outside the docs. check-links.ts checks their
+        // links.
+        starlightLinksValidator({ errorOnLocalLinks: false, exclude: [base, `${base}plugins/`, `${base}plugins/**`, `${base}agents/`] }),
       ],
     }),
   ],
