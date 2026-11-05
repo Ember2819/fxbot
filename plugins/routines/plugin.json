@@ -1,0 +1,22 @@
+{
+  "name": "routines",
+  "version": "0.1.0",
+  "description": "Bots run saved tasks on a schedule, such as a morning summary, and tell you in their chat.",
+  "license": "Apache-2.0",
+  "extensions": {
+    "sh.fxbot": {
+      "server": "./fxbot/server.ts",
+      "page": "./fxbot/page.js",
+      "migrations": "./fxbot/migrations",
+      "settings": [
+        { "name": "minutes", "description": "The most minutes one run takes, 1 to 240", "default": "15" },
+        { "name": "calls", "description": "The most tool calls one run makes, 1 to 1000", "default": "100" },
+        { "name": "everyMinutes", "description": "The fewest minutes between a routine's runs, 5 to 1440", "default": "15" },
+        { "name": "routines", "description": "The most routines a bot can have, 1 to 100", "default": "20" },
+        { "name": "atOnce", "description": "The most runs going at one time, 1 to 10", "default": "3" },
+        { "name": "failures", "description": "Failures in a row before a routine pauses, 1 to 100", "default": "10" },
+        { "name": "keepRuns", "description": "How many of a routine's runs to keep, 1 to 200", "default": "20" }
+      ]
+    }
+  }
+}

@@ -1,0 +1,5 @@
+{
+  "private": true,
+  "type": "module",
+  "description": "The routines plugin's page bundles nothing of its own; see the README for its build. fxbot reads only type, for the server code."
+}

@@ -29,6 +29,12 @@
       "description": "Each night, a bot goes over its day and keeps what it learned as memories and skills, with Undo.",
       "repo": "iammrduncan/fxbot",
       "path": "plugins/dreams"
+    },
+    {
+      "name": "routines",
+      "description": "Bots run saved tasks on a schedule, such as a morning summary, and tell you in their chat.",
+      "repo": "iammrduncan/fxbot",
+      "path": "plugins/routines"
     }
   ]
 }
