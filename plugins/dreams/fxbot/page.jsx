@@ -1,7 +1,7 @@
 // The Dreams section in a bot's settings: when it dreams, each night with what it read and each change it made, with
 // its sources and Undo, Dream now, and the bot's skills from dreams. Built into page.js; see the README.
 import { useEffect, useState } from "react";
-import { api, client, ui } from "@fxbot/app";
+import { api, ui } from "@fxbot/app";
 
 async function call(path, method = "GET", body) {
   const res = await api(path, { method, ...(body ? { headers: { "content-type": "application/json" }, body: JSON.stringify(body) } : {}) });
@@ -15,7 +15,6 @@ const hourOf = (hour) => `${String(hour).padStart(2, "0")}:00`;
 const turns = (n) => `${n} ${n === 1 ? "turn" : "turns"}`;
 const what = (c) =>
   c.kind === "skill" ? (c.before ? "Rewrote a skill" : "Made a skill") : c.merged_into ? "Merged a memory" : c.before ? "Changed a memory" : "Saved a memory";
-const browserZone = Intl.DateTimeFormat().resolvedOptions().timeZone;
 
 // One night: when, what it read, and how it ended, then its changes.
 function nightLine(n) {
@@ -90,12 +89,7 @@ function Dreams({ bot }) {
   const nights = [...data.nights, ...older];
   const more = () => call(`bots/${bot.id}?before=${nights.at(-1).id}`).then((next) => setOlder((all) => [...all, ...next.nights]), (e) => setError(e.message));
   const remove = (name) => window.confirm(`Remove the skill ${name}? It came from a dream.`) && call(`bots/${bot.id}/skills/${encodeURIComponent(name)}`, "DELETE").then(load, (e) => setError(e.message));
-  const useZone = async () => {
-    const plugin = (await client.plugins.list()).find((p) => p.kind === "package" && p.name === "dreams");
-    if (plugin) await client.plugins.configure(plugin.id, { timeZone: browserZone }).catch((e) => setError(e.message));
-    load();
-  };
-  const when = data.zoneSet ? `${hourOf(data.hour)}, ${data.timeZone}` : `${hourOf(data.hour)} ${data.timeZone}, the server's time`;
+  const when = `${hourOf(data.hour)}, ${data.timeZone}`;
 
   return (
     <section className="grid gap-3 text-sm" aria-label="Dreams">
@@ -106,15 +100,7 @@ function Dreams({ bot }) {
         </Button>
       </div>
       <p className="text-muted-foreground">
-        {data.dreaming ? "Dreaming…" : `Each night at ${when}, after ${turns(data.minTurns)}. ${turns(data.waiting)} since the last dream.`}
-        {!data.zoneSet && browserZone && browserZone !== data.timeZone && (
-          <>
-            {" "}
-            <button type="button" className="text-foreground underline underline-offset-4" onClick={useZone}>
-              Use {browserZone}
-            </button>
-          </>
-        )}
+        {data.dreaming ? "Dreaming…" : `Each night at ${when}, from Settings › General, after ${turns(data.minTurns)}. ${turns(data.waiting)} since the last dream.`}
       </p>
       {nights.length > 0 && (
         <ul className="grid gap-3">

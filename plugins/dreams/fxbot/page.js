@@ -1,7 +1,7 @@
 let react = require("react");
 let _fxbot_app = require("@fxbot/app");
 let react_jsx_runtime = require("react/jsx-runtime");
-// fxbot/page.jsx
+// plugins/dreams/fxbot/page.jsx
 async function call(path, method = "GET", body) {
 	const res = await (0, _fxbot_app.api)(path, {
 		method,
@@ -21,7 +21,6 @@ const dayOf = (night) => (/* @__PURE__ */ new Date(`${String(night).slice(0, 10)
 const hourOf = (hour) => `${String(hour).padStart(2, "0")}:00`;
 const turns = (n) => `${n} ${n === 1 ? "turn" : "turns"}`;
 const what = (c) => c.kind === "skill" ? c.before ? "Rewrote a skill" : "Made a skill" : c.merged_into ? "Merged a memory" : c.before ? "Changed a memory" : "Saved a memory";
-const browserZone = Intl.DateTimeFormat().resolvedOptions().timeZone;
 function nightLine(n) {
 	if (n.state === "dreaming") return `${dayOf(n.night)} · Dreaming…`;
 	if (n.state === "off") return `${dayOf(n.night)} · dreams is off for this bot`;
@@ -122,12 +121,7 @@ function Dreams({ bot }) {
 	const nights = [...data.nights, ...older];
 	const more = () => call(`bots/${bot.id}?before=${nights.at(-1).id}`).then((next) => setOlder((all) => [...all, ...next.nights]), (e) => setError(e.message));
 	const remove = (name) => window.confirm(`Remove the skill ${name}? It came from a dream.`) && call(`bots/${bot.id}/skills/${encodeURIComponent(name)}`, "DELETE").then(load, (e) => setError(e.message));
-	const useZone = async () => {
-		const plugin = (await _fxbot_app.client.plugins.list()).find((p) => p.kind === "package" && p.name === "dreams");
-		if (plugin) await _fxbot_app.client.plugins.configure(plugin.id, { timeZone: browserZone }).catch((e) => setError(e.message));
-		load();
-	};
-	const when = data.zoneSet ? `${hourOf(data.hour)}, ${data.timeZone}` : `${hourOf(data.hour)} ${data.timeZone}, the server's time`;
+	const when = `${hourOf(data.hour)}, ${data.timeZone}`;
 	return /* @__PURE__ */ (0, react_jsx_runtime.jsxs)("section", {
 		className: "grid gap-3 text-sm",
 		"aria-label": "Dreams",
@@ -146,14 +140,9 @@ function Dreams({ bot }) {
 					children: "Dream now"
 				})]
 			}),
-			/* @__PURE__ */ (0, react_jsx_runtime.jsxs)("p", {
+			/* @__PURE__ */ (0, react_jsx_runtime.jsx)("p", {
 				className: "text-muted-foreground",
-				children: [data.dreaming ? "Dreaming…" : `Each night at ${when}, after ${turns(data.minTurns)}. ${turns(data.waiting)} since the last dream.`, !data.zoneSet && browserZone && browserZone !== data.timeZone && /* @__PURE__ */ (0, react_jsx_runtime.jsxs)(react_jsx_runtime.Fragment, { children: [" ", /* @__PURE__ */ (0, react_jsx_runtime.jsxs)("button", {
-					type: "button",
-					className: "text-foreground underline underline-offset-4",
-					onClick: useZone,
-					children: ["Use ", browserZone]
-				})] })]
+				children: data.dreaming ? "Dreaming…" : `Each night at ${when}, from Settings › General, after ${turns(data.minTurns)}. ${turns(data.waiting)} since the last dream.`
 			}),
 			nights.length > 0 && /* @__PURE__ */ (0, react_jsx_runtime.jsx)("ul", {
 				className: "grid gap-3",

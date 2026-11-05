@@ -23,8 +23,7 @@ The bot's settings show **Dreams**: when it dreams, each night with what it read
 
 | Setting | What it is | Default |
 | --- | --- | --- |
-| `hour` | The hour dreams start, 0 to 23 | `3` |
-| `timeZone` | That hour's time zone, such as `Europe/Berlin`. Empty: the server's. The journal offers the browser's. | empty |
+| `hour` | The hour dreams start, 0 to 23, in the time zone in **Settings** › **General** | `3` |
 | `minTurns` | Turns a bot needs since its last dream before it dreams | `6` |
 | `minutes` | The most minutes one dream runs | `10` |
 | `skills` | Whether dreams write skills: `on` or `off` | `on` |

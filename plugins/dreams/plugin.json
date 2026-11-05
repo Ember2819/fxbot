@@ -1,6 +1,6 @@
 {
   "name": "dreams",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Each night, a bot goes over its day and keeps what it learned as memories and skills, with Undo.",
   "license": "Apache-2.0",
   "extensions": {
@@ -9,8 +9,7 @@
       "page": "./fxbot/page.js",
       "migrations": "./fxbot/migrations",
       "settings": [
-        { "name": "hour", "description": "The hour dreams start, 0 to 23", "default": "3" },
-        { "name": "timeZone", "description": "That hour's time zone, such as Europe/Berlin. Empty: the server's" },
+        { "name": "hour", "description": "The hour dreams start, 0 to 23, in the time zone in Settings › General", "default": "3" },
         { "name": "minTurns", "description": "Turns a bot needs since its last dream before it dreams", "default": "6" },
         { "name": "minutes", "description": "The most minutes one dream runs", "default": "10" },
         { "name": "skills", "description": "Whether dreams write skills: on or off", "default": "on" }

@@ -64,21 +64,11 @@ function rules(skills: boolean) {
 }
 
 export default async function setup(fx: PluginApi) {
-  // The settings, read at each use. An unknown time zone is the server's, said once in the log.
-  let badZone = "";
+  // The settings, read at each use. The time zone is the owner's, or on an fxbot older than 0.6.0, the server's.
   function settings() {
-    let timeZone = (fx.settings.timeZone ?? "").trim();
-    try {
-      if (timeZone) new Intl.DateTimeFormat("en", { timeZone });
-    } catch {
-      if (badZone !== timeZone) fx.log(`${timeZone} isn't a time zone, so dreams use the server's.`);
-      badZone = timeZone;
-      timeZone = "";
-    }
     return {
       hour: int(fx.settings.hour, 0, 23, 3),
-      timeZone: timeZone || Intl.DateTimeFormat().resolvedOptions().timeZone,
-      zoneSet: Boolean(timeZone),
+      timeZone: fx.timeZone?.() ?? Intl.DateTimeFormat().resolvedOptions().timeZone,
       minTurns: int(fx.settings.minTurns, 1, 100, 6),
       minutes: int(fx.settings.minutes, 1, 60, 10),
       skills: (fx.settings.skills ?? "on").trim().toLowerCase() !== "off",
@@ -398,7 +388,7 @@ export default async function setup(fx: PluginApi) {
   fx.route("GET", "/bots/:bot", async (request, { bot }) => {
     if (!(await known(bot))) return json({ error: "No such bot." }, 404);
     const before = Number(new URL(request.url).searchParams.get("before")) || 2 ** 31 - 1;
-    const { hour, timeZone, zoneSet, minTurns } = settings();
+    const { hour, timeZone, minTurns } = settings();
     // The night as text: postgres.js reads a date as local midnight, a day early east of UTC.
     const nights = await fx.sql`select id, night::text as night, scheduled, started_at, ended_at, state, turns, left_out, summary from nights where bot = ${bot} and id < ${before} order by id desc limit 14`;
     const changes = nights.length
@@ -411,7 +401,6 @@ export default async function setup(fx: PluginApi) {
       waiting,
       hour,
       timeZone,
-      zoneSet,
       minTurns,
       nights: nights.map((n) => ({ ...n, changes: changes.filter((c) => c.night === n.id) })),
       skills,
