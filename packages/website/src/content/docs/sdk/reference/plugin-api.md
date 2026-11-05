@@ -66,6 +66,10 @@ export default async function setup(fx: PluginApi) {
 | `fx.library.read(bot, id)` | A library item's `name`, `type`, and `bytes`, if it's tagged for the bot; otherwise it throws |
 | `fx.library.save({ bot, session, name, type, bytes })` | Saves an image, or UTF-8 text, to the bot's library, tagged for the chat, through the library's checks. It answers the item. |
 | `fx.skills.files(bot, name)` | The files besides `SKILL.md` of the skill the bot sees by that name, as `{ path, text }`. None when it has no such skill. |
+| `fx.skills.set(bot, skills)` | The skills the plugin gives one bot, in place of those it gave before, each `{ name, description, instructions }`, as a `SKILL.md`'s name, description, and body. They join the bot's catalog, its `skill` tool, and its `/` list while the plugin is on for it, and go when the plugin unloads, so a plugin keeps them and sets them again in its setup. It throws with status 400 for a bad name, a description over 1,024 characters, a name twice, or instructions over 64 KiB. Since 0.5.0. |
+| `fx.memories.get(bot, id)` | One of the bot's memories, with `savedBy`, `bot` or `owner`, or null when the bot has none by that id. Since 0.5.0. |
+| `fx.memories.save(bot, { text, replaces? })` | Saves a memory as the bot's, as `memory_save` does, or with `replaces`, changes that one's text. It answers `{ memory, existed, merged }`: `existed` when the same text was saved already, and `merged` when the changed memory now said what another did, and went into that one. It throws with status 400 for text over 1,000 characters, and 404 for a `replaces` the bot doesn't have. Since 0.5.0. |
+| `fx.memories.remove(bot, id)` | Deletes one of the bot's memories. A missing one throws with status 404. Since 0.5.0. |
 | `fx.machine` | In an install made by `setup.sh`, the machine's `fxbot` command, for a job only root can do; `null` in a checkout. `ask("computer")` asks it to set up the computer plugin's engine, and `status("computer")` says how that went: `{ state, error? }`, with `state` `asked`, `working`, `done`, or `failed`, or `null` when nothing asked. `computer` is its only job. |
 | `fx.log(...parts)` | A line in its log, which its settings in **Plugins** show |
 | `fx.signal` | An `AbortSignal` that aborts when the plugin unloads |
@@ -83,7 +87,7 @@ Handlers run in the order the plugins were added, and change the event's fields 
 | `tool.before` | Before every tool call: fxbot's, MCP servers', skills', and plugins' | `bot`, `session`, `tool`, `input` | Change `input`, or answer `{ block: reason }`, which the model gets as a failed call |
 | `tool.after` | After it | the same, with `result`, or `error` when it failed | Change `result` |
 | `turn.start` | Once libfx stores the prompt | `bot`, `session`, `messageId`, `text`, `from` | Observe |
-| `turn.end` | When the turn ends | the same, with `reply`, and `error` when it failed | Observe |
+| `turn.end` | When the turn ends | the same, with `reply`, and `error` when it failed, as when the provider answered with an error | Observe |
 | `settings` | The owner changed its settings | `settings` | Observe |
 | `dependents` | A plugin that needs this one was added, updated, or removed | `dependents`, as `fx.dependents()` gives them | Observe |
 
