@@ -305,6 +305,7 @@ export default async function setup(fx: PluginApi) {
     description: "Your routines, and the time now.",
     inputSchema: { type: "object", properties: {} },
     idempotent: true,
+    safe: true,
     async execute(_input: Input, { bot }) {
       const lines = [clock()];
       for (const r of await fx.sql<Routine[]>`select * from routines where bot = ${bot} order by id`) {

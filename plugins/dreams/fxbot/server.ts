@@ -252,6 +252,7 @@ export default async function setup(fx: PluginApi) {
     description: "Only while dreaming: one page of your day, your turns since your last dream, each with its t:<id>.",
     inputSchema: { type: "object", properties: { page: { type: "integer", minimum: 1, description: "1 first" } } },
     idempotent: true,
+    safe: true,
     async execute(input: { page?: unknown }, { session }) {
       const dream = dreams.get(session);
       if (!dream) return "Only a dream can use this.";
@@ -281,6 +282,7 @@ export default async function setup(fx: PluginApi) {
       required: ["text", "sources"],
     },
     idempotent: true,
+    safe: true,
     async execute(input: { text?: unknown; replaces?: unknown; sources?: unknown }, { session }) {
       const dream = dreams.get(session);
       if (!dream) return "Only a dream can use this.";
@@ -325,6 +327,7 @@ export default async function setup(fx: PluginApi) {
       required: ["name", "description", "instructions", "sources"],
     },
     idempotent: true,
+    safe: true,
     async execute(input: { name?: unknown; description?: unknown; instructions?: unknown; sources?: unknown }, { session }) {
       const dream = dreams.get(session);
       if (!dream) return "Only a dream can use this.";

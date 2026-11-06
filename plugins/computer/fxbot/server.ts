@@ -617,6 +617,7 @@ export default async function setup(fx: PluginApi) {
       required: ["path"],
     },
     idempotent: true,
+    safe: true,
     async execute(input: { path?: unknown; offset?: unknown; limit?: unknown }, { bot, session }) {
       const path = where(input?.path);
       const bytes = await fetchFile((await ready(bot, session)).name, path);
@@ -692,6 +693,7 @@ export default async function setup(fx: PluginApi) {
       "the person sees it. Returns its library:<id>. The library keeps only images and text.",
     inputSchema: { type: "object", properties: { path: { type: "string" }, name: { type: "string", description: "Its name in the library: the file's own unless given" } }, required: ["path"] },
     idempotent: true,
+    safe: true,
     async execute(input: { path?: unknown; name?: unknown }, { bot, session }) {
       const path = where(input?.path);
       const bytes = await fetchFile((await ready(bot, session)).name, path);
@@ -855,6 +857,7 @@ export default async function setup(fx: PluginApi) {
       "Calling it is how you ask: don't just write \"please sign in\". Your desktop and terminal tools wait until they hand it back, and then you hear.",
     inputSchema: { type: "object", properties: { reason: { type: "string", description: "What you need them to do, in one line" } }, required: ["reason"] },
     idempotent: true,
+    safe: true,
     async execute(input: { reason?: unknown }, { bot, session }) {
       const reason = typeof input?.reason === "string" && input.reason.trim() ? input.reason.trim().slice(0, 300) : "";
       if (!reason) return "Say what you need your owner to do, in reason.";
