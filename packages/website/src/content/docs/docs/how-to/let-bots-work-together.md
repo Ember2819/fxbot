@@ -13,7 +13,7 @@ The bot sends a message, which shows in its reply as a card with **To Philly**. 
 
 ## Tag a bot
 
-In a bot's chat, type `@` to list the bots it can reach, and pick one. Its face shows beside the box, and your message shows it as a chip. The bot then knows exactly which one you mean, which matters when two have the same name: each shows the line from its settings, to tell them apart.
+In a bot's chat, type `@` to list the bots it can reach, and pick one. It goes in your message as a chip with its face. The bot then knows exactly which one you mean, which matters when two have the same name: each shows the line from its settings, to tell them apart.
 
 A tag doesn't wake the bot you tag. The bot you're talking to sends the message: "ask @Philly what broke staging". A name you type out without picking it stays plain text.
 

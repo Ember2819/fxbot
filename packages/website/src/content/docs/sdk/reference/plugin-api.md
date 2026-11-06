@@ -229,8 +229,8 @@ The computer and chat rooms provide objects of their own: see [the computer's](/
 | `app.nav({ label, path, icon? })` | A button in the sidebar's footer row, to `/<plugin><path>`. `icon` is a component; without one, the button shows the plugin's icon. |
 | `app.chat(Component)` | Above the message box in a bot's chat. It gets `bot`. Since 0.6.0. |
 | `app.botPanel(Component)` | Above the tabs of a bot's panel, beside its chat. It gets `bot`. |
-| `app.composer(Component)` | A control beside the attach button. It gets `bot`, `draft`, `box`, the textarea's ref, `setDraft(text)`, and `attach(files)`. `setDraft` also takes a function from the draft to the new text. `draft` and `box` are since 0.6.0. |
-| `app.sending(change)` | Changes a message on its way out of a bot's chat: `change(text)` answers the text to send. One that throws leaves it as it was. Since 0.6.0. |
+| `app.composer(Component)` | A control beside the attach button. It gets `bot`, `setDraft(text)`, and `attach(files)`. `setDraft` also takes a function from the draft to the new text. |
+| `app.box(Component)` | Replaces the textarea in a bot's chat, for the first plugin that sets one. It gets `bot` and a textarea's props, and acts as one: `value` is the text, `onChange` gets `{ target: { value, selectionStart } }`, and its `ref` has `selectionStart` and `setSelectionRange`. One that throws falls back to the textarea. Since 0.6.0. |
 | `app.said(pattern, Component)` | Draws each match of `pattern`, a global regex, in what the owner or a plugin said in a bot's chat. `Component` gets `match`. Since 0.6.0. |
 | `app.toolView(tool, Component, { open? })` | How a call of `<plugin>_<tool>` shows in a reply. With `open`, since 0.6.0, it stays in sight below the folded steps, for what the owner shouldn't miss. It gets `call`: `name`, `input`, `output`, `error`, and `done`. |
 | `app.settings(Component)` | A part of the plugin's tab in Settings, at `/settings/plugins/<plugin>`, above its bots and settings. Every plugin has that tab, and several calls stack in it. Before 0.6.0, only a plugin that called this had a tab, and before 0.5.0, it was a section of Settings' one page. |
