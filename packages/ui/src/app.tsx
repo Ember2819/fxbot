@@ -829,14 +829,12 @@ const luminance = (hex: string) => {
   return 0.2126 * r + 0.7152 * g + 0.0722 * b;
 };
 
-// Text on a bot's color: white or near-black, whichever contrasts more.
-function ink(color: Color) {
-  const [light, dark] = [luminance(colors[color]), luminance("#1f1f1f")];
-  return 1.05 / (light + 0.05) >= (light + 0.05) / (dark + 0.05) ? "#ffffff" : "#1f1f1f";
-}
+// Text on a bot's color: white, unless the color is light. On a saturated mid-tone such as blue, near-black scores
+// higher on WCAG's ratio, but white is what reads, so this is a floor for white and not the higher of the two.
+const ink = (color: Color) => (1.05 / (luminance(colors[color]) + 0.05) >= 3.5 ? "#ffffff" : "#1f1f1f");
 
-// Messages to the bot are drawn in the bot's own color. Skills the message starts with show as chips.
-// What the owner or a plugin said, as a turn's opening or where it joined one.
+// What the owner or a plugin said, as a turn's opening or where it joined one, in the bot's own color. Skills the
+// message starts with show as chips.
 function Said({ text, files, from, color, skills }: { text: string; files?: Upload[]; from?: string; color?: Color; skills: Set<string> }) {
   const named = leadingSkills(text, skills);
   return (
