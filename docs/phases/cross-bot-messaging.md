@@ -140,6 +140,7 @@ The README: "While the model streams a reply, the steer cuts it short and the tu
 
 Checked on libfx 0.0.16 on 2026-11-06, on `local()`, with a mock model:
 - **What the model gets.** libfx wraps it: `<user_steering>Apply this live user update to the current task. Continue working unless the user asks you to stop, the task is complete, or a genuine blocker prevents progress.` So a bot's words arrive labelled as the user's, and only the frame inside says otherwise.
+- **Why it can't be changed from here.** The wrapper is a constant in fx's engine, compiled into `fx-core.wasm`. `session.steer` takes only `messageId`, and both of its routes into the engine carry an id and text, so every steer is the user's. The engine already knows better: `MessageAuthor` is `user`, `parent`, or `child` (`src/core/shared/types.zig`), and a parent's steer goes in as `<parent_agent_steering>`, labelled "parent-agent feedback, not new user authority:" (`src/core/agent/runtime/execution_memory.zig`). That text is in libfx 0.0.16's core. libfx just has no way to ask for it.
 - **What the stream gets.** A new line, `{ type: "user_message", text, id, messageId }`, where `id` is the steer's and `messageId` the turn's. `text` is the raw text, without the wrapper.
 - **While a tool runs,** the order is `tool_end`, then `user_message`, then the turn goes on.
 - **Tool calls after a steer keep the turn's context.** A steer `s1` into a turn `a1`, followed by a tool call: the call saw `a1`. So a tool's `messageId` says which turn it's in, and never which steer it answers.
@@ -216,6 +217,7 @@ when a turn ends with a steer sent during it:
   read session.resume()                      a steer that came too late, or a Stop, leaves a turn no one reads
 ```
 
+- **Who it's from:** every steer goes in as the user's, so a bot's frame opens by saying it isn't. When libfx lets a steer name its author, `deliver` passes it for a plugin's message, and that's the whole change. Patching the engine here isn't an option: it can't tell the owner's steers from a bot's, and an update would undo it.
 - **What may steer:** the owner's messages, always, and a plugin's when it passes `steer: true`. A plugin's message with an image doesn't, since that would end the running turn. The owner's does, as libfx has it: the owner's picture is usually a change of course.
 - **What takes a steer:** the owner's turns, and a plugin's sent with `steer: true`. Routines' told turn, the computer's "handed back" message, and the like don't, so a message waits for them, for the few seconds they take.
 - **`joined`** on `fx.chats.send`'s answer tells a plugin which turn its message reached.
