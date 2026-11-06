@@ -187,8 +187,8 @@ export async function createFxbot(options: FxbotOptions) {
           await store.sql`insert into plugin_sessions (id, profile_id, provider, plugin) values (${id}, ${bot}, ${profile.provider}, ${plugin})`;
           return id;
         },
-        send: async (plugin, bot, { text, shown, files, session, messageId = crypto.randomUUID() }) =>
-          (started(), deliver(bot, { text, files, messageId }, { session, from: plugin, shown })),
+        send: async (plugin, bot, { text, shown, label, steer, files, session, messageId = crypto.randomUUID() }) =>
+          (started(), deliver(bot, { text, files, messageId }, { session, from: plugin, shown, label, steer })),
         async stream(plugin, bot, session, cursor = 0) {
           started();
           const profile = await get(bot);
@@ -199,8 +199,15 @@ export async function createFxbot(options: FxbotOptions) {
         async cancel(plugin, bot, session) {
           started();
           const profile = await get(bot);
-          await pluginSession(plugin, profile, session);
-          await (await open(profile, session)).cancel();
+          if (session) await pluginSession(plugin, profile, session);
+          else {
+            const running = profile.sessionId ? working.get(profile.sessionId)?.[0] : undefined;
+            const messageId = running?.messageId ?? resumed.get(profile.sessionId!)?.messageId;
+            if (!messageId) return;
+            // A turn resumed after a restart knows only that a plugin started it.
+            if ((running?.sent.from ?? (byPlugin.has(`${bot}:${messageId}`) ? plugin : "")) !== plugin) fail(409, "That turn isn't this plugin's.");
+          }
+          await (await open(profile, session ?? profile.sessionId!)).cancel();
         },
       },
       async addServer({ url, headers, transport, allowLocal }) {
@@ -297,30 +304,82 @@ export async function createFxbot(options: FxbotOptions) {
 
   // Each turn's reply is saved after the turn ends, and close waits for the saves.
   const saving = new Set<Promise<void>>();
-  function finish(id: string, sessionId: string, turn: FxTurn | FxResumeTurn, sent: { text: string; from?: string } = { text: "" }) {
-    const done = saveReply(id, sessionId, turn, sent).catch((error) => console.error("Could not save a reply:", error));
+  type Sent = { text: string; from?: string; steer?: boolean };
+  function finish(id: string, sessionId: string, turn: FxTurn | FxResumeTurn, sent: Sent = { text: "" }, reader?: "own" | "next") {
+    // After turn.end, so a plugin hears a turn end before the one behind it starts.
+    const done = saveReply(id, sessionId, turn, sent, reader)
+      .catch((error) => console.error("Could not save a reply:", error))
+      .then(() => {
+        const next = reader && working.get(sessionId)?.[0];
+        if (next) begun(id, sessionId, next);
+      });
     saving.add(done);
     void done.finally(() => saving.delete(done));
   }
 
-  // Reading a turn's events waits for its end; a repeated messageId yields no text and saves nothing. A resumed turn
-  // learns its messageId from its events, and one with nothing left open has none. Plugins hear the end either way.
-  async function saveReply(id: string, sessionId: string, turn: FxTurn | FxResumeTurn, sent: { text: string; from?: string }) {
+  // The turns of each bot's own chat, by session, the running one first: whose each is, and whether a message may join
+  // it. A plugin's turn takes messages only when it asked to: routines' told turn, with its tools off, mustn't.
+  type Working = { messageId: string; sent: Sent; steerable: boolean; started?: boolean };
+  const working = new Map<string, Working[]>();
+  const workingOn = (id: string, messageId: string, sent: Sent): Working => ({ messageId, sent, steerable: sent.from ? Boolean(sent.steer) : !byPlugin.has(`${id}:${messageId}`) });
+  function drop(sessionId: string, messageId: string | null) {
+    const rest = (working.get(sessionId) ?? []).filter((t) => t.messageId !== messageId);
+    void (rest.length ? working.set(sessionId, rest) : working.delete(sessionId));
+  }
+  const begun = (id: string, sessionId: string, turn: Working) => void (turn.started || packages.observe("turn.start", { bot: id, session: sessionId, messageId: turn.messageId, ...heard(turn.sent) }), (turn.started = true));
+  // Messages sent to join a turn and not in one yet, by id. One that came too late, or was left when a turn stopped, runs
+  // as the next turn, which only a "next" reader reads: whichever finds it first, once.
+  const steers = new Map<string, Sent & { session: string }>();
+  // The turns picked up at start, which name themselves before their first event does.
+  const resumed = new Map<string, FxResumeTurn>();
+  async function readNext(id: string, sessionId: string) {
+    const profile = await store.profiles.get(id);
+    if (profile) finish(id, sessionId, (await open(profile, sessionId)).resume(), undefined, "next");
+  }
+  const heard = ({ text, from }: Sent) => ({ text, ...(from ? { from } : {}) });
+  async function saveReply(id: string, sessionId: string, turn: FxTurn | FxResumeTurn, sent: Sent, reader?: "own" | "next") {
     let reply = "";
     let failed: string | undefined;
-    count(id, 1);
+    let cancelled = false;
+    let mine = reader !== "next";
+    // A "next" reader keeps a turn only if it's a steer's: any other has a reader of its own. A turn that fails at once
+    // shows no events, so this comes again after them.
+    const claim = () => {
+      const steer = turn.messageId ? steers.get(turn.messageId) : undefined;
+      if (!steer) return false;
+      steers.delete(turn.messageId!);
+      sent = steer;
+      count(id, 1);
+      working.set(sessionId, [workingOn(id, turn.messageId!, sent), ...(working.get(sessionId) ?? [])]);
+      begun(id, sessionId, working.get(sessionId)![0]);
+      return (mine = true);
+    };
+    if (mine) count(id, 1);
     try {
-      for await (const event of turn) if (event.type === "text_delta") reply += event.delta;
+      for await (const event of turn) {
+        if (event.type === "user_message" && event.id) steers.delete(event.id);
+        if (!mine && turn.messageId && !claim()) return;
+        // A turn resumed at start wasn't sent from here.
+        if (reader && turn.messageId && !working.get(sessionId)?.some((t) => t.messageId === turn.messageId)) working.set(sessionId, [{ ...workingOn(id, turn.messageId, sent), started: true }, ...(working.get(sessionId) ?? [])]);
+        if (event.type === "text_delta") reply += event.delta;
+      }
+      if (!mine && !claim()) return;
       // A turn libfx ends as failed, or as refused, which is how a provider's HTTP error ends one, with the error as its text.
       const end = await turn.result;
+      cancelled = end.stopReason === "cancelled";
       if (end.stopReason === "error" || end.stopReason === "refused") failed = ("error" in end && end.error?.message) || reply.trim() || `The turn ended as ${end.stopReason}.`;
     } catch (error) {
-      if (turn.messageId) packages.observe("turn.end", { bot: id, session: sessionId, messageId: turn.messageId, ...sent, reply, error: (error as Error).message });
+      if (mine && turn.messageId) packages.observe("turn.end", { bot: id, session: sessionId, messageId: turn.messageId, ...heard(sent), reply, error: (error as Error).message });
       return;
     } finally {
-      count(id, -1);
+      if (mine) {
+        count(id, -1);
+        if (resumed.get(sessionId) === turn) resumed.delete(sessionId);
+        drop(sessionId, turn.messageId);
+        if ([...steers.values()].some((steer) => steer.session === sessionId)) void readNext(id, sessionId).catch((error) => console.error("Could not read a steered turn:", error));
+      }
     }
-    if (turn.messageId) packages.observe("turn.end", { bot: id, session: sessionId, messageId: turn.messageId, ...sent, reply, ...(failed ? { error: failed } : {}) });
+    if (turn.messageId) packages.observe("turn.end", { bot: id, session: sessionId, messageId: turn.messageId, ...heard(sent), reply, ...(failed ? { error: failed } : {}), ...(cancelled ? { cancelled } : {}) });
     if (!reply.trim() || !turn.messageId) return;
     await history.record(id, sessionId, turn.messageId, "assistant", reply);
     // A reply in a plugin's session isn't the bot's own chat's.
@@ -333,7 +392,12 @@ export async function createFxbot(options: FxbotOptions) {
   function withSent(id: string) {
     let rest = "";
     const fill = async (part: string) => {
-      const line: StreamLine | null = part.includes('"turn_start"') ? JSON.parse(part) : null;
+      const line: StreamLine | null = part.includes('"turn_start"') || part.includes('"user_message"') ? JSON.parse(part) : null;
+      // A message that joined a turn has a line of its own, named by `id`.
+      if (line?.type === "user_message") {
+        const joined = line.id ? await store.sent.get(id, line.id) : null;
+        return joined ? JSON.stringify({ ...line, text: joined.input, files: joined.files, ...(joined.plugin ? { from: joined.plugin } : {}) }) + "\n" : part + "\n";
+      }
       const sent = line?.type === "turn_start" && (line.input === undefined || byPlugin.has(`${id}:${line.messageId}`)) && (await store.sent.get(id, line.messageId!));
       if (!sent) return part + "\n";
       const { plugin, ...saved } = sent;
@@ -461,8 +525,8 @@ export async function createFxbot(options: FxbotOptions) {
 
   // A message to a bot's own chat, or to a plugin's session for it. Resolves once libfx has stored the prompt; the reply
   // arrives on the stream. libfx takes at most 8 images, 3.75 MiB each and 6 MiB together. A plugin's message names it,
-  // and can show other words in the chat than the model gets.
-  async function deliver(id: string, { text, messageId, files = [] }: Message, { session, from, shown }: { session?: string; from?: string; shown?: string } = {}) {
+  // and can show other words and another name in the chat than the model gets.
+  async function deliver(id: string, { text, messageId, files = [] }: Message, { session, from, shown, label, steer }: { session?: string; from?: string; shown?: string; label?: string; steer?: boolean } = {}) {
     // A message to the bot's own chat waits for a start-over of it.
     if (!session) while (moving.has(id)) await moving.get(id);
     let profile = await get(id);
@@ -511,19 +575,47 @@ export async function createFxbot(options: FxbotOptions) {
     if (!text.trim() && !files.length) return { messageId, sessionId, handled: true as const };
     // A skill named as $name, or /name at the start, goes with the message, so the bot has it without asking.
     const skilled = skills.invoked(id, text);
-    const input = files.length || skilled.length ? await attach(profile, sessionId, text, messageId, files, skilled, from, shown) : text;
-    if (from && input === text) await store.sent.save(id, messageId, { input: shown ?? text, files: [], plugin: from });
+    const input = files.length || skilled.length ? await attach(profile, sessionId, text, messageId, files, skilled, label ?? from, shown) : text;
+    if (from && input === text) await store.sent.save(id, messageId, { input: shown ?? text, files: [], plugin: label ?? from });
     if (from) byPlugin.add(`${id}:${messageId}`);
+    const names = files.length ? `\n[files: ${files.map((f) => f.name).join(", ")}]` : "";
+    const sent: Sent = { text, ...by, steer };
     try {
+      // A message to a chat with a turn running joins it, when the turn takes messages and this one may: the owner's
+      // always, and a plugin's that asks, unless it has an image, since an image ends the running turn. libfx runs it as
+      // the next turn if the running one ended meanwhile, so it's read either way. Nothing is read when it joined.
+      const running = session || (from && (!steer || files.some((f) => f.type.startsWith("image/")))) ? undefined : working.get(sessionId)?.[0];
+      if (running?.steerable && running.messageId !== messageId) {
+        const chat = await open(profile, sessionId, messageId);
+        steers.set(messageId, { ...sent, session: sessionId });
+        // Only text joins a turn, so a skill goes as text. libfx would end the turn for it, as for an image.
+        const joining = Array.isArray(input) ? input.map((block) => (block.type === "resource" ? { type: "text" as const, text: block.resource.text } : block)) : input;
+        // A reader on each side of it. One reads from the stream's end, and a steer that came too late can start its turn
+        // at once, which the one after it would miss. The one before it ends first if the chat has gone quiet.
+        const before = chat.resume();
+        await before.accepted;
+        finish(id, sessionId, before, sent, "next");
+        await chat.steer(joining, { messageId }).catch((error) => {
+          steers.delete(messageId);
+          throw error;
+        });
+        finish(id, sessionId, chat.resume(), sent, "next");
+        await history.record(id, sessionId, messageId, "user", text + names);
+        return { messageId, sessionId, joined: running.messageId };
+      }
+      const own = session ? undefined : workingOn(id, messageId, sent);
+      if (own && !working.get(sessionId)?.some((t) => t.messageId === messageId)) working.set(sessionId, [...(working.get(sessionId) ?? []), own]);
       // A messageId the session already accepted runs nothing new and resolves to the same ids.
       const turn = (await open(profile, sessionId, messageId)).prompt(input, { messageId });
       const accepted = await turn.accepted;
-      const names = files.length ? `\n[files: ${files.map((f) => f.name).join(", ")}]` : "";
       await history.record(id, accepted.sessionId, messageId, "user", text + names);
-      packages.observe("turn.start", { bot: id, session: accepted.sessionId, messageId, text, ...by });
-      finish(id, accepted.sessionId, turn, { text, ...by });
+      // A turn behind another starts when that one ends.
+      const first = own ? working.get(sessionId)?.[0] : workingOn(id, messageId, sent);
+      if (first?.messageId === messageId) begun(id, accepted.sessionId, first);
+      finish(id, accepted.sessionId, turn, sent, own && "own");
       return accepted;
     } catch (error) {
+      if (!session) drop(sessionId, messageId);
       // libfx throws a TypeError or RangeError for a prompt it refuses, such as an image whose bytes are not its type.
       throw error instanceof TypeError || error instanceof RangeError ? Object.assign(error, { status: 400 }) : error;
     }
@@ -547,7 +639,10 @@ export async function createFxbot(options: FxbotOptions) {
   for (const profile of await store.profiles.list()) {
     if (!profile.sessionId || !providers.has(profile.provider)) continue;
     const session = await open(profile, profile.sessionId).catch(() => null);
-    if (session) finish(profile.id, profile.sessionId, session.resume());
+    if (!session) continue;
+    const turn = session.resume();
+    resumed.set(profile.sessionId, turn);
+    finish(profile.id, profile.sessionId, turn, undefined, "own");
   }
 
   return {
@@ -584,6 +679,11 @@ export async function createFxbot(options: FxbotOptions) {
       async remove(id: string) {
         await get(id);
         await store.profiles.remove(id);
+      },
+      // Stops the turn running in the bot's own chat, whoever started it. A message that hadn't joined it runs next.
+      async stop(id: string) {
+        const profile = await get(id);
+        if (profile.sessionId) await (await open(profile, profile.sessionId)).cancel();
       },
       // The bot's skills, for the $ and / picker in its chat.
       // Its skills, then its plugins' commands, for the $ and / list.

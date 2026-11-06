@@ -15,10 +15,10 @@ export type HookEvents = {
   "tool.before": { bot: string; session: string; messageId: string; tool: string; input: unknown };
   /** After it: change `result`. A call that failed has `error` instead. */
   "tool.after": { bot: string; session: string; messageId: string; tool: string; input: unknown; result?: unknown; error?: string };
-  /** Once libfx accepts the prompt. Only observes. */
+  /** Once libfx accepts the prompt, or in a bot's own chat, when a turn it waited behind ends. Only observes. */
   "turn.start": { bot: string; session: string; messageId: string; text: string; from?: string };
-  /** When the turn ends, with its reply, or `error` when it failed. Only observes. */
-  "turn.end": { bot: string; session: string; messageId: string; text: string; reply: string; error?: string; from?: string };
+  /** When the turn ends, with its reply, or `error` when it failed, or `cancelled` when it was stopped. Only observes. */
+  "turn.end": { bot: string; session: string; messageId: string; text: string; reply: string; error?: string; cancelled?: boolean; from?: string };
   /** The plugin's settings changed. */
   settings: { settings: Record<string, string> };
   /** A plugin that needs this one was added, updated, or removed: the ones that need it now. */
@@ -91,12 +91,15 @@ export type PluginApi = {
     /** A session of the plugin's own for a bot, on its current provider. */
     newSession(bot: string): Promise<string>;
     /** A message, as the owner's are sent, marked as the plugin's. Without `session`, it goes to the bot's own chat.
-     * `shown` is what the chat shows of it, when that isn't `text`, which the model gets. Since 0.6.0. */
-    send(bot: string, message: { text: string; shown?: string; files?: Upload[]; session?: string; messageId?: string }): Promise<{ messageId: string; sessionId: string }>;
+     * `shown` is what the chat shows of it, when that isn't `text`, which the model gets, and `label` who it says it's
+     * from, in place of the plugin. With `steer`, a message to the own chat joins a turn that's running, and answers
+     * that turn's id as `joined`, and its own turn takes messages the same way. One with an image waits instead. Since 0.6.0. */
+    send(bot: string, message: { text: string; shown?: string; label?: string; steer?: boolean; files?: Upload[]; session?: string; messageId?: string }): Promise<{ messageId: string; sessionId: string; joined?: string }>;
     /** A session's lines as NDJSON, from `cursor` on, then each new one. */
     stream(bot: string, session: string, cursor?: number): Promise<ReadableStream<Uint8Array>>;
-    /** Stops the turn running in one of the plugin's own sessions, if one runs: it ends `cancelled`. */
-    cancel(bot: string, session: string): Promise<void>;
+    /** Stops the turn running in one of the plugin's own sessions, if one runs: it ends `cancelled`. With no session,
+     * the one running in the bot's own chat, if this plugin started it. Since 0.6.0. */
+    cancel(bot: string, session?: string): Promise<void>;
   };
   /** The added plugins that need this one, each with its block for this one, and what it provides. */
   dependents(): Dependent[];

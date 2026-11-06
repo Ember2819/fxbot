@@ -172,9 +172,9 @@ export type PluginHost = {
   machine: PluginApi["machine"];
   chats: {
     newSession(plugin: string, bot: string): Promise<string>;
-    send(plugin: string, bot: string, message: Parameters<PluginApi["chats"]["send"]>[1]): Promise<{ messageId: string; sessionId: string }>;
+    send(plugin: string, bot: string, message: Parameters<PluginApi["chats"]["send"]>[1]): Promise<{ messageId: string; sessionId: string; joined?: string }>;
     stream(plugin: string, bot: string, session: string, cursor?: number): Promise<ReadableStream<Uint8Array>>;
-    cancel(plugin: string, bot: string, session: string): Promise<void>;
+    cancel(plugin: string, bot: string, session?: string): Promise<void>;
   };
   // A package's remote MCP server, added as an MCP plugin of its own, which follows the package's switch and bots, and
   // is removed with it.

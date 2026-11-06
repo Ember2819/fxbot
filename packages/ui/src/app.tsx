@@ -1,5 +1,5 @@
 import { useEffect, useLayoutEffect, useRef, useState, type FormEvent, type MouseEvent, type ReactNode } from "react";
-import { ArrowUpIcon, CheckIcon, ChevronRightIcon, CopyIcon, FileTextIcon, LayoutDashboardIcon, MessageCircleDashedIcon, PanelRightIcon, PaperclipIcon, PinIcon, PinOffIcon, PlusIcon, PuzzleIcon, SettingsIcon, XIcon } from "lucide-react";
+import { ArrowUpIcon, CheckIcon, ChevronRightIcon, CopyIcon, FileTextIcon, LayoutDashboardIcon, MessageCircleDashedIcon, PanelRightIcon, PaperclipIcon, PinIcon, PinOffIcon, PlusIcon, PuzzleIcon, SettingsIcon, SquareIcon, XIcon } from "lucide-react";
 import { Attachment, AttachmentAction, AttachmentActions, AttachmentContent, AttachmentGroup, AttachmentMedia, AttachmentTitle, AttachmentTrigger } from "@/components/ui/attachment";
 import { Bubble, BubbleContent } from "@/components/ui/bubble";
 import { Button, buttonVariants } from "@/components/ui/button";
@@ -798,9 +798,16 @@ function Chat({ id, profiles, onChange, onShown }: { id: string; profiles: Profi
                   disabled={stuck}
                 />
                 <InputGroupAddon align="inline-end" className="pb-1.5">
-                  <InputGroupButton type="submit" variant="default" size="icon-sm" className="rounded-full" disabled={stuck || (!draft.trim() && !attached.length && !skills.picked.length)} aria-label="Send">
-                    <ArrowUpIcon />
-                  </InputGroupButton>
+                  {/* With a turn running, a message joins it, and an empty box can stop it. */}
+                  {running && !draft.trim() && !attached.length && !skills.picked.length ? (
+                    <InputGroupButton variant="default" size="icon-sm" className="rounded-full" aria-label="Stop" onClick={() => void client.profiles.stop(id).catch(() => {})}>
+                      <SquareIcon className="fill-current" />
+                    </InputGroupButton>
+                  ) : (
+                    <InputGroupButton type="submit" variant="default" size="icon-sm" className="rounded-full" disabled={stuck || (!draft.trim() && !attached.length && !skills.picked.length)} aria-label="Send">
+                      <ArrowUpIcon />
+                    </InputGroupButton>
+                  )}
                 </InputGroupAddon>
               </InputGroup>
             </form>
@@ -829,32 +836,39 @@ function ink(color: Color) {
 }
 
 // Messages to the bot are drawn in the bot's own color. Skills the message starts with show as chips.
+// What the owner or a plugin said, as a turn's opening or where it joined one.
+function Said({ text, files, from, color, skills }: { text: string; files?: Upload[]; from?: string; color?: Color; skills: Set<string> }) {
+  const named = leadingSkills(text, skills);
+  return (
+    <Message align="end">
+      <MessageContent>
+        {from && <p className="text-right text-xs text-muted-foreground">From {from}</p>}
+        {named.skills.length ? <SkillChips className="flex-wrap justify-end" names={named.skills} /> : null}
+        {files?.length ? <Files className="flex-wrap justify-end" files={files} /> : null}
+        {named.rest && (
+          <Bubble align="end" variant="muted">
+            <BubbleContent className="whitespace-pre-wrap" style={color && { background: colors[color], color: ink(color) }}>
+              {named.rest}
+            </BubbleContent>
+          </Bubble>
+        )}
+      </MessageContent>
+    </Message>
+  );
+}
+
 function TurnView({ turn, color, skills, retry }: { turn: Turn; color?: Color; skills: Set<string>; retry?: () => void }) {
-  const named = leadingSkills(turn.text, skills);
   return (
     <>
       {turn.text || turn.files?.length ? (
         <MessageScrollerItem messageId={`${turn.messageId}-user`} scrollAnchor>
-          <Message align="end">
-            <MessageContent>
-              {turn.from && <p className="text-right text-xs text-muted-foreground">From {turn.from}</p>}
-              {named.skills.length ? <SkillChips className="flex-wrap justify-end" names={named.skills} /> : null}
-              {turn.files?.length ? <Files className="flex-wrap justify-end" files={turn.files} /> : null}
-              {named.rest && (
-                <Bubble align="end" variant="muted">
-                  <BubbleContent className="whitespace-pre-wrap" style={color && { background: colors[color], color: ink(color) }}>
-                    {named.rest}
-                  </BubbleContent>
-                </Bubble>
-              )}
-            </MessageContent>
-          </Message>
+          <Said text={turn.text} files={turn.files} from={turn.from} color={color} skills={skills} />
         </MessageScrollerItem>
       ) : null}
       <MessageScrollerItem messageId={`${turn.messageId}-reply`}>
         <Message>
           <MessageContent>
-            <Reply turn={turn} />
+            <Reply turn={turn} said={(message) => <Said {...message} color={color} skills={skills} />} />
             {turn.handled && <p className="text-sm text-muted-foreground">A plugin took this message.</p>}
             {turn.note && (
               <p className="text-sm text-destructive">

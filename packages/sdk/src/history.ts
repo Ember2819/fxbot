@@ -135,16 +135,16 @@ export function createHistory(sql: Sql, embeddings?: Embeddings) {
     // switch starts a new session, and the old one may not open again, so the chat shows these above the handoff.
     // A message that sent files gets its saved text and files back.
     async earlier(bot: string, sessionId: string | null, limit = 400): Promise<Turn[]> {
-      const rows = await sql<{ messageId: string; role: string; text: string; input: string | null; files: Upload[] | null }[]>`
-        select m.message_id, m.role, m.text, s.input, s.files
+      const rows = await sql<{ messageId: string; role: string; text: string; input: string | null; files: Upload[] | null; plugin: string | null }[]>`
+        select m.message_id, m.role, m.text, s.input, s.files, s.plugin
         from (select * from messages where profile_id = ${bot} and session_id is distinct from ${sessionId}
           and session_id not in (select id from plugin_sessions) order by id desc limit ${limit}) m
         left join sent s on m.role = 'user' and s.profile_id = m.profile_id and s.message_id = m.message_id
         order by m.id`;
       const turns = new Map<string, Turn>();
-      for (const { messageId, role, text, input, files } of rows) {
+      for (const { messageId, role, text, input, files, plugin } of rows) {
         const turn = turns.get(messageId) ?? { messageId, text: "", reply: "", done: true };
-        if (role === "user") Object.assign(turn, { text: input ?? text, ...(files?.length ? { files } : {}) });
+        if (role === "user") Object.assign(turn, { text: input ?? text, ...(files?.length ? { files } : {}), ...(plugin ? { from: plugin } : {}) });
         else turn.reply = text;
         turns.set(messageId, turn);
       }

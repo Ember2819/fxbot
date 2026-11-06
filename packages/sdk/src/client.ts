@@ -148,6 +148,8 @@ export function createClient({ baseUrl = "", onVersion }: ClientOptions = {}) {
       get: (id: string) => call<Profile>(`/profiles/${id}`),
       create: (fields: Partial<Fields> & { name: string }) => call<Profile>("/profiles", "POST", fields),
       update: (id: string, fields: ProfileUpdate) => call<Profile>(`/profiles/${id}`, "PATCH", fields),
+      // Stops the turn running in the bot's chat.
+      stop: (id: string) => call<{ ok: true }>(`/profiles/${id}/stop`, "POST"),
       remove: (id: string) => call<{ ok: true }>(`/profiles/${id}`, "DELETE"),
       // Finished turns from the bot's chats before its current one, oldest first.
       earlier: (id: string) => call<Turn[]>(`/profiles/${id}/earlier`),
@@ -240,6 +242,7 @@ export type Client = ReturnType<typeof createClient>;
 // A step of a reply, in the order it happened: thinking, text, or a tool call. A tool call has its input when it
 // starts, or a preview of an input over 64 KiB, and its result when it ends.
 export type Part =
+  | { type: "user"; id?: string; text: string; files?: Upload[]; from?: string }
   | { type: "reasoning"; text: string }
   | { type: "text"; text: string }
   | { type: "tool"; id: string; name: string; input?: unknown; inputPreview?: string; output?: string; error?: boolean; done: boolean };
@@ -272,6 +275,13 @@ export function applyLine(turns: Turn[], line: StreamLine): Turn[] {
     return [...(i < 0 ? turns : turns.toSpliced(i, 1)), started];
   }
   const parts = turn.parts ?? [];
+  // A message that joined this turn shows in place among its steps, and the page's own copy of it goes.
+  if (line.type === "user_message") {
+    if (parts.some((p) => p.type === "user" && p.id === line.id)) return turns;
+    const part: Part = { type: "user", id: line.id, text: line.text ?? "", ...(line.files?.length ? { files: line.files } : {}), ...(line.from ? { from: line.from } : {}) };
+    const placed = i < 0 ? [...turns, { ...turn, parts: [part] }] : turns.with(i, { ...turn, parts: [...parts, part] });
+    return line.id ? placed.filter((t) => t.messageId !== line.id) : placed;
+  }
   const last = parts.at(-1);
   // Deltas of one kind in a row make one part; a tool call or the other kind starts the next.
   const add = (type: "text" | "reasoning", delta: string): Part[] =>

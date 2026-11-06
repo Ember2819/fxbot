@@ -308,6 +308,8 @@ export type StreamLine = {
   messageId?: string;
   /** A turn's message on `turn_start`, or a tool's arguments on `tool_start`. */
   input?: unknown;
+  /** On `user_message`, a message that joined a running turn: its words, and in `id`, its own messageId. */
+  text?: string;
   files?: Upload[];
   delta?: string;
   /** A tool call: `id` pairs `tool_start` with `tool_end`. A large input comes as a preview instead. */

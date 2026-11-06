@@ -1,4 +1,4 @@
-import { useState, type ComponentType } from "react";
+import { Fragment, useState, type ComponentType, type ReactNode } from "react";
 import { BookOpenIcon, BrainIcon, CircleAlertIcon, CircleCheckIcon, EraserIcon, FileTextIcon, HistoryIcon, LibraryIcon, LoaderCircleIcon, SaveIcon, SearchIcon, WrenchIcon } from "lucide-react";
 import { Streamdown } from "streamdown";
 import { Trace, TraceCollapsible, TraceCollapsibleContent, TraceCollapsibleTrigger, TraceDescription, TraceIcon, TraceLine, TraceTitle } from "@/components/ui/trace";
@@ -13,20 +13,28 @@ type Input = Record<string, unknown> | undefined;
 const shownChars = 4000;
 
 // A reply as it happened, after shadcn's Trace patterns: each run of steps, thinking and tool calls, is one list, and
-// the reply's text sits between runs. Two or more steps in a run fold under one summary, open while the bot works.
-export function Reply({ turn }: { turn: Turn }) {
+// the reply's text sits between runs. Two or more steps in a run fold under one summary, open while the bot works. A
+// message that joined the turn sits where it did, drawn by `said`.
+export function Reply({ turn, said }: { turn: Turn; said?: (message: Extract<Part, { type: "user" }>) => ReactNode }) {
   const parts = turn.parts ?? [];
   // A turn from an earlier chat has only its text.
   if (!parts.length) return turn.reply ? <Streamdown>{turn.reply}</Streamdown> : turn.done ? null : <p className="animate-pulse text-muted-foreground">Thinking…</p>;
-  const blocks: (string | Step[])[] = [];
+  const blocks: (string | Step[] | Extract<Part, { type: "user" }>)[] = [];
   for (const part of parts) {
     const last = blocks.at(-1);
     if (part.type === "text") blocks.push(part.text);
+    else if (part.type === "user") blocks.push(part);
     else if (Array.isArray(last)) last.push(part);
     else blocks.push([part]);
   }
   return blocks.map((block, i) =>
-    typeof block === "string" ? <Streamdown key={i}>{block}</Streamdown> : <Steps key={i} steps={block} working={!turn.done && i === blocks.length - 1} />,
+    typeof block === "string" ? (
+      <Streamdown key={i}>{block}</Streamdown>
+    ) : Array.isArray(block) ? (
+      <Steps key={i} steps={block} working={!turn.done && i === blocks.length - 1} />
+    ) : (
+      <Fragment key={i}>{said?.(block) ?? <p className="text-muted-foreground">{block.text}</p>}</Fragment>
+    ),
   );
 }
 

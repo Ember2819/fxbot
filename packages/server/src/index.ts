@@ -260,6 +260,8 @@ async function api(req: IncomingMessage, res: ServerResponse, url: URL) {
   } else if (action === "messages" && method === "POST") {
     // libfx takes at most 6 MiB of images in a message, so with base64 a message stays under 12 MiB.
     return json(res, 200, await fxbot.send(id, await body(req, 12 << 20)));
+  } else if (action === "stop" && method === "POST") {
+    return json(res, 200, (await fxbot.profiles.stop(id), ok));
   } else if (action === "earlier" && method === "GET") {
     return json(res, 200, await fxbot.profiles.earlier(id));
   } else if (action === "skills" && method === "GET") {
