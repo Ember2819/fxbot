@@ -34,7 +34,7 @@ import {
 } from "@/components/ui/sidebar";
 import { Textarea } from "@/components/ui/textarea";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
-import { colors, maxPinned, unreachable, type Color, type Fields, type Profile, type Provider, type Shape, type Turn, type Upload } from "@fxbot/sdk/client";
+import { maxPinned, unreachable, type Color, type Fields, type Profile, type Provider, type Shape, type Turn, type Upload } from "@fxbot/sdk/client";
 import { client } from "./client.ts";
 import { maxFiles, readFile } from "./attachments.ts";
 import { Blob, LookPicker } from "./blob.tsx";
@@ -819,19 +819,21 @@ function Chat({ id, profiles, onChange, onShown }: { id: string; profiles: Profi
   );
 }
 
-// One turn: the person's message as the scroll anchor, then the reply as markdown with its actions.
-// WCAG relative luminance of a #rrggbb color.
-const luminance = (hex: string) => {
-  const [r, g, b] = [1, 3, 5].map((i) => {
-    const c = parseInt(hex.slice(i, i + 2), 16) / 255;
-    return c <= 0.04045 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4;
-  });
-  return 0.2126 * r + 0.7152 * g + 0.0722 * b;
+// A message's bubble: the bot's hue, only as dark as white text needs, so it's at least 4.5:1 by WCAG and Lc 75 by APCA.
+// Bots' own colors are mid-tones, picked for their blobs, and on amber, green, and teal neither white nor black reads.
+const bubbles: Record<Color, string> = {
+  black: "#1f1f1f",
+  brown: "#9b6a3f",
+  red: "#d83b43",
+  orange: "#cb4f04",
+  amber: "#a86800",
+  green: "#0b8840",
+  teal: "#108576",
+  blue: "#2b72e5",
+  purple: "#8757f1",
+  pink: "#d1368e",
+  gray: "#767676",
 };
-
-// Text on a bot's color: white, unless the color is light. On a saturated mid-tone such as blue, near-black scores
-// higher on WCAG's ratio, but white is what reads, so this is a floor for white and not the higher of the two.
-const ink = (color: Color) => (1.05 / (luminance(colors[color]) + 0.05) >= 3.5 ? "#ffffff" : "#1f1f1f");
 
 // What the owner or a plugin said, as a turn's opening or where it joined one, in the bot's own color. Skills the
 // message starts with show as chips.
@@ -845,7 +847,7 @@ function Said({ text, files, from, color, skills }: { text: string; files?: Uplo
         {files?.length ? <Files className="flex-wrap justify-end" files={files} /> : null}
         {named.rest && (
           <Bubble align="end" variant="muted">
-            <BubbleContent className="whitespace-pre-wrap" style={color && { background: colors[color], color: ink(color) }}>
+            <BubbleContent className="whitespace-pre-wrap" style={color && { background: bubbles[color], color: "#ffffff" }}>
               {named.rest}
             </BubbleContent>
           </Bubble>
@@ -855,6 +857,7 @@ function Said({ text, files, from, color, skills }: { text: string; files?: Uplo
   );
 }
 
+// One turn: the person's message as the scroll anchor, then the reply as markdown with its actions.
 function TurnView({ turn, color, skills, retry }: { turn: Turn; color?: Color; skills: Set<string>; retry?: () => void }) {
   return (
     <>
