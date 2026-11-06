@@ -136,9 +136,9 @@ async function api(req: IncomingMessage, res: ServerResponse, url: URL) {
   const ok = { ok: true };
   if (resource === "health" && !id && method === "GET") return json(res, 200, { ok: true, version });
   if (resource === "update" && !id) {
-    if (method === "GET") return json(res, 200, updateStatus());
+    if (method === "GET") return json(res, 200, await updateStatus());
     // To the newest release the check found, never one the page names.
-    if (method === "POST") return json(res, 202, startUpdate());
+    if (method === "POST") return json(res, 202, await startUpdate());
     return fail(404, "not found");
   }
   // fxbot's own calls on plugins: the list, search, preview, the page's list, and each plugin by its id. Anything else
@@ -378,13 +378,14 @@ async function shutdown() {
 
 // Settings updates an install made by setup.sh, by asking the machine (control.ts). An update that reached the running
 // version is over, and one that failed shows only while its release is still the newest.
-function updateStatus(): UpdateStatus {
+async function updateStatus(): Promise<UpdateStatus> {
   const release = fxbot.release();
+  const wontRun = release.latest ? await fxbot.plugins.wontRun(release.latest.version) : [];
   const asked = canUpdate ? waiting() : null;
-  if (asked) return { ...release, canUpdate, updating: { to: asked, steps: ["Asking the machine to update"] } };
+  if (asked) return { ...release, canUpdate, wontRun, updating: { to: asked, steps: ["Asking the machine to update"] } };
   const run = canUpdate ? lastUpdate() : null;
   const shown = run && (run.state === "working" || (run.state !== "done" && run.to === release.latest?.version));
-  return { ...release, canUpdate, updating: shown ? { to: run.to, steps: run.steps, ...(run.error ? { error: run.error } : {}) } : null };
+  return { ...release, canUpdate, wontRun, updating: shown ? { to: run.to, steps: run.steps, ...(run.error ? { error: run.error } : {}) } : null };
 }
 function startUpdate() {
   const { latest } = fxbot.release();

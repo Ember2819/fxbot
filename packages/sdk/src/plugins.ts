@@ -7,6 +7,7 @@ import type { FxAgentHostTool, FxAgentTool } from "libfx";
 import postgres, { type Sql } from "postgres";
 import type { Dependent, Hook, HookEvents, PluginApi, PluginRoute, PluginSocket, PluginSocketHandler, PluginTool } from "./plugin-api.ts";
 import type { RepoFiles } from "./archive.ts";
+import { fitSaid, unfit, type PluginBreak } from "./plugin-fit.ts";
 import { createSecrets } from "./secrets.ts";
 import { parseSkill, skillProblem, type CarriedSkill, type Row } from "./skills.ts";
 import { newId, type PluginRecord, type Store } from "./store.ts";
@@ -39,6 +40,8 @@ export type Manifest = {
   name: string;
   version: string;
   description: string;
+  /** The oldest fxbot it runs on, as x.y.z. */
+  minFxbot?: string;
   server?: string;
   page?: string;
   css?: string;
@@ -68,7 +71,7 @@ type Loaded = {
 };
 // `saved` holds the owner's settings, and `settings` those with the defaults, which the plugin reads.
 // `skills` are the ones it carries, read when it loads, and `given` those it gives each bot at runtime (fx.skills.set).
-type Package = { record: PackageRecord; loaded?: Loaded; error?: string; log: string[]; saved: Record<string, string>; settings: Record<string, string>; skills: Row[]; given: Map<string, Row[]> };
+type Package = { record: PackageRecord; loaded?: Loaded; error?: string; unsupported?: string; log: string[]; saved: Record<string, string>; settings: Record<string, string>; skills: Row[]; given: Map<string, Row[]> };
 type Archives = { head(repo: string): Promise<string>; files(repo: string, commit: string, fileLimit?: number): Promise<RepoFiles> };
 type Server = { name: string; url?: string; headers: string[]; transport?: "sse" };
 
@@ -123,6 +126,8 @@ export function parseManifest(text: string): Manifest {
   if (fxbotsOwn.includes(name as string) || /^[0-9a-f]{12}$/.test(name as string)) fail(400, `plugin.json's name can't be ${name}: fxbot uses that name itself.`);
   if (typeof version !== "string" || typeof description !== "string") fail(400, "plugin.json's version and description must be strings.");
   const own = ((json.extensions as Record<string, unknown> | undefined)?.[namespace] ?? {}) as Record<string, unknown>;
+  const { minFxbot } = own;
+  if (minFxbot !== undefined && (typeof minFxbot !== "string" || !/^\d+\.\d+\.\d+$/.test(minFxbot))) fail(400, "plugin.json's minFxbot must be a version, such as 0.7.0.");
   const settings = Array.isArray(own.settings) ? own.settings : [];
   for (const setting of settings)
     if (typeof setting?.name !== "string" || !/^[A-Za-z][\w-]{0,63}$/.test(setting.name) || typeof (setting.description ?? "") !== "string")
@@ -139,6 +144,7 @@ export function parseManifest(text: string): Manifest {
     name: name as string,
     version: version as string,
     description: description as string,
+    ...(minFxbot ? { minFxbot: minFxbot as string } : {}),
     server: part(own.server, "server"),
     page: part(own.page, "page"),
     css: part(own.css, "css"),
@@ -203,8 +209,11 @@ export async function createPlugins(options: {
   host: PluginHost;
   // The owner of fxbot's list entry with a plugin's name, for a checkout's folder of it.
   listedOwner: (name: string) => string | undefined;
+  /** The running version, and what fxbot's releases broke for plugins. */
+  version: string;
+  breaks: () => PluginBreak[];
 }) {
-  const { store, databaseUrl, secretKey, dataDir, archives, dirs, taken, onChange, host, listedOwner } = options;
+  const { store, databaseUrl, secretKey, dataDir, archives, dirs, taken, onChange, host, listedOwner, version, breaks } = options;
   // Settings, secret or not, are sealed together, as an MCP server's header values are.
   const secrets = createSecrets(store.sql, secretKey, "plugin_secrets");
   const plugins = new Map<string, Package>();
@@ -324,6 +333,8 @@ export async function createPlugins(options: {
     const skipped = [...all.skipped].filter(([p]) => inside(p)).map(([p, why]) => ({ path: relative(p), why }));
     const { page, manifest } = pageOf(files, skipped, { repo, path, commit: at, from: ref.from === "fxbot" ? "fxbot" : "github" }, `${repo}${path ? `/${path}` : ""}`);
     if (page.error) return { page, files };
+    const problem = unfit(manifest!, page.code.map((p) => page.texts[p]).join("\n"), version, breaks());
+    if (problem) return { page: { ...page, error: fitSaid(problem, version), unfit: true, ...("needs" in problem ? { needsFxbot: problem.needs } : {}) }, files };
     // An installed plugin's page says what an update changes.
     const installed = [...plugins.values()].find(({ record: r }) => "repo" in r.source && r.source.repo === repo && r.source.path === path);
     if (installed?.record.config.files) {
@@ -426,7 +437,8 @@ export async function createPlugins(options: {
       const looked = await look({ repo: `${source.repo}${source.path ? `/${source.path}` : ""}`, from: source.from }, head).catch(() => null);
       if (!looked) continue;
       if (looked.page.error?.includes("has no plugin.json")) marks.set(id, { kind: "removed" });
-      else if (looked.page.hash && looked.page.hash !== approvedHash) marks.set(id, { kind: "update", version: head.slice(0, 7) });
+      else if (looked.page.needsFxbot) marks.set(id, { kind: "needs", version: looked.page.needsFxbot });
+      else if (!looked.page.unfit && looked.page.hash && looked.page.hash !== approvedHash) marks.set(id, { kind: "update", version: head.slice(0, 7) });
       else (marks.delete(id), same.set(id, head));
     }
   }
@@ -495,8 +507,17 @@ export async function createPlugins(options: {
 
   // Imports the plugin's server code and runs its setup. One that throws, or takes over 10 seconds, stays added but off,
   // with its error on its row.
+  const codeOf = async (record: PackageRecord) =>
+    (await Promise.all([record.config.server, record.config.page].filter((p): p is string => Boolean(p)).map((p) => readFile(resolve(folderOf(record), p), "utf8").catch(() => "")))).join("\n");
+
   async function load(plugin: Package) {
     const { record } = plugin;
+    // Before its migrations and its code. A local plugin's author is at the keyboard, and a branch's version trails it.
+    const problem = unfit(record.config, await codeOf(record), version, breaks());
+    const why = problem && fitSaid(problem, version);
+    plugin.unsupported = "repo" in record.source ? why : undefined;
+    if (why) write(plugin, plugin.unsupported ? why : `${why} It's local, so it runs.`);
+    if (plugin.unsupported) return void (plugin.error = undefined);
     const loaded: Loaded = { hooks: new Map(), tools: [], routes: [], sockets: [], open: new Set(), controller: new AbortController() };
     const api: PluginApi = {
       name: record.name,
@@ -731,6 +752,7 @@ export async function createPlugins(options: {
         page: Boolean(record.config.page),
       },
       ...(plugin.error ? { error: plugin.error } : {}),
+      ...(plugin.unsupported ? { unsupported: plugin.unsupported } : {}),
       ...(marks.has(record.id) ? { mark: marks.get(record.id) } : {}),
     };
   }
@@ -969,6 +991,22 @@ export async function createPlugins(options: {
       return view(plugin);
     },
     check,
+    // After the published list of breaks changes: a plugin it now fits stops, and one it no longer fits runs again.
+    async recheck() {
+      for (const plugin of plugins.values()) {
+        const { record } = plugin;
+        if (!record.enabled || !("repo" in record.source) || Boolean(unfit(record.config, await codeOf(record), version, breaks())) === Boolean(plugin.unsupported)) continue;
+        await unload(plugin);
+        await load(plugin);
+        onChange();
+      }
+    },
+    // The plugins running now that wouldn't on a version of fxbot, for Settings to say before an update.
+    async wontRun(next: string) {
+      const running = [...plugins.values()].filter(({ record, loaded }) => loaded && "repo" in record.source);
+      const stops = await Promise.all(running.map(async ({ record }) => Boolean(unfit(record.config, await codeOf(record), next, breaks()))));
+      return running.filter((_, i) => stops[i]).map(({ record }) => record.name);
+    },
 
     async close() {
       clearInterval(timer);

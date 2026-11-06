@@ -122,6 +122,7 @@ export async function createFxbot(options: FxbotOptions) {
     fxbotUrl: `${lists}/mcp-registry.json`,
     fxbotSkillsUrl: `${lists}/skills-registry.json`,
     fxbotPluginsUrl: `${lists}/plugins-registry.json`,
+    fxbotBreaksUrl: `${lists}/plugin-breaks.json`,
     // GitHub's registry is mirrored while unvetted plugins show, or while a server from it is installed, for its marks.
     mirrorWanted: async () =>
       (await store.settings.get()).unvetted ||
@@ -161,6 +162,8 @@ export async function createFxbot(options: FxbotOptions) {
     dirs: options.pluginDirs ?? [],
     taken: () => mcp.prefixes(),
     listedOwner: registry.listedOwner,
+    version,
+    breaks: registry.breaks,
     onChange: () => void retool(),
     host: {
       bots: { list: async () => (await store.profiles.list()).map(withBusy), get: async (id) => withBusy(await get(id)) },
@@ -230,6 +233,10 @@ export async function createFxbot(options: FxbotOptions) {
     },
   });
   await packages.start();
+  // After the start too, since the published list may have landed during it.
+  const recheck = () => void packages.recheck().catch((error) => console.error("Could not check plugins against fxbot's list:", error));
+  registry.onBreaks(recheck);
+  recheck();
   // What each tool call answered, kept for history until the stream says it ended: the stream has only a preview.
   const answers = new Map<string, unknown>();
   const keepAnswer = (tool: FxAgentTool): FxAgentTool => {
@@ -932,6 +939,7 @@ export async function createFxbot(options: FxbotOptions) {
       readSkill: (id: string, file: unknown) => skills.read(id, file),
       // Checks the skills' and plugins' repositories now, as the hourly check does, and marks what changed there.
       check: async () => (await skills.check(), await packages.check()),
+      wontRun: (next: string) => packages.wontRun(next),
       // What the page loads for packages, and their own routes, under `/api/plugins/<name>/`.
       pages: () => packages.pages(),
       file: (name: string, path: string) => packages.file(name, path),

@@ -34,13 +34,13 @@ function carries(plugin: Plugin) {
 // Under a plugin's name: what it carries, how a server is and how many of its tools bots get, and which bots.
 function summary(plugin: Plugin, profiles: Profile[] | null) {
   if (!plugin.enabled) return `${carries(plugin)} · Off`;
-  if (plugin.kind === "package" && plugin.error) return `Off: ${plugin.error}`;
+  if (plugin.kind === "package" && (plugin.unsupported || plugin.error)) return `Off: ${plugin.unsupported || plugin.error}`;
   const chosen = profiles?.filter((p) => plugin.on.includes(p.id)).length ?? plugin.on.length;
   const bots = plugin.bots === "all" ? "All bots" : plural(chosen, "bot");
   const tools = plugin.kind === "mcp" && plugin.tools.length ? `${plugin.tools.filter((t) => plugin.allowed.includes(t.name)).length} of ${plugin.tools.length} tools` : "";
   return [carries(plugin), plugin.kind === "mcp" ? plugin.status : "", tools, bots].filter(Boolean).join(" · ");
 }
-const markText: Record<Plugin["kind"], Record<PluginMark["kind"], string>> = {
+const markText: Record<Plugin["kind"], Record<Exclude<PluginMark["kind"], "needs">, string>> = {
   mcp: { update: "Update available", deprecated: "Deprecated", removed: "Removed from the registry" },
   skill: { update: "Update available", deprecated: "Deprecated", removed: "Removed from its repository" },
   package: { update: "Update available", deprecated: "Deprecated", removed: "Removed from its repository" },
@@ -195,7 +195,9 @@ export function PluginsPage({ profiles }: { profiles: Profile[] | null }) {
                       <button type="button" className="truncate font-medium underline-offset-4 outline-none hover:underline focus-visible:underline" onClick={() => setInfoId(addon.id)}>
                         {addon.name}
                       </button>
-                      {addon.mark && <span className={`shrink-0 text-xs ${addon.mark.kind === "update" ? "text-muted-foreground" : "text-destructive"}`}>{markText[addon.kind][addon.mark.kind]}</span>}
+                      {addon.kind === "package" && addon.unsupported && <span className="shrink-0 text-xs text-destructive">Unsupported</span>}
+                      {addon.mark?.kind === "needs" && <span className="shrink-0 text-xs text-muted-foreground">Needs fxbot {addon.mark.version}</span>}
+                      {addon.mark && addon.mark.kind !== "needs" && <span className={`shrink-0 text-xs ${addon.mark.kind === "update" ? "text-muted-foreground" : "text-destructive"}`}>{markText[addon.kind][addon.mark.kind]}</span>}
                     </p>
                     {blurb(addon.kind === "mcp" ? addon.info?.description : addon.description) && (
                       <p className="line-clamp-2 text-sm text-muted-foreground">{blurb(addon.kind === "mcp" ? addon.info?.description : addon.description)}</p>

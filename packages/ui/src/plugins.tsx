@@ -58,7 +58,7 @@ type Places = {
   slots: Map<string, ComponentType<any>[]>;
 };
 // `key` is the URLs it loaded from, which change with its files.
-type Loaded = { name: string; iconKey: string; key: string; css?: HTMLLinkElement; places: Places };
+type Loaded = { name: string; iconKey: string; key: string; css?: HTMLLinkElement; places: Places; pageError?: string };
 
 const emptyPlaces = (): Places => ({ routes: [], sidebar: [], nav: [], composer: [], toolViews: new Map(), settings: [], botSettings: [], botPanel: [], chat: [], box: [], fold: [], said: [], slots: new Map() });
 
@@ -168,8 +168,9 @@ export async function loadPlugins() {
       link = Object.assign(document.createElement("link"), { rel: "stylesheet", href: css });
       document.head.append(link);
     }
-    const places = page ? await run(name, version, page).catch((error: Error) => (console.error(`Plugin ${name}:`, error), emptyPlaces())) : emptyPlaces();
-    next.push({ name, iconKey, key, css: link, places });
+    let pageError: string | undefined;
+    const places = page ? await run(name, version, page).catch((error: Error) => (console.error(`Plugin ${name}:`, error), (pageError = error.message), emptyPlaces())) : emptyPlaces();
+    next.push({ name, iconKey, key, css: link, places, ...(pageError ? { pageError } : {}) });
   }
   for (const gone of loaded.filter((p) => !list.some((l) => l.name === p.name))) gone.css?.remove();
   publish(next);
@@ -188,6 +189,9 @@ export function MessageBox({ bot, ...props }: ComponentProps<typeof InputGroupTe
     </PluginPart>
   );
 }
+
+// Why a plugin's page code didn't load, for its tab: the owner can't see the browser's console.
+export const usePageError = (name: string) => usePlugins().find((plugin) => plugin.name === name)?.pageError;
 
 // How a message or a tool call folds, by the first plugin that says. One that throws folds nothing.
 export function useFold() {

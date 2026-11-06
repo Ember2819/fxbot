@@ -1,4 +1,5 @@
 import { readFileSync } from "node:fs";
+import { validBreak, type PluginBreak } from "./plugin-fit.ts";
 import type { Sql } from "./store.ts";
 import type { McpCard, RegistryFrom, RegistryInfo, PluginMark, McpSearch, PackageCard, PackageSearch, SkillCard, SkillSearch } from "./types.ts";
 
@@ -96,6 +97,7 @@ const skillCard = (e: SkillEntry, from: SkillCard["from"]): SkillCard => ({
 export type PluginEntry = { name: string; description: string; repo: string; path?: string };
 const pluginEntry = (e: PluginEntry) =>
   typeof e?.name === "string" && typeof e.description === "string" && typeof e.repo === "string" && /^[A-Za-z0-9-]{1,39}\/[A-Za-z0-9._-]{1,100}$/.test(e.repo) && (e.path === undefined || typeof e.path === "string");
+const shippedBreaks = () => (JSON.parse(readFileSync(new URL("./plugin-breaks.json", import.meta.url), "utf8")) as { breaks: PluginBreak[] }).breaks.filter(validBreak);
 const shippedPlugins = () => (JSON.parse(readFileSync(new URL("./plugins-registry.json", import.meta.url), "utf8")) as { plugins: PluginEntry[] }).plugins.filter(pluginEntry);
 
 // Three sources of MCP servers. fxbot's own list ships with each release, and with `fxbotUrl`, its published copy
@@ -117,6 +119,8 @@ export function createRegistry({
   fxbotSkills = shippedSkills(),
   fxbotPluginsUrl,
   fxbotPlugins = shippedPlugins(),
+  fxbotBreaksUrl,
+  fxbotBreaks = shippedBreaks(),
   mirrorWanted = async () => true,
 }: {
   sql: Sql;
@@ -130,11 +134,15 @@ export function createRegistry({
   fxbotSkills?: SkillEntry[];
   fxbotPluginsUrl?: string;
   fxbotPlugins?: PluginEntry[];
+  fxbotBreaksUrl?: string;
+  fxbotBreaks?: PluginBreak[];
   /** Whether GitHub's registry should be mirrored: while unvetted plugins show, or a server from it is installed. */
   mirrorWanted?: () => Promise<boolean>;
 }) {
   let ourSkills = fxbotSkills;
   let ourPlugins = fxbotPlugins;
+  let ourBreaks = fxbotBreaks;
+  let breaksChanged = () => {};
   const skillSearches = new Map<string, { at: number; entries: SkillEntry[] }>();
   let notBefore = 0;
   let running: Promise<void> | undefined;
@@ -234,7 +242,17 @@ export function createRegistry({
     if (Array.isArray(page?.plugins)) ourPlugins = (page.plugins as PluginEntry[]).filter(pluginEntry);
     else console.error(`fxbot's plugins list didn't answer${res ? ` (HTTP ${res.status})` : ""}; keeping the one it had.`);
   }
-  const sync = () => (running ??= Promise.all([syncList(), syncSkills(), syncPlugins(), syncMirror()]).then(() => {}).finally(() => (running = undefined)));
+  // The published list of what releases broke replaces the shipped one; a failed fetch keeps it. It can only stop a plugin.
+  async function syncBreaks() {
+    if (!fxbotBreaksUrl) return;
+    const res = await get(fxbotBreaksUrl).catch(() => null);
+    const page = res?.ok ? ((await res.json().catch(() => null)) as { breaks?: unknown } | null) : null;
+    if (!Array.isArray(page?.breaks)) return console.error(`fxbot's list of plugin breaks didn't answer${res ? ` (HTTP ${res.status})` : ""}; keeping the one it had.`);
+    const before = JSON.stringify(ourBreaks);
+    ourBreaks = (page.breaks as PluginBreak[]).filter(validBreak);
+    if (JSON.stringify(ourBreaks) !== before) breaksChanged();
+  }
+  const sync = () => (running ??= Promise.all([syncList(), syncSkills(), syncPlugins(), syncBreaks(), syncMirror()]).then(() => {}).finally(() => (running = undefined)));
 
   // The official registry's own search: a name's substring, at least 3 characters.
   async function everythingFor(text: string) {
@@ -386,6 +404,9 @@ export function createRegistry({
     ourPackage: (ref: string) => ourPlugins.find((e) => `${e.repo}${e.path ? `/${e.path}` : ""}`.toLowerCase() === ref.trim().replace(/^https:\/\/github\.com\//, "").replace(/\/+$/, "").toLowerCase()),
     // The owner of the repository of the plugin by this name in fxbot's list, so a checkout's folder of it draws its icon.
     listedOwner: (name: string) => ourPlugins.find((e) => e.name === name)?.repo.split("/")[0],
+    // What releases broke for plugins, and a call for when the published list changes that.
+    breaks: () => ourBreaks,
+    onBreaks: (call: () => void) => void (breaksChanged = call),
     // fxbot's plugins that match, all of them with no words.
     searchPackages(q: unknown): PackageSearch {
       const words = typeof q === "string" ? q.trim().toLowerCase().slice(0, 100) : "";

@@ -7,6 +7,7 @@ import type { Plugin, PackagePlugin, PackagePreview, PackageSearch } from "@fxbo
 import { AddedFooter, Details, heading, hint } from "./mcp-add.tsx";
 import { PluginIcon } from "./plugin-icon.tsx";
 import { client } from "./client.ts";
+import { usePageError } from "./plugins.tsx";
 
 // What Browse opens for a package: a card from fxbot's list, or a repository the owner typed.
 export type PluginTarget = { ref: string; from: "fxbot" | "github"; name?: string; iconKey?: string; description?: string };
@@ -193,7 +194,7 @@ export function PluginDialog({
           )}
           {error && <p role="alert" className="text-sm text-destructive">{error}</p>}
           {page?.error && <p className="text-sm text-destructive">{page.error}</p>}
-          {page && !page.error && <Contents page={page} added={Boolean(installed)} />}
+          {page && (!page.error || page.unfit) && <Contents page={page} added={Boolean(installed)} />}
           {page && (
             <section className="grid gap-2">
               <h3 className={heading}>Information</h3>
@@ -218,7 +219,7 @@ export function PluginDialog({
         {installed && <AddedFooter onSettings={installed.onSettings} />}
         {!installed && page?.hash && (
           <div className="border-t pt-3">
-            <Button onClick={add} disabled={busy || page.needs.some((need) => !need.added)}>
+            <Button onClick={add} disabled={busy || page.unfit || page.needs.some((need) => !need.added)}>
               {busy && <LoaderCircleIcon className="animate-spin" />}
               Add {page.name}
             </Button>
@@ -238,6 +239,7 @@ export function PluginSettings({ addon, bots, servers, onChange, onRemoved }: { 
   const [next, setNext] = useState<PackagePreview | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
+  const pageError = usePageError(addon.name);
   const { source } = addon;
   const fromGitHub = "repo" in source;
   const look = () => {
@@ -268,6 +270,8 @@ export function PluginSettings({ addon, bots, servers, onChange, onRemoved }: { 
   return (
     <>
       {addon.error && <p className="text-sm text-destructive">Off: {addon.error}</p>}
+      {addon.unsupported && <p className="text-sm text-destructive">Unsupported. {addon.unsupported}</p>}
+      {pageError && <p className="text-sm text-destructive">Its page didn't load: {pageError}</p>}
       {bots}
       {addon.settings.length > 0 && (
         <form onSubmit={save} className="grid gap-3">
@@ -343,6 +347,7 @@ export function PluginSettings({ addon, bots, servers, onChange, onRemoved }: { 
           }
         />
         {!fromGitHub && <p className={`text-xs ${hint}`}>A local plugin, from FXBOT_PLUGIN_DIRS. fxbot reads it again when it starts.</p>}
+        {addon.mark?.kind === "needs" && <p className="text-sm text-muted-foreground">A newer version needs fxbot {addon.mark.version}. This one stays as it is until fxbot is updated.</p>}
         {addon.mark?.kind === "update" && !next && (
           <Button size="sm" variant="outline" className="justify-self-start" disabled={busy} onClick={look}>
             {busy && <LoaderCircleIcon className="animate-spin" />}

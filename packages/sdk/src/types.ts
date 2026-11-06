@@ -63,6 +63,8 @@ export type UpdateStatus = {
   version: string;
   latest: Release | null;
   canUpdate: boolean;
+  /** The plugins running now that wouldn't on `latest`. */
+  wontRun: string[];
   updating: { to: string; steps: string[]; error?: string } | null;
 };
 
@@ -193,6 +195,8 @@ export type PackagePlugin = PluginCommon & {
   settings: (PluginSetting & { value?: string; set: boolean })[];
   parts: PackageParts;
   error?: string;
+  /** Why it doesn't run on this fxbot. Its files, settings, and tables stay. */
+  unsupported?: string;
 };
 export type Plugin = McpPlugin | SkillPlugin | PackagePlugin;
 // A plugin by its GitHub repository and the folder it's in: `<owner>/<repo>`, or `<owner>/<repo>/<folder>`.
@@ -225,6 +229,9 @@ export type PackagePreview = {
   servers: { name: string; url?: string; used: boolean }[];
   changed?: { path: string; change: "changed" | "added" | "removed" }[];
   error?: string;
+  /** It can't run on this fxbot, which `error` says, and `needsFxbot` is the fxbot it needs, if a newer one would do. */
+  unfit?: boolean;
+  needsFxbot?: string;
 };
 // A plugin in fxbot's own list.
 export type PackageCard = { kind: "package"; name: string; iconKey: string; description: string; ref: string; from: "fxbot" };
@@ -287,7 +294,7 @@ export type RegistryInfo = {
 // `local` runs only on this machine.
 export type McpCard = RegistryInfo & { kind: "mcp"; iconKey: string; url?: string; host?: string; hostMatches?: boolean; needs?: "key"; local?: boolean };
 // What the hourly check found about an installed plugin. It changes nothing by itself.
-export type PluginMark = { kind: "update"; version: string } | { kind: "deprecated" } | { kind: "removed" };
+export type PluginMark = { kind: "update"; version: string } | { kind: "needs"; version: string } | { kind: "deprecated" } | { kind: "removed" };
 // A search's cards, and the mirror's state: when it last synced, and why the last try failed.
 export type McpSearch = { cards: McpCard[]; syncedAt: string | null; error?: string; everythingError?: string };
 // A skill found in fxbot's list or on skills.sh. skills.sh gives installs but no description; fxbot's list gives one.

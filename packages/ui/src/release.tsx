@@ -80,6 +80,7 @@ export function Version() {
               Release notes
             </a>
           )}
+          {status.wontRun.length > 0 && <p className="text-destructive">Won't run on {latest.version}: {status.wontRun.join(", ")}.</p>}
           {canUpdate ? (
             <Button className="justify-self-start" onClick={start}>
               Update to {latest.version}
