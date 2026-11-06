@@ -78,7 +78,7 @@ function Row({ message, bots }) {
 			/* @__PURE__ */ (0, react_jsx_runtime.jsx)("span", {
 				className: "whitespace-pre-wrap",
 				style: wraps,
-				children: message.text
+				children: named(message.text)
 			}),
 			message.files.length > 0 && /* @__PURE__ */ (0, react_jsx_runtime.jsx)("span", {
 				className: "text-muted-foreground",
@@ -187,17 +187,23 @@ function Screen() {
 function Sent({ call: tool }) {
 	const { to, text } = tool.input ?? {};
 	const out = tool.done && tool.output && !/^Sent to /.test(tool.output);
+	const id = (/\/profiles\/([0-9a-f]{12})/i.exec(to ?? "")?.[1] ?? to ?? "").toLowerCase();
+	const bot = ((0, _fxbot_app.useBots)() ?? []).find((b) => b.id === id);
 	return /* @__PURE__ */ (0, react_jsx_runtime.jsxs)("div", {
 		className: "grid gap-1 text-sm",
 		children: [
 			/* @__PURE__ */ (0, react_jsx_runtime.jsxs)("p", {
-				className: "font-medium",
-				children: ["To ", to ?? "a bot"]
+				className: "flex items-center gap-2 font-medium",
+				children: [
+					/* @__PURE__ */ (0, react_jsx_runtime.jsx)(Face, { bot }),
+					"To ",
+					bot?.name ?? named(to) ?? "a bot"
+				]
 			}),
 			text && /* @__PURE__ */ (0, react_jsx_runtime.jsx)("p", {
 				className: "whitespace-pre-wrap",
 				style: wraps,
-				children: text
+				children: named(text)
 			}),
 			/* @__PURE__ */ (0, react_jsx_runtime.jsx)("p", {
 				className: out ? "text-destructive" : "text-muted-foreground",
@@ -244,7 +250,159 @@ function About({ bot }) {
 		]
 	});
 }
+const tagLink = /\[@([^\]\n]*)\]\(\/profiles\/([0-9a-f]{12})\)/g;
+const named = (text) => text?.replace(tagLink, "@$1");
+const safeName = (name) => name.replace(/[[\]\n]/g, "");
+const escaped = (text) => text.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+const inBox = (text, tag) => new RegExp(`(^|\\s)${escaped(`@${tag.name}`)}(?!\\w)`).test(text);
+let tagged = [];
+function linked(text) {
+	if (!tagged.length) return text;
+	const left = [...tagged];
+	const names = [...new Set(left.map((tag) => tag.name))].sort((a, b) => b.length - a.length).map((name) => escaped(`@${name}`));
+	return text.replace(new RegExp(`(^|\\s)(${names.join("|")})(?!\\w)`, "g"), (whole, before, shown) => {
+		const at = left.findIndex((tag) => `@${tag.name}` === shown);
+		if (at < 0) return whole;
+		const [tag] = left.splice(at, 1);
+		return `${before}[@${safeName(tag.name)}](/profiles/${tag.id})`;
+	});
+}
+function Tags({ bot, draft, box, setDraft }) {
+	const bots = (0, _fxbot_app.useBots)() ?? [];
+	const [reach, setReach] = (0, react.useState)([]);
+	const [picked, setPicked] = (0, react.useState)([]);
+	const [token, setToken] = (0, react.useState)(null);
+	const [active, setActive] = (0, react.useState)(0);
+	const caret = (0, react.useRef)(null);
+	tagged = picked;
+	const load = () => void call(`/tags/${bot.id}`).then(setReach, () => {});
+	(0, react.useEffect)(() => void (setPicked([]), setToken(null), load()), [bot.id]);
+	(0, react.useEffect)(() => void (token && load()), [Boolean(token)]);
+	(0, react.useEffect)(() => {
+		if (!draft) setPicked([]);
+		const at = box.current?.selectionStart ?? draft.length;
+		const typed = /(?:^|\s)@([^\s@]*)$/.exec(draft.slice(0, at));
+		setToken(typed ? {
+			start: at - typed[1].length - 1,
+			query: typed[1].toLowerCase()
+		} : null);
+		setActive(0);
+	}, [draft]);
+	(0, react.useLayoutEffect)(() => {
+		if (caret.current === null || !box.current) return;
+		box.current.setSelectionRange(caret.current, caret.current);
+		caret.current = null;
+	}, [draft]);
+	const about = new Map(reach.map((one) => [one.id, one.about]));
+	const lower = (b) => b.name.toLowerCase();
+	const matches = token ? bots.filter((b) => about.has(b.id) && lower(b).includes(token.query)).sort((a, b) => Number(lower(b).startsWith(token.query)) - Number(lower(a).startsWith(token.query))).slice(0, 8) : [];
+	const open = matches.length > 0;
+	function choose(pick) {
+		const shown = `@${pick.name} `;
+		setDraft(draft.slice(0, token.start) + shown + draft.slice(token.start + 1 + token.query.length).replace(/^ /, ""));
+		setPicked((all) => [...all, {
+			id: pick.id,
+			name: pick.name
+		}]);
+		setToken(null);
+		caret.current = token.start + shown.length;
+	}
+	(0, react.useEffect)(() => {
+		const el = box.current;
+		if (!el || !open) return;
+		const keys = (e) => {
+			if (e.key === "ArrowDown" || e.key === "ArrowUp") setActive((i) => (i + (e.key === "ArrowDown" ? 1 : -1) + matches.length) % matches.length);
+			else if ((e.key === "Enter" || e.key === "Tab") && !e.shiftKey) choose(matches[active]);
+			else if (e.key === "Escape") setToken(null);
+			else return;
+			e.preventDefault();
+			e.stopPropagation();
+		};
+		const blur = () => setToken(null);
+		el.addEventListener("keydown", keys);
+		el.addEventListener("blur", blur);
+		el.setAttribute("aria-expanded", "true");
+		el.setAttribute("aria-controls", "tag-picker");
+		el.setAttribute("aria-activedescendant", `tag-option-${active}`);
+		return () => {
+			el.removeEventListener("keydown", keys);
+			el.removeEventListener("blur", blur);
+			el.setAttribute("aria-expanded", "false");
+			el.setAttribute("aria-controls", "skill-picker");
+			el.removeAttribute("aria-activedescendant");
+		};
+	});
+	const form = box.current?.closest("form");
+	return /* @__PURE__ */ (0, react_jsx_runtime.jsxs)(react_jsx_runtime.Fragment, { children: [picked.filter((tag) => inBox(draft, tag)).map((tag, i) => {
+		const face = bots.find((b) => b.id === tag.id);
+		return face ? /* @__PURE__ */ (0, react_jsx_runtime.jsx)("span", {
+			title: `@${tag.name}`,
+			"aria-label": `Tagged ${tag.name}`,
+			style: { display: "inline-flex" },
+			children: /* @__PURE__ */ (0, react_jsx_runtime.jsx)(_fxbot_app.ui.Blob, {
+				shape: face.shape,
+				color: face.color,
+				size: 18
+			})
+		}, i) : null;
+	}), open && form && (0, _fxbot_app.createPortal)(/* @__PURE__ */ (0, react_jsx_runtime.jsx)("div", {
+		id: "tag-picker",
+		role: "listbox",
+		"aria-label": "Bots",
+		className: "absolute right-4 bottom-full left-4 z-10 mb-2 max-h-72 overflow-y-auto rounded-2xl border bg-popover p-1 text-popover-foreground shadow-md",
+		children: matches.map((b, i) => /* @__PURE__ */ (0, react_jsx_runtime.jsxs)("button", {
+			id: `tag-option-${i}`,
+			type: "button",
+			role: "option",
+			"aria-selected": i === active,
+			onMouseDown: (e) => e.preventDefault(),
+			onClick: () => choose(b),
+			className: `flex w-full min-w-0 items-start gap-2.5 rounded-xl px-2.5 py-2 text-left text-sm ${i === active ? "bg-accent text-accent-foreground" : ""}`,
+			children: [/* @__PURE__ */ (0, react_jsx_runtime.jsx)(_fxbot_app.ui.Blob, {
+				shape: b.shape,
+				color: b.color,
+				size: 20
+			}), /* @__PURE__ */ (0, react_jsx_runtime.jsxs)("span", {
+				className: "grid min-w-0 flex-1",
+				children: [/* @__PURE__ */ (0, react_jsx_runtime.jsx)("span", {
+					className: "font-medium",
+					children: b.name
+				}), /* @__PURE__ */ (0, react_jsx_runtime.jsx)("span", {
+					className: "line-clamp-1 text-xs text-muted-foreground",
+					children: about.get(b.id) || b.id
+				})]
+			})]
+		}, b.id))
+	}), form)] });
+}
+function Tag({ match }) {
+	const bot = ((0, _fxbot_app.useBots)() ?? []).find((b) => b.id === match[2]);
+	return /* @__PURE__ */ (0, react_jsx_runtime.jsxs)("span", {
+		style: {
+			display: "inline-flex",
+			alignItems: "center",
+			gap: 4,
+			padding: "0 6px 0 3px",
+			borderRadius: 9999,
+			background: "rgb(255 255 255 / 0.2)",
+			fontWeight: 500,
+			verticalAlign: "bottom"
+		},
+		children: [
+			bot && /* @__PURE__ */ (0, react_jsx_runtime.jsx)(_fxbot_app.ui.Blob, {
+				shape: bot.shape,
+				color: bot.color,
+				size: 16
+			}),
+			"@",
+			bot?.name ?? match[1]
+		]
+	});
+}
 function setup(app) {
+	app.composer(Tags);
+	app.sending(linked);
+	app.said(tagLink, Tag);
 	app.nav({
 		label: "Messages",
 		path: "/"

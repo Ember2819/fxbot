@@ -72,7 +72,8 @@ export default async function setup(fx: PluginApi) {
   // Who a bot can reach: the others the plugin is on for.
   const reachable = async (me: string) => (await all()).filter((bot) => bot.id !== me && fx.bots.on(bot.id));
   function find(to: string, me: string, bots: Bot[]) {
-    const word = to.trim().toLowerCase();
+    // A tag from the owner's message may come whole.
+    const word = (/\/profiles\/([0-9a-f]{12})/i.exec(to)?.[1] ?? to.trim()).toLowerCase();
     if (word === me.toLowerCase()) return "You can't message yourself.";
     const others = bots.filter((bot) => bot.id !== me && fx.bots.on(bot.id));
     const byId = others.find((bot) => bot.id.toLowerCase() === word);
@@ -277,7 +278,7 @@ export default async function setup(fx: PluginApi) {
     const shared = (name: string) => bots.filter((bot) => bot.name === name).length > 1;
     const names = bots.map((bot) => `${bot.name}${shared(bot.name) ? ` (${bot.id})` : ""}${about.get(bot.id) ? ` (${about.get(bot.id)})` : ""}`);
     event.instructions.push(
-      `You can message the owner's other bots with messages_send: ${joinNames(names)}. A message wakes them in their own chat, where the owner can read it. They can't see this chat, so say everything they need, and give each piece of work one owner. Their reply comes later, as a new message: don't wait for it.`,
+      `You can message the owner's other bots with messages_send: ${joinNames(names)}. A message wakes them in their own chat, where the owner can read it. They can't see this chat, so say everything they need, and give each piece of work one owner. Their reply comes later, as a new message: don't wait for it. A tag in the owner's words, such as [@Bob](/profiles/<id>), means exactly that bot: give that id as \`to\`.`,
     );
   });
 
@@ -383,6 +384,12 @@ export default async function setup(fx: PluginApi) {
     // One still waiting is cancelled when its turn starts.
     for (const row of rows) if (row.state === "working") await fx.chats.cancel(row.to_bot).catch((error) => fx.log(`Stopping m:${row.id} failed: ${error.message}`));
     return json({ ok: true });
+  });
+
+  // Who the owner can tag in a bot's chat, each with its line, to tell two Bobs apart.
+  fx.route("GET", "/tags/:bot", async (_request, { bot }) => {
+    const about = new Map((await fx.sql<{ bot: string; about: string }[]>`select bot, about from roles`).map((role) => [role.bot, role.about]));
+    return json((await reachable(bot)).map(({ id }) => ({ id, about: about.get(id) ?? "" })));
   });
 
   fx.route("GET", "/bots/:bot", async (_request, { bot }) => {

@@ -11,6 +11,12 @@ Add it from **Plugins**, where fxbot's list has it. It runs inside fxbot: read i
 - **What the model gets:** a frame that opens by saying this isn't from the owner, with the words quoted, what the sender can't OK, and whether a reply is expected. libfx labels every steer as the user's, so the frame is what says otherwise. When libfx lets a steer name its author, core passes it.
 - **Who a bot can reach:** the others the plugin is on for, named in its instructions, each with its line from **Messages** in its settings. Any can reach any: the plugin's switch for each bot is how an owner narrows it.
 
+## Tags
+
+In a bot's chat, `@` at the start of the box or after a space lists the bots it can reach, each with its line, or its id if it has none. Picking one puts `@Name` in the box, with the bot's face beside it. It's sent as a link, `[@Name](/profiles/<id>)`, so the bot knows exactly which one you mean, even with two of one name, and it shows as a chip in the message. A name typed by hand stays plain text.
+
+A tag names a bot, and wakes no one. The bot you're talking to does the sending, with `messages_send`, and everything here applies to it. `to` takes the whole tag, as well as a name or an id.
+
 ## Replies
 
 A message's `reply` is `yes`, `no`, or `maybe`. A send to the bot whose message reached this turn is a reply: the plugin sets `answers` to that message, and `answered_at` on it.
