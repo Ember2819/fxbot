@@ -130,10 +130,9 @@ Ask where they'll use it. A machine with no screen, such as a VPS, needs one of 
 
 The rest is for the person, in the app, because it takes their sign-ins. Tell them to:
 
-1. Open **Settings** › **Providers**, choose **Add provider…**, and sign in to an account with a
-   device code, paste a key, or point at a local model server such as Ollama. See
-   https://fxbot.sh/docs/how-to/add-a-provider/
-2. Make a bot and say hello. See https://fxbot.sh/docs/tutorials/first-fxbot/#make-a-bot
+1. Open fxbot. It walks them through plugins, a provider, and their first bot. See
+   https://fxbot.sh/docs/tutorials/first-fxbot/#set-up-fxbot
+2. Say hello to their bot.
 
 Then tell them what you did: the version, the address, and what the machine now has. Point them at:
 

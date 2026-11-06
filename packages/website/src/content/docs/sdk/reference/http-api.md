@@ -85,7 +85,7 @@ A plugin's id is 12 hex characters, and anything else after `/api/plugins/` that
 | Method | Path | Body or query | Answer |
 | --- | --- | --- | --- |
 | `GET` | `/api/settings` | | `Settings` |
-| `PATCH` | `/api/settings` | Any of `defaultProvider`, `defaultProfile`, `unvetted`, `timeZone`, `turnsAtOnce`, `embedder`, `embeddingProvider`, `embeddingModel`, `messageVectors`, and `local` | `Settings` |
+| `PATCH` | `/api/settings` | Any of `defaultProvider`, `defaultProfile`, `unvetted`, `onboardingStep`, `onboarded`, `timeZone`, `turnsAtOnce`, `embedder`, `embeddingProvider`, `embeddingModel`, `messageVectors`, and `local` | `Settings` |
 | `GET` | `/api/settings/embedding` | | `EmbeddingStatus` |
 
 - `local` is `cpu`, `gpu`, or `off`. It asks the machine to run its local embedder that way. Outside an install made by `setup.sh`, it gets 400.

@@ -4,6 +4,10 @@ Each release of fxbot, newest first. A release that adds migrations, bumps libfx
 
 ## Unreleased
 
+**Before upgrading.** Migration `0011_onboarding` adds `onboarding_step` and `onboarded_at` columns to `settings`. An install with a bot, a plugin, or a provider is marked done, so it never sees first-run setup.
+
+- **First-run setup.** A new install walks through plugins, a provider and a model, and a first bot, then opens its chat. It saves each step, so a restart comes back to it, and **Skip for now** is on every step.
+- **Essentials.** A pack of what most people want from fxbot, at the top of **Browse**, with **Add the other 3**. Each plugin in it stays its own.
 - **fxbot knows which plugins can run on it.** A plugin that needs a newer fxbot says so on its page, and **Add** stays off. A newer version that needs a newer fxbot shows **Needs fxbot** in place of **Update available**, and the one you have keeps running.
 - **Unsupported.** When a release breaks something a plugin uses, the plugin doesn't run, its tab says why and how to fix it, and the rest of fxbot starts as usual. Its files, settings, and tables are kept, and an update that fits brings it back.
 - **Settings warns before an update,** naming the plugins that wouldn't run on the new release.

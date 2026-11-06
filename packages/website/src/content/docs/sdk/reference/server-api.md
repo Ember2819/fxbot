@@ -278,7 +278,7 @@ type Provider = {
   error: string | null; // why its agent didn't start
 };
 
-type Settings = { defaultProvider: string; unvetted: boolean; timeZone: string; turnsAtOnce: number; embedder: "local" | "remote" | "off"; embeddingProvider: string; embeddingModel: string; messageVectors: number };
+type Settings = { defaultProvider: string; unvetted: boolean; timeZone: string; onboarded: boolean; onboardingStep: string; turnsAtOnce: number; embedder: "local" | "remote" | "off"; embeddingProvider: string; embeddingModel: string; messageVectors: number };
 
 type EmbeddingStatus = {
   model: string | null;

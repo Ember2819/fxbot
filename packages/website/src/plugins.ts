@@ -107,6 +107,8 @@ export const listed: Listed[] = [
   ...(JSON.parse(serversList) as { servers: ServerEntry[] }).servers.map(serverOf),
   ...(JSON.parse(skillsList) as { skills: SkillEntry[] }).skills.map(skillOf),
 ];
+// The pack the app offers on first run and at the top of Browse, in its order.
+export const essentials = (JSON.parse(pluginsList) as { essentials: string[] }).essentials.flatMap((name) => listed.filter((plugin) => plugin.kind === "package" && plugin.name === name));
 const seen = new Set<string>();
 for (const { slug } of listed) {
   if (seen.has(slug)) throw new Error(`Two plugins on fxbot's lists want /plugins/${slug}/.`);

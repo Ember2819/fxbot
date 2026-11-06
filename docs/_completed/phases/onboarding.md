@@ -7,7 +7,7 @@ A new owner gets from an empty install to a bot that's ready, in a few screens:
 - **Where plugins live.** One short screen says how to add more, then opens the bot's chat.
 - **Nothing to get stuck in.** Each step saves where you are, so a restart picks up there, **Skip for now** is always there, and owners who already use fxbot never see it.
 
-Status: planned on 2026-11-06, at the owner's word. Researched against the research directive's references, and Grok Bot, OpenClaw, Hermes Agent, Home Assistant, VS Code, JetBrains, WordPress, and Obsidian. Not built. It's for 0.7.0.
+Status: built on 2026-11-06, for 0.7.0, as planned the same day at the owner's word. Researched against the research directive's references, and Grok Bot, OpenClaw, Hermes Agent, Home Assistant, VS Code, JetBrains, WordPress, and Obsidian. Where the build differs from the plan, [What the build changed](#what-the-build-changed) says so.
 
 ## What the owner asked
 
@@ -25,7 +25,7 @@ After reading this plan: "Essentials right now would be: computer, fresh, permis
 
 ## 0. Core or plugin
 
-**Core** ([Core or plugin](../../CONVENTIONS.md#core-or-plugin)). It runs before any plugin exists, and "finding, vetting, adding, and updating plugins" are core. Which plugins are in the pack is data, in fxbot's list, so core never names one.
+**Core** ([Core or plugin](../../../CONVENTIONS.md#core-or-plugin)). It runs before any plugin exists, and "finding, vetting, adding, and updating plugins" are core. Which plugins are in the pack is data, in fxbot's list, so core never names one.
 
 ## 1. Research
 
@@ -93,8 +93,8 @@ Read from the code on 2026-11-06.
 - **There's no onboarding.** A new install shows **No bots yet**, and the tutorial sends the owner to **Settings** › **Providers**, then **New bot**.
 - **A bot needs a provider.** `create` reads the default one, and a chat with none says "No provider yet". So the owner's step 3 has a part in front of it.
 - **Adding plugins already works from the page.** `client.plugins.preview` then `client.plugins.add`. fxbot's plugins are in one repository, and `archives.files` keeps a commit's files for 5 minutes, so several adds read GitHub once.
-- **An add can be refused,** by a plugin that needs another first, or by [compatibility](../_completed/phases/plugin-compatibility.md). `chat-rooms-computer` needs `computer` and `chat-rooms`, so order matters.
-- **`computer` reaches outside the app.** On **Add**, in a release install, it asks the machine to run a setup script as root, which makes a user, a rootless engine, and a firewall, then restarts fxbot's container ([the computer on Add](../_completed/phases/computer-on-add.md)). The add returns first, and the restart comes later. So it could land during a later step, and a sign-in in progress lives in memory.
+- **An add can be refused,** by a plugin that needs another first, or by [compatibility](plugin-compatibility.md). `chat-rooms-computer` needs `computer` and `chat-rooms`, so order matters.
+- **`computer` reaches outside the app.** On **Add**, in a release install, it asks the machine to run a setup script as root, which makes a user, a rootless engine, and a firewall, then restarts fxbot's container ([the computer on Add](computer-on-add.md)). The add returns first, and the restart comes later. So it could land during a later step, and a sign-in in progress lives in memory.
 - **`settings` is one row,** with room for a column or two. It's the natural home for this.
 - **`plugins-registry.json`** is shipped and read hourly from fxbot.sh, as `{ plugins: [...] }`, so a new top-level key is ignored by older installs.
 - **`Providers`** is a whole component, exported, with its add and sign-in dialogs. It can go in a step as it is.
@@ -158,7 +158,7 @@ One component, `AddPlugins`, in `packages/ui/src/add-plugins.tsx`, used by onboa
 - **One that fails doesn't stop the rest.** It shows why, with **Try again**.
 - **One already added is passed over,** so **Try again**, a reload, and a second run are all safe, as eve says of setup: "Must be idempotent".
 - **There's no new server route.** The page already makes these calls.
-- **The plugin's own rules still hold.** A plugin [compatibility](../_completed/phases/plugin-compatibility.md) refuses is shown, and passed by.
+- **The plugin's own rules still hold.** A plugin [compatibility](plugin-compatibility.md) refuses is shown, and passed by.
 
 ### At the top of Browse
 
@@ -316,60 +316,60 @@ Print a check's setup, and match exact fields: one that tested nothing can't pas
 - **If it must be cut,** the directory's section goes first, then **What's in it** on Browse. The pack, the flow, and resuming stay.
 
 **M1. The pack**
-- [ ] `essentials` in `plugins-registry.json` reaches `PackageSearch`, in order, and a name not on the list is left out.
-- [ ] The published list replaces it hourly, and with the site down, the shipped copy holds.
-- [ ] An older reader of the file still gets its `plugins`.
-- [ ] No plugin's name is in core's code.
-- [ ] `npm run typecheck` passes.
+- [x] `essentials` in `plugins-registry.json` reaches `PackageSearch`, in order, and a name not on the list is left out.
+- [x] The published list replaces it hourly, and with the site down, the shipped copy holds.
+- [x] An older reader of the file still gets its `plugins`.
+- [x] No plugin's name is in core's code.
+- [x] `npm run typecheck` passes.
 
 **M2. Adding several**
-- [ ] `AddPlugins` adds a list in order, and shows each as it goes.
-- [ ] One that fails shows why, and the rest carry on.
-- [ ] **Try again** adds only what's left.
-- [ ] One already added is passed over, with no error.
-- [ ] A plugin that needs a newer fxbot shows it, and is passed by.
-- [ ] A plugin whose needs come after it in the list fails with a reason, not a crash.
+- [x] `AddPlugins` adds a list in order, and shows each as it goes.
+- [x] One that fails shows why, and the rest carry on.
+- [x] **Try again** adds only what's left.
+- [x] One already added is passed over, with no error.
+- [x] A plugin that needs a newer fxbot shows it, and is passed by.
+- [x] A plugin whose needs come after it in the list fails with a reason, not a crash.
 
 **M3. Browse**
-- [ ] Essentials is first on **Browse**, with each plugin's icon and how many are added.
-- [ ] **Add the other 2** adds only those.
-- [ ] With all added, it says so, with no button.
-- [ ] **What's in it** lists each with its description, and links to its page.
-- [ ] Each plugin stays its own: removing one leaves the rest, and the count drops.
-- [ ] At 375 pixels there's no sideways scroll.
+- [x] Essentials is first on **Browse**, with each plugin's icon and how many are added.
+- [x] **Add the other 2** adds only those.
+- [x] With all added, it says so, with no button.
+- [x] **What's in it** lists each with its description, and links to its page.
+- [x] Each plugin stays its own: removing one leaves the rest, and the count drops.
+- [x] At 375 pixels there's no sideways scroll.
 
 **M4. Remembering**
-- [ ] `0011_onboarding.sql` stamps an install with a bot, a plugin, or a provider, and leaves an empty one.
-- [ ] Moving a step saves its id.
-- [ ] A restart at each step comes back to it.
-- [ ] A second browser opens at the same step.
-- [ ] **Skip for now** on each step ends it, and it doesn't come back.
-- [ ] A bot made through the API ends it.
-- [ ] An upgraded install with bots never sees it. Check on a database made by 0.6.0.
+- [x] `0011_onboarding.sql` stamps an install with a bot, a plugin, or a provider, and leaves an empty one.
+- [x] Moving a step saves its id.
+- [x] A restart at each step comes back to it.
+- [x] A second browser opens at the same step.
+- [x] **Skip for now** on each step ends it, and it doesn't come back.
+- [x] A bot made through the API ends it.
+- [x] An upgraded install with bots never sees it. Check on a database made by 0.6.0.
 
 **M5. The flow**
-- [ ] A fresh install's `/` shows **Set up fxbot**, with the pack's plugins and their descriptions, and `computer`'s line.
-- [ ] **Set up Essentials** adds them in order, and moves on by itself.
-- [ ] A failure stays on the screen, with **Try again** and **Continue**.
-- [ ] **Choose my own** lists fxbot's plugins, with the pack ticked. Unticking leaves it out, and the button counts.
-- [ ] Ticking a plugin ticks what it needs.
-- [ ] With nothing ticked, it goes on with no plugins.
-- [ ] With no provider, `provider` shows, and **Continue** is off until there's one. With one already, the step is passed.
-- [ ] `bot` makes a bot, on the default provider, with its look.
-- [ ] The last screen names the bot and says where plugins are, and **Start chatting** opens its chat, and the bot answers. Assert on what the mock got.
-- [ ] `/settings` and `/plugins` still open while the flow is open.
-- [ ] A restart during `adding`, as `computer` causes, comes back and finishes.
-- [ ] At 375 pixels there's no sideways scroll, and the page logs no errors. Load 5173 as well as the build, with writes blocked.
+- [x] A fresh install's `/` shows **Set up fxbot**, with the pack's plugins and their descriptions, and `computer`'s line.
+- [x] **Set up Essentials** adds them in order, and moves on by itself.
+- [x] A failure stays on the screen, with **Try again** and **Continue**.
+- [x] **Choose my own** lists fxbot's plugins, with the pack ticked. Unticking leaves it out, and the button counts.
+- [x] Ticking a plugin ticks what it needs.
+- [x] With nothing ticked, it goes on with no plugins.
+- [x] With no provider, `provider` shows, and **Continue** is off until there's one. With one already, the step is passed.
+- [x] `bot` makes a bot, on the default provider, with its look.
+- [x] The last screen names the bot and says where plugins are, and **Start chatting** opens its chat, and the bot answers. Assert on what the mock got.
+- [x] `/settings` and `/plugins` still open while the flow is open.
+- [x] A restart during `adding`, as `computer` causes, comes back and finishes.
+- [x] At 375 pixels there's no sideways scroll, and the page logs no errors. Load 5173 as well as the build, with writes blocked.
 
 **M6. Docs and checks**
-- [ ] fxbot.sh's directory shows Essentials at the top.
-- [ ] **The website:** "Your first fxbot" walks the new flow, and the how-to for adding a plugin says what Essentials is.
-- [ ] `agent-setup.txt` hands the person to the flow.
-- [ ] `CHANGELOG.md`, under `## Unreleased`: the flow, the pack, and migration `0011_onboarding` under **Before upgrading**.
-- [ ] `npm run typecheck`, `npm run build`, `npm run build-site`, and `git diff --check` pass. New files are checked for whitespace too.
-- [ ] The line counts are within the bound.
-- [ ] This doc's Status says built, with what the build changed. It moves to `docs/_completed/phases/`, and `AGENTS.md` lists it.
-- [ ] The work is committed on the open release branch, core and docs in separate commits, and not pushed.
+- [x] fxbot.sh's directory shows Essentials at the top.
+- [x] **The website:** "Your first fxbot" walks the new flow, and the how-to for adding a plugin says what Essentials is.
+- [x] `agent-setup.txt` hands the person to the flow.
+- [x] `CHANGELOG.md`, under `## Unreleased`: the flow, the pack, and migration `0011_onboarding` under **Before upgrading**.
+- [x] `npm run typecheck`, `npm run build`, `npm run build-site`, and `git diff --check` pass. New files are checked for whitespace too.
+- [x] The line counts are within the bound.
+- [x] This doc's Status says built, with what the build changed. It moves to `docs/_completed/phases/`, and `AGENTS.md` lists it.
+- [x] The work is committed on the open release branch, core and docs in separate commits, and not pushed.
 
 **The human runs these:**
 - **A real first run:** a fresh release install on a machine that's never had fxbot. Does `computer`'s setup, and its restart, feel fine in the middle of it?
@@ -387,3 +387,14 @@ Print a check's setup, and match exact fields: one that tested nothing can't pas
 
 1. **A separate "Essentials or custom?" screen.** *Default:* keep it, as asked, with Essentials as the big choice. Microsoft's guide says to drop such a page, and Grok, Home Assistant, and Obsidian have none. The smaller way: one button, **Set up Essentials**, with **Choose my own** as a link, which is nearly what the sketch shows.
 2. **Is the pack at the top of Browse only, or above Installed too?** *Default:* Browse, since that's where plugins are added, and an owner with everything added doesn't need it.
+
+## What the build changed
+
+- **The open questions took their defaults:** the choice screen stays, and the pack is at the top of **Browse** only.
+- **The provider step asks for a model too.** The plan missed this. Every provider starts with no default model, so a new owner could finish setup and have their first message answered "Not sent: No model." The check that the bot answers caught it. So once there's a provider, the step offers `ModelField`, and **Continue** waits for both: "READY MEANS IT WORKS, NOT THAT SOMETHING IS SET." It's passed only when the default provider has a model.
+- **A plugin's warning is data.** Core can't name `computer`, so its line is `note` on its entry in `plugins-registry.json`, which reaches `PackageCard`. It shows on the first screen, and on **Choose my own** while it's ticked.
+- **The step holds what's being added,** as `adding:<names>`, so a reload or a restart knows what's left, on either path.
+- **Choose my own reads each plugin's page,** for what it needs, which fxbot's repository serves in one read. Unticking a plugin unticks what needs it too, and a plugin that can't run on this fxbot shows why, and can't be ticked.
+- **The published list keeps the pack when it has none,** so an install reading an older fxbot.sh still has one. A dev install's first screen has no `note` until a release puts it on fxbot.sh, since the published `plugins` replace the shipped ones.
+- **`BotForm`** is in `bot-form.tsx`, and `NewBot` is the dialog around it.
+- **The size:** it first came to 418 core lines against a bound of 380. A shared `Step`, and fewer one-off components, with nothing cut, gave 372.

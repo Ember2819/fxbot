@@ -13,7 +13,7 @@ On the machine you want fxbot on, tell your agent:
 Set up fxbot on this computer for me: follow https://fxbot.sh/agent-setup.txt
 ```
 
-It checks the machine, asks before it installs anything, and leaves your keys and sign-ins to you. When it's done, carry on from [Add a provider](/docs/tutorials/first-fxbot/#add-a-provider).
+It checks the machine, asks before it installs anything, and leaves your keys and sign-ins to you. When it's done, carry on from [Set up fxbot](/docs/tutorials/first-fxbot/#set-up-fxbot).
 
 ## Give it the docs
 

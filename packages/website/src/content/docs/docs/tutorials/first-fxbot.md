@@ -49,7 +49,7 @@ Using fxbot only on this machine? Open `http://127.0.0.1:8787` there, and carry 
 sudo tailscale serve --bg 8787
 ```
 
-Tailscale prints the address it serves, `https://<machine>.<tailnet>.ts.net`. Open that address on your phone. fxbot shows **No bots yet**.
+Tailscale prints the address it serves, `https://<machine>.<tailnet>.ts.net`. Open that address on your phone. fxbot shows **Set up fxbot**.
 
 Install it as an app:
 
@@ -58,19 +58,29 @@ Install it as an app:
 
 Open fxbot from the home screen. It opens on its own, without the browser's bars.
 
-## Add a provider
+## Set up fxbot
 
-Open **Settings** › **Providers**, and choose **Add provider…**, then **ChatGPT plan**.
+The first time you open it, fxbot shows **Essentials**: the plugins most people want, each with what it gives you. One of them, the computer, sets up a computer engine on this machine, then restarts fxbot, and it says so there.
 
-fxbot shows a link and a code. Open the link, sign in to ChatGPT, and enter the code. The dialog closes by itself once you have, and the provider appears under Providers, marked **Default**.
+Tap **Set up Essentials**. fxbot adds them one by one, and moves on by itself. To pick your own instead, tap **Choose my own**, where they're already ticked, and untick what you don't want. Plugins you leave out are under **Plugins** for later.
+
+### Connect a model
+
+Choose **Add provider…**, then **ChatGPT plan**.
+
+fxbot shows a link and a code. Open the link, sign in to ChatGPT, and enter the code. The dialog closes by itself once you have.
 
 With a key instead, choose **OpenAI key** or **OpenRouter key**, paste the key, and tap **Save**. fxbot checks the key with the provider before it keeps it.
 
-## Make a bot
+Then pick the model your bots use, and tap **Continue**.
 
-Tap **New bot**. Name the bot `Scout`, pick a shape and a color, and tap **Create**. As you choose, the bot in the dialog watches.
+### Make a bot
 
-Scout's chat opens. A new bot starts on the default provider, with its default model.
+Name the bot `Scout`, pick a shape and a color, and tap **Create**. As you choose, the bot watches.
+
+fxbot says where plugins live for later. Tap **Start chatting**, and Scout's chat opens.
+
+If you leave partway, fxbot comes back to the same step. **Skip for now** ends it, and everything it does is still there: **Plugins** at the foot of the sidebar, **Settings** › **Providers**, and **New bot**.
 
 ## Chat
 

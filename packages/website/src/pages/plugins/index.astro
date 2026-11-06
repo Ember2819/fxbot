@@ -2,7 +2,7 @@
 // The plugin directory: fxbot's vetted plugins, a card each, with a search box (docs/phases/plugin-directory.md).
 import StarlightPage from "@astrojs/starlight/components/StarlightPage.astro";
 import PluginIcon from "../../components/PluginIcon.astro";
-import { listed } from "../../plugins.ts";
+import { essentials, listed } from "../../plugins.ts";
 
 const base = import.meta.env.BASE_URL;
 const description = "The plugins fxbot vets: code, MCP servers, and skills to add to your fxbot.";
@@ -11,6 +11,10 @@ const description = "The plugins fxbot vets: code, MCP servers, and skills to ad
 <StarlightPage frontmatter={{ title: "Plugins", description, template: "splash", pageActions: false }}>
   <p>
     These are the plugins fxbot vets. <strong>Browse</strong>, in fxbot's <strong>Plugins</strong>, shows them while unvetted plugins are off, and each costs nothing until it's added.
+  </p>
+  <p>
+    <strong>Essentials</strong> is what most people want from fxbot, offered when you first set it up, and at the top of <strong>Browse</strong>:{" "}
+    {essentials.map((plugin, i) => <>{i > 0 && ", "}<a href={`${base}plugins/${plugin.slug}/`}>{plugin.name}</a></>)}.
   </p>
   <input type="search" id="plugin-search" class="fxbot-plugin-search" placeholder="Search plugins" aria-label="Search plugins" autocomplete="off" hidden />
   <ul class="fxbot-plugins not-content">
