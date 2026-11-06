@@ -38,7 +38,9 @@ import { maxPinned, unreachable, type Color, type Fields, type Profile, type Pro
 import { client } from "./client.ts";
 import { maxFiles, readFile } from "./attachments.ts";
 import { Blob, LookPicker } from "./blob.tsx";
+import { BotForm } from "./bot-form.tsx";
 import { Fold, type Folded } from "./fold.tsx";
+import { Onboarding } from "./onboarding.tsx";
 import { BotPanel, usePanel } from "./bot-panel.tsx";
 import { BotMemories } from "./memories.tsx";
 import { PluginsPage, BotPlugins } from "./plugins-page.tsx";
@@ -106,7 +108,7 @@ export function App() {
   // The owner's time zone, from the first browser that opens fxbot. After that, only Settings › General changes it.
   useEffect(() => {
     const { timeZone } = Intl.DateTimeFormat().resolvedOptions();
-    void client.settings.get().then((settings) => (settings.timeZone ? settings : client.settings.update({ timeZone }))).catch(() => {});
+    void client.settings.get().then((settings) => (setFirstRun(settings.onboarded ? null : settings.onboardingStep || "choose"), settings.timeZone ? settings : client.settings.update({ timeZone }))).catch(() => setFirstRun(null));
   }, []);
   const pluginScreen = usePluginScreen(path);
 
@@ -120,9 +122,11 @@ export function App() {
   const [, top, id, sub] = path.split("/");
   // The app paints once its first screen is whole: the bots, and on a chat its messages. Until then it's laid out but
   // hidden, so nothing flashes in as it loads. After that, a chat hides only its own messages while it loads.
+  // Where first-run setup is up to, null once it's over, and undefined until the settings are read.
+  const [firstRun, setFirstRun] = useState<string | null>();
   const [chatShown, setChatShown] = useState(false);
   const onChat = top === "profiles" && Boolean(id) && sub === undefined;
-  const whole = (profiles !== null || offline) && (!onChat || chatShown);
+  const whole = (profiles !== null || offline) && (firstRun !== undefined || offline) && (!onChat || chatShown);
   const [shown, setShown] = useState(false);
   useEffect(() => {
     if (whole) setShown(true);
@@ -133,7 +137,10 @@ export function App() {
     return () => clearTimeout(late);
   }, []);
   let screen: ReactNode;
-  if (path === "/") screen = <Home profiles={profiles} offline={offline} onNew={() => setCreating(true)} />;
+  // First-run setup, at / while it's open. A bot made some other way ends it, except its own, for the screen after it.
+  const onboarding = Boolean(firstRun) && profiles !== null && (profiles.length === 0 || firstRun!.startsWith("plugins"));
+  if (path === "/" && onboarding) screen = <Onboarding step={firstRun!} profiles={profiles!} onStep={setFirstRun} onRefresh={refresh} onDone={(bot) => (setFirstRun(null), bot && go(`/profiles/${bot}`))} />;
+  else if (path === "/") screen = <Home profiles={profiles} offline={offline} onNew={() => setCreating(true)} />;
   else if (top === "settings") screen = <SettingsScreen tab={path.split("/").slice(2).join("/")} profiles={profiles} />;
   else if (path === "/library") screen = <LibraryPage profiles={profiles} />;
   // /addons is where it was before 0.4.0.
@@ -162,46 +169,29 @@ export function App() {
 
 // The create dialog: a name and a look, with the new bot watching as you choose.
 function NewBot({ open, onOpenChange, onCreated }: { open: boolean; onOpenChange: (open: boolean) => void; onCreated: (profile: Profile) => void }) {
-  const [name, setName] = useState("");
-  const [shape, setShape] = useState<Shape>("circle");
-  const [color, setColor] = useState<Color>("brown");
-  const [busy, setBusy] = useState(false);
-  const [error, setError] = useState("");
-  async function create(event: FormEvent) {
-    event.preventDefault();
-    setBusy(true);
-    setError("");
-    try {
-      const profile = await client.profiles.create({ name, shape, color });
-      setName("");
-      onCreated(profile);
-    } catch (e) {
-      setError((e as Error).message);
-    }
-    setBusy(false);
-  }
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent aria-describedby={undefined} className="gap-0 p-0 sm:max-w-md">
         <DialogHeader className="border-b px-6 py-4">
           <DialogTitle className="text-lg">Create New Bot</DialogTitle>
         </DialogHeader>
-        <form id="new-bot" onSubmit={create} className="grid max-h-[70dvh] gap-6 overflow-y-auto px-6 py-6">
-          <Blob shape={shape} color={color} size={112} follow className="mx-auto" />
-          <Input aria-label="Name" required maxLength={200} value={name} onChange={(e) => setName(e.target.value)} placeholder="Name your Bot" className="h-12 rounded-xl text-center text-base" />
-          <LookPicker shape={shape} color={color} onShape={setShape} onColor={setColor} />
-          {error && <Problem>{error}</Problem>}
-        </form>
-        <DialogFooter className="mx-0 mb-0 px-6 py-4">
-          <DialogClose asChild>
-            <Button variant="outline" className="rounded-full">
-              Cancel
-            </Button>
-          </DialogClose>
-          <Button type="submit" form="new-bot" className="rounded-full" disabled={busy || !name.trim()}>
-            Create
-          </Button>
-        </DialogFooter>
+        <BotForm
+          id="new-bot"
+          className="grid max-h-[70dvh] gap-6 overflow-y-auto px-6 py-6"
+          onCreated={onCreated}
+          footer={(disabled) => (
+            <DialogFooter className="mx-0 mb-0 px-6 py-4">
+              <DialogClose asChild>
+                <Button variant="outline" className="rounded-full">
+                  Cancel
+                </Button>
+              </DialogClose>
+              <Button type="submit" form="new-bot" className="rounded-full" disabled={disabled}>
+                Create
+              </Button>
+            </DialogFooter>
+          )}
+        />
       </DialogContent>
     </Dialog>
   );

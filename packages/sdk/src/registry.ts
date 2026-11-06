@@ -94,11 +94,12 @@ const skillCard = (e: SkillEntry, from: SkillCard["from"]): SkillCard => ({
 });
 
 // A plugin in fxbot's plugins list: its GitHub repository, and the folder it is in, if it isn't the repository's root.
-export type PluginEntry = { name: string; description: string; repo: string; path?: string };
+export type PluginEntry = { name: string; description: string; repo: string; path?: string; note?: string };
 const pluginEntry = (e: PluginEntry) =>
   typeof e?.name === "string" && typeof e.description === "string" && typeof e.repo === "string" && /^[A-Za-z0-9-]{1,39}\/[A-Za-z0-9._-]{1,100}$/.test(e.repo) && (e.path === undefined || typeof e.path === "string");
 const shippedBreaks = () => (JSON.parse(readFileSync(new URL("./plugin-breaks.json", import.meta.url), "utf8")) as { breaks: PluginBreak[] }).breaks.filter(validBreak);
-const shippedPlugins = () => (JSON.parse(readFileSync(new URL("./plugins-registry.json", import.meta.url), "utf8")) as { plugins: PluginEntry[] }).plugins.filter(pluginEntry);
+const shippedList = () => JSON.parse(readFileSync(new URL("./plugins-registry.json", import.meta.url), "utf8")) as { plugins: PluginEntry[]; essentials: string[] };
+const shippedPlugins = () => shippedList().plugins.filter(pluginEntry);
 
 // Three sources of MCP servers. fxbot's own list ships with each release, and with `fxbotUrl`, its published copy
 // replaces it every hour. GitHub's registry is mirrored into Postgres every hour, so that search stays on this
@@ -141,6 +142,8 @@ export function createRegistry({
 }) {
   let ourSkills = fxbotSkills;
   let ourPlugins = fxbotPlugins;
+  // The pack fxbot recommends, by name, in the order they're added: a plugin after what it needs.
+  let ourEssentials = shippedList().essentials;
   let ourBreaks = fxbotBreaks;
   let breaksChanged = () => {};
   const skillSearches = new Map<string, { at: number; entries: SkillEntry[] }>();
@@ -238,9 +241,10 @@ export function createRegistry({
   async function syncPlugins() {
     if (!fxbotPluginsUrl) return;
     const res = await get(fxbotPluginsUrl).catch(() => null);
-    const page = res?.ok ? ((await res.json().catch(() => null)) as { plugins?: unknown } | null) : null;
+    const page = res?.ok ? ((await res.json().catch(() => null)) as { plugins?: unknown; essentials?: unknown[] } | null) : null;
     if (Array.isArray(page?.plugins)) ourPlugins = (page.plugins as PluginEntry[]).filter(pluginEntry);
     else console.error(`fxbot's plugins list didn't answer${res ? ` (HTTP ${res.status})` : ""}; keeping the one it had.`);
+    if (Array.isArray(page?.essentials)) ourEssentials = page.essentials.filter((name) => typeof name === "string");
   }
   // The published list of what releases broke replaces the shipped one; a failed fetch keeps it. It can only stop a plugin.
   async function syncBreaks() {
@@ -412,8 +416,8 @@ export function createRegistry({
       const words = typeof q === "string" ? q.trim().toLowerCase().slice(0, 100) : "";
       const cards = ourPlugins
         .filter((e) => !words || [e.name, e.repo, e.description].some((t) => t.toLowerCase().includes(words)))
-        .map((e): PackageCard => ({ kind: "package", name: e.name.slice(0, 64), iconKey: `${e.repo.split("/")[0]}/${e.name}`, description: e.description.slice(0, 1024), ref: `${e.repo}${e.path ? `/${e.path}` : ""}`, from: "fxbot" }));
-      return { cards };
+        .map((e): PackageCard => ({ kind: "package", name: e.name.slice(0, 64), iconKey: `${e.repo.split("/")[0]}/${e.name}`, description: e.description.slice(0, 1024), ref: `${e.repo}${e.path ? `/${e.path}` : ""}`, from: "fxbot", ...(typeof e.note === "string" ? { note: e.note.slice(0, 200) } : {}) }));
+      return { cards, essentials: ourEssentials.filter((name) => ourPlugins.some((e) => e.name === name)) };
     },
     close: () => clearInterval(timer),
   };

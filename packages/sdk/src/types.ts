@@ -32,8 +32,8 @@ export const maxPinned = 3;
 export type Embedder = "local" | "remote" | "off";
 // `unvetted` shows plugins fxbot doesn't vet: the public registries, and adding by address or repository.
 // `defaultProfile` is the bot whose chat a launch at / opens, or "" for none. `turnsAtOnce` is how many turns run at
-// once, read when fxbot starts.
-export type Settings = { defaultProvider: string; defaultProfile: string; unvetted: boolean; timeZone: string; turnsAtOnce: number; embedder: Embedder; embeddingProvider: string; embeddingModel: string; messageVectors: number };
+// once, read when fxbot starts. `onboarded` says first-run setup is finished or skipped, and `onboardingStep` is where it's up to.
+export type Settings = { defaultProvider: string; defaultProfile: string; unvetted: boolean; timeZone: string; turnsAtOnce: number; onboarded: boolean; onboardingStep: string; embedder: Embedder; embeddingProvider: string; embeddingModel: string; messageVectors: number };
 // What the machine runs as its local embedder, in an install made by setup.sh.
 export type LocalEmbedder = "cpu" | "gpu" | "off";
 // How far memory search's vectors have got: the model in use, or null when it's off or not answering, the counts, and
@@ -234,8 +234,10 @@ export type PackagePreview = {
   needsFxbot?: string;
 };
 // A plugin in fxbot's own list.
-export type PackageCard = { kind: "package"; name: string; iconKey: string; description: string; ref: string; from: "fxbot" };
-export type PackageSearch = { cards: PackageCard[] };
+// `note` is what the owner should know before adding it, such as that it changes the machine.
+export type PackageCard = { kind: "package"; name: string; iconKey: string; description: string; ref: string; from: "fxbot"; note?: string };
+// `essentials` is the pack fxbot recommends, by name, in the order to add them, whatever the search matched.
+export type PackageSearch = { cards: PackageCard[]; essentials: string[] };
 // What the page loads for a running plugin: its page code and its CSS, by URL.
 export type PluginPage = { name: string; iconKey: string; version: string; page?: string; css?: string };
 // Where a registry entry comes from: fxbot's own list, GitHub's registry, or the official one, unmoderated.

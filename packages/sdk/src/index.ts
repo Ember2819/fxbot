@@ -820,6 +820,12 @@ export async function createFxbot(options: FxbotOptions) {
           if (!Number.isInteger(input.turnsAtOnce) || input.turnsAtOnce < 4 || input.turnsAtOnce > 100) fail(400, "Turns at once must be a whole number from 4 to 100.");
           await store.settings.save({ turnsAtOnce: input.turnsAtOnce });
         }
+        // First-run setup: a step, as `<word>`, or `<word>:<what it's working on>`, and finishing it, which can't be undone.
+        if (input.onboardingStep !== undefined) {
+          if (typeof input.onboardingStep !== "string" || !/^[a-z-]{0,32}(:[a-z0-9,-]{1,2000})?$/.test(input.onboardingStep)) fail(400, "That isn't a step.");
+          await store.settings.save({ onboardingStep: input.onboardingStep });
+        }
+        if (input.onboarded === true) await store.settings.save({ onboarded: true });
         // Showing unvetted plugins fills the mirror of GitHub's registry for search.
         if (input.unvetted !== undefined) {
           if (typeof input.unvetted !== "boolean") fail(400, "unvetted must be true or false");

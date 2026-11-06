@@ -1,8 +1,10 @@
 {
+  "essentials": ["permissions", "fresh", "routines", "messages", "chat-rooms", "computer", "chat-rooms-computer"],
   "plugins": [
     {
       "name": "computer",
       "description": "A Linux computer for each bot: a desktop you watch and take over, a terminal, a browser, and files.",
+      "note": "Sets up a computer engine on this machine, then restarts fxbot.",
       "repo": "iammrduncan/fxbot",
       "path": "plugins/computer"
     },

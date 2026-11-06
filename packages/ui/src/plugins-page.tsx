@@ -15,6 +15,7 @@ import { PluginIcon } from "./plugin-icon.tsx";
 import { Blob } from "./blob.tsx";
 import { client } from "./client.ts";
 import { follow, go } from "./nav.ts";
+import { Essentials } from "./add-plugins.tsx";
 import { PluginDialog, PluginSettings, RepoForm, usePackageSearch, type PluginTarget } from "./packages.tsx";
 import { loadPlugins } from "./plugins.tsx";
 import { blurb } from "@/lib/utils";
@@ -216,6 +217,7 @@ export function PluginsPage({ profiles }: { profiles: Profile[] | null }) {
           )}
           {tab === "browse" && (
             <div className="grid gap-6">
+              {!words && <Essentials added={(addons ?? []).map((addon) => addon.name)} onOpen={(card) => setPlugin({ ref: card.ref, from: card.from, name: card.name, iconKey: card.iconKey, description: card.description })} onChange={() => void load()} />}
               <section className="grid gap-2">
                 <h2 className={heading}>fxbot's picks</h2>
                 {picks.map((pick) => (
