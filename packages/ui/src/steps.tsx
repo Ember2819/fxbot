@@ -3,7 +3,8 @@ import { BookOpenIcon, BrainIcon, CircleAlertIcon, CircleCheckIcon, EraserIcon, 
 import { Streamdown } from "streamdown";
 import { Trace, TraceCollapsible, TraceCollapsibleContent, TraceCollapsibleTrigger, TraceDescription, TraceIcon, TraceLine, TraceTitle } from "@/components/ui/trace";
 import type { Part, Turn } from "@fxbot/sdk/client";
-import { PluginPart, usePluginToolView } from "./plugins.tsx";
+import { Fold } from "./fold.tsx";
+import { PluginPart, useFold, usePluginToolView } from "./plugins.tsx";
 
 type Tool = Extract<Part, { type: "tool" }>;
 type Step = Extract<Part, { type: "reasoning" | "tool" }>;
@@ -12,18 +13,23 @@ type Input = Record<string, unknown> | undefined;
 // A tool result shows this much; the bot saw all of it.
 const shownChars = 4000;
 
+type Joined = Extract<Part, { type: "user" }>;
+
 // A reply as it happened, after shadcn's Trace patterns: each run of steps, thinking and tool calls, is one list, and
-// the reply's text sits between runs. Two or more steps in a run fold under one summary, open while the bot works. A
-// message that joined the turn sits where it did, drawn by `said`.
-export function Reply({ turn, said }: { turn: Turn; said?: (message: Extract<Part, { type: "user" }>) => ReactNode }) {
+// the reply's text sits between runs. Two or more steps in a run fold under one summary, open while the bot works. Messages
+// that joined the turn sit where they did, each run of them drawn by `said`.
+export function Reply({ turn, said }: { turn: Turn; said?: (messages: Joined[]) => ReactNode }) {
   const parts = turn.parts ?? [];
   // A turn from an earlier chat has only its text.
   if (!parts.length) return turn.reply ? <Streamdown>{turn.reply}</Streamdown> : turn.done ? null : <p className="animate-pulse text-muted-foreground">Thinking…</p>;
-  const blocks: (string | Step[] | Extract<Part, { type: "user" }>)[] = [];
+  const blocks: (string | Step[] | { joined: Joined[] })[] = [];
   for (const part of parts) {
     const last = blocks.at(-1);
     if (part.type === "text") blocks.push(part.text);
-    else if (part.type === "user") blocks.push(part);
+    else if (part.type === "user") {
+      if (last && typeof last === "object" && "joined" in last) last.joined.push(part);
+      else blocks.push({ joined: [part] });
+    }
     else if (Array.isArray(last)) last.push(part);
     else blocks.push([part]);
   }
@@ -33,23 +39,36 @@ export function Reply({ turn, said }: { turn: Turn; said?: (message: Extract<Par
     ) : Array.isArray(block) ? (
       <Steps key={i} steps={block} working={!turn.done && i === blocks.length - 1} />
     ) : (
-      <Fragment key={i}>{said?.(block) ?? <p className="text-muted-foreground">{block.text}</p>}</Fragment>
+      <Fragment key={i}>{said?.(block.joined) ?? block.joined.map((message, j) => <p key={j} className="text-muted-foreground">{message.text}</p>)}</Fragment>
     ),
   );
 }
 
-function Steps({ steps, working }: { steps: Step[]; working: boolean }) {
+function Steps({ steps: all, working }: { steps: Step[]; working: boolean }) {
   const [open, setOpen] = useState<boolean>();
+  const fold = useFold();
+  // A call a plugin folds is in a pill, not among the steps.
+  const sends = all.filter((s): s is Tool => s.type === "tool" && Boolean(fold.tool(s)));
+  const steps = all.filter((s) => !sends.includes(s as Tool));
+  const pill = sends.length > 0 && (
+    <Fold items={sends.map((call) => ({ sent: true, ...fold.tool(call) }))} busy={sends.some((call) => !call.done)}>
+      {sends.map((call) => (
+        <ToolCard key={call.id} call={call} />
+      ))}
+    </Fold>
+  );
   const rows = steps.map((step, i) =>
     step.type === "reasoning" ? <Thinking key={i} text={step.text} running={working && i === steps.length - 1} /> : <ToolCall key={step.id} call={step} />,
   );
   const tools = steps.filter((s): s is Tool => s.type === "tool");
   const cards = tools.map((call) => <ToolCard key={call.id} call={call} />);
+  if (!steps.length) return pill;
   if (steps.length === 1)
     return (
       <>
         <Trace>{rows}</Trace>
         {cards}
+        {pill}
       </>
     );
   const failed = tools.filter(failedCall).length;
@@ -72,6 +91,7 @@ function Steps({ steps, working }: { steps: Step[]; working: boolean }) {
         </TraceCollapsible>
       </Trace>
       {cards}
+      {pill}
     </>
   );
 }

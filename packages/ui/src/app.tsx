@@ -1,4 +1,4 @@
-import { useEffect, useLayoutEffect, useRef, useState, type FormEvent, type MouseEvent, type ReactNode } from "react";
+import { Fragment, useEffect, useLayoutEffect, useRef, useState, type FormEvent, type MouseEvent, type ReactNode } from "react";
 import { ArrowUpIcon, CheckIcon, ChevronRightIcon, CopyIcon, FileTextIcon, LayoutDashboardIcon, MessageCircleDashedIcon, PanelRightIcon, PaperclipIcon, PinIcon, PinOffIcon, PlusIcon, PuzzleIcon, SettingsIcon, SquareIcon, XIcon } from "lucide-react";
 import { Attachment, AttachmentAction, AttachmentActions, AttachmentContent, AttachmentGroup, AttachmentMedia, AttachmentTitle, AttachmentTrigger } from "@/components/ui/attachment";
 import { Bubble, BubbleContent } from "@/components/ui/bubble";
@@ -38,6 +38,7 @@ import { maxPinned, unreachable, type Color, type Fields, type Profile, type Pro
 import { client } from "./client.ts";
 import { maxFiles, readFile } from "./attachments.ts";
 import { Blob, LookPicker } from "./blob.tsx";
+import { Fold, type Folded } from "./fold.tsx";
 import { BotPanel, usePanel } from "./bot-panel.tsx";
 import { BotMemories } from "./memories.tsx";
 import { PluginsPage, BotPlugins } from "./plugins-page.tsx";
@@ -45,7 +46,7 @@ import { LibraryPage } from "./library.tsx";
 import { Reply } from "./steps.tsx";
 import { follow, go } from "./nav.ts";
 import { Header } from "./header.tsx";
-import { BotsProvider, loadPlugins, MessageBox, Place, SaidText, usePluginNav, usePluginScreen } from "./plugins.tsx";
+import { BotsProvider, loadPlugins, MessageBox, Place, SaidText, useFold, usePluginNav, usePluginScreen } from "./plugins.tsx";
 import { ModelField } from "./providers.tsx";
 import { keepDraft, reload, takeDraft, useNewVersion } from "./pwa.ts";
 import { SettingsScreen } from "./settings.tsx";
@@ -744,12 +745,9 @@ function Chat({ id, profiles, onChange, onShown }: { id: string; profiles: Profi
               <MessageScroller className="flex-1">
                 <MessageScrollerViewport ref={viewport} onScroll={showEarlier}>
                   <MessageScrollerContent className="mx-auto w-full max-w-3xl gap-6 px-4 py-4">
-                    {first === 0 &&
-                      earlier.map((turn) => <TurnView key={turn.messageId} turn={turn} color={profile?.color} skills={skillNames} />)}
+                    {first === 0 && <Thread turns={earlier} color={profile?.color} skills={skillNames} />}
                     {first === 0 && profile?.handoff && <Handoff text={profile.handoff} />}
-                    {turns.slice(first).map((turn) => (
-                      <TurnView key={turn.messageId} turn={turn} color={profile?.color} skills={skillNames} retry={() => send(turn.text, turn.messageId, turn.files ?? [])} />
-                    ))}
+                    <Thread turns={turns.slice(first)} color={profile?.color} skills={skillNames} retry={(turn) => send(turn.text, turn.messageId, turn.files ?? [])} />
                   </MessageScrollerContent>
                 </MessageScrollerViewport>
                 <MessageScrollerButton />
@@ -843,18 +841,18 @@ const bubbles: Record<Color, string> = {
 };
 
 // What the owner or a plugin said, as a turn's opening or where it joined one, in the bot's own color. Skills the
-// message starts with show as chips.
-function Said({ text, files, from, color, skills }: { text: string; files?: Upload[]; from?: string; color?: Color; skills: Set<string> }) {
+// message starts with show as chips. A folded message, opened, isn't the owner's, so it sits on the other side, in grey.
+function Said({ text, files, from, color, skills, folded }: { text: string; files?: Upload[]; from?: string; color?: Color; skills: Set<string>; folded?: boolean }) {
   const named = leadingSkills(text, skills);
   return (
-    <Message align="end">
+    <Message align={folded ? "start" : "end"}>
       <MessageContent>
-        {from && <p className="text-right text-xs text-muted-foreground">From {from}</p>}
+        {from && <p className={`text-xs text-muted-foreground ${folded ? "" : "text-right"}`}>From {from}</p>}
         {named.skills.length ? <SkillChips className="flex-wrap justify-end" names={named.skills} /> : null}
         {files?.length ? <Files className="flex-wrap justify-end" files={files} /> : null}
         {named.rest && (
-          <Bubble align="end" variant="muted">
-            <BubbleContent className="whitespace-pre-wrap" style={color && { background: bubbles[color], color: "#ffffff" }}>
+          <Bubble align={folded ? "start" : "end"} variant="muted">
+            <BubbleContent className="whitespace-pre-wrap" style={color && !folded ? { background: bubbles[color], color: "#ffffff" } : undefined}>
               <SaidText text={named.rest} />
             </BubbleContent>
           </Bubble>
@@ -864,40 +862,117 @@ function Said({ text, files, from, color, skills }: { text: string; files?: Uplo
   );
 }
 
-// One turn: the person's message as the scroll anchor, then the reply as markdown with its actions.
-function TurnView({ turn, color, skills, retry }: { turn: Turn; color?: Color; skills: Set<string>; retry?: () => void }) {
-  return (
-    <>
-      {turn.text || turn.files?.length ? (
-        <MessageScrollerItem messageId={`${turn.messageId}-user`} scrollAnchor>
-          <Said text={turn.text} files={turn.files} from={turn.from} color={color} skills={skills} />
-        </MessageScrollerItem>
-      ) : null}
-      <MessageScrollerItem messageId={`${turn.messageId}-reply`}>
-        <Message>
-          <MessageContent>
-            <Reply turn={turn} said={(message) => <Said {...message} color={color} skills={skills} />} />
-            {turn.handled && <p className="text-sm text-muted-foreground">A plugin took this message.</p>}
-            {turn.note && (
-              <p className="text-sm text-destructive">
-                {turn.note}{" "}
-                {turn.unsent && retry && (
-                  <Button size="xs" variant="outline" onClick={retry}>
-                    Retry
-                  </Button>
-                )}
-              </p>
-            )}
-            {turn.done && turn.reply && (
-              <MessageFooter>
-                <CopyButton text={turn.reply} />
-              </MessageFooter>
-            )}
-          </MessageContent>
-        </Message>
-      </MessageScrollerItem>
-    </>
+type Joined = Extract<NonNullable<Turn["parts"]>[number], { type: "user" }>;
+
+// Messages that joined a turn, in place: each run a plugin folds is one pill, and the rest show as said.
+function JoinedMessages({ messages, color, skills }: { messages: Joined[]; color?: Color; skills: Set<string> }) {
+  const fold = useFold();
+  const folds = (message: Joined) => Boolean(message.id && fold.message(message.id));
+  const runs: Joined[][] = [];
+  for (const message of messages) {
+    const last = runs.at(-1);
+    if (last && folds(message) && folds(last[0])) last.push(message);
+    else runs.push([message]);
+  }
+  return runs.map((run, i) =>
+    folds(run[0]) ? (
+      <Fold key={i} items={run.map((message) => ({ name: message.from, bot: fold.message(message.id!)?.bot }))}>
+        {run.map((message, j) => (
+          <Said key={j} {...message} skills={skills} folded />
+        ))}
+      </Fold>
+    ) : (
+      <Said key={i} {...run[0]} color={color} skills={skills} />
+    ),
   );
+}
+
+// A turn's reply with its actions.
+function TurnReply({ turn, color, skills, retry }: { turn: Turn; color?: Color; skills: Set<string>; retry?: () => void }) {
+  return (
+    <Message>
+      <MessageContent>
+        <Reply turn={turn} said={(messages) => <JoinedMessages messages={messages} color={color} skills={skills} />} />
+        {turn.handled && <p className="text-sm text-muted-foreground">A plugin took this message.</p>}
+        {turn.note && (
+          <p className="text-sm text-destructive">
+            {turn.note}{" "}
+            {turn.unsent && retry && (
+              <Button size="xs" variant="outline" onClick={retry}>
+                Retry
+              </Button>
+            )}
+          </p>
+        )}
+        {turn.done && turn.reply && (
+          <MessageFooter>
+            <CopyButton text={turn.reply} />
+          </MessageFooter>
+        )}
+      </MessageContent>
+    </Message>
+  );
+}
+
+// A chat's turns: the person's message as the scroll anchor, then the reply. What a plugin folds is one pill between the
+// things said to the owner: a run of turns folded whole, and perhaps one whose message alone folds, since its reply is for
+// the owner. The owner's words inside a turn keep it in view, so they never go into a pill.
+function Thread({ turns, color, skills, retry }: { turns: Turn[]; color?: Color; skills: Set<string>; retry?: (turn: Turn) => void }) {
+  const fold = useFold();
+  const runs: { folded: Turn[]; shown?: Turn }[] = [];
+  for (const turn of turns) {
+    const how = fold.message(turn.messageId);
+    const whole = how?.fold === "turn" && !turn.parts?.some((part) => part.type === "user" && !part.from);
+    const last = runs.at(-1);
+    if (!how) runs.push({ folded: [], shown: turn });
+    else if (last?.folded.length && !last.shown) (last.folded.push(turn), (last.shown = whole ? undefined : turn));
+    else runs.push({ folded: [turn], shown: whole ? undefined : turn });
+  }
+  // What a pill counts of a turn: its message, and if it folded whole, what joined it and what it sent. Such a turn ends by
+  // answering what started it, unless that was the last it sent.
+  const counted = (turn: Turn, shown?: Turn) => {
+    const how = fold.message(turn.messageId);
+    const items: Folded[] = [{ name: turn.from, bot: how?.bot }];
+    if (turn === shown) return items;
+    let last: Folded | undefined;
+    for (const part of turn.parts ?? []) {
+      const joined = part.type === "user" && part.id ? fold.message(part.id) : undefined;
+      if (part.type === "user" && joined) items.push({ name: part.from, bot: joined.bot });
+      const sent = part.type === "tool" ? fold.tool(part) : undefined;
+      if (sent) items.push((last = { sent: true, ...sent }));
+    }
+    if (turn.done && turn.reply.trim() && !(last && (last.bot ? last.bot === how?.bot : last.name === turn.from))) items.push({ sent: true, name: turn.from, bot: how?.bot });
+    return items;
+  };
+  return runs.map(({ folded, shown }) => {
+    const first = folded[0];
+    return (
+      <Fragment key={(first ?? shown)!.messageId}>
+        {first && (
+          <MessageScrollerItem messageId={`${first.messageId}-fold`}>
+            <Fold items={folded.flatMap((turn) => counted(turn, shown))} busy={folded.some((turn) => turn !== shown && !turn.done)}>
+              {folded.map((turn) => (
+                <Fragment key={turn.messageId}>
+                  <Said text={turn.text} files={turn.files} from={turn.from} skills={skills} folded />
+                  {turn !== shown && <TurnReply turn={turn} color={color} skills={skills} />}
+                </Fragment>
+              ))}
+            </Fold>
+          </MessageScrollerItem>
+        )}
+        {!first && shown && (shown.text || shown.files?.length) ? (
+          <MessageScrollerItem messageId={`${shown.messageId}-user`} scrollAnchor>
+            <Said text={shown.text} files={shown.files} from={shown.from} color={color} skills={skills} />
+          </MessageScrollerItem>
+        ) : null}
+        {shown && (
+          <MessageScrollerItem messageId={`${shown.messageId}-reply`}>
+            <TurnReply turn={shown} color={color} skills={skills} retry={retry && (() => retry(shown))} />
+          </MessageScrollerItem>
+        )}
+      </Fragment>
+    );
+  });
 }
 
 // Files in the composer, as shadcn's Attachment chips with a remove button, or on a sent message, where images come

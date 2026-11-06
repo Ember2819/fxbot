@@ -34,6 +34,12 @@ import { Reply } from "./steps.tsx";
 export type ToolCall = Extract<Part, { type: "tool" }>;
 // setDraft takes the new text, or a function from the draft to it, as React's setters do.
 export type ComposerProps = { bot: Profile; setDraft: (text: string | ((draft: string) => string)) => void; attach: (files: File[]) => void };
+// What a plugin folds into a pill: a message by its id, with the turn it starts or alone, and the bot it's from, and a
+// tool call that sends one, with the bot it went to.
+export type Fold = {
+  message?: (id: string) => { fold: "turn" | "message"; bot?: string } | void;
+  tool?: (call: ToolCall) => { bot?: string; name?: string } | void;
+};
 type Nav = { label: string; path: string; icon?: ComponentType<{ className?: string }> };
 type Places = {
   routes: { path: string; parts: string[]; Component: ComponentType<{ params: Record<string, string> }> }[];
@@ -46,6 +52,7 @@ type Places = {
   botPanel: ComponentType<{ bot: Profile }>[];
   chat: ComponentType<{ bot: Profile }>[];
   box: ComponentType<any>[];
+  fold: Fold[];
   said: { pattern: RegExp; Component: ComponentType<{ match: RegExpMatchArray }> }[];
   // Places other plugins leave with Slot, by name, such as `chat-rooms.room-header`.
   slots: Map<string, ComponentType<any>[]>;
@@ -53,7 +60,7 @@ type Places = {
 // `key` is the URLs it loaded from, which change with its files.
 type Loaded = { name: string; iconKey: string; key: string; css?: HTMLLinkElement; places: Places };
 
-const emptyPlaces = (): Places => ({ routes: [], sidebar: [], nav: [], composer: [], toolViews: new Map(), settings: [], botSettings: [], botPanel: [], chat: [], box: [], said: [], slots: new Map() });
+const emptyPlaces = (): Places => ({ routes: [], sidebar: [], nav: [], composer: [], toolViews: new Map(), settings: [], botSettings: [], botPanel: [], chat: [], box: [], fold: [], said: [], slots: new Map() });
 
 // The loaded plugins, by name. A change makes a new array, which the places read through usePlugins.
 let loaded: Loaded[] = [];
@@ -65,6 +72,7 @@ export const usePlugins = () => useSyncExternalStore(subscribe, () => loaded);
 // The bots, for `useBots`: the app's own list.
 const BotsContext = createContext<Profile[] | null>(null);
 export const BotsProvider = BotsContext.Provider;
+export const useAppBots = () => useContext(BotsContext);
 
 // Built when a plugin loads, after every module of the page has.
 const ui = () => ({
@@ -96,7 +104,7 @@ function appModule(name: string) {
     applyLine,
     api: (path: string, init?: RequestInit) => fetch(`/api/plugins/${name}/${path.replace(/^\//, "")}`, init),
     go,
-    useBots: () => useContext(BotsContext),
+    useBots: useAppBots,
     // React's, for a plugin that draws a component into DOM it doesn't render, such as an editor's node.
     createPortal,
     // A place in this plugin's page that other plugins fill with app.slot(name, Component), each part in its own
@@ -134,6 +142,7 @@ async function run(name: string, version: string, url: string): Promise<Places> 
     botPanel: (Component: ComponentType<{ bot: Profile }>) => places.botPanel.push(Component),
     chat: (Component: ComponentType<{ bot: Profile }>) => places.chat.push(Component),
     box: (Component: ComponentType<any>) => places.box.push(Component),
+    fold: (fold: Fold) => places.fold.push(fold),
     said: (pattern: RegExp, Component: ComponentType<{ match: RegExpMatchArray }>) => places.said.push({ pattern, Component }),
     slot: (name: string, Component: ComponentType<any>) => places.slots.set(name, [...(places.slots.get(name) ?? []), Component]),
   });
@@ -178,6 +187,22 @@ export function MessageBox({ bot, ...props }: ComponentProps<typeof InputGroupTe
       <Box bot={bot} {...props} />
     </PluginPart>
   );
+}
+
+// How a message or a tool call folds, by the first plugin that says. One that throws folds nothing.
+export function useFold() {
+  const folds = usePlugins().flatMap((plugin) => plugin.places.fold);
+  const first = <T,>(ask: (fold: Fold) => T | void) => {
+    for (const fold of folds) {
+      try {
+        const answer = ask(fold);
+        if (answer) return answer;
+      } catch (error) {
+        console.error("A plugin's fold failed:", error);
+      }
+    }
+  };
+  return { message: (id: string) => first((fold) => fold.message?.(id)), tool: (call: ToolCall) => first((fold) => fold.tool?.(call)) };
 }
 
 // What the owner or a plugin said, with each match of a plugin's `said` pattern drawn by its part.
