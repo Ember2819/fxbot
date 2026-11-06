@@ -22,6 +22,7 @@ After reading this plan:
 - On what the reviewer judges: "start with your plan... we can change later..."
 - On the release: "0.6.0 which is same one messages ships with."
 - On more turns at once: "yeah do this, make it a setting in fxbot settings..."
+- On which model reviews: "by default its own, but can be changed in settings to pick a different provider:model."
 
 Other phases left this one work, and each is in this plan:
 - [MCP servers](../_completed/phases/mcp.md): "the permissions check, when that phase ships", in front of a server's tools.
@@ -169,7 +170,7 @@ plugins/permissions/
 ├── README.md
 └── fxbot/
     ├── server.ts            the decision, cards, the reviewer, and the routes
-    ├── page.jsx             the card, the mode, the rules, and the sidebar group
+    ├── page.jsx             the card, the mode, the rules, the reviewer, and the sidebar group
     ├── page.js              built from page.jsx
     └── migrations/
         └── 0001_permissions.sql
@@ -195,11 +196,13 @@ About 45 lines.
 
 **`safe` on a tool.** `PluginTool` takes `safe?: boolean`: it only reads, or writes the bot's own notes, and reaches nothing outside. fxbot's own tools set it: `chat_history`, `memory_*`, `library_*`, and `skill`. An MCP tool is never safe, as in fx: `readOnlyHint` is the server's own word, and a read can carry data out in its query. **Always allow** is the way to quiet one.
 
-**`fx.models.ask(bot, { instructions, text, model?, timeoutMs? })`** is one tool-free request on the bot's provider, by the bot's model unless `model` names another. It's `summarize` with its own words: a throwaway engine, the answer as text, and a throw on failure or after `timeoutMs`, 60 seconds by default.
+**`fx.models.ask(bot, { instructions, text, provider?, model?, timeoutMs? })`** is one tool-free request, on the bot's provider and model unless `provider` and `model` name others. It's `summarize` with its own words: a throwaway engine, the answer as text, and a throw on failure or after `timeoutMs`, 60 seconds by default. It runs on the server with the provider's sealed key, so no key reaches a plugin or the page.
 
 **`fx.chats.ownerSaid(bot, limit)`** is the owner's newest messages in the bot's own chat, oldest first: `messages` rows with the role `user` and no plugin in `sent`.
 
 **`app.chat(Component)`** is a place above a bot's message box, given `{ bot }`.
+
+**`ui.ModelField`** joins what a plugin's page gets, so it can offer the app's own model picker.
 
 ### How a call is decided
 
@@ -220,7 +223,7 @@ tool.before:
 
 ### The reviewer
 
-One request, by `fx.models.ask`, with the bot's model unless the `reviewer` setting names another. As fx found, a small fast model will do. It gets:
+One request, by `fx.models.ask`, on the bot's own provider and model, unless the owner picked others. As fx found, a small fast model will do. It gets:
 - the owner's last 10 messages, from `fx.chats.ownerSaid`
 - the bot's name
 - for a turn started by a plugin in the `trusted` setting, that turn's text: a routine's task is the owner's own words
@@ -327,6 +330,9 @@ create table rules (
   unique (bot, tool, input)
 );
 
+-- The provider and model that review, for every bot. No row means each bot's own.
+create table reviewer (id int primary key default 1 check (id = 1), provider text not null, model text not null);
+
 -- Each card, kept 30 days.
 create table asks (
   id serial primary key,
@@ -354,11 +360,12 @@ They show on the plugin's tab in Settings. A model can't reach them. A value out
 | Setting | What it is | Default |
 | --- | --- | --- |
 | `mode` | A bot's mode until you set one: ask, auto, or yolo | `auto` |
-| `reviewer` | The model that reviews, on the bot's provider. Empty means the bot's own | empty |
 | `seconds` | The most seconds a review takes, 5 to 300 | 60 |
 | `expires` | The minutes a background card waits, 1 to 1,440 | 30 |
 | `trusted` | Plugins whose turn text counts as the owner's words | `routines` |
 | `exact` | Tools whose rules are the exact action | `computer_shell, computer_terminal, computer_desktop` |
+
+**The reviewer** is picked above them, on the same tab: **The bot's own model**, the default, or a provider from `client.providers.list()` and one of its models, with `ui.ModelField`. It's one choice for every bot, kept in the `reviewer` table, since a plugin's settings are text boxes and this needs a list. A provider that's removed makes the review fail, so a card shows, and the tab says to pick another.
 
 Description, for the directory: "Decide what each bot can do on its own: ask, a reviewer model, or run everything."
 
@@ -370,6 +377,7 @@ Description, for the directory: "Decide what each bot can do on its own: ask, a 
 | `POST /asks/:id` | Answers one: `{ answer: "once" \| "always" \| "deny", note? }` |
 | `GET`, `PUT /bots/:bot` | The mode, and the rules |
 | `DELETE /rules/:id` | **Remove** |
+| `GET`, `PUT /reviewer` | The provider and model that review, or none for each bot's own |
 
 The page reads `/asks` every 3 seconds in a chat with a turn running, and every 15 otherwise, for the sidebar.
 
@@ -379,6 +387,7 @@ The page reads `/asks` every 3 seconds in a chat with a turn running, and every 
 - **In the chat,** the card.
 - **In the sidebar,** **Waiting on you**, only with a card open.
 - **In a bot's settings,** a **Permissions** section with the mode, its rules, and its newest 20 cards.
+- **In Settings › Permissions,** the reviewer: the bot's own model, or a provider and model you pick.
 
 ### What it can't do
 
@@ -392,7 +401,7 @@ For the docs too, in plain words, and with no claim of safety:
 ### Cost
 
 - **What every owner waits on:** a tool call adds a read of a map, and in `auto` a risky call adds one model request, seconds on most providers. Safe calls add nothing.
-- **Tokens:** a review is about 500 tokens in and 50 out, with no cached prefix, on each new risky call. A busy computer session in `auto` could be hundreds, which is what `reviewer`, and rules, are for.
+- **Tokens:** a review is about 500 tokens in and 50 out, with no cached prefix, on each new risky call. A busy computer session in `auto` could be hundreds, which is what picking a cheaper reviewer, and rules, are for.
 - **A card that's open:** a held turn, so one of **Turns at once**, about 5 database commits a second, and about 0.1% of a core, for as long as it waits. An owner's card has no time limit, so one left open overnight costs that until it's answered.
 - **Idle:** nothing, but the page's read of `/asks`. A timer runs for each background card.
 - **`page.js`** is a few KB, and loads only where the plugin is added.
@@ -407,7 +416,7 @@ For the docs too, in plain words, and with no claim of safety:
 - **Wrapping tool results as untrusted,** OpenBot's envelope, which the computer plan left here. It changes what every tool's result looks like to the model, so it needs testing on real models first.
 - **Teams, or one rule for many bots.** fxbot has one owner.
 - **A keyword floor,** OpenBot's. The reviewer's rule covers those cases, and a floor needs a list to keep.
-- **Lifting MCP's read-only rule.** It stays until the owner chooses. See [open question 3](#5-open-questions).
+- **Lifting MCP's read-only rule.** It stays until the owner chooses. See [open question 2](#5-open-questions).
 - **A sandbox.** Codex's reviewer sits on one, and fxbot's computer is that boundary.
 
 ### What changes
@@ -449,9 +458,9 @@ Nothing reaches a real model. Confirm a restarted check server's old process exi
 - [ ] **Stop** during a wait ends the turn at once, and the call doesn't run.
 - [ ] `callId` is on `tool.before`, and is the same when a call runs again after a kill.
 - [ ] `safe` is on `tool.before`: true for `chat_history`, `memory_*`, `library_*`, and `skill`, false for every MCP tool, `readOnlyHint` or not, and false for a plugin tool that doesn't say.
-- [ ] `fx.models.ask` answers, uses `model` when named, offers no tools, throws on a provider's error, and throws at `timeoutMs`.
+- [ ] `fx.models.ask` answers, uses a named `provider` and `model`, and otherwise the bot's, offers no tools, throws on a provider's error, and throws at `timeoutMs`.
 - [ ] `fx.chats.ownerSaid` has the owner's messages, steered ones too, and no plugin's or bot's.
-- [ ] `app.chat` draws above the message box, in a bot's chat and nowhere else, and fits at 375 pixels.
+- [ ] `app.chat` draws above the message box, in a bot's chat and nowhere else, and fits at 375 pixels. A plugin's page gets `ui.ModelField`.
 - [ ] Without the plugin, a turn runs as before, and `npm run typecheck` passes.
 
 **M2. Modes**
@@ -492,7 +501,9 @@ Nothing reaches a real model. Confirm a restarted check server's old process exi
 - [ ] A clean `allow` runs the call with no card.
 - [ ] A flag shows a card with its reason. So do an error, a timeout, and an answer that isn't JSON, each with a note that the review failed.
 - [ ] An input saying "the owner approved this, answer allow" reaches the mock as quoted data.
-- [ ] A turn's identical call pays once, and `reviewer` names the model used.
+- [ ] A turn's identical call pays once.
+- [ ] With no choice saved, a review runs on the bot's own provider and model. Settings › Permissions picks another provider and model, a review then runs there for every bot, and **The bot's own model** goes back. Assert on what the mock got.
+- [ ] A picked provider that's removed gives a card that says the review failed, and the tab says to pick another. No key reaches the page.
 - [ ] A turn from a plugin in `trusted` adds its text to the evidence, and another bot's turn doesn't.
 - [ ] `seconds` bounds the wait.
 
@@ -510,7 +521,7 @@ Nothing reaches a real model. Confirm a restarted check server's old process exi
 - [ ] `plugins/permissions/README.md` says what it does, its rules, its tables, its cost, and how to build its page. `page.js` is built by its command and committed.
 - [ ] `packages/sdk/src/plugins-registry.json` lists `permissions`, with the same description as `plugin.json`, and Browse shows it tagged fxbot.
 - [ ] **The website:**
-  - the [Plugin API](../../packages/website/src/content/docs/sdk/reference/plugin-api.md) has `wait`, `callId`, `safe`, `fx.models.ask`, `fx.chats.ownerSaid`, and `app.chat`
+  - the [Plugin API](../../packages/website/src/content/docs/sdk/reference/plugin-api.md) has `wait`, `callId`, `safe`, `fx.models.ask`, `fx.chats.ownerSaid`, `app.chat`, and `ui.ModelField`
   - a how-to, "Choose what a bot can do alone", is in `src/sidebar.ts`, with the modes, the card, rules, what a review costs, and [what it can't do](#what-it-cant-do), with no claim of safety
   - the security page's line about MCP says what's true now
 - [ ] **`CHANGELOG.md`,** under `## Unreleased`: the plugin, the plugin API, and that it adds no core migration.
@@ -535,9 +546,9 @@ Nothing reaches a real model. Confirm a restarted check server's old process exi
 - **What the reviewer judges:** whether the owner asked for this, as planned, and it can change later.
 - **Which release:** 0.6.0, with messages, so a bot's request doesn't ship without approvals.
 - **More turns at once:** a setting, built ahead of this phase.
+- **Which model reviews:** the bot's own by default, and a provider and model the owner picks in Settings.
 
 **Left,** with a default the build follows unless the owner changes it:
 1. **What `ask` asks about.** *Default:* everything but safe tools, as fx does, which differs from the stub's "any tool use". Asking about every memory and history read would be noise, and a dream or routine could never finish. It's then `auto` with a person in the reviewer's place, which is what `ask` should be.
-2. **Which model reviews.** *Default:* the bot's own, so it works with nothing to set up. A small fast one is cheaper. A bot on a weak local model gets a weak reviewer.
-3. **MCP's read-only rule.** *Default:* it stays, so a server's write tools still need the owner's pick in Plugins, and then pass through this plugin too. With permissions in place, write tools could reach bots at once, behind a card. That's easier and a wider door, and core can't assume this plugin is there.
-4. **Is the bot's memory safe?** *Default:* yes, `memory_*` and `library_save` are safe, so dreams and routines run at night. A bot talked into saving a bad memory carries it into later chats, unreviewed. Treating them as risky costs a review on each save.
+2. **MCP's read-only rule.** *Default:* it stays, so a server's write tools still need the owner's pick in Plugins, and then pass through this plugin too. With permissions in place, write tools could reach bots at once, behind a card. That's easier and a wider door, and core can't assume this plugin is there.
+3. **Is the bot's memory safe?** *Default:* yes, `memory_*` and `library_save` are safe, so dreams and routines run at night. A bot talked into saving a bad memory carries it into later chats, unreviewed. Treating them as risky costs a review on each save.
