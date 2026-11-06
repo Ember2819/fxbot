@@ -316,9 +316,10 @@ export async function createFxbot(options: FxbotOptions) {
   // Each turn's reply is saved after the turn ends, and close waits for the saves.
   const saving = new Set<Promise<void>>();
   type Sent = { text: string; from?: string; steer?: boolean };
-  function finish(id: string, sessionId: string, turn: FxTurn | FxResumeTurn, sent: Sent = { text: "" }, reader?: "own" | "next") {
+  type Stoppable = { cancel(): Promise<void> };
+  function finish({ id, provider }: { id: string; provider: string }, chat: Stoppable, sessionId: string, turn: FxTurn | FxResumeTurn, sent: Sent = { text: "" }, reader?: "own" | "next") {
     // After turn.end, so a plugin hears a turn end before the one behind it starts.
-    const done = saveReply(id, sessionId, turn, sent, reader)
+    const done = saveReply(id, provider, chat, sessionId, turn, sent, reader)
       .catch((error) => console.error("Could not save a reply:", error))
       .then(() => {
         const next = reader && working.get(sessionId)?.[0];
@@ -345,10 +346,34 @@ export async function createFxbot(options: FxbotOptions) {
   const resumed = new Map<string, FxResumeTurn>();
   async function readNext(id: string, sessionId: string) {
     const profile = await store.profiles.get(id);
-    if (profile) finish(id, sessionId, (await open(profile, sessionId)).resume(), undefined, "next");
+    if (!profile) return;
+    const chat = await open(profile, sessionId);
+    finish(profile, chat, sessionId, chat.resume(), undefined, "next");
   }
   const heard = ({ text, from }: Sent) => ({ text, ...(from ? { from } : {}) });
-  async function saveReply(id: string, sessionId: string, turn: FxTurn | FxResumeTurn, sent: Sent, reader?: "own" | "next") {
+
+  // Every session with a turn running, in any chat of any bot, so a bot or a provider that goes can end them. Each keeps
+  // the session it was opened with: an agent that's closing waits for its turns, opens no session, and can still cancel
+  // through one it opened already.
+  type Live = { bot: string; provider: string; chat: Stoppable; messageId?: string | null; turns: number; heardAt: number; inTool: boolean };
+  const live = new Map<string, Live>();
+  async function stopTurns(which: (turn: Live) => boolean) {
+    for (const turn of live.values()) if (which(turn)) await turn.chat.cancel().catch((error) => console.error("Could not stop a turn:", error));
+  }
+  // libfx retries a provider that refuses for as long as it's let, which is for ever, with the bot silent. A turn that's
+  // heard nothing for 5 minutes on a provider still refusing ends, and says why. A slow model refuses nothing.
+  const stuck = new Map<string, string>();
+  const stuckAfter = 5 * 60_000;
+  const sweep = setInterval(() => {
+    for (const turn of live.values()) {
+      const status = providers.refusing(turn.provider);
+      if (!status || turn.inTool || !turn.messageId || Date.now() - turn.heardAt < stuckAfter || stuck.has(turn.messageId)) continue;
+      stuck.set(turn.messageId, `The provider kept refusing this, with HTTP ${status}, so it was stopped after 5 minutes.`);
+      void stopTurns((other) => other === turn);
+    }
+  }, 30_000);
+  sweep.unref();
+  async function saveReply(id: string, provider: string, chat: Stoppable, sessionId: string, turn: FxTurn | FxResumeTurn, sent: Sent, reader?: "own" | "next") {
     let reply = "";
     let failed: string | undefined;
     let cancelled = false;
@@ -370,17 +395,22 @@ export async function createFxbot(options: FxbotOptions) {
     };
     // A "next" reader keeps a turn only if it's a steer's: any other has a reader of its own. A turn that fails at once
     // shows no events, so this comes again after them.
+    const enter = () => {
+      count(id, 1);
+      const entry = live.get(sessionId) ?? { bot: id, provider, chat, turns: 0, heardAt: 0, inTool: false };
+      live.set(sessionId, Object.assign(entry, { messageId: turn.messageId, turns: entry.turns + 1, heardAt: Date.now() }));
+    };
     const claim = () => {
       const steer = turn.messageId ? steers.get(turn.messageId) : undefined;
       if (!steer) return false;
       steers.delete(turn.messageId!);
       sent = steer;
-      count(id, 1);
+      enter();
       working.set(sessionId, [workingOn(id, turn.messageId!, sent), ...(working.get(sessionId) ?? [])]);
       begun(id, sessionId, working.get(sessionId)![0]);
       return (mine = true);
     };
-    if (mine) count(id, 1);
+    if (mine) enter();
     try {
       for await (const event of turn) {
         if (event.type === "user_message" && event.id) steers.delete(event.id);
@@ -396,11 +426,13 @@ export async function createFxbot(options: FxbotOptions) {
           await called(event.id, calls.get(event.id) ?? { name: event.name, input: undefined }, typeof answer === "string" ? answer : (JSON.stringify(answer, (key, value) => (key === "data" ? "[data]" : value)) ?? ""));
           calls.delete(event.id);
         }
+        Object.assign(live.get(sessionId) ?? {}, { messageId: turn.messageId, heardAt: Date.now(), inTool: calls.size > 0 });
       }
       if (!mine && !claim()) return;
       // A turn libfx ends as failed, or as refused, which is how a provider's HTTP error ends one, with the error as its text.
       const end = await turn.result;
       cancelled = end.stopReason === "cancelled";
+      if (cancelled && turn.messageId) failed = stuck.get(turn.messageId);
       if (end.stopReason === "error" || end.stopReason === "refused") failed = ("error" in end && end.error?.message) || reply.trim() || `The turn ended as ${end.stopReason}.`;
     } catch (error) {
       if (mine && turn.messageId) packages.observe("turn.end", { bot: id, session: sessionId, messageId: turn.messageId, ...heard(sent), reply, error: (error as Error).message });
@@ -410,6 +442,8 @@ export async function createFxbot(options: FxbotOptions) {
         await thought();
         for (const [callId, call] of calls) await called(callId, call, "[stopped]");
         count(id, -1);
+        const entry = live.get(sessionId);
+        if (entry && !--entry.turns) live.delete(sessionId);
         if (resumed.get(sessionId) === turn) resumed.delete(sessionId);
         drop(sessionId, turn.messageId);
         if ([...steers.values()].some((steer) => steer.session === sessionId)) void readNext(id, sessionId).catch((error) => console.error("Could not read a steered turn:", error));
@@ -428,7 +462,10 @@ export async function createFxbot(options: FxbotOptions) {
   function withSent(id: string) {
     let rest = "";
     const fill = async (part: string) => {
-      const line: StreamLine | null = part.includes('"turn_start"') || part.includes('"user_message"') ? JSON.parse(part) : null;
+      const line: StreamLine | null = part.includes('"turn_start"') || part.includes('"user_message"') || (stuck.size && part.includes('"turn_end"')) ? JSON.parse(part) : null;
+      // A turn fxbot ended, for a provider that kept refusing, says so.
+      const why = line?.type === "turn_end" && stuck.get(line.messageId!);
+      if (why) return JSON.stringify({ ...line, error: { name: "Error", message: why } }) + "\n";
       // A message that joined a turn has a line of its own, named by `id`.
       if (line?.type === "user_message") {
         const joined = line.id ? await store.sent.get(id, line.id) : null;
@@ -630,25 +667,26 @@ export async function createFxbot(options: FxbotOptions) {
         // at once, which the one after it would miss. The one before it ends first if the chat has gone quiet.
         const before = chat.resume();
         await before.accepted;
-        finish(id, sessionId, before, sent, "next");
+        finish(profile, chat, sessionId, before, sent, "next");
         await chat.steer(joining, { messageId }).catch((error) => {
           steers.delete(messageId);
           throw error;
         });
-        finish(id, sessionId, chat.resume(), sent, "next");
+        finish(profile, chat, sessionId, chat.resume(), sent, "next");
         await history.record(id, sessionId, messageId, "user", text + names);
         return { messageId, sessionId, joined: running.messageId };
       }
       const own = session ? undefined : workingOn(id, messageId, sent);
       if (own && !working.get(sessionId)?.some((t) => t.messageId === messageId)) working.set(sessionId, [...(working.get(sessionId) ?? []), own]);
       // A messageId the session already accepted runs nothing new and resolves to the same ids.
-      const turn = (await open(profile, sessionId, messageId)).prompt(input, { messageId });
+      const chat = await open(profile, sessionId, messageId);
+      const turn = chat.prompt(input, { messageId });
       const accepted = await turn.accepted;
       await history.record(id, accepted.sessionId, messageId, "user", text + names);
       // A turn behind another starts when that one ends.
       const first = own ? working.get(sessionId)?.[0] : workingOn(id, messageId, sent);
       if (first?.messageId === messageId) begun(id, accepted.sessionId, first);
-      finish(id, accepted.sessionId, turn, sent, own && "own");
+      finish(profile, chat, accepted.sessionId, turn, sent, own && "own");
       return accepted;
     } catch (error) {
       if (!session) drop(sessionId, messageId);
@@ -678,7 +716,7 @@ export async function createFxbot(options: FxbotOptions) {
     if (!session) continue;
     const turn = session.resume();
     resumed.set(profile.sessionId, turn);
-    finish(profile.id, profile.sessionId, turn, undefined, "own");
+    finish(profile, session, profile.sessionId, turn, undefined, "own");
   }
 
   return {
@@ -714,6 +752,7 @@ export async function createFxbot(options: FxbotOptions) {
       },
       async remove(id: string) {
         await get(id);
+        await stopTurns((turn) => turn.bot === id);
         await store.profiles.remove(id);
       },
       // Stops the turn running in the bot's own chat, whoever started it. A message that hadn't joined it runs next.
@@ -800,7 +839,7 @@ export async function createFxbot(options: FxbotOptions) {
       list: () => providers.list(),
       add: (input: NewProvider) => providers.add(input),
       update: (id: string, input: ProviderUpdate) => providers.update(id, input),
-      remove: (id: string) => providers.remove(id),
+      remove: (id: string) => providers.remove(id, () => stopTurns((turn) => turn.provider === id)),
       models: (id: string) => providers.models(id),
       teams: (id: string) => providers.teams(id),
     },
@@ -898,6 +937,7 @@ export async function createFxbot(options: FxbotOptions) {
     // Waits for the turns this process started and the saves of their replies, with the plugins, MCP servers, and
     // skills they use still there, then stops those and lets Postgres go.
     async close() {
+      clearInterval(sweep);
       await providers.close();
       await Promise.all(saving);
       await packages.close();

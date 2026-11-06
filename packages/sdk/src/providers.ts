@@ -1,4 +1,4 @@
-import { createFxAgent, type FxAgent, type FxAgentTool, type FxCustomProviderModel, type FxProviderCredentials } from "libfx";
+import { createFxAgent, type FxAgent, type FxAgentEvent, type FxAgentTool, type FxCustomProviderModel, type FxProviderCredentials } from "libfx";
 import * as chatgpt from "libfx/chatgpt";
 import type { Durability } from "libfx/durable-world";
 import * as grok from "libfx/grok";
@@ -71,6 +71,8 @@ export async function createProviders({ store, secretKey, durability, vercelClie
   const agents = new Map<string, { agent: FxAgent; models: Record<string, FxCustomProviderModel> | null }>();
   // Why a provider has no agent, such as a secret that will not open. The server keeps running.
   const errors = new Map<string, string>();
+  // The last refusal each provider gave, until it next answers. libfx retries one out of sight, for as long as it's let.
+  const refused = new Map<string, { status: number; at: number }>();
 
   // One queue per provider, so its tokens are renewed once at a time: by libfx for turns and by the SDK for its own calls.
   const locks = new Map<string, Promise<unknown>>();
@@ -118,12 +120,14 @@ export async function createProviders({ store, secretKey, durability, vercelClie
     const apiKey = await keyOf(record);
     if (record.kind === "gateway") return { apiKey: apiKey ?? fail(400, "This provider has no key.") };
     const provider = { name: `p-${record.id}`, baseUrl: record.baseUrl!, models: {} };
-    if (record.kind !== "opencode" && record.kind !== "opencode-go") return { provider, ...(apiKey ? { credentials: async () => ({ apiKey }) } : {}) };
+    // Read at each request, so a key that's replaced or removed stops working at once, even for a turn already running.
+    const key = async () => (await keyOf(record)) ?? fail(400, "This provider has no key.");
+    if (record.kind !== "opencode" && record.kind !== "opencode-go") return { provider, ...(apiKey ? { credentials: async () => ({ apiKey: await key() }) } : {}) };
     // OpenCode routes each conversation by its `x-opencode-session` header, which Go requires. Only credentials() learns
     // a request's session, so the key handed to libfx carries it, and opencodeFetch moves it into the header.
     return {
       provider,
-      credentials: async ({ sessionId }: { sessionId?: string }) => ({ apiKey: sessionId ? `${apiKey} session=${sessionId}` : apiKey }),
+      credentials: async ({ sessionId }: { sessionId?: string }) => ({ apiKey: sessionId ? `${await key()} session=${sessionId}` : await key() }),
       fetch: opencodeFetch(fetch),
     };
   }
@@ -140,6 +144,11 @@ export async function createProviders({ store, secretKey, durability, vercelClie
         model: "fxbot-unset",
         durability,
         tools,
+        onEvent: (event: FxAgentEvent) => {
+          if (event.type !== "transport.response") return;
+          if (event.status >= 400) refused.set(record.id, { status: event.status, at: Date.now() });
+          else refused.delete(record.id);
+        },
         ...provider,
       } as Parameters<typeof createFxAgent>[0]);
       agents.set(record.id, { agent, models: (provider.provider as { models?: Record<string, FxCustomProviderModel> })?.models ?? null });
@@ -148,10 +157,13 @@ export async function createProviders({ store, secretKey, durability, vercelClie
     }
   }
 
-  async function stop(id: string) {
+  // Closing an agent waits for its running turns, so one that's closing is kept: a second call waits for the same close.
+  const stopping = new Map<string, Promise<void>>();
+  function stop(id: string) {
     const entry = agents.get(id);
     agents.delete(id);
-    await entry?.agent.close();
+    if (entry) stopping.set(id, entry.agent.close().finally(() => stopping.delete(id)));
+    return stopping.get(id);
   }
 
   // Closing an agent waits for its running turns. A turn asking for it meanwhile waits for the new one.
@@ -213,6 +225,11 @@ export async function createProviders({ store, secretKey, durability, vercelClie
     options,
     // The agent for a bot's provider, with the model metadata libfx reads when a turn opens its engine (libfx 0.0.16,
     // checked by hand). Vision stays on when unknown, so images are still tried.
+    // The status a provider has been refusing with, if it did in the last 90 seconds.
+    refusing(id: string) {
+      const last = refused.get(id);
+      return last && Date.now() - last.at < 90_000 ? last.status : undefined;
+    },
     async agentFor(id: string, model: string) {
       await restarts.get(id);
       const entry = agents.get(id) ?? fail(400, errors.get(id) ?? "This bot's provider is gone. Pick another in its settings.");
@@ -290,20 +307,28 @@ export async function createProviders({ store, secretKey, durability, vercelClie
       const apiKey = input.apiKey === undefined ? undefined : text(input.apiKey, "apiKey", 4096);
       if (apiKey === "" && preset.connect === "key") fail(400, "apiKey is required");
       if (apiKey !== undefined || next.baseUrl !== current.baseUrl) await models.check(next, { apiKey: apiKey ?? (await keyOf(current)) });
+      // An agent reads a custom provider's key at each request, once it has one, so a new key needs no new agent. Closing
+      // the old one would wait for its turns, which may be stuck on the key this replaces.
+      const keyed = current.kind !== "gateway" && Boolean(await keyOf(current));
       await store.sql.begin(async (tx) => {
         await store.providers.save(next, tx as unknown as Sql);
         if (apiKey) await secrets.put(id, { apiKey }, tx as unknown as Sql);
       });
       if (apiKey !== undefined || next.baseUrl !== current.baseUrl || next.teamId !== current.teamId) await models.forget(id);
-      if (apiKey !== undefined || next.baseUrl !== current.baseUrl || next.teamId !== current.teamId || next.contextWindow !== current.contextWindow) await restart(next);
+      if ((apiKey !== undefined && !keyed) || next.baseUrl !== current.baseUrl || next.teamId !== current.teamId || next.contextWindow !== current.contextWindow) await restart(next);
       return listed(id);
     },
 
-    async remove(id: string) {
+    // `stopTurns` ends what's running on it, which closing the agent waits for. A tool that ignores that gets 15 seconds:
+    // the key goes either way, and a request after that fails.
+    async remove(id: string, stopTurns: () => Promise<void>) {
       await record(id);
       const bots = await store.profiles.usingProvider(id);
       if (bots) fail(400, `${bots} bot${bots === 1 ? " uses" : "s use"} this provider. Move ${bots === 1 ? "it" : "them"} to another first.`);
-      await stop(id);
+      await stopTurns();
+      // A restart under way would bring the agent back, so it finishes first.
+      const closed = (async () => (await restarts.get(id), await stop(id)))();
+      await Promise.race([closed, new Promise((done) => setTimeout(done, 15_000).unref())]);
       await store.providers.remove(id);
       secrets.forget(id);
       await models.forget(id);

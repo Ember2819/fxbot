@@ -26,6 +26,10 @@ The kinds of provider in **Add provider…**, in **Settings** › **Providers**.
 - A device code sign-in runs on the server. The page gets the link, the code, and when it expires.
 - Keys and tokens are stored sealed. See the [security model](/docs/explanation/security/).
 
+A new key works from the next request, even for a turn already running. **Remove** ends whatever is still running on a provider first, in any chat, and its key stops working at once.
+
+When a provider keeps refusing, such as with a rate limit, libfx tries again by itself. After 5 minutes of nothing but refusals, fxbot stops the turn, and the chat says why. A model that's only slow is left alone.
+
 ## Model lists
 
 - fxbot keeps each provider's model list in Postgres and answers with it at once. A list older than 5 minutes is fetched again behind that answer, and a failed fetch keeps the old list.
