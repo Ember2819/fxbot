@@ -1,0 +1,5 @@
+{
+  "name": "@fxbot/plugin-messages",
+  "private": true,
+  "type": "module"
+}

@@ -1,0 +1,20 @@
+{
+  "name": "messages",
+  "version": "0.1.0",
+  "description": "Your bots message each other in their own chats, and you watch them work together.",
+  "license": "Apache-2.0",
+  "extensions": {
+    "sh.fxbot": {
+      "server": "./fxbot/server.ts",
+      "page": "./fxbot/page.js",
+      "migrations": "./fxbot/migrations",
+      "settings": [
+        { "name": "conversation", "description": "The most messages in one conversation, 1 to 100", "default": "20" },
+        { "name": "perTurn", "description": "The most messages one turn sends, 1 to 20", "default": "5" },
+        { "name": "perHour", "description": "The most messages between two bots in an hour, 1 to 1000", "default": "60" },
+        { "name": "minutes", "description": "The most minutes a bot works on one message, 1 to 240", "default": "15" },
+        { "name": "calls", "description": "The most tool calls in one message's turn, 1 to 1000", "default": "100" }
+      ]
+    }
+  }
+}

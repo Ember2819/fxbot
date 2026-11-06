@@ -1,0 +1,90 @@
+# messages
+
+A plugin for [fxbot](https://fxbot.sh): the owner's bots message each other in their own chats, so one can ask another for what it knows, or hand it a job, and the owner sees the work where it happens.
+
+Add it from **Plugins**, where fxbot's list has it. It runs inside fxbot: read its code there before you add it. It needs fxbot 0.6.0 or newer. See [Let bots work together](https://fxbot.sh/docs/how-to/let-bots-work-together/).
+
+## A message
+
+- **Sending:** a bot calls `messages_send` with `to`, `text`, and optionally `reply: false` and `files`. Who it's from, its conversation, and what it answers come from the call and the rows, never from the model.
+- **Where it goes:** the receiver's own chat, shown as "From Bob" with the sender's words. A working bot takes it in where it is, through core's steering, and an idle one wakes. A message with an image waits for the running turn, since joining would end it, and so does a message to a turn that takes none.
+- **What the model gets:** a frame that opens by saying this isn't from the owner, with the words quoted, what the sender can't OK, and whether a reply is expected. libfx labels every steer as the user's, so the frame is what says otherwise. When libfx lets a steer name its author, core passes it.
+- **Who a bot can reach:** the others the plugin is on for, named in its instructions, each with its line from **Messages** in its settings. Any can reach any: the plugin's switch for each bot is how an owner narrows it.
+
+## Replies
+
+A message's `reply` is `yes`, `no`, or `maybe`. A send to the bot whose message reached this turn is a reply: the plugin sets `answers` to that message, and `answered_at` on it.
+
+When a turn a `yes` message started ends:
+
+| How it ended | What the asker gets |
+| --- | --- |
+| It failed, or the owner stopped it | A note, with no reply needed |
+| Its last act was a send to the asker | Nothing more |
+| Its last message is empty, `(no reply)`, or libfx's `Done.` | A note: it finished without an answer |
+| Otherwise | Its last message, as a `maybe`, with what the turn saved |
+
+A `yes` message that joined a turn and stayed unanswered gets one turn of its own, `messages-again-<id>`, since that turn's last message is for someone else. A turn a `no` message reached can't message that sender. Every note is `no`, so notes don't chain.
+
+## Limits
+
+- **A conversation** starts when a turn no message started sends one, follows the work across bots, and stops at `conversation` messages, or at the owner's **Stop**. The count and the write are one step, under a lock, so parallel sends can't pass it. What the server sends counts too: at the budget, a last message isn't sent, and the log says so.
+- **A turn** sends at most `perTurn`, raised before anything waits.
+- **Two bots** send at most `perHour` between them.
+- **A repeat** is one message: its key is a hash of the turn, the receiver, and the words. A call cut off by a crash runs again and lands on its row.
+- **A turn a message started** stops at `minutes` and `calls`. A turn it only joined keeps whatever limits it had.
+
+Nothing is retried. A turn has effects, and a bot can ask again.
+
+## The screen
+
+**Messages**, at `/messages`, shows each conversation as one thread, newest first, with its count, each message's state, **Stop** while one runs, and **Older**. It reads again every 5 seconds while a message is out. A row opens that bot's chat. **Stop** marks the conversation, cancels the turns its messages started, and cancels a waiting one when it starts. The sender hears nothing, and a turn a message only joined goes on.
+
+A send shows in the sender's reply as a card: who it's to, the words, and how it went.
+
+## Settings
+
+| Setting | What it is | Default |
+| --- | --- | --- |
+| `conversation` | The most messages in one conversation, 1 to 100 | `20` |
+| `perTurn` | The most messages one turn sends, 1 to 20 | `5` |
+| `perHour` | The most messages between two bots in an hour, 1 to 1,000 | `60` |
+| `minutes` | The most minutes a bot works on one message, 1 to 240 | `15` |
+| `calls` | The most tool calls in one message's turn, 1 to 1,000 | `100` |
+
+A value outside its range means its default, with a line in the plugin's log.
+
+## Tables
+
+In the plugin's own schema, `plugin_messages`, from `fxbot/migrations/0001_messages.sql`:
+- `conversations`: each thread, by the turn that began it, and when it was stopped
+- `messages`: each message, its words, who it's from and to, what it answers, the turn it started or joined, and how it went
+- `roles`: what each bot does, for the others
+
+Each send deletes conversations older than 30 days. Removing the plugin drops the schema. What was said stays in the chats.
+
+## Cost
+
+- **Each message of any bot:** one in-memory check per tool call. Every request of every bot carries the tool's definition, about 120 tokens, cached with the rest. Plugin tools join every agent, so a bot the plugin is off for carries it too.
+- **Each chat that opens:** one read of the bots and their lines, and one short entry in its instructions.
+- **Idle:** nothing, but a timer for each message working.
+- **A message to an idle bot:** one turn at its whole chat, cached where the provider caches. This is the cost to watch: a conversation of 20 messages is at most 20 turns.
+- **A message to a working bot:** no new turn.
+- **Storage:** 30 days of rows. The turns are in the chats, so a message adds no session.
+
+## Files
+
+| File | What it is |
+| --- | --- |
+| `plugin.json` | Its name, its parts, and its settings |
+| `fxbot/server.ts` | The tool and its guards, delivery, the reply rule, limits, and the routes |
+| `fxbot/migrations/0001_messages.sql` | Its three tables |
+| `fxbot/page.jsx` | The Messages screen, the card in a reply, and the line in a bot's settings |
+| `fxbot/page.js` | `page.jsx`, built |
+| `package.json` | `"type": "module"`, for the server code |
+
+Build `page.js` from this folder with:
+
+```sh
+npx rolldown fxbot/page.jsx --format cjs -e react -e react/jsx-runtime -e @fxbot/app --file fxbot/page.js
+```

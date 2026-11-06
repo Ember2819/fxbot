@@ -35,6 +35,12 @@
       "description": "Bots run saved tasks on a schedule, such as a morning summary, and tell you in their chat.",
       "repo": "iammrduncan/fxbot",
       "path": "plugins/routines"
+    },
+    {
+      "name": "messages",
+      "description": "Your bots message each other in their own chats, and you watch them work together.",
+      "repo": "iammrduncan/fxbot",
+      "path": "plugins/messages"
     }
   ]
 }
