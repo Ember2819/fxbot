@@ -7,7 +7,7 @@
 - **Replies are real messages.** A bot can say "got it, I'll work on it", go and do it, and send the result. A message expects a reply, and one that needs none says so.
 - **The server keeps it bounded.** A conversation has a budget of messages, and **Stop** ends it.
 
-Status: planned on 2026-11-05, at the owner's word, and rewritten the same day after the owner read the first plan, to work the way Grok Bot does. Researched against the research directive's references, OpenClaw, Hermes Agent, and Letta, and for Grok Bot its docs and outside reviews. Not built. It's for 0.6.0.
+Status: built on 2026-11-06, for 0.6.0, as planned the day before at the owner's word, and rewritten after the owner read the first plan, to work the way Grok Bot does. Researched against the research directive's references, OpenClaw, Hermes Agent, and Letta, and for Grok Bot its docs and outside reviews. Where the build differs from the plan, [What the build changed](#what-the-build-changed) says so.
 
 ## What the owner asked
 
@@ -27,19 +27,19 @@ After reading this plan:
 
 ## 0. Core or plugin
 
-**A plugin**, `messages` ([Core or plugin](../../CONVENTIONS.md#core-or-plugin)). Not every bot needs it, and an owner with one bot has no use for it.
+**A plugin**, `messages` ([Core or plugin](../../../CONVENTIONS.md#core-or-plugin)). Not every bot needs it, and an owner with one bot has no use for it.
 
-[Routines](../_completed/phases/routines.md#the-core-pieces) built the pieces this plan shared with it: `fx.bots.on`, `shown`, `messageId` on tool calls, `fx.library.list`, and `app.toolView`'s `open`. Working in a bot's own chat needs four more, about 105 lines:
+[Routines](routines.md#the-core-pieces) built the pieces this plan shared with it: `fx.bots.on`, `shown`, `messageId` on tool calls, `fx.library.list`, and `app.toolView`'s `open`. Working in a bot's own chat needs four more, about 105 lines:
 - **Steering.** A message to a bot that's working joins its turn. This one is for every bot, and it's most of the core work: it changes what happens when the owner writes to a busy bot, and it's core because a chat is.
 - **Stop in a bot's chat.** Also for every bot. A steer waits for a running tool, and a tool can run for 10 minutes, so the owner needs a way to end a turn.
 - **`label` on `fx.chats.send`:** who the chat says a message is from, so it reads "From Bob" and not "From messages".
 - **`fx.chats.cancel(bot)`, with no session:** stops a turn this plugin started in a bot's own chat, and no other.
 
-[Chat rooms](../_completed/phases/chat-rooms.md#cross-bot-messaging) said this phase would use its counting, and now it does: a budget for each conversation, as a room has for each of the owner's messages.
+[Chat rooms](chat-rooms.md#cross-bot-messaging) said this phase would use its counting, and now it does: a budget for each conversation, as a room has for each of the owner's messages.
 
 ## 1. Research
 
-Read from source unless marked, in clones made on 2026-11-04. Paths are relative to each repository. [Chat rooms' research](../_completed/phases/chat-rooms.md#1-research) covers Slack, AutoGen, CrewAI, CAMEL, and how conversations between models go wrong, and isn't repeated here.
+Read from source unless marked, in clones made on 2026-11-04. Paths are relative to each repository. [Chat rooms' research](chat-rooms.md#1-research) covers Slack, AutoGen, CrewAI, CAMEL, and how conversations between models go wrong, and isn't repeated here.
 
 ### The directive's references
 
@@ -103,7 +103,7 @@ Read on 2026-11-05 from its docs, as Markdown, and from reviews. It's a few mont
 - **What it costs.** "Every Bot reply counts toward your usage, including replies in a group and messages between Bots."
 - **Who it acts for.** "A handoff needs a Bot acting for one person on that turn." A personal bot in a shared Slack channel can't hand off.
 - **Advice.** "Ask for a single owner at each stage. Parallel handoffs create duplicate work and noisy updates."
-- **Background work has less authority.** Approvals from "work that started without you, like a routine, a trigger, or a message from another Bot, expires after about 30 minutes", and email from "a routine, an incoming message, or other work you didn't start" waits as a draft. Auto Review also covers "delegation such as Cloud Agent and subagent launches", though the docs don't say whether that takes in a message to another bot. See [Permissions](permissions.md).
+- **Background work has less authority.** Approvals from "work that started without you, like a routine, a trigger, or a message from another Bot, expires after about 30 minutes", and email from "a routine, an incoming message, or other work you didn't start" waits as a draft. Auto Review also covers "delegation such as Cloud Agent and subagent launches", though the docs don't say whether that takes in a message to another bot. See [Permissions](../../phases/permissions.md).
 - **The sidebar tells them apart:** "**Needs attention** for a question, approval, or handoff", "**Unread activity** for a new result", and "Working or typing status". (`settings-and-notifications`)
 - **Not documented:** how an acknowledgement is treated, whether a reply is told apart from a new request, and what stops two bots thanking each other.
 
@@ -521,7 +521,7 @@ Description, for the directory: "Your bots message each other in their own chats
 - **Unread and "needs attention" marks in the sidebar,** as Grok has. The hopping bot and the preview stay as they are.
 - **Nudging a stalled handoff.** The screen shows a message waiting.
 - **Rules for who may message whom, pair by pair.** See [open question 1](#5-open-questions).
-- **Approvals,** for what a bot does on another's word. That's [Permissions](permissions.md).
+- **Approvals,** for what a bot does on another's word. That's [Permissions](../../phases/permissions.md).
 - **Sending to every bot,** or by tag.
 - **Bots on other machines,** A2A, or OpenClaw's Reef.
 - **Letting the owner write as a bot.**
@@ -561,103 +561,103 @@ Nothing reaches a real model. Confirm a restarted check server's old process exi
 - **If it must be cut,** the screen's **Older** goes first, then each bot's line, then files. The guards, the reply rule, and both Stops stay.
 
 **M1. Core: steering**
-- [ ] **While the model writes:** the owner's message joins the turn, the reply goes on from it, and the mock's next request has it.
-- [ ] **While a tool runs:** it waits for the tool, then joins. A message sent then shows at once in the page.
-- [ ] **With nothing running:** it's a normal turn, with its reply saved and `turn.end` heard.
-- [ ] **In the chat:** a steered message shows as the owner's bubble, in place among the steps, live, after a reload, and in an earlier chat, with its files. The page's own copy of it doesn't show twice.
-- [ ] **A steer that comes too late:** one sent as a turn ends runs as the next turn, with its reply saved, and the bot isn't left busy.
-- [ ] A text file joins. A picture from the owner ends the running turn, as libfx has it, and runs next, with what the bot had written kept.
-- [ ] A skill named in a steered message reaches the bot. `chat_history` finds a steered message.
-- [ ] **A turn that takes no steers:** the owner's message during a routine's told turn waits, then runs with its tools on. A plugin's message without `steer` waits too, as before.
-- [ ] Two steers in a row both join, in order. A repeated `messageId` runs nothing new.
-- [ ] A message hook can change or handle a steered message.
-- [ ] After a restart mid-turn, a steered message is still in the chat, and the turn goes on.
+- [x] **While the model writes:** the owner's message joins the turn, the reply goes on from it, and the mock's next request has it.
+- [x] **While a tool runs:** it waits for the tool, then joins. A message sent then shows at once in the page.
+- [x] **With nothing running:** it's a normal turn, with its reply saved and `turn.end` heard.
+- [x] **In the chat:** a steered message shows as the owner's bubble, in place among the steps, live, after a reload, and in an earlier chat, with its files. The page's own copy of it doesn't show twice.
+- [x] **A steer that comes too late:** one sent as a turn ends runs as the next turn, with its reply saved, and the bot isn't left busy.
+- [x] A text file joins. A picture from the owner ends the running turn, as libfx has it, and runs next, with what the bot had written kept.
+- [x] A skill named in a steered message reaches the bot. `chat_history` finds a steered message.
+- [x] **A turn that takes no steers:** the owner's message during a routine's told turn waits, then runs with its tools on. A plugin's message without `steer` waits too, as before.
+- [x] Two steers in a row both join, in order. A repeated `messageId` runs nothing new.
+- [x] A message hook can change or handle a steered message.
+- [x] After a restart mid-turn, a steered message is still in the chat, and the turn goes on. One still waiting for a tool at the crash reaches the bot, but doesn't show. See [What the build changed](#what-the-build-changed).
 
 **M2. Core: Stop and labels**
-- [ ] `fx.chats.send(bot, { text, shown, label })`: the chat shows "From <label>" above `shown`, live and after a reload, and hooks still get the plugin's name in `from`. Without `label`, messages show as before.
-- [ ] `fx.chats.cancel(bot)` stops a turn this plugin started in the bot's own chat, answers 409 for the owner's turn or another plugin's, and answers quietly when nothing runs.
-- [ ] **Stop in the chat:** while a turn runs and the box is empty, the button is **Stop**. It ends the turn as stopped, a command on the bot's computer stops too, and a steer it hadn't read runs next. Typing brings the send button back. At 375 pixels it fits.
-- [ ] `POST /api/profiles/:id/stop` answers for an idle bot, and a bot that doesn't exist.
-- [ ] `npm run typecheck` passes.
+- [x] `fx.chats.send(bot, { text, shown, label })`: the chat shows "From <label>" above `shown`, live and after a reload, and hooks still get the plugin's name in `from`. Without `label`, messages show as before.
+- [x] `fx.chats.cancel(bot)` stops a turn this plugin started in the bot's own chat, answers 409 for the owner's turn or another plugin's, and answers quietly when nothing runs.
+- [x] **Stop in the chat:** while a turn runs and the box is empty, the button is **Stop**. It ends the turn as stopped, a command on the bot's computer stops too, and a steer it hadn't read runs next. Typing brings the send button back. At 375 pixels it fits.
+- [x] `POST /api/profiles/:id/stop` answers for an idle bot, and a bot that doesn't exist.
+- [x] `npm run typecheck` passes.
 
 **M3. Sending, and the guards**
-- [ ] `messages_send` from a bot's own chat makes a row and a turn in the receiver's own chat, shown as "From <sender>" with the sender's words, and the tool answers "Sent to Philly as m:<id>."
-- [ ] To a bot that's working, it joins that turn instead, shown the same way, and `messages.turn` names the turn.
-- [ ] `to` takes a name in any case, and an id.
-- [ ] **Each refusal answers its sentence, and starts no turn:**
+- [x] `messages_send` from a bot's own chat makes a row and a turn in the receiver's own chat, shown as "From <sender>" with the sender's words, and the tool answers "Sent to Philly as m:<id>."
+- [x] To a bot that's working, it joins that turn instead, shown the same way, and `messages.turn` names the turn.
+- [x] `to` takes a name in any case, and an id.
+- [x] **Each refusal answers its sentence, and starts no turn:**
   - to itself
   - to an unknown bot, listing who it can reach
   - to a bot the plugin is off for
   - from a name two bots share, until it uses an id
   - with text over 8,000 characters, or more than 5 files, or a file that isn't the sender's
   - a bot with no provider
-- [ ] **The cap:** a turn with 8 parallel calls sends exactly `perTurn`, and a later turn can send again.
-- [ ] **The rate:** the message past `perHour` between two bots is refused, in either direction, and another pair isn't affected.
-- [ ] **The key:** the same call twice in one turn is one message, and the second answers "You already sent Bob exactly this". A server killed during the call runs it again and makes no second message. The same words in a new turn are a new message.
-- [ ] A bot's input can't change who it's from: an extra `from`, `answers`, or `conversation` field does nothing.
-- [ ] The `instructions` line lists the bots it can reach, with their lines, leaves out one the plugin is off for, and a bot with no one to reach gets none.
+- [x] **The cap:** a turn with 8 parallel calls sends exactly `perTurn`, and a later turn can send again.
+- [x] **The rate:** the message past `perHour` between two bots is refused, in either direction, and another pair isn't affected.
+- [x] **The key:** the same call twice in one turn is one message, and the second answers "You already sent Bob exactly this". A server killed during the call runs it again and makes no second message. The same words in a new turn are a new message.
+- [x] A bot's input can't change who it's from: an extra `from`, `answers`, or `conversation` field does nothing.
+- [x] The `instructions` line lists the bots it can reach, with their lines, leaves out one the plugin is off for, and a bot with no one to reach gets none.
 
 **M4. In the chats**
-- [ ] **What the mock is sent:** the frame, opening that this isn't from the owner, with the words quoted, what the bot can't OK, and that a reply is expected. The mock sees the receiver's own chat as context. Inside libfx's steering wrapper, the frame is whole.
-- [ ] A message with an image waits for the running turn to end, and the turn isn't cancelled.
-- [ ] The sender's chat shows the send as a card, out of the fold, with "To <bot>" and the words.
-- [ ] The receiver hops in the sidebar while it works, and its preview follows its reply.
-- [ ] A chat on a turn that takes no steers takes a message after it, and a start-over in progress holds it. The row is `waiting` until `turn.start`.
-- [ ] `chat_history` finds a message in both bots' chats.
-- [ ] A routine's run and a room's turn can send, and the reply lands in the sender's own chat.
+- [x] **What the mock is sent:** the frame, opening that this isn't from the owner, with the words quoted, what the bot can't OK, and that a reply is expected. The mock sees the receiver's own chat as context. Inside libfx's steering wrapper, the frame is whole.
+- [x] A message with an image waits for the running turn to end, and the turn isn't cancelled.
+- [x] The sender's chat shows the send as a card, out of the fold, with "To <bot>" and the words.
+- [x] The receiver hops in the sidebar while it works, and its preview follows its reply.
+- [x] A chat on a turn that takes no steers takes a message after it, and a start-over in progress holds it. The row is `waiting` until `turn.start`.
+- [ ] `chat_history` finds a message in both bots' chats. In the receiver's, yes. See [What the build changed](#what-the-build-changed).
+- [x] A routine's run and a room's turn can send, and the reply lands in the sender's own chat.
 
 **M5. The reply rule**
-- [ ] **The owner's case:** Philly sends "got it" with `reply: false`, works, and ends with a last message. Bob's chat gets both, in order. The first can't message Philly back, and the second can.
-- [ ] A turn that ends with no send sends its last message, once, as a `maybe`, with `answers` set.
-- [ ] A turn that sends its answer, then says "Sent.", sends one message: the closing words don't go.
-- [ ] A turn that sends "got it", calls a tool, and ends sends its last message too.
-- [ ] `(no reply)`, no text, or libfx's "Done." on a `yes` message tell the asker "finished without an answer", once.
-- [ ] A `no` or `maybe` message's turn sends nothing by itself.
-- [ ] From a turn woken by a `no` message, a send to its sender is refused, and a send to a third bot works.
-- [ ] A `no` message that joined a turn holds that turn to the same rule, after a restart too.
-- [ ] A `yes` message that joined a turn and was answered with `messages_send` adds nothing when the turn ends.
-- [ ] One left unanswered gets a turn of its own, once, and the first turn's last message doesn't go to the asker.
-- [ ] A reply from a turn that took messages from two conversations counts in the asker's.
-- [ ] From a turn woken by a `maybe`, a follow-up works, and expects a reply.
-- [ ] After a restart mid-turn, the turn resumes in the chat and the rule still runs, and at worst says something twice.
+- [x] **The owner's case:** Philly sends "got it" with `reply: false`, works, and ends with a last message. Bob's chat gets both, in order. The first can't message Philly back, and the second can.
+- [x] A turn that ends with no send sends its last message, once, as a `maybe`, with `answers` set.
+- [x] A turn that sends its answer, then says "Sent.", sends one message: the closing words don't go.
+- [x] A turn that sends "got it", calls a tool, and ends sends its last message too.
+- [x] `(no reply)`, no text, or libfx's "Done." on a `yes` message tell the asker "finished without an answer", once.
+- [x] A `no` or `maybe` message's turn sends nothing by itself.
+- [x] From a turn woken by a `no` message, a send to its sender is refused, and a send to a third bot works.
+- [x] A `no` message that joined a turn holds that turn to the same rule, after a restart too.
+- [x] A `yes` message that joined a turn and was answered with `messages_send` adds nothing when the turn ends.
+- [x] One left unanswered gets a turn of its own, once, and the first turn's last message doesn't go to the asker.
+- [x] A reply from a turn that took messages from two conversations counts in the asker's.
+- [x] From a turn woken by a `maybe`, a follow-up works, and expects a reply.
+- [x] After a restart mid-turn, the turn resumes in the chat and the rule still runs, and at worst says something twice.
 
 **M6. Conversations**
-- [ ] Every send from one outside turn shares a conversation, and the owner's next message starts a new one.
-- [ ] It follows the work: Bob to Philly to Eve is one conversation, with one count.
-- [ ] **The budget:** with `conversation` at 6, two bots told to keep talking stop at 6, the next send answers its sentence, and exactly 6 turns ran. Parallel sends can't pass it.
-- [ ] **No loop:** with a mock told to send on every turn, three bots in a ring stop at the budget.
-- [ ] After a restart mid-conversation, the count holds.
+- [x] Every send from one outside turn shares a conversation, and the owner's next message starts a new one.
+- [x] It follows the work: Bob to Philly to Eve is one conversation, with one count.
+- [x] **The budget:** with `conversation` at 6, two bots told to keep talking stop at 6, the next send answers its sentence, and exactly 6 turns ran. Parallel sends can't pass it.
+- [x] **No loop:** with a mock told to send on every turn, three bots in a ring stop at the budget.
+- [x] After a restart mid-conversation, the count holds.
 
 **M7. Stopping and failures**
-- [ ] **Stop on a conversation:** a turn it started is cancelled, one that's waiting is cancelled when it starts, a turn it only joined goes on, new sends are refused, and the sender hears nothing.
-- [ ] **Stop in the chat** on a message's turn: the row is `stopped`, and the sender hears "The owner stopped Philly."
-- [ ] **The time limit:** with `minutes` at 1 and a mock that never answers, a turn a message started is cancelled, the row is `failed`, and the sender hears once. On a computer, the command stops too. A turn a message joined isn't limited.
-- [ ] **The call limit:** past `calls`, a call is blocked with its sentence, and the turn ends.
-- [ ] An error in the turn tells the sender once, and no notice starts another.
-- [ ] A sender deleted meanwhile leaves the row, and a line in the log.
+- [x] **Stop on a conversation:** a turn it started is cancelled, one that's waiting is cancelled when it starts, a turn it only joined goes on, new sends are refused, and the sender hears nothing.
+- [x] **Stop in the chat** on a message's turn: the row is `stopped`, and the sender hears "The owner stopped Philly."
+- [x] **The time limit:** with `minutes` at 1 and a mock that never answers, a turn a message started is cancelled, the row is `failed`, and the sender hears once. On a computer, the command stops too. A turn a message joined isn't limited.
+- [x] **The call limit:** past `calls`, a call is blocked with its sentence, and the turn ends.
+- [x] An error in the turn tells the sender once, and no notice starts another.
+- [x] A sender deleted meanwhile leaves the row, and a line in the log.
 
 **M8. Files, roles, and the screen**
-- [ ] A file sent with a message shows under it in the receiver's chat, opens from the library, which keeps one copy, and reaches the model. One past the limits is named.
-- [ ] The rule that sends a last message sends what the turn saved.
-- [ ] A bot's line saves in its settings, shows in others' rosters, and an empty one leaves just the name.
-- [ ] The sidebar's footer has **Messages**, and `/messages` shows conversations newest first, each with its messages, states, count, and **Stop**, with **Older**.
-- [ ] A row opens that bot's chat, and a running message changes by itself when it ends.
-- [ ] Conversations older than 30 days go at the next send.
-- [ ] With one bot, it says what it's for.
-- [ ] At 375 pixels wide there's no sideways scroll, and the page logs no errors. Load 5173 as well as the build.
+- [x] A file sent with a message shows under it in the receiver's chat, opens from the library, which keeps one copy, and reaches the model. One past the limits is named.
+- [x] The rule that sends a last message sends what the turn saved.
+- [x] A bot's line saves in its settings, shows in others' rosters, and an empty one leaves just the name.
+- [x] The sidebar's footer has **Messages**, and `/messages` shows conversations newest first, each with its messages, states, count, and **Stop**, with **Older**.
+- [x] A row opens that bot's chat, and a running message changes by itself when it ends.
+- [x] Conversations older than 30 days go at the next send.
+- [x] With one bot, it says what it's for.
+- [x] At 375 pixels wide there's no sideways scroll, and the page logs no errors. Load 5173 as well as the build.
 
 **M9. Package, docs, and checks**
-- [ ] `plugins/messages/README.md` says what it does, its rules, its tables, its cost, and how to build its page. `page.js` is built by its command and committed.
-- [ ] `packages/sdk/src/plugins-registry.json` lists `messages`, with the same description as `plugin.json`, and Browse shows it tagged fxbot.
-- [ ] **The website:**
-  - the [Plugin API](../../packages/website/src/content/docs/sdk/reference/plugin-api.md) has `label`, `steer`, `joined`, and `cancel` with no session
+- [x] `plugins/messages/README.md` says what it does, its rules, its tables, its cost, and how to build its page. `page.js` is built by its command and committed.
+- [x] `packages/sdk/src/plugins-registry.json` lists `messages`, with the same description as `plugin.json`, and Browse shows it tagged fxbot.
+- [x] **The website:**
+  - the [Plugin API](../../../packages/website/src/content/docs/sdk/reference/plugin-api.md) has `label`, `steer`, `joined`, and `cancel` with no session
   - the docs say a message to a working bot joins what it's doing, and when it doesn't
   - a how-to, "Let bots work together", is in `src/sidebar.ts`, and says when to use a room, what a conversation costs, and that a bot can ask any other bot the plugin is on for to act
-- [ ] **`CHANGELOG.md`,** under `## Unreleased`: the plugin, steering, **Stop** in a chat, the plugin API, and that it adds no core migration.
-- [ ] `npm run typecheck`, `npm run build`, `npm run build-site`, and `git diff --check` pass. The new files are checked for whitespace too.
-- [ ] The core and plugin line counts are within the bound.
-- [ ] This doc's Status says built, with what the build changed. It moves to `docs/_completed/phases/`, and `AGENTS.md` lists it.
-- [ ] The work is committed on the open release branch, the core, the plugin, and the docs in separate commits, and not pushed.
+- [x] **`CHANGELOG.md`,** under `## Unreleased`: the plugin, steering, **Stop** in a chat, the plugin API, and that it adds no core migration.
+- [x] `npm run typecheck`, `npm run build`, `npm run build-site`, and `git diff --check` pass. The new files are checked for whitespace too.
+- [x] The core and plugin line counts are within the bound.
+- [x] This doc's Status says built, with what the build changed. It moves to `docs/_completed/phases/`, and `AGENTS.md` lists it.
+- [x] The work is committed on the open release branch, the core, the plugin, and the docs in separate commits, and not pushed.
 
 **The human runs these:**
 - **A real errand:** ask one bot to find something only another knows. Watch both chats: it asks, the other says it's on it, does the work, and answers, and the first tells you in its own words.
@@ -678,5 +678,25 @@ Nothing reaches a real model. Confirm a restarted check server's old process exi
 - **Which release:** 0.6.0.
 
 **Left,** with a default the build follows unless the owner changes it:
-1. **Who may message whom.** *Default:* any bot the plugin is on for can reach any other, as on Grok ("There is no switch for this"), OpenClaw, and Hermes, and the owner narrows it with the plugin's switch for each bot. The risk is OpenClaw's: "Send-only access is permission to ask the target agent to act." A message reaches a bot's own chat, with all its tools, and libfx labels a steer as the user's words, so only the frame says otherwise. A routine can start one with no one watching. A bot talked into it by a page could ask a bot with a computer to run something, until [Permissions](permissions.md) is built. OpenBot's directed grants, off by default, close that, at about 60 lines and one more step before anything works.
+1. **Who may message whom.** *Default:* any bot the plugin is on for can reach any other, as on Grok ("There is no switch for this"), OpenClaw, and Hermes, and the owner narrows it with the plugin's switch for each bot. The risk is OpenClaw's: "Send-only access is permission to ask the target agent to act." A message reaches a bot's own chat, with all its tools, and libfx labels a steer as the user's words, so only the frame says otherwise. A routine can start one with no one watching. A bot talked into it by a page could ask a bot with a computer to run something, until [Permissions](../../phases/permissions.md) is built. OpenBot's directed grants, off by default, close that, at about 60 lines and one more step before anything works.
 2. **A message to an idle bot wakes it.** *Default:* yes, as on Grok, since nothing reaches a chat without a turn. A "got it" to an idle bot costs a turn at its whole chat. Showing it without a turn needs a core way to post to a chat, which would serve dreams and routines too.
+
+## What the build changed
+
+- **Two more pieces of core.** `turn.end` says `cancelled`, since "the owner stopped Philly" has to read differently from an error. And in a bot's own chat, `turn.start` comes when a turn starts, not when it's accepted behind another, which is what makes a row's `waiting` true. Core keeps each own chat's turns in order to do it, which also tells `fx.chats.cancel(bot)` what's really running.
+- **How a steer is read.** The plan read `session.resume()` after each steer. Timed around a turn's end, that lost about 1 in 40: libfx started a steer that came too late before the reader had looked at the stream, so its reply wasn't saved and `turn.end` never came. Now a steer has a reader on each side of it, the first to find its turn keeps it, and a steer not yet in a turn is kept in memory until it shows. That turn gets `turn.start` and `turn.end`, under its own `messageId`. 120 tries around a turn's end lost none and read none twice. A very narrow gap remains: if both readers miss one, the chat still shows it, but its reply isn't in `chat_history`, and the plugin's reminder covers the message.
+- **A skill in a message.** libfx ends the running turn for any block that isn't text, which takes in the resource a skill goes as. So a steer sends a skill as text, and the message joins. Without this, `$skill` in a working bot's chat would have ended its turn.
+- **A picture while a tool runs** lets the tool finish, and the turn ends `end_turn`. While the model writes, it ends `cancelled`, as planned. Either way the picture runs next, and what the bot did stays.
+- **A steer waiting for a tool at a crash.** The resumed turn takes it in, so the model has it, but libfx writes no `user_message` line then, so the chat doesn't show it. A steer the turn had already taken shows as usual. It's in `chat_history` either way.
+- **`chat_history` in the sender's chat.** It searches messages, not tool calls, so a message is found in the receiver's chat, and in the sender's only as far as the sender wrote about it. The box stays open, since finding it there needs a way to save a tool call as a message.
+- **The budget is a transaction, not one statement.** Under read committed, a send waiting on a lock still reads the count from before the other's write, so the one statement in the plan could leak. The check and the write run in a transaction, under an advisory lock.
+- **The key comes first,** before the budget, so a call cut off by a crash lands on its row, even at the budget. A row still `waiting` from before a restart is delivered again, which its `messageId` makes safe.
+- **What the server sends counts toward the budget,** so the check of exactly 6 turns holds. At the budget, a last message isn't sent, and the plugin's log says so.
+- **A reminder has the whole frame,** not just the words, since it's a turn of its own with another bot's words in it. It waits 2 seconds, because a steer left at a turn's end may be starting a turn of its own, and shows as "From Messages".
+- **A last message is cut at 8,000 characters,** and only what the turn generated goes with it, so a file the bot was sent doesn't go back.
+- **The roster** writes a bot's line in brackets, "Philly (runs the deploys)", and not "who runs the deploys", since an owner's line won't always follow "who".
+- **The computer's kill never worked.** M2's check showed `sleep` still running after **Stop**: `kill -KILL -- -<id>` ran under `sh`, which on Debian is dash, and it refuses that form, and the failure was swallowed. So since the computer plugin began, a cancelled turn's command ran on to its own timeout, routines' time limit included. `kill -s KILL` works in both shells, in a commit of its own.
+- **The screen's styles.** A plugin page gets only the classes the app itself uses, so its widths are inline. `Header`'s title is a prop.
+- **libfx's author.** At the owner's word, the fork's work on `session.steer(input, { messageId, author: "agent" })` is under way upstream. When it's released, `deliver` passes it for a plugin's message, and the frame can stop saying the model will see it as the user's.
+- **Nothing was cut:** **Older**, each bot's line, and files are all built.
+- **The size:** a net 139 core lines, and 641 of the plugin, within the bound.

@@ -48,6 +48,7 @@ Each call is one route of the [HTTP API](/sdk/reference/http-api/). They mirror 
 | `profiles.list()` | `GET /api/profiles` | `Profile[]` |
 | `profiles.get(id)` | `GET /api/profiles/<id>` | `Profile` |
 | `profiles.create(fields)` | `POST /api/profiles` | `Profile` |
+| `profiles.stop(id)` | `POST /api/profiles/<id>/stop` | `{ ok: true }` |
 | `profiles.update(id, fields)` | `PATCH /api/profiles/<id>` | `Profile` |
 | `profiles.remove(id)` | `DELETE /api/profiles/<id>` | `{ ok: true }` |
 | `profiles.earlier(id)` | `GET /api/profiles/<id>/earlier` | `Turn[]` |
@@ -63,7 +64,7 @@ Each call is one route of the [HTTP API](/sdk/reference/http-api/). They mirror 
 
 | Call | Route | Returns |
 | --- | --- | --- |
-| `send(id, message)` | `POST /api/profiles/<id>/messages` | `{ messageId, sessionId }` |
+| `send(id, message)` | `POST /api/profiles/<id>/messages` | `{ messageId, sessionId }`, and `joined`, the running turn's `messageId`, when the message joined it |
 | `stream(id, options?)` | `GET /api/profiles/<id>/stream?cursor=` | An async generator of `StreamLine` |
 
 `send` resolves once the server has stored the message. The reply arrives on the stream.
@@ -162,6 +163,7 @@ stream(id: string, options?: { cursor?: number; session?: string; signal?: Abort
 | `text_delta` | Adds `delta` to `reply`, and to the last part when it is text, or else to a new text part. Separate text parts are joined in `reply` with a blank line. |
 | `reasoning_delta` | Adds `delta` to the last part when it is reasoning, or else to a new reasoning part |
 | `tool_start` | Adds a tool part with its `id`, `name`, and `input`, or `inputPreview` for a large input |
+| `user_message` | Adds a `user` part to the running turn, `{ type: "user", id, text, files?, from? }`, and drops the turn the page made for that message. |
 | `tool_end` | Ends the tool part of the same `id`, with `output` from `content` and `error` from `isError`. A tool that started before the replay's cursor is added here. |
 | `turn_end` | Sets `done`. `note` is `Error: <message>` for an error, or `Stopped: <stopReason>` when the reason isn't `end_turn`. A tool still running is marked done. |
 | Any other type | Nothing |
@@ -199,6 +201,7 @@ A turn from `profiles.earlier` has `reply` and no `parts`.
 | `type` | `string` | The line's type |
 | `messageId` | `string` | The turn it belongs to |
 | `input` | `unknown` | The message on `turn_start`, or a tool's arguments on `tool_start` |
+| `text` | `string` | A message's words, on `user_message` |
 | `files` | `Upload[]` | A message's files, on `turn_start` |
 | `delta` | `string` | New text, on `text_delta` and `reasoning_delta` |
 | `id` | `string` | A tool call's id, which pairs `tool_start` with `tool_end` |

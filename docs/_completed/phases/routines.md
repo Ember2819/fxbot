@@ -25,7 +25,7 @@ After reading the plan, on 2026-11-05:
 
 **The time zone is core.** Where the owner lives is true of the whole install, and plugins plug into it: dreams has a clock already, and routines is the second. Each with a setting of its own means setting it twice, and forgetting one runs on the server's zone, which is UTC in a release. Dreams did that to the owner's dev install: 03:00 was about 9 in the evening.
 
-`fx.chats` starts turns already. The plugin API widens by five small pieces. The first three, about 15 lines, are ones [cross-bot messaging](../../phases/cross-bot-messaging.md) needs too, and whichever phase is built first adds them:
+`fx.chats` starts turns already. The plugin API widens by five small pieces. The first three, about 15 lines, are ones [cross-bot messaging](cross-bot-messaging.md) needs too, and whichever phase is built first adds them:
 - **`fx.bots.on(bot)`:** whether this plugin is on for a bot. Today a plugin finds out only by whether its `instructions` hook reached a session, after a turn has started.
 - **`shown` on `fx.chats.send`:** what the chat shows in place of the text the model gets.
 - **`messageId` on tool calls and the tool hooks:** the turn a call belongs to, so a plugin can treat its own turns differently.
@@ -197,7 +197,7 @@ plugins/routines/
 
 ### The core pieces
 
-The first three are the same in [cross-bot messaging](../../phases/cross-bot-messaging.md#the-core-pieces). A phase built second finds them done. The last two are this phase's.
+The first three are the same in [cross-bot messaging](cross-bot-messaging.md#the-core-pieces). A phase built second finds them done. The last two are this phase's.
 
 **`fx.bots.on(bot)`**, in `PluginApi` (`plugin-api.ts`), built in `plugins.ts:521` as `bots: { ...host.bots, on: (bot) => applies(plugin, bot) }`:
 

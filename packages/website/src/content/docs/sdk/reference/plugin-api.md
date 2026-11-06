@@ -89,14 +89,15 @@ Handlers run in the order the plugins were added, and change the event's fields 
 | `instructions` | Each time a chat opens | `bot`, `session`, `instructions`, a list | Add, change, or remove entries |
 | `tool.before` | Before every tool call: fxbot's, MCP servers', skills', and plugins' | `bot`, `session`, `messageId`, the message whose turn it's in, since 0.6.0, `tool`, `input` | Change `input`, or answer `{ block: reason }`, which the model gets as a failed call |
 | `tool.after` | After it | the same, with `result`, or `error` when it failed | Change `result` |
-| `turn.start` | Once libfx stores the prompt | `bot`, `session`, `messageId`, `text`, `from` | Observe |
-| `turn.end` | When the turn ends | the same, with `reply`, and `error` when it failed, as when the provider answered with an error | Observe |
+| `turn.start` | Once libfx stores the prompt, or since 0.6.0, in a bot's own chat, when the turn it waited behind ends | `bot`, `session`, `messageId`, `text`, `from` | Observe |
+| `turn.end` | When the turn ends | the same, with `reply`, `error` when it failed, as when the provider answered with an error, and `cancelled` when it was stopped, since 0.6.0 | Observe |
 | `settings` | The owner changed its settings | `settings` | Observe |
 | `dependents` | A plugin that needs this one was added, updated, or removed | `dependents`, as `fx.dependents()` gives them | Observe |
 
 - `message`, `instructions`, `tool.before`, and `tool.after` handlers get 5 seconds each. One that throws or runs late is logged and skipped, except `tool.before`, where it blocks the call.
 - `turn.start` and `turn.end` run beside the turn, and never hold it up.
 - `from` is the plugin that sent the message, when one did.
+- A message that joins a running turn runs the `message` hook as ever, and has no `turn.start` or `turn.end` of its own: those are the running turn's. See [Turns](#turns).
 - A message that a `message` hook handled answers `send` with `{ messageId, sessionId, handled: true }`.
 - `{ startOver: { ask } }`, since 0.5.0, starts the bot's own chat over before the message runs: the bot's model summarizes the chat, answering `ask`, up to 16 KiB of text, and the bot starts a new chat from that summary, as a provider switch does. The message then goes to the new chat as the owner's. It applies only to the bot's own chat, only to a chat with messages, and only once for a message: a retry of one that went through doesn't start over again. The other plugins' hooks still run, and the first `startOver` counts. A message left with no text and no files answers `handled: true`. A summary that fails fails the send, with 502, and nothing moves. The fresh plugin, in fxbot's `plugins/fresh`, is one.
 
@@ -168,9 +169,17 @@ A plugin's turns run as the owner's do, with the same hooks, history, library, a
 | Call | What it does |
 | --- | --- |
 | `fx.chats.newSession(bot)` | A session of the plugin's own for the bot, on the bot's provider now. Keep its id. |
-| `fx.chats.send(bot, { text, shown?, files?, session?, messageId? })` | A message. `shown`, since 0.6.0, is what the chat shows of it, when that isn't `text`, which the model gets. Without `session`, it goes to the bot's own chat, which shows it as "From <plugin>". With one, it stays out of the bot's chat, its earlier chats, and its preview, and `chat_history` still finds it. `messageId` defaults to a new UUID. |
+| `fx.chats.send(bot, { text, shown?, label?, steer?, files?, session?, messageId? })` | A message. `shown`, since 0.6.0, is what the chat shows of it, when that isn't `text`, which the model gets. Without `session`, it goes to the bot's own chat, which shows it as "From <plugin>". With one, it stays out of the bot's chat, its earlier chats, and its preview, and `chat_history` still finds it. `messageId` defaults to a new UUID. |
 | `fx.chats.stream(bot, session, cursor?)` | That session's lines, as NDJSON, from `cursor` on, then each new one. The same lines as [`fxbot.stream`](/sdk/how-to/stream-replies/). |
-| `fx.chats.cancel(bot, session)` | Stops the turn running in one of the plugin's own sessions, if one runs. It ends `cancelled`, and the session's stream says so. Since 0.4.1. |
+| `fx.chats.cancel(bot, session?)` | Stops the turn running in one of the plugin's own sessions, if one runs. It ends `cancelled`, and the session's stream says so. Since 0.4.1. With no `session`, since 0.6.0, it stops the turn running in the bot's own chat, if this plugin started it. Any other turn there throws with `status` 409, and with nothing running it does nothing. |
+
+In a bot's own chat, since 0.6.0, `send` also takes these, and its answer has `joined`:
+
+| Field | What it does |
+| --- | --- |
+| `label` | Who the chat says the message is from, in place of the plugin's name. Hooks still get the plugin in `from`. |
+| `steer` | `true` lets the message join a turn that's running, instead of waiting behind it, when that turn takes messages: the owner's turns, and plugin turns sent with `steer`. The turn this message starts takes messages the same way. A message with an image never joins, since that would end the running turn. |
+| `joined` | In the answer: the `messageId` of the turn the message joined, when it did. Its text reaches that turn, and the turn's hooks stay that turn's. A message that came just too late runs as a turn of its own, under its own `messageId`, with `turn.start` and `turn.end`. |
 
 A session belongs to the provider it started on. After the bot moves to another provider, `send` and `stream` for it fail with `status` 409: make a new one.
 

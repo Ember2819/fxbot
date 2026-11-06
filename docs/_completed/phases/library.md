@@ -571,7 +571,7 @@ Answered on 2026-11-01.
 | Question | Decision |
 | --- | --- |
 | What happens to a bot's items when it is deleted? | They stay. Their tags lose the bot, and the library shows "Removed bot". |
-| What can a bot's tools reach? | Only items tagged for that bot, for now. [Cross-bot messaging](../../phases/cross-bot-messaging.md) may widen this later. |
+| What can a bot's tools reach? | Only items tagged for that bot, for now. [Cross-bot messaging](cross-bot-messaging.md) may widen this later. |
 | Which tools? | `library_save`, `library_search`, and `library_read` |
 | What is one item? | One file, by the SHA-256 of its bytes, across the whole system. The same bytes saved again, from any chat or bot, under any name, tag the existing item. |
 | What does the grid look like? | Even square tiles |

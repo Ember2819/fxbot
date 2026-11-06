@@ -142,6 +142,7 @@ A file's answer has these headers:
 | `GET` | `/api/profiles/<id>` | | `Profile` |
 | `PATCH` | `/api/profiles/<id>` | Any of the fields, and `pinned` | `Profile` |
 | `DELETE` | `/api/profiles/<id>` | | `{ "ok": true }` |
+| `POST` | `/api/profiles/<id>/stop` | | `{ "ok": true }`. Stops the turn running in the bot's own chat, if one runs. Since 0.6.0. |
 | `GET` | `/api/profiles/<id>/earlier` | | `Turn[]`: the chats before the current one |
 | `GET` | `/api/profiles/<id>/skills` | | `BotSkill[]`: the bot's skills, then its plugins' commands, with `command: true` |
 | `GET` | `/api/profiles/<id>/memories` | `?query=&limit=` | `Memory[]` |

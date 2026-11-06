@@ -350,7 +350,7 @@ The plugin's version goes to 0.2.0. An install on 0.4.0 that added rooms gets it
 
 ### Cross-bot messaging
 
-[Cross-bot messaging](../../phases/cross-bot-messaging.md) plans a `send` tool for bots to message each other outside rooms. Rooms don't need it: a room's handoffs are its mentions.
+[Cross-bot messaging](cross-bot-messaging.md) plans a `send` tool for bots to message each other outside rooms. Rooms don't need it: a room's handoffs are its mentions.
 
 The guards are the same in both, and set by the server:
 - a count per chain

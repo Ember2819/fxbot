@@ -12,7 +12,7 @@ This follows the fx CLI modes (ask / auto / full-access) and reviewer models doc
 
 ## When no one is there to answer
 
-Some work starts without the owner: a [routine](../_completed/phases/routines.md), a trigger, or [a message from another bot](cross-bot-messaging.md). An approval it raises can't wait for ever, and the turn holding it holds the bot's chat. Grok Bot's rules are the ones to follow ([approvals](https://docs.x.ai/grok-bot/approvals-security-and-privacy) and [security](https://docs.x.ai/grok-bot/security), read on 2026-11-05):
+Some work starts without the owner: a [routine](../_completed/phases/routines.md), a trigger, or [a message from another bot](../_completed/phases/cross-bot-messaging.md). An approval it raises can't wait for ever, and the turn holding it holds the bot's chat. Grok Bot's rules are the ones to follow ([approvals](https://docs.x.ai/grok-bot/approvals-security-and-privacy) and [security](https://docs.x.ai/grok-bot/security), read on 2026-11-05):
 - **Work from a chat the owner is in waits.** "When the work started from a chat message, the card waits for an answer and doesn't expire on a timer."
 - **Work that started without them expires.** "When a routine, an incoming message, or other background work raised the card, it expires after 30 minutes."
 - **An expired approval is a no.** "A closed card shows **Expired** and says the Bot didn't do the action." The call fails, with that reason.

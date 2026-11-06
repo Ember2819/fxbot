@@ -89,6 +89,7 @@ Each line has a `type`. A line of a turn has the turn's `messageId`, and every l
 | `reasoning_delta` | The next piece of the model's thinking, in `delta`, when the provider sends it. |
 | `tool_start` | A tool call: its `id`, `name`, and `input`, or `inputPreview` for an input over 64 KiB. |
 | `tool_end` | The call's result, by the same `id`: `content`, and `isError` when it failed. |
+| `user_message` | A message joined the running turn, whose `messageId` this has. `id` is the message's own, `text` its words, and `files` and `from` as on `turn_start`. Since 0.6.0. |
 | `turn_end` | The turn ended, and `stopReason` says how: `end_turn` normally, another reason such as `max_output_tokens`, or `error`, with the reason in `error`. |
 | `turn_resume` | A turn left open by a stopped process runs again. Its reply starts over. |
 

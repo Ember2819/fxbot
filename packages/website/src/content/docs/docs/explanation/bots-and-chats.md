@@ -15,6 +15,17 @@ Each bot has one long-running chat, a durable libfx session on the server. The p
 
 Every message is also kept in Postgres, and each bot has a `chat_history` tool that searches its own messages, across all its chats, and reads them in full around a match. So a bot can look up what was said in an earlier chat, or long ago. It reaches only its own chats.
 
+## A message to a working bot
+
+You don't wait for a bot to finish. A message you write while it works joins what it's doing: a reply it's writing is cut short, and it goes on with your words in mind. While a tool runs, your message waits for the tool, then joins, so the chat shows it where the bot took it in, among its steps. If nothing is running, it's an ordinary turn.
+
+Some messages don't join:
+
+- A picture of yours ends the running turn and runs next, since it's usually a change of course. What the bot had done stays.
+- A turn that only passes something on, such as a routine's result, takes no messages. A message waits for it, for the few seconds it takes.
+
+To end a turn instead, press **Stop**, where the send button is while the box is empty. It doesn't wait for a running tool, and a command on the bot's computer stops too. Anything you sent that the bot hadn't read runs next, so nothing you wrote is lost.
+
 ## The default bot
 
 One bot can be the default, picked in **Settings** › **General**. Opening fxbot at its address then opens that bot's chat, where it left off, instead of the list of bots. A link to another screen opens that screen, and a reload stays where it was. Deleting the bot clears the choice.
