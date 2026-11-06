@@ -460,8 +460,16 @@ function DesktopCall({ call }) {
 // Whether the computer is on for a bot, from the list of plugins, read once a page load.
 let plugins;
 async function onFor(bot) {
-  const mine = (await (plugins ??= client.plugins.list())).find((p) => p.name === "computer");
-  return Boolean(mine?.enabled && (mine.bots === "all" || mine.on?.includes(bot)));
+  for (;;) {
+    try {
+      const mine = (await (plugins ??= client.plugins.list())).find((p) => p.name === "computer");
+      return Boolean(mine?.enabled && (mine.bots === "all" || mine.on?.includes(bot)));
+    } catch {
+      // It fails while fxbot restarts. Kept, that would hide the computer here until a reload.
+      plugins = undefined;
+      await new Promise((done) => setTimeout(done, 3000));
+    }
+  }
 }
 
 const Monitor = () => (

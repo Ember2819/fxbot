@@ -13697,8 +13697,13 @@ function DesktopCall({ call }) {
 }
 let plugins;
 async function onFor(bot) {
-	const mine = (await (plugins ??= _fxbot_app.client.plugins.list())).find((p) => p.name === "computer");
-	return Boolean(mine?.enabled && (mine.bots === "all" || mine.on?.includes(bot)));
+	for (;;) try {
+		const mine = (await (plugins ??= _fxbot_app.client.plugins.list())).find((p) => p.name === "computer");
+		return Boolean(mine?.enabled && (mine.bots === "all" || mine.on?.includes(bot)));
+	} catch {
+		plugins = void 0;
+		await new Promise((done) => setTimeout(done, 3e3));
+	}
 }
 const Monitor = () => /* @__PURE__ */ (0, react_jsx_runtime.jsxs)("svg", {
 	xmlns: "http://www.w3.org/2000/svg",
