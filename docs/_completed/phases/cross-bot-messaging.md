@@ -522,7 +522,7 @@ Description, for the directory: "Your bots message each other in their own chats
 - **Nudging a stalled handoff.** The screen shows a message waiting.
 - **Rules for who may message whom, pair by pair.** See [open question 1](#5-open-questions).
 - **Approvals,** for what a bot does on another's word. That's [Permissions](permissions.md).
-- **Sending to every bot,** or by tag.
+- **Sending to every bot,** or by tag. A tag came later, as a name, not a send: see [What the build changed](#what-the-build-changed).
 - **Bots on other machines,** A2A, or OpenClaw's Reef.
 - **Letting the owner write as a bot.**
 
@@ -701,3 +701,4 @@ Nothing reaches a real model. Confirm a restarted check server's old process exi
 - **Nothing was cut:** **Older**, each bot's line, and files are all built.
 - **The size:** a net 139 core lines, and 641 of the plugin, within the bound, before the owner's two later asks: `chat_history`, about 40 lines, and the bubble shades, which took 3 away.
 - **A bubble is a shade of the bot's color, with white text.** The owner found dark text on blue unreadable, and then on green "funky". WCAG's ratio picked those, and scoring with APCA showed why no rule could do better: bots' colors are mid-tones, and on amber, green, and teal neither white nor near-black reaches Lc 60, though WCAG rates dark on green at 7:1. So `app.tsx` has a table of shades: each color's hue, only as dark as white text needs, at least 4.5:1 by WCAG and Lc 75 by APCA. The swap and its luminance math are gone.
+- **Tagging a bot, at the owner's word.** "Just like in chat rooms I want to be able to `@tag` any bot in the app", "that way I can pick the righ "bob" if there are multiple". `@` in a bot's chat lists the bots it can reach, each with its line, and the pick goes as `[@Name](/profiles/<id>)`, a link, so the name holds the exact bot, and the text still reads in `chat_history`, or with the plugin gone. A tag wakes no one: the bot you're talking to sends, so the budget, the guards, and permissions all still apply. The box is a textarea, not the room's editor, so it shows `@Name` with the bot's face beside it, and the chip comes in the sent message. Two tags of one name go in the order they were picked. It needed three small hooks, not the feature in core: `draft` and `box` for `app.composer`, `app.sending`, and `app.said`. A net 36 core lines, and 166 of the plugin.

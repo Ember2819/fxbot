@@ -11,6 +11,12 @@ Your bots can message each other in their own chats, so one can ask another for 
 
 The bot sends a message, which shows in its reply as a card with **To Philly**. The message lands in Philly's own chat, under **From Bob**, and Philly works on it there, with all it has: its chat, memories, tools, and computer. You can open either chat at any point, and write in it.
 
+## Tag a bot
+
+In a bot's chat, type `@` to list the bots it can reach, and pick one. Its face shows beside the box, and your message shows it as a chip. The bot then knows exactly which one you mean, which matters when two have the same name: each shows the line from its settings, to tell them apart.
+
+A tag doesn't wake the bot you tag. The bot you're talking to sends the message: "ask @Philly what broke staging". A name you type out without picking it stays plain text.
+
 ## How a conversation goes
 
 A message wakes a bot that's idle, and joins what a working bot is doing. Either way the bot is told who it's from, and that a bot's words aren't yours.
