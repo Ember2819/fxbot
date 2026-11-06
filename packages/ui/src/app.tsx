@@ -7,7 +7,7 @@ import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/component
 import { Dialog, DialogClose, DialogContent, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Empty, EmptyContent, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from "@/components/ui/empty";
 import { Input } from "@/components/ui/input";
-import { InputGroup, InputGroupAddon, InputGroupButton, InputGroupTextarea } from "@/components/ui/input-group";
+import { InputGroup, InputGroupAddon, InputGroupButton } from "@/components/ui/input-group";
 import { Message, MessageContent, MessageFooter } from "@/components/ui/message";
 import { NativeSelect, NativeSelectOption } from "@/components/ui/native-select";
 import {
@@ -45,7 +45,7 @@ import { LibraryPage } from "./library.tsx";
 import { Reply } from "./steps.tsx";
 import { follow, go } from "./nav.ts";
 import { Header } from "./header.tsx";
-import { BotsProvider, loadPlugins, outgoing, Place, SaidText, usePluginNav, usePlugins, usePluginScreen } from "./plugins.tsx";
+import { BotsProvider, loadPlugins, MessageBox, Place, SaidText, usePluginNav, usePluginScreen } from "./plugins.tsx";
 import { ModelField } from "./providers.tsx";
 import { keepDraft, reload, takeDraft, useNewVersion } from "./pwa.ts";
 import { SettingsScreen } from "./settings.tsx";
@@ -561,7 +561,6 @@ function Chat({ id, profiles, onChange, onShown }: { id: string; profiles: Profi
   const [attached, setAttached] = useState<Upload[]>([]);
   const [notice, setNotice] = useState("");
   const box = useRef<HTMLTextAreaElement>(null);
-  const plugins = usePlugins();
   const picker = useRef<HTMLInputElement>(null);
   const skills = useSkillPicker(id, box, draft, setDraft);
   const skillNames = new Set(skills.skills.filter((s) => !s.command).map((s) => s.name));
@@ -656,7 +655,7 @@ function Chat({ id, profiles, onChange, onShown }: { id: string; profiles: Profi
   function submit(event: { preventDefault(): void }) {
     event.preventDefault();
     if ((!draft.trim() && !attached.length && !skills.picked.length) || stuck) return;
-    send(outgoing([...skills.picked.map((name) => `$${name}`), draft].filter((part) => part.trim()).join(" "), plugins), newMessageId(), attached);
+    send([...skills.picked.map((name) => `$${name}`), draft].filter((part) => part.trim()).join(" "), newMessageId(), attached);
     setDraft("");
     setAttached([]);
     skills.setPicked([]);
@@ -778,9 +777,10 @@ function Chat({ id, profiles, onChange, onShown }: { id: string; profiles: Profi
                   <InputGroupButton size="icon-sm" className="rounded-full" disabled={stuck} aria-label="Attach files" onClick={() => picker.current?.click()}>
                     <PaperclipIcon />
                   </InputGroupButton>
-                  {profile && <Place pick={(places) => places.composer} props={{ bot: profile, draft, box, setDraft, attach: (files: File[]) => void attach(files) }} />}
+                  {profile && <Place pick={(places) => places.composer} props={{ bot: profile, setDraft, attach: (files: File[]) => void attach(files) }} />}
                 </InputGroupAddon>
-                <InputGroupTextarea
+                <MessageBox
+                  bot={profile}
                   ref={box}
                   rows={1}
                   aria-label="Message"

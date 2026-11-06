@@ -1,6 +1,6 @@
 import * as React from "react";
 import * as jsxRuntime from "react/jsx-runtime";
-import { Component, createContext, useContext, useSyncExternalStore, type ComponentType, type ReactNode, type RefObject } from "react";
+import { Component, createContext, useContext, useSyncExternalStore, type ComponentProps, type ComponentType, type ReactNode } from "react";
 import { Streamdown } from "streamdown";
 import { createPortal } from "react-dom";
 import * as attachment from "@/components/ui/attachment";
@@ -11,6 +11,7 @@ import * as checkbox from "@/components/ui/checkbox";
 import * as dialog from "@/components/ui/dialog";
 import * as empty from "@/components/ui/empty";
 import * as input from "@/components/ui/input";
+import { InputGroupTextarea } from "@/components/ui/input-group";
 import * as message from "@/components/ui/message";
 import * as nativeSelect from "@/components/ui/native-select";
 import * as scroller from "@/components/ui/message-scroller";
@@ -31,9 +32,8 @@ import { Reply } from "./steps.tsx";
 // boundary. With no plugins, nothing here fetches or runs any code.
 
 export type ToolCall = Extract<Part, { type: "tool" }>;
-// setDraft takes the new text, or a function from the draft to it, as React's setters do. `box` is the textarea, for a
-// plugin that follows the caret or the keys.
-export type ComposerProps = { bot: Profile; draft: string; box: RefObject<HTMLTextAreaElement | null>; setDraft: (text: string | ((draft: string) => string)) => void; attach: (files: File[]) => void };
+// setDraft takes the new text, or a function from the draft to it, as React's setters do.
+export type ComposerProps = { bot: Profile; setDraft: (text: string | ((draft: string) => string)) => void; attach: (files: File[]) => void };
 type Nav = { label: string; path: string; icon?: ComponentType<{ className?: string }> };
 type Places = {
   routes: { path: string; parts: string[]; Component: ComponentType<{ params: Record<string, string> }> }[];
@@ -45,7 +45,7 @@ type Places = {
   botSettings: ComponentType<{ bot: Profile }>[];
   botPanel: ComponentType<{ bot: Profile }>[];
   chat: ComponentType<{ bot: Profile }>[];
-  sending: ((text: string) => string)[];
+  box: ComponentType<any>[];
   said: { pattern: RegExp; Component: ComponentType<{ match: RegExpMatchArray }> }[];
   // Places other plugins leave with Slot, by name, such as `chat-rooms.room-header`.
   slots: Map<string, ComponentType<any>[]>;
@@ -53,7 +53,7 @@ type Places = {
 // `key` is the URLs it loaded from, which change with its files.
 type Loaded = { name: string; iconKey: string; key: string; css?: HTMLLinkElement; places: Places };
 
-const emptyPlaces = (): Places => ({ routes: [], sidebar: [], nav: [], composer: [], toolViews: new Map(), settings: [], botSettings: [], botPanel: [], chat: [], sending: [], said: [], slots: new Map() });
+const emptyPlaces = (): Places => ({ routes: [], sidebar: [], nav: [], composer: [], toolViews: new Map(), settings: [], botSettings: [], botPanel: [], chat: [], box: [], said: [], slots: new Map() });
 
 // The loaded plugins, by name. A change makes a new array, which the places read through usePlugins.
 let loaded: Loaded[] = [];
@@ -133,7 +133,7 @@ async function run(name: string, version: string, url: string): Promise<Places> 
     botSettings: (Component: ComponentType<{ bot: Profile }>) => places.botSettings.push(Component),
     botPanel: (Component: ComponentType<{ bot: Profile }>) => places.botPanel.push(Component),
     chat: (Component: ComponentType<{ bot: Profile }>) => places.chat.push(Component),
-    sending: (change: (text: string) => string) => places.sending.push(change),
+    box: (Component: ComponentType<any>) => places.box.push(Component),
     said: (pattern: RegExp, Component: ComponentType<{ match: RegExpMatchArray }>) => places.said.push({ pattern, Component }),
     slot: (name: string, Component: ComponentType<any>) => places.slots.set(name, [...(places.slots.get(name) ?? []), Component]),
   });
@@ -166,16 +166,18 @@ export async function loadPlugins() {
   publish(next);
 }
 
-// A message on its way out, through each plugin's `sending`. One that throws leaves the text as it was.
-export function outgoing(text: string, plugins: Loaded[]) {
-  return plugins.flatMap((plugin) => plugin.places.sending).reduce((out, change) => {
-    try {
-      return change(out);
-    } catch (error) {
-      console.error("A plugin's sending failed:", error);
-      return out;
-    }
-  }, text);
+// A chat's message box: the first plugin's, given a textarea's props and the bot, or the app's textarea. That takes over
+// if the plugin's throws, so a broken plugin can't take away the box.
+export function MessageBox({ bot, ...props }: ComponentProps<typeof InputGroupTextarea> & { bot?: Profile | null }) {
+  const plugin = usePlugins().find((p) => p.places.box.length);
+  const plain = <InputGroupTextarea {...props} />;
+  if (!plugin) return plain;
+  const Box = plugin.places.box[0];
+  return (
+    <PluginPart plugin={plugin.name} fallback={plain}>
+      <Box bot={bot} {...props} />
+    </PluginPart>
+  );
 }
 
 // What the owner or a plugin said, with each match of a plugin's `said` pattern drawn by its part.
@@ -197,13 +199,14 @@ export function SaidText({ text }: { text: string }) {
 }
 
 // A plugin's part, kept from taking down the app: one that throws shows a short card in its place.
-export class PluginPart extends Component<{ plugin: string; children: ReactNode }, { error?: Error }> {
+export class PluginPart extends Component<{ plugin: string; children: ReactNode; fallback?: ReactNode }, { error?: Error }> {
   state: { error?: Error } = {};
   static getDerivedStateFromError(error: Error) {
     return { error };
   }
   render() {
     if (!this.state.error) return this.props.children;
+    if (this.props.fallback) return this.props.fallback;
     return (
       <p role="alert" className="m-2 rounded-lg bg-destructive/10 px-3 py-2 text-sm text-destructive">
         {this.props.plugin} broke here: {this.state.error.message}
