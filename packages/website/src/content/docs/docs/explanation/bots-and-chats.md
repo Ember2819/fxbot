@@ -13,7 +13,7 @@ A bot is a name, instructions, a provider and a model, and a look: one of fourte
 
 Each bot has one long-running chat, a durable libfx session on the server. The page only shows it, so the chat survives a reload, a closed app, and a server restart, and a reply carries on while nobody watches.
 
-Every message is also kept in Postgres, and each bot has a `chat_history` tool that searches its own messages, across all its chats, and reads them in full around a match. So a bot can look up what was said in an earlier chat, or long ago. It reaches only its own chats.
+Everything in a chat is also kept in Postgres: what you and other bots said, the bot's replies, its thinking, and its tool calls with their results. Each bot has a `chat_history` tool that searches all of that, across all its chats, and reads it in full around a match, in the order it happened. So a bot can look up what was said in an earlier chat, or long ago, and what it did about it. Each result says who it's from, so another bot's words don't read as yours. It reaches only its own chats. Thinking and tool calls are kept since 0.6.0, each up to 64 KiB.
 
 ## A message to a working bot
 

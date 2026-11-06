@@ -146,7 +146,7 @@ export function createEmbeddings({ sql, fetch, localUrl, target }: { sql: Sql; f
           table = "messages";
           rows = await sql<{ id: string; text: string; stamp: string | null }[]>`
             select id, left(text, ${chosen.messageVectors}) as text, null as stamp from messages
-            where embedded_with is distinct from ${from.model} order by id desc limit ${batch}`;
+            where embedded_with is distinct from ${from.model} and role in ('user', 'assistant') order by id desc limit ${batch}`;
         }
         if (!rows.length) break;
         const full = rows.filter((r) => r.text.trim());
@@ -214,7 +214,7 @@ export function createEmbeddings({ sql, fetch, localUrl, target }: { sql: Sql; f
       // The embedder answers again: try now rather than at the next minute, which clears the error when it works.
       if (from && lastError && !running) void fill();
       const [counts] = await sql<{ messages: number; withVectors: number; memories: number; memoriesWithVectors: number }[]>`
-        select (select count(*)::int from messages) as messages,
+        select (select count(*)::int from messages where role in ('user', 'assistant')) as messages,
           (select count(*)::int from messages where embedded_with = ${model ?? ""}) as with_vectors,
           (select count(*)::int from memories) as memories,
           (select count(*)::int from memories where embedded_with = ${model ?? ""}) as memories_with_vectors`;

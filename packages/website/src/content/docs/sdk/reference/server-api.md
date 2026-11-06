@@ -211,7 +211,7 @@ Every agent has these tools. Each one acts for the bot whose chat runs it.
 
 | Tool | What it does |
 | --- | --- |
-| `chat_history` | Searches the bot's messages in all of its chats, by words, and by meaning when message vectors are on. With `around`, a `msg:<id>`, it reads that message and up to 6 on each side, in full. |
+| `chat_history` | Searches the bot's history in all of its chats: messages, thinking, and tool calls with their results, since 0.6.0, by words, and messages by meaning too when message vectors are on. With `around`, a `msg:<id>`, it reads that message and up to 6 on each side, in full. |
 | `memory_save` | Saves one fact, up to 1,000 characters. With `replaces`, a `mem:<id>`, it changes that memory instead. |
 | `memory_search` | Searches the bot's memories by words and, with an embedder, by meaning: up to 20 |
 | `memory_forget` | Removes a memory by its `mem:<id>` |

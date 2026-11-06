@@ -1,4 +1,4 @@
-import type { FxResumeTurn, FxSessionPromptInput, FxTurn } from "libfx";
+import type { FxAgentTool, FxResumeTurn, FxSessionPromptInput, FxTurn } from "libfx";
 import { createArchives } from "./archive.ts";
 import { createEmbeddings, type EmbeddingSettings } from "./embeddings.ts";
 import { createHistory, summarize, switchAsk } from "./history.ts";
@@ -220,8 +220,19 @@ export async function createFxbot(options: FxbotOptions) {
     },
   });
   await packages.start();
+  // What each tool call answered, kept for history until the stream says it ended: the stream has only a preview.
+  const answers = new Map<string, unknown>();
+  const keepAnswer = (tool: FxAgentTool): FxAgentTool => {
+    if (tool.providerExecuted) return tool;
+    const { execute } = tool;
+    return { ...tool, execute: async (input, context) => {
+      const answer = await execute(input, context);
+      answers.set(context.executionId, answer);
+      return answer;
+    } };
+  };
   const toolsNow = async () =>
-    [history.tool, ...memories.tools, ...library.tools, ...(skills.any() ? [skills.tool] : []), ...(await mcp.tools()), ...packages.tools()].map(packages.wrap);
+    [history.tool, ...memories.tools, ...library.tools, ...(skills.any() ? [skills.tool] : []), ...(await mcp.tools()), ...packages.tools()].map(packages.wrap).map(keepAnswer);
   const providers = await createProviders({ store, secretKey: key, durability: sessions.durability, vercelClientId, fetch, tools: await toolsNow() });
   // Vectors that rows lack, from where Settings says, in the background.
   embeddings.nudge();
@@ -342,6 +353,21 @@ export async function createFxbot(options: FxbotOptions) {
     let failed: string | undefined;
     let cancelled = false;
     let mine = reader !== "next";
+    // The turn's thinking and tool calls go into history as they end, so they read in the order they happened.
+    let thinking = "";
+    let thoughts = 0;
+    const calls = new Map<string, { name: string; input: unknown }>();
+    const remember = (key: string, role: "thinking" | "tool", text: string) =>
+      history.record(id, sessionId, `${turn.messageId}:${key}`, role, text).catch((error) => console.error("Could not save a step:", error));
+    const thought = async () => {
+      if (thinking.trim()) await remember(`thinking:${++thoughts}`, "thinking", thinking);
+      thinking = "";
+    };
+    // A search that saved its own results would find them the next time.
+    const called = async (callId: string, call: { name: string; input: unknown }, result: string) => {
+      answers.delete(callId);
+      if (call.name !== "chat_history") await remember(callId, "tool", `${call.name} ${JSON.stringify(call.input ?? {})}\n${result}`);
+    };
     // A "next" reader keeps a turn only if it's a steer's: any other has a reader of its own. A turn that fails at once
     // shows no events, so this comes again after them.
     const claim = () => {
@@ -361,7 +387,15 @@ export async function createFxbot(options: FxbotOptions) {
         if (!mine && turn.messageId && !claim()) return;
         // A turn resumed at start wasn't sent from here.
         if (reader && turn.messageId && !working.get(sessionId)?.some((t) => t.messageId === turn.messageId)) working.set(sessionId, [{ ...workingOn(id, turn.messageId, sent), started: true }, ...(working.get(sessionId) ?? [])]);
+        if (event.type === "reasoning_delta") thinking += event.delta;
+        else await thought();
         if (event.type === "text_delta") reply += event.delta;
+        if (event.type === "tool_start") calls.set(event.id, { name: event.name, input: event.input ?? event.inputPreview });
+        if (event.type === "tool_end") {
+          const answer = answers.has(event.id) ? answers.get(event.id) : event.content;
+          await called(event.id, calls.get(event.id) ?? { name: event.name, input: undefined }, typeof answer === "string" ? answer : (JSON.stringify(answer, (key, value) => (key === "data" ? "[data]" : value)) ?? ""));
+          calls.delete(event.id);
+        }
       }
       if (!mine && !claim()) return;
       // A turn libfx ends as failed, or as refused, which is how a provider's HTTP error ends one, with the error as its text.
@@ -373,6 +407,8 @@ export async function createFxbot(options: FxbotOptions) {
       return;
     } finally {
       if (mine) {
+        await thought();
+        for (const [callId, call] of calls) await called(callId, call, "[stopped]");
         count(id, -1);
         if (resumed.get(sessionId) === turn) resumed.delete(sessionId);
         drop(sessionId, turn.messageId);

@@ -31,12 +31,18 @@ const stamp = (at: Date) => at.toISOString().slice(0, 16).replace("T", " ");
 const side = 6;
 const messageBytes = 4_000;
 
-type Row = { id: string; createdAt: Date; role: string; text: string };
+type Row = { id: string; createdAt: Date; role: string; text: string; plugin: string | null };
+// A bot's thinking and tool calls are rows too, for chat_history. What's said, by anyone, is these two.
+type Role = "user" | "assistant" | "thinking" | "tool";
+const said = ["user", "assistant"];
+// Who said it. A plugin's message was saved as a user's, and another bot's words mustn't read as the owner's.
+const speaker = (row: Row) => (row.role === "user" && row.plugin ? `from ${row.plugin}` : row.role);
 
-// Every message as plain text, so a bot can search its own chats after a provider switch, and a switch can be
-// summarized from them when the old provider cannot do it. With an embedder and message vectors on, a search also
-// finds messages by meaning.
+// Everything a chat held as plain text: messages, the bot's thinking, and its tool calls, so a bot can search its own
+// chats after a provider switch, and a switch can be summarized from them when the old provider cannot do it. With an
+// embedder and message vectors on, a search also finds messages by meaning.
 export function createHistory(sql: Sql, embeddings?: Embeddings) {
+  const pluginOf = sql`(select s.plugin from sent s where s.profile_id = m.profile_id and s.message_id = m.message_id and m.role = 'user') as plugin`;
   // A message and its neighbours in the same chat, in full, oldest first. It reads 6 more on each side than it shows,
   // so the ids it names to page on give windows that meet this one end to end.
   async function around(bot: string, ref: string) {
@@ -44,10 +50,10 @@ export function createHistory(sql: Sql, embeddings?: Embeddings) {
     const rows = id
       ? await sql<(Row & { before: boolean })[]>`
           with target as (select id, session_id from messages where profile_id = ${bot} and id = ${id})
-          select * from (select m.id, m.created_at, m.role, m.text, true as before from messages m, target t
+          select * from (select m.id, m.created_at, m.role, m.text, ${pluginOf}, true as before from messages m, target t
             where m.profile_id = ${bot} and m.session_id = t.session_id and m.id < t.id order by m.id desc limit ${2 * side + 1}) b
           union all
-          select * from (select m.id, m.created_at, m.role, m.text, false from messages m, target t
+          select * from (select m.id, m.created_at, m.role, m.text, ${pluginOf}, false from messages m, target t
             where m.profile_id = ${bot} and m.session_id = t.session_id and m.id >= t.id order by m.id limit ${2 * side + 2}) a`
       : [];
     if (!rows.some((r) => r.id === id)) return `This bot has no message ${ref.trim()}.`;
@@ -57,7 +63,7 @@ export function createHistory(sql: Sql, embeddings?: Embeddings) {
     const lines = shown.map((r) => {
       const text = cutBytes(r.text, messageBytes);
       const note = text.length < r.text.length ? `\n[cut: ${r.text.length.toLocaleString("en-US")} characters in all]` : "";
-      return `[${stamp(r.createdAt)}] msg:${r.id} ${r.role}${r.id === id ? " (asked for)" : ""}:\n${text}${note}`;
+      return `[${stamp(r.createdAt)}] msg:${r.id} ${speaker(r)}${r.id === id ? " (asked for)" : ""}:\n${text}${note}`;
     });
     const older = before.slice(0, -side);
     const newer = after.slice(side + 1);
@@ -69,7 +75,7 @@ export function createHistory(sql: Sql, embeddings?: Embeddings) {
   const tool: FxAgentTool = {
     name: "chat_history",
     description:
-      "Search this bot's messages across all of its chats, or read them in full. With query: a message matching any of the words counts, " +
+      "Search this bot's history across all of its chats, or read it in full: what the owner and other bots said, its replies, its thinking, and its tool calls with their results. With query: a message matching any of the words counts, " +
       "more matches rank higher, a word also matches longer words it starts, and, with meaning search on, messages close in meaning count too. Returns the best matches oldest first, each with its date, " +
       "msg:<id>, and whether it is from an earlier chat. With around: a msg:<id>, reads that message and the ones before and after it in " +
       "its chat, in full; call again with the first or last id to page.",
@@ -94,22 +100,22 @@ export function createHistory(sql: Sql, embeddings?: Embeddings) {
       // matches and the nearest vectors are fused, best first.
       const [byWords, byMeaning] = await Promise.all([
         sql<(Row & { here: boolean })[]>`
-          select id, created_at, role, session_id = ${call.sessionId} as here, ts_headline('simple', text, q, 'MaxWords=40, MinWords=15') as text
-          from messages, to_tsquery('simple', ${words}) q
-          where profile_id = ${bot} and tsv @@ q
-            and id <> coalesce((select max(id) from messages where profile_id = ${bot} and session_id = ${call.sessionId} and role = 'user'), 0)
-          order by ts_rank_cd(tsv, q) desc, created_at desc limit 40`,
+          select m.id, m.created_at, m.role, ${pluginOf}, m.session_id = ${call.sessionId} as here, ts_headline('simple', m.text, q, 'MaxWords=40, MinWords=15') as text
+          from messages m, to_tsquery('simple', ${words}) q
+          where m.profile_id = ${bot} and m.tsv @@ q
+            and m.id <> coalesce((select max(id) from messages where profile_id = ${bot} and session_id = ${call.sessionId} and role = 'user'), 0)
+          order by ts_rank_cd(m.tsv, q) desc, m.created_at desc limit 40`,
         (async () => {
           const close = embeddings && (await embeddings.messagesOn()) ? await embeddings.query(String(input.query)) : null;
           if (!close) return [] as (Row & { here: boolean })[];
           return sql<(Row & { here: boolean })[]>`
             with nearest as (
-              select id, created_at, role, session_id = ${call.sessionId} as here, text, embedding <=> ${close.vector}::vector as distance
-              from messages
-              where profile_id = ${bot} and embedded_with = ${close.model} and embedding is not null
-                and id <> coalesce((select max(id) from messages where profile_id = ${bot} and session_id = ${call.sessionId} and role = 'user'), 0)
+              select m.id, m.created_at, m.role, ${pluginOf}, m.session_id = ${call.sessionId} as here, m.text, m.embedding <=> ${close.vector}::vector as distance
+              from messages m
+              where m.profile_id = ${bot} and m.embedded_with = ${close.model} and m.embedding is not null
+                and m.id <> coalesce((select max(id) from messages where profile_id = ${bot} and session_id = ${call.sessionId} and role = 'user'), 0)
               order by distance limit 40)
-            select id, created_at, role, here, ts_headline('simple', text, to_tsquery('simple', ${words}), 'MaxWords=40, MinWords=15') as text
+            select id, created_at, role, plugin, here, ts_headline('simple', text, to_tsquery('simple', ${words}), 'MaxWords=40, MinWords=15') as text
             from nearest where distance <= (select min(distance) from nearest) + ${near} order by distance`;
         })(),
       ]);
@@ -118,18 +124,18 @@ export function createHistory(sql: Sql, embeddings?: Embeddings) {
       // The best matches, in the order they were written.
       return rows
         .sort((a, b) => Number(a.id) - Number(b.id))
-        .map((r) => `[${stamp(r.createdAt)}] msg:${r.id} ${r.role}${r.here ? "" : " (earlier chat)"}: ${r.text.replace(/\s+/g, " ")}`)
+        .map((r) => `[${stamp(r.createdAt)}] msg:${r.id} ${speaker(r)}${r.here ? "" : " (earlier chat)"}: ${r.text.replace(/\s+/g, " ")}`)
         .join("\n");
     },
   };
 
   return {
     tool,
-    // A new message also gets its vector, in the background.
-    async record(bot: string, sessionId: string, messageId: string, role: "user" | "assistant", text: string) {
+    // A new message also gets its vector, in the background. Thinking and tool calls are found by their words.
+    async record(bot: string, sessionId: string, messageId: string, role: Role, text: string) {
       await sql`insert into messages (profile_id, session_id, message_id, role, text)
-        values (${bot}, ${sessionId}, ${messageId}, ${role}, ${text}) on conflict do nothing`;
-      embeddings?.nudge();
+        values (${bot}, ${sessionId}, ${messageId}, ${role}, ${cutBytes(text, 64 * 1024)}) on conflict do nothing`;
+      if (said.includes(role)) embeddings?.nudge();
     },
     // The bot's chats before `sessionId`, as finished turns, oldest first: the newest `limit` messages of them. A provider
     // switch starts a new session, and the old one may not open again, so the chat shows these above the handoff.
@@ -137,7 +143,7 @@ export function createHistory(sql: Sql, embeddings?: Embeddings) {
     async earlier(bot: string, sessionId: string | null, limit = 400): Promise<Turn[]> {
       const rows = await sql<{ messageId: string; role: string; text: string; input: string | null; files: Upload[] | null; plugin: string | null }[]>`
         select m.message_id, m.role, m.text, s.input, s.files, s.plugin
-        from (select * from messages where profile_id = ${bot} and session_id is distinct from ${sessionId}
+        from (select * from messages where profile_id = ${bot} and session_id is distinct from ${sessionId} and role in ${sql(said)}
           and session_id not in (select id from plugin_sessions) order by id desc limit ${limit}) m
         left join sent s on m.role = 'user' and s.profile_id = m.profile_id and s.message_id = m.message_id
         order by m.id`;
@@ -153,7 +159,7 @@ export function createHistory(sql: Sql, embeddings?: Embeddings) {
     // A session's messages, oldest first, as many of the newest as fit `maxChars`, or the last 100.
     async transcript(bot: string, sessionId: string, maxChars: number) {
       const rows = await sql<{ role: string; text: string }[]>`
-        select role, text from messages where profile_id = ${bot} and session_id = ${sessionId} order by id desc limit 100`;
+        select role, text from messages where profile_id = ${bot} and session_id = ${sessionId} and role in ${sql(said)} order by id desc limit 100`;
       const kept: string[] = [];
       let size = 0;
       for (const { role, text } of rows) {
