@@ -12,7 +12,7 @@ Status: built on 2026-11-03, for 0.4.0. Replanned on 2026-11-02 after the owner 
 
 ## 0. Core or add-on
 
-**Core: the plugin API.** The API is the seam every other add-on phase plugs into: [chat rooms](chat-rooms.md), [routines](../../phases/routines.md), [triggers](../../phases/triggers.md), [soul](../../phases/soul.md), [permissions](../../phases/permissions.md), and the rest. Chat rooms and herdr are add-ons, and the core never names them ([Core or add-on](../../../CONVENTIONS.md#core-or-plugin)).
+**Core: the plugin API.** The API is the seam every other add-on phase plugs into: [chat rooms](chat-rooms.md), [routines](../../phases/routines.md), [triggers](../../phases/triggers.md), [soul](../../phases/soul.md), [permissions](permissions.md), and the rest. Chat rooms and herdr are add-ons, and the core never names them ([Core or add-on](../../../CONVENTIONS.md#core-or-plugin)).
 
 ## 1. Research
 

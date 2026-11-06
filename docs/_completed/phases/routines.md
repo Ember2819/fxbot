@@ -603,7 +603,7 @@ every hour at :00 · paused after 10 failures
 - **Running in the own chat, or in a chat room.** One path.
 - **Cheap gates,** like OpenClaw's condition script and Hermes's `monitor`, which skip the model when nothing changed.
 - **A time zone per routine.** One setting, in core.
-- **A list of tools per routine,** like Hermes's `enabled_toolsets` and OpenClaw's `toolsAllow`. A run is the whole bot. With a [permissions](../../phases/permissions.md) plugin, `tool.before` narrows runs like anything else.
+- **A list of tools per routine,** like Hermes's `enabled_toolsets` and OpenClaw's `toolsAllow`. A run is the whole bot. With a [permissions](permissions.md) plugin, `tool.before` narrows runs like anything else.
 - **A lock on the computer** between a run and the chat.
 - **Waiting for the owner inside a run.** A run ends with what it needs, and the bot goes on in its own chat.
 - **Telling bots the time in every chat.** Core still doesn't, and the time would break the prompt cache. `routines_list` has it.
@@ -774,7 +774,7 @@ Nothing reaches a real model. Confirm a restarted check server's old process exi
 
 **Decided by the owner on 2026-11-05:**
 - **Which release:** 0.6.0.
-- **Routines a bot makes:** on at once, with the card's **Remove**. With a [permissions](../../phases/permissions.md) plugin, this becomes one of its rules.
+- **Routines a bot makes:** on at once, with the card's **Remove**. With a [permissions](permissions.md) plugin, this becomes one of its rules.
 - **One time zone:** a core setting in Settings › General, and plugins use it.
 - **How often:** a setting, `everyMinutes`, 15 by default.
 

@@ -103,7 +103,7 @@ Read on 2026-11-05 from its docs, as Markdown, and from reviews. It's a few mont
 - **What it costs.** "Every Bot reply counts toward your usage, including replies in a group and messages between Bots."
 - **Who it acts for.** "A handoff needs a Bot acting for one person on that turn." A personal bot in a shared Slack channel can't hand off.
 - **Advice.** "Ask for a single owner at each stage. Parallel handoffs create duplicate work and noisy updates."
-- **Background work has less authority.** Approvals from "work that started without you, like a routine, a trigger, or a message from another Bot, expires after about 30 minutes", and email from "a routine, an incoming message, or other work you didn't start" waits as a draft. Auto Review also covers "delegation such as Cloud Agent and subagent launches", though the docs don't say whether that takes in a message to another bot. See [Permissions](../../phases/permissions.md).
+- **Background work has less authority.** Approvals from "work that started without you, like a routine, a trigger, or a message from another Bot, expires after about 30 minutes", and email from "a routine, an incoming message, or other work you didn't start" waits as a draft. Auto Review also covers "delegation such as Cloud Agent and subagent launches", though the docs don't say whether that takes in a message to another bot. See [Permissions](permissions.md).
 - **The sidebar tells them apart:** "**Needs attention** for a question, approval, or handoff", "**Unread activity** for a new result", and "Working or typing status". (`settings-and-notifications`)
 - **Not documented:** how an acknowledgement is treated, whether a reply is told apart from a new request, and what stops two bots thanking each other.
 
@@ -521,7 +521,7 @@ Description, for the directory: "Your bots message each other in their own chats
 - **Unread and "needs attention" marks in the sidebar,** as Grok has. The hopping bot and the preview stay as they are.
 - **Nudging a stalled handoff.** The screen shows a message waiting.
 - **Rules for who may message whom, pair by pair.** See [open question 1](#5-open-questions).
-- **Approvals,** for what a bot does on another's word. That's [Permissions](../../phases/permissions.md).
+- **Approvals,** for what a bot does on another's word. That's [Permissions](permissions.md).
 - **Sending to every bot,** or by tag.
 - **Bots on other machines,** A2A, or OpenClaw's Reef.
 - **Letting the owner write as a bot.**
@@ -678,7 +678,7 @@ Nothing reaches a real model. Confirm a restarted check server's old process exi
 - **Which release:** 0.6.0.
 
 **Left,** with a default the build follows unless the owner changes it:
-1. **Who may message whom.** *Default:* any bot the plugin is on for can reach any other, as on Grok ("There is no switch for this"), OpenClaw, and Hermes, and the owner narrows it with the plugin's switch for each bot. The risk is OpenClaw's: "Send-only access is permission to ask the target agent to act." A message reaches a bot's own chat, with all its tools, and libfx labels a steer as the user's words, so only the frame says otherwise. A routine can start one with no one watching. A bot talked into it by a page could ask a bot with a computer to run something, until [Permissions](../../phases/permissions.md) is built. OpenBot's directed grants, off by default, close that, at about 60 lines and one more step before anything works.
+1. **Who may message whom.** *Default:* any bot the plugin is on for can reach any other, as on Grok ("There is no switch for this"), OpenClaw, and Hermes, and the owner narrows it with the plugin's switch for each bot. The risk is OpenClaw's: "Send-only access is permission to ask the target agent to act." A message reaches a bot's own chat, with all its tools, and libfx labels a steer as the user's words, so only the frame says otherwise. A routine can start one with no one watching. A bot talked into it by a page could ask a bot with a computer to run something, until [Permissions](permissions.md) is built. OpenBot's directed grants, off by default, close that, at about 60 lines and one more step before anything works.
 2. **A message to an idle bot wakes it.** *Default:* yes, as on Grok, since nothing reaches a chat without a turn. A "got it" to an idle bot costs a turn at its whole chat. Showing it without a turn needs a core way to post to a chat, which would serve dreams and routines too.
 
 ## What the build changed

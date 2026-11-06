@@ -529,7 +529,7 @@ Each has a default that the build follows unless the owner changes it.
 7. **Fonts.** *Default:* DejaVu and Noto. Noto's CJK and emoji fonts would add 102 MB.
 8. **A desktop in every computer.** *Default:* yes: one plugin, one image, one shape, and about 90 MB per running computer. A setting that turns the desktop off could come later.
 9. **Models without vision.** *Default:* `computer_desktop` always returns its image, and the skill steers those bots to the trees and text. If M3 finds that libfx or a provider refuses the image, the tool leaves it out for that bot's model.
-10. **Approvals.** *Default:* the rule in the instructions, and no prompt of the plugin's own. Allow once, Always allow, or Deny for sends, buys, sign-ins, and deletes belong to the [Permissions](../../phases/permissions.md) phase, a plugin on a core hook, and the computer's tools will go through it.
+10. **Approvals.** *Default:* the rule in the instructions, and no prompt of the plugin's own. Allow once, Always allow, or Deny for sends, buys, sign-ins, and deletes belong to the [Permissions](permissions.md) phase, a plugin on a core hook, and the computer's tools will go through it.
 11. **Untrusted text.** *Default:* the rule only. OpenBot wraps each tool result in an untrusted envelope; that could come with Permissions.
 12. **The Computer button.** *Default:* yes, adding `$computer`. Codex has a composer icon and `@Computer`; fxbot's `$` picker already lists the skill, so the button is the shortcut.
 13. **The order's wording.** *Default:* the five lines above. They're the always-on part, so each word costs in every chat of those bots.

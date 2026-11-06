@@ -72,6 +72,7 @@ export default async function setup(fx: PluginApi) {
 | `fx.skills.set(bot, skills)` | The skills the plugin gives one bot, in place of those it gave before, each `{ name, description, instructions }`, as a `SKILL.md`'s name, description, and body. They join the bot's catalog, its `skill` tool, and its `/` list while the plugin is on for it, and go when the plugin unloads, so a plugin keeps them and sets them again in its setup. It throws with status 400 for a bad name, a description over 1,024 characters, a name twice, or instructions over 64 KiB. Since 0.5.0. |
 | `fx.memories.get(bot, id)` | One of the bot's memories, with `savedBy`, `bot` or `owner`, or null when the bot has none by that id. Since 0.5.0. |
 | `fx.memories.save(bot, { text, replaces? })` | Saves a memory as the bot's, as `memory_save` does, or with `replaces`, changes that one's text. It answers `{ memory, existed, merged }`: `existed` when the same text was saved already, and `merged` when the changed memory now said what another did, and went into that one. It throws with status 400 for text over 1,000 characters, and 404 for a `replaces` the bot doesn't have. Since 0.5.0. |
+| `fx.models.ask(bot, { instructions, text, provider?, model?, timeoutMs? })` | One tool-free request, on the bot's provider and model unless `provider` and `model` name others. It answers the text, and throws on a failure or after `timeoutMs`, 60 seconds by default. Keys stay on the server. Since 0.6.0. |
 | `fx.memories.remove(bot, id)` | Deletes one of the bot's memories. A missing one throws with status 404. Since 0.5.0. |
 | `fx.machine` | In an install made by `setup.sh`, the machine's `fxbot` command, for a job only root can do; `null` in a checkout. `ask("computer")` asks it to set up the computer plugin's engine, and `status("computer")` says how that went: `{ state, error? }`, with `state` `asked`, `working`, `done`, or `failed`, or `null` when nothing asked. `computer` is its only job. |
 | `fx.log(...parts)` | A line in its log, which its tab in **Settings** shows |
@@ -87,7 +88,7 @@ Handlers run in the order the plugins were added, and change the event's fields 
 | --- | --- | --- | --- |
 | `message` | Before a message runs, after the chat is known | `bot`, `session`, `text`, `files`, `from` | Change `text` and `files`; answer `{ handled: true }`, and no turn runs; or answer `{ startOver: { ask } }`, and the message goes to a new chat |
 | `instructions` | Each time a chat opens | `bot`, `session`, `instructions`, a list | Add, change, or remove entries |
-| `tool.before` | Before every tool call: fxbot's, MCP servers', skills', and plugins' | `bot`, `session`, `messageId`, the message whose turn it's in, since 0.6.0, `tool`, `input` | Change `input`, or answer `{ block: reason }`, which the model gets as a failed call |
+| `tool.before` | Before every tool call: fxbot's, MCP servers', skills', and plugins' | `bot`, `session`, `messageId`, the message whose turn it's in, since 0.6.0, and since 0.6.0, `callId`, which holds across a restart, `tool`, `description`, `input`, and `safe`, the tool's own word that it only reads or writes the bot's own notes | Change `input`, answer `{ block: reason }`, which the model gets as a failed call, or since 0.6.0 answer `{ wait }`: a function core calls after every hook, with `{ input }`, the final one, and no time limit but the call's own. It answers `{ block: reason }`, or nothing, and the call runs |
 | `tool.after` | After it | the same, with `result`, or `error` when it failed | Change `result` |
 | `turn.start` | Once libfx stores the prompt, or since 0.6.0, in a bot's own chat, when the turn it waited behind ends | `bot`, `session`, `messageId`, `text`, `from` | Observe |
 | `turn.end` | When the turn ends | the same, with `reply`, `error` when it failed, as when the provider answered with an error, and `cancelled` when it was stopped, since 0.6.0 | Observe |
@@ -119,6 +120,7 @@ fx.tool({
 | `description` | What the model reads |
 | `inputSchema` | A JSON Schema object for the input |
 | `idempotent` | Whether running a call twice is harmless, so a call cut off by a crash runs again |
+| `safe` | Optional: it only reads, or writes the bot's own notes, and reaches nothing outside. A hook sees this on `tool.before`. Since 0.6.0. |
 | `execute(input, call)` | Runs one call. `call` has the `bot` and `session` of the chat, the `messageId` of the message whose turn it's in, since 0.6.0, and a `signal` that aborts with the turn. A string goes to the model as it is, and anything else as JSON, but for `{ type: "libfx.tool-result", text, images }`, whose images, up to 8, the model sees. |
 
 Adding a tool makes fxbot's agents again. A call from a bot the plugin isn't on for fails, and so does a result over 64 KiB.
@@ -171,6 +173,7 @@ A plugin's turns run as the owner's do, with the same hooks, history, library, a
 | `fx.chats.newSession(bot)` | A session of the plugin's own for the bot, on the bot's provider now. Keep its id. |
 | `fx.chats.send(bot, { text, shown?, label?, steer?, files?, session?, messageId? })` | A message. `shown`, since 0.6.0, is what the chat shows of it, when that isn't `text`, which the model gets. Without `session`, it goes to the bot's own chat, which shows it as "From <plugin>". With one, it stays out of the bot's chat, its earlier chats, and its preview, and `chat_history` still finds it. `messageId` defaults to a new UUID. |
 | `fx.chats.stream(bot, session, cursor?)` | That session's lines, as NDJSON, from `cursor` on, then each new one. The same lines as [`fxbot.stream`](/sdk/how-to/stream-replies/). |
+| `fx.chats.ownerSaid(bot, limit)` | The owner's newest messages in the bot's own chat, oldest first, with no plugin's or other bot's. Since 0.6.0. |
 | `fx.chats.cancel(bot, session?)` | Stops the turn running in one of the plugin's own sessions, if one runs. It ends `cancelled`, and the session's stream says so. Since 0.4.1. With no `session`, since 0.6.0, it stops the turn running in the bot's own chat, if this plugin started it. Any other turn there throws with `status` 409, and with nothing running it does nothing. |
 
 In a bot's own chat, since 0.6.0, `send` also takes these, and its answer has `joined`:
@@ -224,6 +227,7 @@ The computer and chat rooms provide objects of their own: see [the computer's](/
 | `app.route(path, Component)` | The screen at `/<plugin><path>`. `path` may have `:name` parts, which `Component` gets as `params`. |
 | `app.sidebar(Component)` | A group in the sidebar, after the bots |
 | `app.nav({ label, path, icon? })` | A button in the sidebar's footer row, to `/<plugin><path>`. `icon` is a component; without one, the button shows the plugin's icon. |
+| `app.chat(Component)` | Above the message box in a bot's chat. It gets `bot`. Since 0.6.0. |
 | `app.botPanel(Component)` | Above the tabs of a bot's panel, beside its chat. It gets `bot`. |
 | `app.composer(Component)` | A control beside the attach button. It gets `bot`, `setDraft(text)`, and `attach(files)`. `setDraft` also takes a function from the draft to the new text. |
 | `app.toolView(tool, Component, { open? })` | How a call of `<plugin>_<tool>` shows in a reply. With `open`, since 0.6.0, it stays in sight below the folded steps, for what the owner shouldn't miss. It gets `call`: `name`, `input`, `output`, `error`, and `done`. |
@@ -244,7 +248,7 @@ Each part sits in its own error boundary: one that throws shows a short card in 
 | `useBots()` | The app's list of bots, or `null` while it loads |
 | `createPortal(children, node)` | React's, from `react-dom`, for drawing a component into DOM the plugin doesn't render with React, such as an editor's node. Since 0.4.1. |
 | `Slot` | `<Slot name="<plugin>.<place>" props={…} />` leaves a place other plugins fill with `app.slot`, each part in its own error boundary. One nobody fills draws nothing. Since 0.5.0. |
-| `ui` | The app's components: Button, Input, Textarea, Badge, Switch, Checkbox, the Dialog, Empty, Sidebar (with `useSidebar`), Attachment, Message, Bubble, and MessageScroller parts, `Streamdown` for Markdown, `Header` for a screen's top bar, `Blob` for a bot's look, and `Reply` for a turn's reply |
+| `ui` | The app's components: Button, Input, Textarea, Badge, Switch, Checkbox, the Dialog, Empty, Sidebar (with `useSidebar`), Attachment, Message, Bubble, and MessageScroller parts, `Streamdown` for Markdown, `Header` for a screen's top bar, `Blob` for a bot's look, `NativeSelect`, `ModelField` for the app's model picker, since 0.6.0, and `Reply` for a turn's reply |
 
 The page's styles hold only the classes the app uses. A plugin brings its own CSS for anything else.
 

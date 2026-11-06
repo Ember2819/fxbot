@@ -37,7 +37,7 @@ By default, fxbot finds and adds only the plugins on its own lists, which the pr
 
 ## MCP servers
 
-A remote MCP server's tools are code fxbot doesn't control, and a call may not be safe to run twice. Until fxbot can ask before a tool call, bots get only a server's read-only tools, until you allow others by name.
+A remote MCP server's tools are code fxbot doesn't control, and a call may not be safe to run twice. Bots get only a server's read-only tools until you allow others by name. The [permissions](/docs/how-to/choose-what-a-bot-can-do-alone/) plugin can ask before any tool call, a server's included.
 
 Adding a server makes fxbot's server fetch its address. So fxbot takes HTTPS only, and refuses local and private addresses, the tailnet's included, unless you allow one for a server you run. A server's key, headers, and OAuth client are sealed like a provider's.
 

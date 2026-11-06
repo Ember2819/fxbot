@@ -4,7 +4,7 @@ Add any remote MCP server to fxbot, by its URL or from [add-ons](addons.md). fxb
 
 The hard part is signing in. fxbot runs on a tailnet or on localhost, with no public address, and the project should not have to register its own OAuth client with every MCP provider. This page answers that: [section 2](#2-key-takeaways) in short, [OAuth sign-in](#oauth-sign-in) in full.
 
-Status: built on 2026-11-01, and checked against mock MCP servers built on `@modelcontextprotocol/server`, a mock authorization server, a mock model, and disposable databases: 67 checks, all passing (section 4), after the follow-up below. No real account was used; those sign-ins are the owner's. Where the build differs from the plan, section 3 says so under **Built**. It is the first add-on phase, so it created the add-on tables ([add-ons: Postgres](addons.md#postgres)) and a first Add-ons page, with Add by URL and the installed list, which [add-ons](addons.md) extends with search. Its read-only trust stands in for [permissions](../../phases/permissions.md) until that phase ships.
+Status: built on 2026-11-01, and checked against mock MCP servers built on `@modelcontextprotocol/server`, a mock authorization server, a mock model, and disposable databases: 67 checks, all passing (section 4), after the follow-up below. No real account was used; those sign-ins are the owner's. Where the build differs from the plan, section 3 says so under **Built**. It is the first add-on phase, so it created the add-on tables ([add-ons: Postgres](addons.md#postgres)) and a first Add-ons page, with Add by URL and the installed list, which [add-ons](addons.md) extends with search. Its read-only trust stands in for [permissions](permissions.md) until that phase ships.
 
 ## 1. Research
 
@@ -88,7 +88,7 @@ These are read from specs, source, docs, and read-only requests, as of November 
 4. **Sign-in runs on the server** as an attempt the page polls, as in provider logins. The verifier and tokens never reach the page, and tokens are sealed.
 5. **libfx only adapts a client.** fxbot owns the transport, sign-in, reconnects, and shutdown, through `@modelcontextprotocol/client`, whose `auth()` does discovery, PKCE, DCR, and CIMD.
 6. **Tools are fixed per agent** (libfx). Adding, removing, or changing a server's allowed tools rebuilds the provider agents. Whether a bot uses a server is decided inside each tool's `execute()` ([add-ons: bots](addons.md#bots-and-add-ons)).
-7. **MCP tools are untrusted** and not safe to run twice. Until [permissions](../../phases/permissions.md) ships, bots get only a server's read-only tools until the owner allows others by name.
+7. **MCP tools are untrusted** and not safe to run twice. Until [permissions](permissions.md) ships, bots get only a server's read-only tools until the owner allows others by name.
 8. **Adding a URL makes the server fetch it.** fxbot takes HTTPS only, and refuses private and tailnet addresses unless the user allows one.
 
 ## 3. Implementation
@@ -154,7 +154,7 @@ The fixed-port URI is for servers that match ports exactly. Until the document e
 - Each adapted tool's `execute()` is wrapped, in this order:
   1. With `bots` set to `each`, is the bot in `context.bot` chosen? If not: "This tool is off for this bot."
   2. Is the tool still allowed? A tool that isn't is left out of the agents' lists, and this catches a call during the rebuild.
-  3. The [permissions](../../phases/permissions.md) check, when that phase ships.
+  3. The [permissions](permissions.md) check, when that phase ships.
 - `idempotent` stays `false`, except for tools with `readOnlyHint: true` and `idempotentHint: true`.
 - The adapter's `instructions` go into the instructions of bots that use the server.
 - **Skills.** When the server declares the skills extension, its skills join the add-on, labelled with the server, and bots read them through it ([skills](skills.md#5-open-questions)).
@@ -189,7 +189,7 @@ Adding, listing, enabling, allowing tools, choosing bots, and removing are the [
 - **Credentials.** Tokens, registered clients, and secret headers are sealed (`secrets.ts`) and never returned. The SDK sends a token only to the MCP server it was issued for.
 - **Sign-in checks.** PKCE, `state`, `iss`, and `resource` are checked on every sign-in, and the callback rejects unknown or used states.
 - **SSRF.** fxbot takes HTTPS only. It refuses loopback, private, link-local, `100.64.0.0/10`, and `*.ts.net` addresses unless the add-on says "allow local address", which the user sets after a warning. The address is checked again after DNS resolution, and the same check covers every URL that discovery and sign-in fetch.
-- **Untrusted tools.** Tool results can carry prompt injection. Only read-only tools are allowed until the owner picks, and the [permissions](../../phases/permissions.md) phase adds ask, auto, and yolo.
+- **Untrusted tools.** Tool results can carry prompt injection. Only read-only tools are allowed until the owner picks, and the [permissions](permissions.md) phase adds ask, auto, and yolo.
 - **Writes from other sites.** A browser names the page's origin on every write, and the server refuses one whose origin doesn't match the address the request came in on. A site open in the same browser cannot add a server or start a sign-in. Tools without a browser send no origin, and pass.
 - **The tailnet name.** The page's MagicDNS name is already public in Certificate Transparency logs, so naming it in a registration reveals nothing new. Renaming the machine means registering again.
 - **No borrowed clients.** fxbot never uses fx's, Claude Code's, or opencode's client ids.
