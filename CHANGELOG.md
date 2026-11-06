@@ -2,6 +2,15 @@
 
 Each release of fxbot, newest first. A release that adds migrations, bumps libfx, or needs a step by hand opens with **Before upgrading**. Lines for the next release collect under Unreleased. GitHub Releases and Settings show a short version of each section.
 
+## Unreleased
+
+- **fxbot knows which plugins can run on it.** A plugin that needs a newer fxbot says so on its page, and **Add** stays off. A newer version that needs a newer fxbot shows **Needs fxbot** in place of **Update available**, and the one you have keeps running.
+- **Unsupported.** When a release breaks something a plugin uses, the plugin doesn't run, its tab says why and how to fix it, and the rest of fxbot starts as usual. Its files, settings, and tables are kept, and an update that fits brings it back.
+- **Settings warns before an update,** naming the plugins that wouldn't run on the new release.
+- **A plugin's page that fails to load says so** on its tab, where before only the browser's console knew.
+- **Each of fxbot's plugins says the oldest fxbot it runs on,** so they show **Update available** once, with nothing to do but update.
+- **For plugins:** `minFxbot` in `plugin.json` is the oldest fxbot a plugin runs on, and fxbot publishes what each release broke in [plugin-breaks.json](https://fxbot.sh/plugin-breaks.json). See [Which fxbot it runs on](https://fxbot.sh/sdk/reference/plugin-api/#which-fxbot-it-runs-on). It adds no migration.
+
 ## 0.6.0 (2026-11-06)
 
 **Before upgrading.** Migrations `0009_time_zone` and `0010_turns_at_once` add `time_zone` and `turns_at_once` columns to `settings`. A time zone set in dreams moves to **Settings** › **General**: the first browser to open fxbot sets it there, so check it if yours should be another.

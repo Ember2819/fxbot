@@ -27,6 +27,7 @@ The rules:
 - The core never imports or names a particular plugin. fxbot's lists name the plugins it suggests, as data.
 - fxbot's own plugins use the same plugin API as anyone's. If one needs a shortcut into core, the API is missing a hook.
 - Removing a plugin leaves the core working.
+- A change that removes or breaks something in the plugin API adds a line to `packages/sdk/src/plugin-breaks.json`, and a note under `## Unreleased`. A plugin that starts using something newer raises its `minFxbot`.
 
 ## Code
 

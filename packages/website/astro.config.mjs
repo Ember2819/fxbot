@@ -35,7 +35,7 @@ function repositoryFiles() {
       `---\ntitle: Changelog\ndescription: ${JSON.stringify(about)}\n---\n\n${changelog.trim()}\n\nEach release is also on [GitHub Releases](${repo}/releases), with a short version of its section here.\n`,
     );
     mkdirSync(new URL("public", here), { recursive: true });
-    for (const list of ["mcp-registry.json", "skills-registry.json", "plugins-registry.json"]) copyFileSync(new URL(`packages/sdk/src/${list}`, root), new URL(`public/${list}`, here));
+    for (const list of ["mcp-registry.json", "skills-registry.json", "plugins-registry.json", "plugin-breaks.json"]) copyFileSync(new URL(`packages/sdk/src/${list}`, root), new URL(`public/${list}`, here));
     copyFileSync(new URL("setup.sh", root), new URL("public/setup.sh", here));
     copyFileSync(new URL("packages/ui/public/icon-192.png", root), new URL("public/icon-192.png", here));
     write("public/robots.txt", `User-agent: *\nAllow: /\n\nSitemap: ${site}${base}sitemap-index.xml\n`);

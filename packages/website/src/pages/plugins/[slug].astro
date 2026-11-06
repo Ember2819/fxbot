@@ -17,6 +17,7 @@ const where = plugin.source.replace(/^https:\/\//, "");
     <PluginIcon iconKey={plugin.iconKey} size={56} />
     <div>
       <p class="fxbot-plugin-meta">{plugin.creator} · {plugin.carries}</p>
+      {plugin.minFxbot && <p class="fxbot-plugin-meta">Needs fxbot {plugin.minFxbot} or newer</p>}
       <p>{plugin.description}</p>
     </div>
   </div>

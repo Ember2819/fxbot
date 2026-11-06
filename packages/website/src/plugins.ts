@@ -15,6 +15,7 @@ export type Listed = {
   iconKey: string; // creator/name, as the app keys it (docs/_completed/phases/plugin-icons.md)
   description: string;
   carries: string; // as the app writes it: "Code · 3 skills", "MCP server", or "Skill"
+  minFxbot?: string; // the oldest fxbot it runs on
   source: string; // its folder or repository on GitHub
   code?: string[];
   skills?: { name: string; description: string }[];
@@ -28,7 +29,7 @@ export type Listed = {
 type PluginEntry = { name: string; description: string; repo: string; path?: string };
 type ServerEntry = { server: { name: string; title?: string; description: string; websiteUrl?: string; remotes?: { url: string; headers?: { description?: string; isSecret?: boolean }[] }[] } };
 type SkillEntry = { id: string; source: string; skillId: string; name: string; description?: string };
-type Manifest = { name: string; extensions?: { "sh.fxbot"?: { server?: string; page?: string; settings?: { name: string; description: string }[] } } };
+type Manifest = { name: string; extensions?: { "sh.fxbot"?: { minFxbot?: string; server?: string; page?: string; settings?: { name: string; description: string }[] } } };
 
 // This repository's own plugins' folders, read at build time.
 const files = import.meta.glob<string>(["../../../plugins/*/plugin.json", "../../../plugins/*/mcp.json", "../../../plugins/*/README.md", "../../../plugins/*/skills/*/SKILL.md"], {
@@ -58,6 +59,7 @@ function packageOf(entry: PluginEntry): Listed {
   const readme = inFolder(folder, "README.md")?.replace(/^# .*\n+/, "");
   return {
     ...base,
+    minFxbot: fx.minFxbot,
     carries: [code.length && "Code", servers.length && plural(servers.length, "MCP server"), skills.length && plural(skills.length, "skill")].filter(Boolean).join(" · ") || "Plugin",
     code,
     skills,

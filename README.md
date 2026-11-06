@@ -46,7 +46,7 @@ In order of execution priority. Checked phases are built. Each is marked **core*
 - [x] [Chat rooms](docs/_completed/phases/chat-rooms.md) (plugin, with two core hooks; 0.4.1): rooms of the owner and several bots, with `@` chips, bots tagging each other within limits, a Stop, and skills for working in a room
 - [x] [Cross-bot messaging](docs/_completed/phases/cross-bot-messaging.md) (plugin, with core steering and Stop; 0.6.0): bots message each other in their own chats, where the owner watches them work together, and a message to a working bot joins what it's doing
 - [x] [Routines](docs/_completed/phases/routines.md) (plugin, with a core time zone; 0.6.0): saved tasks a bot runs on a schedule, with everything it has, telling the owner in its chat
-- [ ] [Plugin compatibility](docs/phases/plugin-compatibility.md) (core; 0.7.0): a minimum fxbot for each plugin, a list of what each release broke, and **Unsupported** where a plugin can't run
+- [x] [Plugin compatibility](docs/_completed/phases/plugin-compatibility.md) (core; 0.7.0): a minimum fxbot for each plugin, a list of what each release broke, and **Unsupported** where a plugin can't run
 - [ ] [Triggers](docs/phases/triggers.md) (plugins): webhooks and new email start a bot's turn
 - [ ] [Soul](docs/phases/soul.md) (plugin): a written persona behind each bot's system prompt
 - [ ] [Context management](docs/phases/context-management.md) (core): one never-ending chat that fits the model's context window, past the compaction libfx does

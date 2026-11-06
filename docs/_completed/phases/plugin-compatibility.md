@@ -6,7 +6,7 @@ fxbot knows which plugins can run on it, before they run:
 - **Before it happens.** That list is published, so Settings can say which plugins an update would stop, before the owner clicks **Update**.
 - **No ceiling.** A plugin never says the newest fxbot it runs on. An author can't know that, and Firefox and JetBrains both backed away from asking.
 
-Status: planned on 2026-11-06, at the owner's word. Researched against the research directive's references, and Obsidian, VS Code, Firefox, Chrome, JetBrains, WordPress, Home Assistant, Grafana, OpenClaw, Hermes Agent, and Claude Code. Not built. It's for 0.7.0.
+Status: built on 2026-11-06, for 0.7.0, as planned the same day at the owner's word. Researched against the research directive's references, and Obsidian, VS Code, Firefox, Chrome, JetBrains, WordPress, Home Assistant, Grafana, OpenClaw, Hermes Agent, and Claude Code. Where the build differs from the plan, [What the build changed](#what-the-build-changed) says so.
 
 ## What the owner asked
 
@@ -18,7 +18,7 @@ So there are two cases:
 
 ## 0. Core or plugin
 
-**Core** ([Core or plugin](../../CONVENTIONS.md#core-or-plugin)). The conventions name "finding, vetting, adding, and updating plugins, and the plugin API" as core, and a plugin can't guard the door it comes in through. No plugin changes. fxbot's own plugins each gain one line in `plugin.json`.
+**Core** ([Core or plugin](../../../CONVENTIONS.md#core-or-plugin)). The conventions name "finding, vetting, adding, and updating plugins, and the plugin API" as core, and a plugin can't guard the door it comes in through. No plugin changes. fxbot's own plugins each gain one line in `plugin.json`.
 
 ## 1. Research
 
@@ -289,66 +289,66 @@ Print a check's setup, and match exact fields: one that tested nothing can't pas
 - **If it must be cut,** `plugin` and `below` in the list go first, then the directory's line, then the version row's warning. The floor, **Unsupported**, and a page's error stay.
 
 **M1. The rule**
-- [ ] `minFxbot` parses. A value that isn't `x.y.z` fails with a sentence, and a plugin with none is fine.
-- [ ] `unfit` answers for each case, by a table of inputs: too new, equal, older, a prerelease meeting its release, `0.0.0` skipping the floor, `since` with `uses`, `since` alone, `plugin` with `below`, and an entry whose `since` is past the running version.
-- [ ] A name matches as a whole word: `fx.chats.send` doesn't match `fx.chats.sendAll`.
-- [ ] A plugin with a floor at or past `since` isn't flagged, whatever its code says.
-- [ ] `npm run typecheck` passes.
+- [x] `minFxbot` parses. A value that isn't `x.y.z` fails with a sentence, and a plugin with none is fine.
+- [x] `unfit` answers for each case, by a table of inputs: too new, equal, older, a prerelease meeting its release, `0.0.0` skipping the floor, `since` with `uses`, `since` alone, `plugin` with `below`, and an entry whose `since` is past the running version.
+- [x] A name matches as a whole word: `fx.chats.send` doesn't match `fx.chats.sendAll`.
+- [x] A plugin with a floor at or past `since` isn't flagged, whatever its code says.
+- [x] `npm run typecheck` passes.
 
 **M2. Adding and updating**
-- [ ] A plugin that needs a newer fxbot shows its page, with its code, and the sentence, and **Add** is off.
-- [ ] `POST` to add it anyway fails, with no files written, no row, and no schema.
-- [ ] A plugin on the list is refused the same way, with its reason.
-- [ ] The hourly check marks an installed plugin **Needs fxbot 0.8.0** when the new commit needs that. The installed one keeps running, and it isn't silent.
-- [ ] **Update** to that commit is refused, and nothing moves.
-- [ ] When fxbot catches up, the mark becomes **Update available**.
+- [x] A plugin that needs a newer fxbot shows its page, with its code, and the sentence, and **Add** is off.
+- [x] `POST` to add it anyway fails, with no files written, no row, and no schema.
+- [x] A plugin on the list is refused the same way, with its reason.
+- [x] The hourly check marks an installed plugin **Needs fxbot 0.8.0** when the new commit needs that. The installed one keeps running, and it isn't silent.
+- [x] **Update** to that commit is refused, and nothing moves.
+- [x] When fxbot catches up, the mark becomes **Update available**.
 
 **M3. Unsupported**
-- [ ] After a start on a fxbot that broke what it uses, the plugin doesn't run: no hook, no tool in a request, no route, no page. Assert on what the mock got.
-- [ ] Its migrations don't run, and its code isn't imported. Prove it with a line the plugin's setup would write.
-- [ ] Every other plugin runs, bots answer, and fxbot starts in the usual time.
-- [ ] Its files, settings, and tables are still there.
-- [ ] A plugin that needs it says so, as it does today.
-- [ ] **Update** to a commit that fits runs it, with no restart, and **Unsupported** goes.
-- [ ] A plugin with a floor above the running version, as after a downgrade, doesn't run, and says what it needs.
-- [ ] **Remove** works.
-- [ ] A local plugin runs whatever the check says, with its line in the log.
+- [x] After a start on a fxbot that broke what it uses, the plugin doesn't run: no hook, no tool in a request, no route, no page. Assert on what the mock got.
+- [x] Its migrations don't run, and its code isn't imported. Prove it with a line the plugin's setup would write.
+- [x] Every other plugin runs, bots answer, and fxbot starts in the usual time.
+- [x] Its files, settings, and tables are still there.
+- [x] A plugin that needs it says so, as it does today.
+- [x] **Update** to a commit that fits runs it, with no restart, and **Unsupported** goes.
+- [x] A plugin with a floor above the running version, as after a downgrade, doesn't run, and says what it needs.
+- [x] **Remove** works.
+- [x] A local plugin runs whatever the check says, with its line in the log.
 
 **M4. A page that fails**
-- [ ] A page whose code throws at load shows on its tab, with the error, as a server's does.
-- [ ] The rest of the app draws, and the page logs no other error.
+- [x] A page whose code throws at load shows on its tab, with the error, as a server's does.
+- [x] The rest of the app draws, and the page logs no other error.
 
 **M5. The published list**
-- [ ] A new entry on a stubbed fxbot.sh reaches a running install at the hourly read, and a start uses it.
-- [ ] With the site down, the shipped copy is used, and a failed read keeps what it had.
-- [ ] A broken file changes nothing.
-- [ ] With a newer release out and an entry for it, the version row says "Won't run on" with the plugins it fits, and only those.
-- [ ] With no entry, the row is as it was.
-- [ ] An entry for a release this install isn't on leaves its plugins running.
+- [x] A new entry on a stubbed fxbot.sh reaches a running install at the hourly read, and a start uses it.
+- [x] With the site down, the shipped copy is used, and a failed read keeps what it had.
+- [x] A broken file changes nothing.
+- [x] With a newer release out and an entry for it, the version row says "Won't run on" with the plugins it fits, and only those.
+- [x] With no entry, the row is as it was.
+- [x] An entry for a release this install isn't on leaves its plugins running.
 
 **M6. The page**
-- [ ] **Plugins** shows **Unsupported** and **Needs fxbot 0.8.0** where **Update available** shows.
-- [ ] The tab says why, and offers **Update** when there is one, and **Remove**.
-- [ ] At 375 pixels there's no sideways scroll, and the page logs no errors. Load 5173 as well as the build, with writes blocked.
+- [x] **Plugins** shows **Unsupported** and **Needs fxbot 0.8.0** where **Update available** shows.
+- [x] The tab says why, and offers **Update** when there is one, and **Remove**.
+- [x] At 375 pixels there's no sideways scroll, and the page logs no errors. Load 5173 as well as the build, with writes blocked.
 
 **M7. fxbot's own plugins**
-- [ ] Each plugin with code in `plugins/` sets `minFxbot`.
-- [ ] `plugins/tsconfig.json` is in `npm run typecheck`. Removing a name from `PluginApi` that a plugin uses fails it. Try one, and put it back.
-- [ ] `scripts/check-plugins.mjs` is in `npm run typecheck`, and fails on a floor above the next release, on a missing floor, and on a plugin the list marks.
-- [ ] Their guards stay, with a line saying why.
-- [ ] fxbot.sh's directory shows each plugin's floor.
+- [x] Each plugin with code in `plugins/` sets `minFxbot`.
+- [x] `plugins/tsconfig.json` is in `npm run typecheck`. Removing a name from `PluginApi` that a plugin uses fails it. Try one, and put it back.
+- [x] `scripts/check-plugins.mjs` is in `npm run typecheck`, and fails on a floor above the next release, on a missing floor, and on a plugin the list marks.
+- [x] Their guards stay, with a line saying why.
+- [x] fxbot.sh's directory shows each plugin's floor.
 
 **M8. Docs and checks**
-- [ ] `CONVENTIONS.md` and `AGENTS.md` have the rule: a break adds a line to `plugin-breaks.json`.
-- [ ] **The website:**
+- [x] `CONVENTIONS.md` and `AGENTS.md` have the rule: a break adds a line to `plugin-breaks.json`.
+- [x] **The website:**
   - `write-a-plugin.md` says how to set `minFxbot`
-  - the [Plugin API](../../packages/website/src/content/docs/sdk/reference/plugin-api.md) has its `plugin.json` row, and how fxbot marks a break
+  - the [Plugin API](../../../packages/website/src/content/docs/sdk/reference/plugin-api.md) has its `plugin.json` row, and how fxbot marks a break
   - the how-to for adding a plugin says what **Unsupported** and **Needs fxbot** mean, and [what it can't do](#what-it-cant-do)
-- [ ] `CHANGELOG.md`, under `## Unreleased`: the rule, and that it adds no migration.
-- [ ] `npm run typecheck`, `npm run build`, `npm run build-site`, and `git diff --check` pass. New files are checked for whitespace too.
-- [ ] The line counts are within the bound.
-- [ ] This doc's Status says built, with what the build changed. It moves to `docs/_completed/phases/`, and `AGENTS.md` lists it.
-- [ ] The work is committed on the open release branch, core, plugins, and docs in separate commits, and not pushed.
+- [x] `CHANGELOG.md`, under `## Unreleased`: the rule, and that it adds no migration.
+- [x] `npm run typecheck`, `npm run build`, `npm run build-site`, and `git diff --check` pass. New files are checked for whitespace too.
+- [x] The line counts are within the bound.
+- [x] This doc's Status says built, with what the build changed. It moves to `docs/_completed/phases/`, and `AGENTS.md` lists it.
+- [x] The work is committed on the open release branch, core, plugins, and docs in separate commits, and not pushed.
 
 **The human runs these:**
 - **A real break:** remove something small on a branch, list it, and start. Does the message read true, and does the way out work?
@@ -362,3 +362,16 @@ Print a check's setup, and match exact fields: one that tested nothing can't pas
 1. **Does Unsupported stop a plugin, or only warn?** *Default:* it stops, with no way to run it anyway. That's what keeps a bot from breaking, as Hermes and Firefox's hard block do. The price: a false match, such as a removed name in a plugin's comment, stops a plugin that's fine until its author raises `minFxbot`. A **Run anyway** switch, like Firefox's soft block, is about 10 lines.
 2. **An older install wants a plugin that needs a newer fxbot: refuse, or find one that fits?** *Default:* refuse, and say to update fxbot, since that's one button. Most systems here serve the newest version that fits. For fxbot's own plugins that's cheap: read them at the tag of the running release, not `main`, about 15 lines, and an old install could still add them. For anyone else's it needs a `versions.json`, so that waits.
 3. **Is a row in Plugins enough, once a plugin has gone Unsupported?** *Default:* yes, with the warning before the update. If a bot quietly loses a plugin the owner relies on, a line in that bot's chat or the sidebar may be wanted. It matters most for `permissions`, where the plugin going off means no guard.
+
+## What the build changed
+
+- **The open questions took their defaults.** Unsupported stops a plugin, with no **Run anyway**, an older install is refused and told to update fxbot, and a row in **Plugins**, with the warning before an update, is what shows.
+- **`plugin-fit.ts` holds the rule,** on its own, so `scripts/check-plugins.mjs` can import it without loading the plugin system.
+- **A change to the published list acts at once.** The plan only read it at a start, but a start loads plugins before the first read lands, so a published line would never have taken effect. So `recheck` runs after the start and whenever the list changes: a plugin a new line fits stops, and one a removed line no longer fits runs again, with no restart.
+- **A plugin that needs an Unsupported one still loads.** The plan said it would fail with "It needs computer", but that's only for a plugin that's missing. `fx.need` gives it `null`, as it does for any plugin that isn't running.
+- **`wontRun` names only plugins running now,** and none from `FXBOT_PLUGIN_DIRS`, since those run whatever the check says. It's on `UpdateStatus`, so `updateStatus` is async.
+- **`check-plugins.mjs` reads the next release from the branch's name,** `release/<version>`, since `package.json` trails it, and from `package.json` on `main`, which is what the release workflow checks.
+- **The floors:** 0.5.0 for `chat-rooms`, `chat-rooms-computer`, `computer`, and `fresh`, and 0.6.0 for `dreams`, `messages`, `permissions`, and `routines`, read from the Plugin API's `Since` notes and what each uses. `safe` doesn't raise a floor, since an older fxbot ignores it.
+- **Each of fxbot's plugins shows Update available once,** since its `plugin.json` changed.
+- **A dev install logs that the list didn't answer,** once an hour, until a release puts `plugin-breaks.json` on fxbot.sh.
+- **The size:** it first came to 146 core lines against a bound of 130, with `recheck`, which the plan didn't have, as the largest part. Tightening it, with nothing cut, gave 130: a net 87 in existing files, 40 in `plugin-fit.ts`, and 3 in the list. The checks are 46 lines.

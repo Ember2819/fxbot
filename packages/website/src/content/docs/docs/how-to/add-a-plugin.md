@@ -37,6 +37,11 @@ fxbot doesn't vet any of these. Read what each one does before you add it. While
 ## When it goes differently
 
 - **Its row says Off, with a reason.** Its code failed to load, or its folder is gone. The rest of fxbot runs. Its tab in **Settings** shows its log.
+- **Its page says it needs a newer fxbot.** **Add** stays off, and its code still shows. [Update fxbot](/docs/how-to/update/), then add it.
+- **Its row says Needs fxbot.** A newer version of it needs a newer fxbot than yours. The one you have keeps running, and you can update it once you've updated fxbot.
+- **Its row says Unsupported.** This fxbot broke something it uses, or fxbot's list marks its version as bad. It doesn't run, and the rest of fxbot does. Its tab in **Settings** says why, with **Update** when there's a version that fits. Its files, settings, and tables are kept. A plugin that guards your bots, such as permissions, isn't guarding them while it's **Unsupported**, so see to it soon.
+- **Its tab says its page didn't load.** Its code ran, and its part of the app didn't. Update it, or ask its author.
+- **Settings says a plugin won't run on the next release.** It shows above **Update**, so you can wait for the plugin's update first. fxbot finds this by reading names in a plugin's code, so it can miss a break, and it can flag a plugin that's fine.
 - **Its row says Update available.** Its files changed in its repository. Open its tab in **Settings** and choose **Update to**: fxbot shows what changes, with the code to read, and moves only when you choose **Update**. If new code doesn't load, the old version keeps running.
 - **A server it carries isn't added.** A plugin's remote MCP servers are added with it, under the same rules as any other server: from GitHub, an address on this machine or your network isn't added. Its log says why. A server that runs a command on this machine isn't used yet.
 - **A file is passed over.** Files over 2 MiB, and files that aren't text, aren't kept.

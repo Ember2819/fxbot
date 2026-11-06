@@ -165,7 +165,17 @@ A plugin can build on another. The browser plugin has no code: it gives the comp
 2. The owner adds the plugin you need first: your plugin's page says what it needs, and **Add** waits for it. Yours loads after it, and while yours is added, it can't be removed.
 3. The plugin you need reads every plugin's object with `fx.dependents()`, and hears a change with `fx.on("dependents", …)`.
 
-## 7. Publish it
+## 7. Say which fxbot it needs
+
+Set `minFxbot` in `plugin.json` to the oldest fxbot your plugin runs on, and raise it when you start using something newer. The [Plugin API](/sdk/reference/plugin-api/#which-fxbot-it-runs-on) says `Since` on what's new:
+
+```json
+{ "extensions": { "sh.fxbot": { "minFxbot": "0.6.0", "server": "./fxbot/server.ts" } } }
+```
+
+An owner on an older fxbot can't add it, or update to it, and is told what it needs. When a later release breaks something your plugin uses, it shows as **Unsupported**, with what to change. Change it, raise `minFxbot` to that release, and push.
+
+## 8. Publish it
 
 1. Push the plugin's folder to a public GitHub repository, at its root or in a folder of it.
 2. Anyone can add it from **Plugins**, on **Browse**, under **From GitHub**: `owner/repo`, or `owner/repo/folder`. That's there once they turn on unvetted plugins in Settings › Plugins, since fxbot doesn't vet it. fxbot pins it to the commit that its page showed.

@@ -28,6 +28,7 @@ Only `plugin.json` is required, and only the paths it names count.
 | `name` | Required. Up to 40 lowercase letters, digits, and dashes. Its tools are `<name>_<tool>`, its routes are under `/api/plugins/<name>/`, its page paths under `/<name>/`, and its schema is `plugin_<name>`, with `_` for `-`. It can't be `chat`, `memory`, `library`, or `skill`, or an MCP server's prefix, nor a name fxbot uses itself: `pages`, `preview`, `search`, `addons`, `plugins`, `settings`, `profiles`, or 12 hex characters, which is a plugin's id. It and the repository's owner make the plugin's icon. |
 | `version` | Shown on its row. Default `0.0.0` |
 | `description` | Shown whole on its page. Its rows in **Plugins** show its first sentence, up to 100 characters and two lines, so write one sentence that fits. |
+| `extensions["sh.fxbot"].minFxbot` | The oldest fxbot it runs on, as `x.y.z`. See [Which fxbot it runs on](#which-fxbot-it-runs-on). Since 0.7.0. |
 | `extensions["sh.fxbot"].server` | Its server code, a path inside the folder |
 | `extensions["sh.fxbot"].page` | Its page code |
 | `extensions["sh.fxbot"].css` | Its CSS |
@@ -35,6 +36,34 @@ Only `plugin.json` is required, and only the paths it names count.
 | `extensions["sh.fxbot"].settings` | A list of settings, each with `name`, `description`, and optionally `default`, `isRequired`, and `isSecret` |
 | `extensions["sh.fxbot"].commands` | Commands for the `/` list in a bot's message box, each with `name` (up to 40 lowercase letters, digits, and dashes) and `description` (up to 200 characters). Listing one runs nothing: the plugin's `message` hook sees `/name` as text. Since 0.5.0. |
 | `extensions["sh.fxbot"].needs` | The plugins it needs, each name mapped to an object for that plugin, up to 16 KiB in all. See [Plugins that need others](#plugins-that-need-others). |
+
+## Which fxbot it runs on
+
+`minFxbot` is the oldest fxbot a plugin runs on. The rows on this page say `Since 0.6.0` where a call is newer than the rest, so set it to the newest of those that the plugin uses. It's a version and not a range: nothing says the newest fxbot a plugin runs on, since nobody can know that ahead of time.
+
+A plugin with code on a fxbot older than its `minFxbot` can't be added, or updated to. On a start, it doesn't run, and says what it needs. fxbot before 0.7.0 doesn't read `minFxbot`, so a plugin that wants to refuse those can check for a call it needs, and throw.
+
+What a release breaks is in fxbot's [`plugin-breaks.json`](https://fxbot.sh/plugin-breaks.json), which installs read every hour:
+
+```json
+{
+  "breaks": [
+    { "since": "0.8.0", "uses": ["fx.models.ask"], "says": "Use fx.models.run." },
+    { "since": "0.9.0", "says": "Hooks changed shape, so every plugin needs a new version." },
+    { "plugin": "computer", "below": "0.4.0", "says": "It can lose a bot's files on this version." }
+  ]
+}
+```
+
+| A line | It fits a plugin when |
+| --- | --- |
+| `since` and `uses` | Its `minFxbot` is below `since`, and its server or page code names one of `uses`, as a whole word |
+| `since` alone | Its `minFxbot` is below `since` |
+| `plugin` and `below` | It's that plugin, at a version below `below` |
+
+A line applies on a fxbot at `since` or later. A plugin it fits is **Unsupported** there: it doesn't run, its files, settings, and tables stay, and it can't be added. To say a plugin has moved on from a break, raise its `minFxbot` to `since`. A plugin that needs one that's **Unsupported** gets `null` from `fx.need`, as it does for any plugin that isn't running.
+
+The check reads names in code, so it can miss a call reached another way, and a name in a comment counts. A plugin from `FXBOT_PLUGIN_DIRS` runs whatever the check says, with a line in its log, since its author is at the keyboard.
 
 ## Server code
 
