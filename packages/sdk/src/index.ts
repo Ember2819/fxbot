@@ -95,7 +95,7 @@ export async function createFxbot(options: FxbotOptions) {
   const { databaseUrl, secretKey, vercelClientId, dataDir = "data", backupsDir = "backups", version = "0.0.0", fetch = globalThis.fetch } = options;
   const key = typeof secretKey === "string" ? readKey(secretKey) : secretKey;
   const store = await createStore({ databaseUrl, dataDir, backupsDir });
-  const sessions = await openSessions(store.sql, { databaseUrl, dataDir, backupsDir, backedUp: store.backedUp }).catch(async (error) => {
+  const sessions = await openSessions(store.sql, { databaseUrl, dataDir, backupsDir, backedUp: store.backedUp, turnsAtOnce: (await store.settings.get()).turnsAtOnce }).catch(async (error) => {
     await store.close();
     throw error;
   });
@@ -756,6 +756,11 @@ export async function createFxbot(options: FxbotOptions) {
           }
           await store.settings.save({ timeZone: zone });
           timeZone = zone;
+        }
+        // How many turns run at once. The queue reads it when fxbot starts.
+        if (input.turnsAtOnce !== undefined) {
+          if (!Number.isInteger(input.turnsAtOnce) || input.turnsAtOnce < 4 || input.turnsAtOnce > 100) fail(400, "Turns at once must be a whole number from 4 to 100.");
+          await store.settings.save({ turnsAtOnce: input.turnsAtOnce });
         }
         // Showing unvetted plugins fills the mirror of GitHub's registry for search.
         if (input.unvetted !== undefined) {

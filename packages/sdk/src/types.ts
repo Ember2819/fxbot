@@ -31,8 +31,9 @@ export const maxPinned = 3;
 // each message are embedded, and 0 embeds none.
 export type Embedder = "local" | "remote" | "off";
 // `unvetted` shows plugins fxbot doesn't vet: the public registries, and adding by address or repository.
-// `defaultProfile` is the bot whose chat a launch at / opens, or "" for none.
-export type Settings = { defaultProvider: string; defaultProfile: string; unvetted: boolean; timeZone: string; embedder: Embedder; embeddingProvider: string; embeddingModel: string; messageVectors: number };
+// `defaultProfile` is the bot whose chat a launch at / opens, or "" for none. `turnsAtOnce` is how many turns run at
+// once, read when fxbot starts.
+export type Settings = { defaultProvider: string; defaultProfile: string; unvetted: boolean; timeZone: string; turnsAtOnce: number; embedder: Embedder; embeddingProvider: string; embeddingModel: string; messageVectors: number };
 // What the machine runs as its local embedder, in an install made by setup.sh.
 export type LocalEmbedder = "cpu" | "gpu" | "off";
 // How far memory search's vectors have got: the model in use, or null when it's off or not answering, the counts, and

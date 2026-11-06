@@ -121,6 +121,7 @@ A new Vercel account with one team gets that team.
 | --- | --- | --- | --- |
 | `defaultProvider` | `string` | `""` | The provider new bots start on, or `""` for none |
 | `timeZone` | `string` | `""` | The owner's time zone, such as `Europe/Berlin`, which plugins read. `""` is the machine's. Since 0.6.0. |
+| `turnsAtOnce` | `number` | `32` | How many turns run at once, across every bot and chat, from 4 to 100. Read when fxbot starts. Since 0.6.0. |
 | `defaultProfile` | `string` | `""` | The bot whose chat a launch at `/` opens, or `""` for none. A bot's id: an id of another shape fails with 400, and an unknown one with 404. Deleting the bot clears it. Since 0.5.0. |
 | `unvetted` | `boolean` | `false` | Whether plugins fxbot doesn't vet can be found and added: the public registries, and adding by address or repository |
 | `embedder` | `"local"`, `"remote"`, or `"off"` | `"local"` | Where memory search's vectors come from: `embedUrl`, a provider's `/embeddings`, or none |
@@ -277,7 +278,7 @@ type Provider = {
   error: string | null; // why its agent didn't start
 };
 
-type Settings = { defaultProvider: string; unvetted: boolean; timeZone: string; embedder: "local" | "remote" | "off"; embeddingProvider: string; embeddingModel: string; messageVectors: number };
+type Settings = { defaultProvider: string; unvetted: boolean; timeZone: string; turnsAtOnce: number; embedder: "local" | "remote" | "off"; embeddingProvider: string; embeddingModel: string; messageVectors: number };
 
 type EmbeddingStatus = {
   model: string | null;

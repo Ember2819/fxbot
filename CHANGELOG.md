@@ -4,8 +4,9 @@ Each release of fxbot, newest first. A release that adds migrations, bumps libfx
 
 ## Unreleased
 
-**Before upgrading.** Migration `0009_time_zone` adds a `time_zone` column to `settings`. A time zone set in dreams moves to **Settings** › **General**: the first browser to open fxbot sets it there, so check it if yours should be another.
+**Before upgrading.** Migrations `0009_time_zone` and `0010_turns_at_once` add `time_zone` and `turns_at_once` columns to `settings`. A time zone set in dreams moves to **Settings** › **General**: the first browser to open fxbot sets it there, so check it if yours should be another.
 
+- **More bots can work at once.** Up to 32 turns run together, up from 4, so four long commands no longer stop your other bots. **Turns at once** in **Settings** › **General** changes it, from the next time fxbot starts.
 - **Routines,** from the new routines plugin, on fxbot's list. Ask a bot "every weekday at 8, summarize my calendar", and it saves a routine, which runs on time in a session of its own with everything the bot has: its computer, MCP servers, skills, memories, and library. It tells you in its chat, with the files it saved, and stays quiet when there's nothing to say. Each bot's settings list its routines and their runs, with a switch, **Run now**, **Stop**, and **Remove**, and **Settings** › **Routines** has the limits, such as how long a run takes. See [Give a bot a routine](https://fxbot.sh/docs/how-to/give-a-bot-a-routine/).
 - **A time zone** in **Settings** › **General**, which the first browser to open fxbot sets, and plugins use.
 - **Dreams 0.2.0** uses that time zone, in place of a setting of its own. Update it from **Plugins**.

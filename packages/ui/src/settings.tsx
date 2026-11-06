@@ -2,6 +2,7 @@ import { useEffect, useRef, useState, type ComponentType, type ReactNode } from 
 import { BrainIcon, InfoIcon, KeyRoundIcon, PuzzleIcon, SlidersHorizontalIcon } from "lucide-react";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
+import { Input } from "@/components/ui/input";
 import { NativeSelect, NativeSelectOption } from "@/components/ui/native-select";
 import type { Plugin, Profile, Settings } from "@fxbot/sdk/client";
 import { client } from "./client.ts";
@@ -85,6 +86,21 @@ export function SettingsScreen({ tab, profiles }: { tab: string; profiles: Profi
               ))}
             </NativeSelect>
             <span className="font-normal text-muted-foreground">Bots' schedules use this.</span>
+          </label>
+        )}
+        {settings && (
+          <label className="grid gap-1.5 text-sm font-medium">
+            Turns at once
+            <Input
+              key={settings.turnsAtOnce}
+              type="number"
+              min={4}
+              max={100}
+              defaultValue={settings.turnsAtOnce}
+              className="w-24"
+              onBlur={(e) => Number(e.target.value) !== settings.turnsAtOnce && save({ turnsAtOnce: Number(e.target.value) })}
+            />
+            <span className="font-normal text-muted-foreground">How many bots can work at the same time. One waiting on a long command holds its place. This takes effect the next time fxbot starts.</span>
           </label>
         )}
       </>

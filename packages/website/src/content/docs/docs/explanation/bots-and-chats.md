@@ -24,6 +24,8 @@ Some messages don't join:
 - A picture of yours ends the running turn and runs next, since it's usually a change of course. What the bot had done stays.
 - A turn that only passes something on, such as a routine's result, takes no messages. A message waits for it, for the few seconds it takes.
 
+Up to 32 turns run at once, across all your bots, and a bot waiting on a long command holds its place. Past that, a turn waits for one to end. **Turns at once** in **Settings** › **General** changes it, from the next time fxbot starts.
+
 To end a turn instead, press **Stop**, where the send button is while the box is empty. It doesn't wait for a running tool, and a command on the bot's computer stops too. Anything you sent that the bot hadn't read runs next, so nothing you wrote is lost.
 
 ## The default bot

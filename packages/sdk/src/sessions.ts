@@ -15,16 +15,17 @@ const home = dirname(dirname(fileURLToPath(import.meta.resolve("@workflow/world-
 
 // libfx's sessions, in fxbot's Postgres through Workflow's Postgres World. Its tables are the package's, in schemas of
 // its own (workflow, workflow_drizzle, and graphile_worker), and its bootstrap migrates them, not migrations/.
-export async function openSessions(sql: postgres.Sql, options: MigrateOptions & { backedUp: boolean }) {
+export async function openSessions(sql: postgres.Sql, options: MigrateOptions & { backedUp: boolean; turnsAtOnce: number }) {
   await bootstrap(sql, options);
   // At its defaults the queue polls 100 times a second while idle. LISTEN wakes it for each new message, so a turn
   // doesn't wait on the poll. Its start() isn't called: it would queue every session again for an agent named
   // "default" (vercel-labs/fx#1253). The queue starts on its first message, and index.ts resumes open turns itself.
+  // A turn waiting in a tool holds its place in the queue, so too few, and long commands stop every other bot.
   const sessions = createWorld({
     connectionString: options.databaseUrl,
     jobPrefix: "fxbot_",
     namespace: "fxbot",
-    queueConcurrency: 4,
+    queueConcurrency: options.turnsAtOnce,
     pollInterval: 5000,
     maxPoolSize: 6,
     applicationManagedShutdown: true,
