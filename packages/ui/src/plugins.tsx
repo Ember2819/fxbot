@@ -1,6 +1,6 @@
 import * as React from "react";
 import * as jsxRuntime from "react/jsx-runtime";
-import { Component, createContext, useContext, useSyncExternalStore, type ComponentType, type ReactNode } from "react";
+import { Component, createContext, useContext, useSyncExternalStore, type ComponentType, type ReactNode, type RefObject } from "react";
 import { Streamdown } from "streamdown";
 import { createPortal } from "react-dom";
 import * as attachment from "@/components/ui/attachment";
@@ -31,8 +31,9 @@ import { Reply } from "./steps.tsx";
 // boundary. With no plugins, nothing here fetches or runs any code.
 
 export type ToolCall = Extract<Part, { type: "tool" }>;
-// setDraft takes the new text, or a function from the draft to it, as React's setters do.
-export type ComposerProps = { bot: Profile; setDraft: (text: string | ((draft: string) => string)) => void; attach: (files: File[]) => void };
+// setDraft takes the new text, or a function from the draft to it, as React's setters do. `box` is the textarea, for a
+// plugin that follows the caret or the keys.
+export type ComposerProps = { bot: Profile; draft: string; box: RefObject<HTMLTextAreaElement | null>; setDraft: (text: string | ((draft: string) => string)) => void; attach: (files: File[]) => void };
 type Nav = { label: string; path: string; icon?: ComponentType<{ className?: string }> };
 type Places = {
   routes: { path: string; parts: string[]; Component: ComponentType<{ params: Record<string, string> }> }[];
@@ -44,13 +45,15 @@ type Places = {
   botSettings: ComponentType<{ bot: Profile }>[];
   botPanel: ComponentType<{ bot: Profile }>[];
   chat: ComponentType<{ bot: Profile }>[];
+  sending: ((text: string) => string)[];
+  said: { pattern: RegExp; Component: ComponentType<{ match: RegExpMatchArray }> }[];
   // Places other plugins leave with Slot, by name, such as `chat-rooms.room-header`.
   slots: Map<string, ComponentType<any>[]>;
 };
 // `key` is the URLs it loaded from, which change with its files.
 type Loaded = { name: string; iconKey: string; key: string; css?: HTMLLinkElement; places: Places };
 
-const emptyPlaces = (): Places => ({ routes: [], sidebar: [], nav: [], composer: [], toolViews: new Map(), settings: [], botSettings: [], botPanel: [], chat: [], slots: new Map() });
+const emptyPlaces = (): Places => ({ routes: [], sidebar: [], nav: [], composer: [], toolViews: new Map(), settings: [], botSettings: [], botPanel: [], chat: [], sending: [], said: [], slots: new Map() });
 
 // The loaded plugins, by name. A change makes a new array, which the places read through usePlugins.
 let loaded: Loaded[] = [];
@@ -130,6 +133,8 @@ async function run(name: string, version: string, url: string): Promise<Places> 
     botSettings: (Component: ComponentType<{ bot: Profile }>) => places.botSettings.push(Component),
     botPanel: (Component: ComponentType<{ bot: Profile }>) => places.botPanel.push(Component),
     chat: (Component: ComponentType<{ bot: Profile }>) => places.chat.push(Component),
+    sending: (change: (text: string) => string) => places.sending.push(change),
+    said: (pattern: RegExp, Component: ComponentType<{ match: RegExpMatchArray }>) => places.said.push({ pattern, Component }),
     slot: (name: string, Component: ComponentType<any>) => places.slots.set(name, [...(places.slots.get(name) ?? []), Component]),
   });
   return places;
@@ -159,6 +164,36 @@ export async function loadPlugins() {
   }
   for (const gone of loaded.filter((p) => !list.some((l) => l.name === p.name))) gone.css?.remove();
   publish(next);
+}
+
+// A message on its way out, through each plugin's `sending`. One that throws leaves the text as it was.
+export function outgoing(text: string, plugins: Loaded[]) {
+  return plugins.flatMap((plugin) => plugin.places.sending).reduce((out, change) => {
+    try {
+      return change(out);
+    } catch (error) {
+      console.error("A plugin's sending failed:", error);
+      return out;
+    }
+  }, text);
+}
+
+// What the owner or a plugin said, with each match of a plugin's `said` pattern drawn by its part.
+export function SaidText({ text }: { text: string }) {
+  let pieces: ReactNode[] = [text];
+  for (const { name, places } of usePlugins())
+    for (const { pattern, Component } of places.said)
+      pieces = pieces.flatMap((piece) => {
+        if (typeof piece !== "string") return [piece];
+        const out: ReactNode[] = [];
+        let at = 0;
+        for (const match of piece.matchAll(pattern)) {
+          out.push(piece.slice(at, match.index), <PluginPart key={match.index} plugin={name}><Component match={match} /></PluginPart>);
+          at = match.index + match[0].length;
+        }
+        return [...out, piece.slice(at)];
+      });
+  return <>{pieces}</>;
 }
 
 // A plugin's part, kept from taking down the app: one that throws shows a short card in its place.

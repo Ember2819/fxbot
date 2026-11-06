@@ -45,7 +45,7 @@ import { LibraryPage } from "./library.tsx";
 import { Reply } from "./steps.tsx";
 import { follow, go } from "./nav.ts";
 import { Header } from "./header.tsx";
-import { BotsProvider, loadPlugins, Place, usePluginNav, usePluginScreen } from "./plugins.tsx";
+import { BotsProvider, loadPlugins, outgoing, Place, SaidText, usePluginNav, usePlugins, usePluginScreen } from "./plugins.tsx";
 import { ModelField } from "./providers.tsx";
 import { keepDraft, reload, takeDraft, useNewVersion } from "./pwa.ts";
 import { SettingsScreen } from "./settings.tsx";
@@ -561,6 +561,7 @@ function Chat({ id, profiles, onChange, onShown }: { id: string; profiles: Profi
   const [attached, setAttached] = useState<Upload[]>([]);
   const [notice, setNotice] = useState("");
   const box = useRef<HTMLTextAreaElement>(null);
+  const plugins = usePlugins();
   const picker = useRef<HTMLInputElement>(null);
   const skills = useSkillPicker(id, box, draft, setDraft);
   const skillNames = new Set(skills.skills.filter((s) => !s.command).map((s) => s.name));
@@ -655,7 +656,7 @@ function Chat({ id, profiles, onChange, onShown }: { id: string; profiles: Profi
   function submit(event: { preventDefault(): void }) {
     event.preventDefault();
     if ((!draft.trim() && !attached.length && !skills.picked.length) || stuck) return;
-    send([...skills.picked.map((name) => `$${name}`), draft].filter((part) => part.trim()).join(" "), newMessageId(), attached);
+    send(outgoing([...skills.picked.map((name) => `$${name}`), draft].filter((part) => part.trim()).join(" "), plugins), newMessageId(), attached);
     setDraft("");
     setAttached([]);
     skills.setPicked([]);
@@ -777,7 +778,7 @@ function Chat({ id, profiles, onChange, onShown }: { id: string; profiles: Profi
                   <InputGroupButton size="icon-sm" className="rounded-full" disabled={stuck} aria-label="Attach files" onClick={() => picker.current?.click()}>
                     <PaperclipIcon />
                   </InputGroupButton>
-                  {profile && <Place pick={(places) => places.composer} props={{ bot: profile, setDraft, attach: (files: File[]) => void attach(files) }} />}
+                  {profile && <Place pick={(places) => places.composer} props={{ bot: profile, draft, box, setDraft, attach: (files: File[]) => void attach(files) }} />}
                 </InputGroupAddon>
                 <InputGroupTextarea
                   ref={box}
@@ -854,7 +855,7 @@ function Said({ text, files, from, color, skills }: { text: string; files?: Uplo
         {named.rest && (
           <Bubble align="end" variant="muted">
             <BubbleContent className="whitespace-pre-wrap" style={color && { background: bubbles[color], color: "#ffffff" }}>
-              {named.rest}
+              <SaidText text={named.rest} />
             </BubbleContent>
           </Bubble>
         )}
