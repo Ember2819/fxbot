@@ -42,7 +42,7 @@ In order of execution priority. Checked phases are built. Each is marked **core*
 - [x] [Agent computer](docs/_completed/phases/computer.md) (plugin, one others build on): a Linux computer for each bot, in the machine's own podman or docker, run rootless; the [computer](plugins/computer/README.md) is in `plugins/`
 - [x] [Streams](docs/_completed/phases/streams.md) (core): chats in the Postgres fxbot already runs, so an open chat costs nothing while idle and a long one is as quick to send to as a new one
 - [x] [Computer v2](docs/_completed/phases/computer-v2.md) (plugin, with one core hook): a whole computer in one plugin: a desktop the owner watches and takes over, a shared terminal, a browser on the desktop, and the tools to drive them by pixels, accessibility trees, and text
-- [ ] [Permissions](docs/phases/permissions.md) (plugin, on a core hook): ask, auto, and yolo modes for tool calls
+- [ ] [Permissions](docs/phases/permissions.md) (plugin, on a core hook; 0.6.0): ask, auto, and yolo modes for tool calls, with a reviewer model and an approval card
 - [x] [Chat rooms](docs/_completed/phases/chat-rooms.md) (plugin, with two core hooks; 0.4.1): rooms of the owner and several bots, with `@` chips, bots tagging each other within limits, a Stop, and skills for working in a room
 - [x] [Cross-bot messaging](docs/_completed/phases/cross-bot-messaging.md) (plugin, with core steering and Stop; 0.6.0): bots message each other in their own chats, where the owner watches them work together, and a message to a working bot joins what it's doing
 - [x] [Routines](docs/_completed/phases/routines.md) (plugin, with a core time zone; 0.6.0): saved tasks a bot runs on a schedule, with everything it has, telling the owner in its chat

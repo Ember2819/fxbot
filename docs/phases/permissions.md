@@ -7,7 +7,7 @@
 - **Work the owner didn't start can't wait for ever.** A card from a routine or another bot expires after 30 minutes, and the action doesn't happen.
 - **It's a seatbelt, not a wall.** A reviewer misses things. See [What it can't do](#what-it-cant-do).
 
-Status: planned on 2026-11-06, at the owner's word, from the stub. Researched against the research directive's references, Grok Bot's docs, Hermes Agent, OpenClaw, Claude Code, and Codex. Not built.
+Status: planned on 2026-11-06, at the owner's word, from the stub. Researched against the research directive's references, Grok Bot's docs, Hermes Agent, OpenClaw, Claude Code, and Codex. Not built. It's for 0.6.0.
 
 ## What the owner asked
 
@@ -16,6 +16,12 @@ The stub: "fxbot needs a permission mode, set per profile and changeable during 
 And: "When a tool call needs approval — any call in ask mode, or anything the auto-mode reviewer flags or cannot finish reviewing — the PWA asks the user: Approve once, Approve always (a remembered allow rule for that tool or action), or Deny. A denial goes back to the model as a failed tool result with the reason."
 
 And: "Keep it a thin wrapper around every tool's `execute()`, under the simplicity rule."
+
+After reading this plan:
+- On the default mode: "auto"
+- On what the reviewer judges: "start with your plan... we can change later..."
+- On the release: "0.6.0 which is same one messages ships with."
+- On more turns at once: "yeah do this, make it a setting in fxbot settings..."
 
 Other phases left this one work, and each is in this plan:
 - [MCP servers](../_completed/phases/mcp.md): "the permissions check, when that phase ships", in front of a server's tools.
@@ -30,7 +36,7 @@ Other phases left this one work, and each is in this plan:
 
 The rule built with MCP servers, that bots get only a server's read-only tools until the owner allows more, stays in core.
 
-Core needs six small pieces, about 45 lines. See [The core pieces](#the-core-pieces). Two matter most: `tool.before` handlers get 5 seconds, which neither a person nor a reviewer model can meet, and only 4 turns can run at once, so 4 open cards would stop every bot.
+Core needs five small pieces, about 45 lines. See [The core pieces](#the-core-pieces). The one that matters most: `tool.before` handlers get 5 seconds, which neither a person nor a reviewer model can meet. A sixth is built already: more turns at once, since 4 open cards would have stopped every bot.
 
 ## 1. Research
 
@@ -110,8 +116,8 @@ Checked on libfx 0.0.16 with a mock model, on 2026-11-06.
 
 - **`tool.before`** runs for every tool, core and plugin, and can block a call or change its input. Each handler gets 5 seconds, and one that fails or runs late blocks the call, so a broken guard lets nothing through.
 - **A tool can wait a long time.** A call pending for 31 minutes, on Postgres, finished normally, with nothing ending the turn. fxbot sets no limit, and libfx renews the turn's lease every 5 seconds while it waits.
-- **Only 4 turns run at once.** `queueConcurrency` is 4 (`packages/sdk/src/sessions.ts`), and a turn waiting in a tool holds its slot. With 3 held, another bot answered in 0.4 seconds. With 4 held, it took 24 seconds, until one ended, and with 6, only 4 tools were running. So today, four long computer commands stop every bot.
-- **More slots cost little.** It was set to 4 for idle polling, in [streams](../_completed/phases/streams.md). At 32, an idle server made the same 1.8 database commits a second as at 4. With 28 turns held, another bot still answered in 0.4 seconds, using about 80 MB more memory and 11 database connections at most.
+- **Turns at once were 4.** A turn waiting in a tool holds its slot in the queue. With 3 held, another bot answered in 0.4 seconds. With 4 held, it took 24 seconds, until one ended, and with 6, only 4 tools were running. So four long computer commands stopped every bot.
+- **More slots cost little,** so it's now **Turns at once** in Settings › General, 32 by default, read at start, and built ahead of this phase. It had been set to 4 for idle polling, in [streams](../_completed/phases/streams.md). At 32, an idle server made the same 1.8 database commits a second as at 4. With 28 turns held, another bot still answered in 0.4 seconds, using about 80 MB more memory and 11 database connections at most.
 - **A held turn isn't free:** it re-reads its log for steers, about 5 database commits a second, and about 0.1% of a core.
 - **A message during a wait** joins once the tool ends: `tool_end`, then `user_message`. So a card that's open holds back the owner's words, unless the plugin closes it.
 - **A restart during a wait:** a tool marked `idempotent` runs again, with `tool.before` again. One that isn't gets a failed result, "fx stopped while this tool was running, so it may have partly run. Check its effects before running it again."
@@ -127,7 +133,7 @@ Checked on libfx 0.0.16 with a mock model, on 2026-11-06.
 ## 2. Key takeaways
 
 1. **Asking about everything fails.** "users accept 93% of them anyway". That's why every product here built a reviewer, why fx's `ask` skips reads, and why `ask` can't be the default.
-2. **Judge the action against what the owner said.** There are two schools. fx hunts for harm, in tool output, and doesn't judge consent. Grok, Claude Code, and OpenBot ask whether the owner wanted this, and keep tool output away from the reviewer, so what attacked the bot can't attack it too. fxbot's bots act on the owner's accounts and in the world, not in a repository, and "did you ask for this?" catches both an overeager bot and an injected one. So the reviewer gets the owner's words and the call. The price, from Claude Code: it can't see where a value came from. See [open question 6](#5-open-questions).
+2. **Judge the action against what the owner said.** There are two schools. fx hunts for harm, in tool output, and doesn't judge consent. Grok, Claude Code, and OpenBot ask whether the owner wanted this, and keep tool output away from the reviewer, so what attacked the bot can't attack it too. fxbot's bots act on the owner's accounts and in the world, not in a repository, and "did you ask for this?" catches both an overeager bot and an injected one. So the reviewer gets the owner's words and the call. The price, from Claude Code: it can't see where a value came from. The owner chose this to start with, and it can change.
 3. **A reviewer's flag goes to a person, not to a no.** The stub says so, and OpenBot, Hermes, and OpenClaw agree. Any failure, timeout, or unreadable answer is a flag: a broken reviewer asks, and never allows.
 4. **A reviewer misses things, and we say so.** 17% on real overeager actions, from the only published number. Nobody has shown one holding against an adaptive attacker. It lowers how often a bot goes wrong. It's no boundary, so the site must not call it one.
 5. **Hold the call, don't park the turn.** OpenBot ends the run and saves a continuation, and has to digest and recheck the action, since it runs later. fxbot's call can just wait, as 31 minutes on Postgres showed: the input can't change, nothing needs resuming, and Stop works. It costs a slot and a little database work for each card, and a restart can lose the wait. If that ever proves too much, the computer's `ask_owner` is the other shape: fail the call, end the turn, and go on from a new message.
@@ -139,7 +145,7 @@ Checked on libfx 0.0.16 with a mock model, on 2026-11-06.
 11. **Always allow must not grant everything.** Claude Code drops "broad allow rules that grant arbitrary code execution" in auto, and OpenClaw and OpenBot store exact values. So a shell's rule is that exact command, and a plain tool's is the tool.
 12. **Another bot's word is no one's OK.** eve: a parent's message "never answers a subagent's tool approval". The reviewer's evidence is the owner's words alone, so a colleague's request can't approve itself.
 13. **A floor beats a rule.** eve's policy "can add a gate but never remove one". The order here is: a denial in this turn, then rules, then the mode.
-14. **Holding needs slots.** With 4, four cards stop every bot, including the chat the owner would answer from. It's the one change here every owner gets, plugin or not, and it fixes the same freeze from long computer commands.
+14. **Holding needs slots.** At 4, four cards would have stopped every bot, including the chat the owner would answer from, as four long computer commands did. **Turns at once** fixed both, ahead of this phase.
 
 ## 3. Implementation
 
@@ -174,8 +180,6 @@ It adds no tools, so it costs no tokens in a bot's requests, and a model can't r
 ### The core pieces
 
 About 45 lines.
-
-**32 turns at once.** `queueConcurrency` goes from 4 to 32. A slot is an `await`, not a thread, and the measurements are in [fxbot today](#fxbot-today). This one is for every owner: it stops long computer commands freezing the other bots too.
 
 **`tool.before` can wait.** A handler can answer `{ wait }`, a function that core calls after every hook has run, with no time limit, racing the call's own signal. It answers `{ block }`, or nothing, and the call runs. The 5 seconds still bind the handler, so a broken plugin can't hang a turn by accident, only by asking to.
 
@@ -389,7 +393,7 @@ For the docs too, in plain words, and with no claim of safety:
 
 - **What every owner waits on:** a tool call adds a read of a map, and in `auto` a risky call adds one model request, seconds on most providers. Safe calls add nothing.
 - **Tokens:** a review is about 500 tokens in and 50 out, with no cached prefix, on each new risky call. A busy computer session in `auto` could be hundreds, which is what `reviewer`, and rules, are for.
-- **A card that's open:** a held turn, so a slot of 32, about 5 database commits a second, and about 0.1% of a core, for as long as it waits. An owner's card has no time limit, so one left open overnight costs that until it's answered.
+- **A card that's open:** a held turn, so one of **Turns at once**, about 5 database commits a second, and about 0.1% of a core, for as long as it waits. An owner's card has no time limit, so one left open overnight costs that until it's answered.
 - **Idle:** nothing, but the page's read of `/asks`. A timer runs for each background card.
 - **`page.js`** is a few KB, and loads only where the plugin is added.
 - **Storage:** 30 days of cards.
@@ -403,7 +407,7 @@ For the docs too, in plain words, and with no claim of safety:
 - **Wrapping tool results as untrusted,** OpenBot's envelope, which the computer plan left here. It changes what every tool's result looks like to the model, so it needs testing on real models first.
 - **Teams, or one rule for many bots.** fxbot has one owner.
 - **A keyword floor,** OpenBot's. The reviewer's rule covers those cases, and a floor needs a list to keep.
-- **Lifting MCP's read-only rule.** It stays until the owner chooses. See [open question 4](#5-open-questions).
+- **Lifting MCP's read-only rule.** It stays until the owner chooses. See [open question 3](#5-open-questions).
 - **A sandbox.** Codex's reviewer sits on one, and fxbot's computer is that boundary.
 
 ### What changes
@@ -411,7 +415,7 @@ For the docs too, in plain words, and with no claim of safety:
 | Part | Change | Lines |
 | --- | --- | --- |
 | `packages/sdk/src/plugins.ts`, `plugin-api.ts` | `wait`, `callId`, `safe`, `fx.models.ask`, and `fx.chats.ownerSaid` | about 30 |
-| `packages/sdk/src/index.ts`, `history.ts`, `sessions.ts`, tools | `safe` on fxbot's own tools, the request, and 32 turns at once | about 10 |
+| `packages/sdk/src/index.ts`, `history.ts`, tools | `safe` on fxbot's own tools, and the request | about 10 |
 | `packages/ui/src/plugins.tsx`, `app.tsx` | `app.chat` | about 5 |
 | `plugins/permissions/fxbot/server.ts` | The decision, cards, the reviewer, rules, and routes | about 300 |
 | `plugins/permissions/fxbot/migrations/0001_permissions.sql` | Three tables | about 30 |
@@ -440,7 +444,6 @@ Nothing reaches a real model. Confirm a restarted check server's old process exi
 - **If it must be cut,** the card's history in a bot's settings goes first, then **Waiting on you**, then `trusted`. The modes, the card, the reviewer, a denial sticking, and expiry stay.
 
 **M1. Core**
-- [ ] With 6 bots held in a tool, a seventh answers at once, and all 6 finish. An idle server's database commits are unchanged.
 - [ ] `tool.before` can answer `{ wait }`: a wait past 5 seconds holds the call and no other hook, `{ block }` fails it with that text, and nothing runs it.
 - [ ] It gets the final `input`, after every hook.
 - [ ] **Stop** during a wait ends the turn at once, and the call doesn't run.
@@ -527,12 +530,14 @@ Nothing reaches a real model. Confirm a restarted check server's old process exi
 
 ## 5. Open questions
 
+**Decided by the owner on 2026-11-06:**
+- **The mode when the plugin is added:** `auto`, for every bot, as Grok has it on by default.
+- **What the reviewer judges:** whether the owner asked for this, as planned, and it can change later.
+- **Which release:** 0.6.0, with messages, so a bot's request doesn't ship without approvals.
+- **More turns at once:** a setting, built ahead of this phase.
+
 **Left,** with a default the build follows unless the owner changes it:
 1. **What `ask` asks about.** *Default:* everything but safe tools, as fx does, which differs from the stub's "any tool use". Asking about every memory and history read would be noise, and a dream or routine could never finish. It's then `auto` with a person in the reviewer's place, which is what `ask` should be.
-2. **The mode when the plugin is added.** *Default:* `auto`, for every bot, as Grok has it on by default. Adding the plugin then starts costing review requests at once, and every bot's risky calls change.
-3. **Which model reviews.** *Default:* the bot's own, so it works with nothing to set up. A small fast one is cheaper. A bot on a weak local model gets a weak reviewer.
-4. **MCP's read-only rule.** *Default:* it stays, so a server's write tools still need the owner's pick in Plugins, and then pass through this plugin too. With permissions in place, write tools could reach bots at once, behind a card. That's easier and a wider door, and core can't assume this plugin is there.
-5. **Is the bot's memory safe?** *Default:* yes, `memory_*` and `library_save` are safe, so dreams and routines run at night. A bot talked into saving a bad memory carries it into later chats, unreviewed. Treating them as risky costs a review on each save.
-6. **What the reviewer judges.** *Default:* whether the owner asked for this, without seeing tool output, as Grok, Claude Code, and OpenBot do, and not fx's hunt for harm in that output. It's stricter, so it shows more cards, above all for work no one started. fx's kind shows fewer, and reads the page that may be attacking it.
-7. **The 32 turns.** *Default:* part of this plan's first step. It also fixes a live problem, four long computer commands stopping every bot, so it could land by itself in 0.6.0, ahead of this phase.
-8. **Which release.** *Default:* the one after 0.6.0, which already has routines and messages, and has herdr to plan. Until then, [messages](../_completed/phases/cross-bot-messaging.md) ships with no approvals, so any bot can ask any other to act.
+2. **Which model reviews.** *Default:* the bot's own, so it works with nothing to set up. A small fast one is cheaper. A bot on a weak local model gets a weak reviewer.
+3. **MCP's read-only rule.** *Default:* it stays, so a server's write tools still need the owner's pick in Plugins, and then pass through this plugin too. With permissions in place, write tools could reach bots at once, behind a card. That's easier and a wider door, and core can't assume this plugin is there.
+4. **Is the bot's memory safe?** *Default:* yes, `memory_*` and `library_save` are safe, so dreams and routines run at night. A bot talked into saving a bad memory carries it into later chats, unreviewed. Treating them as risky costs a review on each save.
