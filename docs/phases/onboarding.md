@@ -21,6 +21,8 @@ Status: planned on 2026-11-06, at the owner's word. Researched against the resea
 4. "Setup their first bot"
 5. "Tell them how to add new plugins in the future"
 
+After reading this plan: "Essentials right now would be: computer, fresh, permissions, messages, routines, chat-rooms, chat-rooms-computer."
+
 ## 0. Core or plugin
 
 **Core** ([Core or plugin](../../CONVENTIONS.md#core-or-plugin)). It runs before any plugin exists, and "finding, vetting, adding, and updating plugins" are core. Which plugins are in the pack is data, in fxbot's list, so core never names one.
@@ -111,7 +113,7 @@ Read from the code on 2026-11-06.
 8. **The provider comes before the bot.** Hermes calls it "The single most important setup step." fxbot can't make a bot without one. OpenClaw's live check is the right instinct, and the provider's own sign-in and key check already give it.
 9. **End in the product.** Microsoft and OpenBot agree: the chat is the proof. The last screen's button opens it.
 10. **Keep the teaching to a screen.** NN/g found no benefit from tutorials, and the owner asked for this, so it's one sentence and a picture of where to look, on the way to the chat.
-11. **Put what reaches the machine last.** `computer` restarts fxbot at some point after its **Add**. Going last, it can't stop the others, and a saved step means the restart costs nothing but a moment.
+11. **Put what reaches the machine as late as it can go.** `computer` restarts fxbot at some point after its **Add**. Going late, it can't stop the others, and a saved step means the restart costs nothing but a moment.
 
 ## 3. Implementation
 
@@ -129,13 +131,13 @@ One new key in `plugins-registry.json`, in the order they're added:
 
 ```json
 {
-  "essentials": ["permissions", "fresh", "routines", "dreams", "messages", "chat-rooms", "computer"],
+  "essentials": ["permissions", "fresh", "routines", "messages", "chat-rooms", "computer", "chat-rooms-computer"],
   "plugins": [ ... ]
 }
 ```
 
 - **It's data.** It ships with a release, and the published list replaces it hourly, so the pack can change with no release. Core never names a plugin.
-- **The order is the install order.** A plugin that needs another comes after it, and whatever reaches the machine comes last.
+- **The order is the install order.** A plugin that needs another comes after it, and `computer`, which reaches the machine, comes as late as that allows: only `chat-rooms-computer`, which needs it, follows it.
 - **Only plugins from fxbot's list.** A name that isn't on the list is left out.
 - **An install that's older ignores it.**
 
@@ -192,7 +194,7 @@ Set up fxbot
   │ Essentials                     Recommended  │
   │ What most people want. You can change it.   │
   │  ◉ permissions  Decide what each bot can…   │
-  │  ◉ routines     Bots run saved tasks…       │
+  │  ◉ fresh        /fresh starts a bot's chat… │
   │  ◉ computer     A Linux computer for each…  │
   │  …                                          │
   │  [ Set up Essentials ]                      │
@@ -274,7 +276,7 @@ update settings set onboarded_at = now() where exists (select 1 from profiles) o
 - **Idle:** nothing. One key more in a list that's read already, and one more value in `settings`.
 - **A finished install:** one boolean read with the settings the app reads anyway.
 - **In the page:** a few KB for the flow.
-- **The pack itself** costs what its plugins cost. The list's descriptions say what they do, and each plugin's README says what it costs. `dreams` and a reviewer in `auto` spend tokens, so an owner on a tight budget has **Choose my own**.
+- **The pack itself** costs what its plugins cost. The list's descriptions say what they do, and each plugin's README says what it costs. A reviewer in `auto` spends tokens on each risky call, so an owner on a tight budget has **Choose my own**, or `yolo`.
 
 ### Not in this phase
 
@@ -377,9 +379,11 @@ Print a check's setup, and match exact fields: one that tested nothing can't pas
 
 ## 5. Open questions
 
+**Decided by the owner on 2026-11-06:**
+- **What's in Essentials:** `computer`, `fresh`, `permissions`, `messages`, `routines`, `chat-rooms`, and `chat-rooms-computer`, "right now", so it can change. `dreams` stays out, since it spends tokens each night, and an owner can add it from **Browse**.
+- **`computer` is in the pack,** so its machine setup can happen on the first screen's button, and that screen says so. It goes after everything but `chat-rooms-computer`, which needs it.
+
 **Left,** with a default the build follows unless the owner changes it:
 
-1. **What's in Essentials?** *Default:* `permissions`, `fresh`, `routines`, `dreams`, `messages`, `chat-rooms`, and `computer`, which is every plugin but `chat-rooms-computer`. That's a lot of a short list, and the sources warn a pack goes stale when it's too big. `messages` and `chat-rooms` do nothing with one bot, and `dreams` costs tokens each night. A tighter pack would be `permissions`, `computer`, `routines`, and `fresh`.
-2. **Should `computer` be in it?** *Default:* yes, added last, with its own line on the first screen. It's what lets a bot do real work, and it's also the one plugin that runs a root script, makes a user, sets a firewall, and restarts fxbot, which is a lot to do from one button on a first screen, and it may not suit a small machine. The other way: leave it out of the pack, and offer it on the last screen.
-3. **A separate "Essentials or custom?" screen.** *Default:* keep it, as asked, with Essentials as the big choice. Microsoft's guide says to drop such a page, and Grok, Home Assistant, and Obsidian have none. The smaller way: one button, **Set up Essentials**, with **Choose my own** as a link, which is nearly what the sketch shows.
-4. **Is the pack at the top of Browse only, or above Installed too?** *Default:* Browse, since that's where plugins are added, and an owner with everything added doesn't need it.
+1. **A separate "Essentials or custom?" screen.** *Default:* keep it, as asked, with Essentials as the big choice. Microsoft's guide says to drop such a page, and Grok, Home Assistant, and Obsidian have none. The smaller way: one button, **Set up Essentials**, with **Choose my own** as a link, which is nearly what the sketch shows.
+2. **Is the pack at the top of Browse only, or above Installed too?** *Default:* Browse, since that's where plugins are added, and an owner with everything added doesn't need it.
