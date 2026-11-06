@@ -285,12 +285,19 @@ function Reviewer() {
   const [picked, setPicked] = useState(null);
   const [providers, setProviders] = useState([]);
   const [error, setError] = useState("");
+  const [saved, setSaved] = useState(false);
   useEffect(() => {
     void call("reviewer").then(setPicked, (e) => setError(e.message));
     void client.providers.list().then(setProviders, () => {});
   }, []);
   if (!picked) return null;
-  const save = (next) => (setPicked(next), (!next.provider || next.model) && void call("reviewer", "PUT", next).catch((e) => setError(e.message)));
+  // A pick saves at once. Save settings below is for the plugin's text boxes.
+  const save = (next) => {
+    setPicked(next);
+    setSaved(false);
+    setError("");
+    if (!next.provider || next.model) void call("reviewer", "PUT", next).then(() => setSaved(true), (e) => setError(e.message));
+  };
   const gone = picked.provider && providers.length > 0 && !providers.some((p) => p.id === picked.provider);
   return (
     <section className="grid gap-2 text-sm" aria-label="Reviewer">
@@ -305,6 +312,8 @@ function Reviewer() {
         ))}
       </ui.NativeSelect>
       {picked.provider && !gone && <ui.ModelField id="reviewer" provider={picked.provider} value={picked.model} onChange={(model) => save({ ...picked, model })} placeholder="Pick a model" />}
+      {saved && <p className="text-muted-foreground">Saved. The next review uses this.</p>}
+      {picked.provider && !gone && !picked.model && <p className="text-muted-foreground">Pick a model to save this.</p>}
       {gone && <p className="text-destructive">That provider is gone, so reviews fail and every risky call asks you. Pick another.</p>}
       {error && <p className="text-destructive">{error}</p>}
     </section>

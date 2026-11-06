@@ -400,12 +400,18 @@ function Reviewer() {
 	const [picked, setPicked] = (0, react.useState)(null);
 	const [providers, setProviders] = (0, react.useState)([]);
 	const [error, setError] = (0, react.useState)("");
+	const [saved, setSaved] = (0, react.useState)(false);
 	(0, react.useEffect)(() => {
 		call("reviewer").then(setPicked, (e) => setError(e.message));
 		_fxbot_app.client.providers.list().then(setProviders, () => {});
 	}, []);
 	if (!picked) return null;
-	const save = (next) => (setPicked(next), (!next.provider || next.model) && void call("reviewer", "PUT", next).catch((e) => setError(e.message)));
+	const save = (next) => {
+		setPicked(next);
+		setSaved(false);
+		setError("");
+		if (!next.provider || next.model) call("reviewer", "PUT", next).then(() => setSaved(true), (e) => setError(e.message));
+	};
 	const gone = picked.provider && providers.length > 0 && !providers.some((p) => p.id === picked.provider);
 	return /* @__PURE__ */ (0, react_jsx_runtime.jsxs)("section", {
 		className: "grid gap-2 text-sm",
@@ -444,6 +450,14 @@ function Reviewer() {
 					model
 				}),
 				placeholder: "Pick a model"
+			}),
+			saved && /* @__PURE__ */ (0, react_jsx_runtime.jsx)("p", {
+				className: "text-muted-foreground",
+				children: "Saved. The next review uses this."
+			}),
+			picked.provider && !gone && !picked.model && /* @__PURE__ */ (0, react_jsx_runtime.jsx)("p", {
+				className: "text-muted-foreground",
+				children: "Pick a model to save this."
 			}),
 			gone && /* @__PURE__ */ (0, react_jsx_runtime.jsx)("p", {
 				className: "text-destructive",
