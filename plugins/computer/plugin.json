@@ -5,6 +5,7 @@
   "license": "Apache-2.0",
   "extensions": {
     "sh.fxbot": {
+      "minFxbot": "0.5.0",
       "server": "./fxbot/server.ts",
       "page": "./fxbot/page.js",
       "css": "./fxbot/page.css",

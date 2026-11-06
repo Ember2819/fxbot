@@ -10,6 +10,7 @@ type Room = { id: number; name: string; members: string[] };
 type Rooms = { roomOf(session: string): Promise<Room | null>; rooms(): Promise<Room[]> };
 
 export default async function setup(fx: PluginApi) {
+  // For a fxbot before 0.7.0, which doesn't read minFxbot.
   if (typeof fx.need !== "function" || typeof fx.provide !== "function") throw new Error("chat-rooms-computer needs fxbot 0.5.0 or newer.");
   const rooms = () => fx.need<Rooms>("chat-rooms");
   // The room sessions this plugin's instructions reached this turn: a bot it's off for gets no hook, and keeps its own

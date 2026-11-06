@@ -34,6 +34,7 @@ const said = (state: string) => ({ done: "told the owner", quiet: "nothing to sa
 const text = (value: unknown) => (typeof value === "string" ? value.trim() : "");
 
 export default async function setup(fx: PluginApi) {
+  // For a fxbot before 0.7.0, which doesn't read minFxbot.
   if (!fx.timeZone || !fx.library.list) throw new Error("routines needs fxbot 0.6.0 or newer.");
   const zone = () => fx.timeZone();
   const stamp = (at = new Date()) => slot(at, zone());

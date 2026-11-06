@@ -19,7 +19,7 @@
     "prod": "npm run build && npm run server",
     "build": "npm run build -w @fxbot/ui",
     "build-site": "npm run build -w @fxbot/website",
-    "typecheck": "npm run typecheck --workspaces",
+    "typecheck": "npm run typecheck --workspaces && tsc -p plugins/tsconfig.json && node scripts/check-plugins.mjs",
     "rotate-key": "node --env-file-if-exists=.env packages/server/src/rotate-key.ts"
   },
   "devDependencies": {

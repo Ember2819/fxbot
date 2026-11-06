@@ -41,6 +41,7 @@ const joinNames = (names: string[]) => (names.length < 2 ? names.join("") : name
 const json = (body: unknown, status = 200) => Response.json(body, { status });
 
 export default async function setup(fx: PluginApi) {
+  // For a fxbot before 0.7.0, which doesn't read minFxbot.
   if (!fx.bots.on) throw new Error("messages needs fxbot 0.6.0 or newer.");
 
   // A setting, read at each use. One outside its range is its default, said once in the log.

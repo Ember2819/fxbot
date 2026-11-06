@@ -46,6 +46,7 @@ const stable = (input: unknown) => JSON.stringify(input, (_key, value) => (value
 const keyOf = (tool: string, input: unknown) => `${tool}\0${stable(input)}`;
 
 export default async function setup(fx: PluginApi) {
+  // For a fxbot before 0.7.0, which doesn't read minFxbot.
   if (!fx.models) throw new Error("permissions needs fxbot 0.6.0 or newer.");
 
   // A setting, read at each use. One outside its range is its default, said once in the log.
