@@ -12,12 +12,14 @@ import * as dialog from "@/components/ui/dialog";
 import * as empty from "@/components/ui/empty";
 import * as input from "@/components/ui/input";
 import * as message from "@/components/ui/message";
+import * as nativeSelect from "@/components/ui/native-select";
 import * as scroller from "@/components/ui/message-scroller";
 import * as sidebar from "@/components/ui/sidebar";
 import * as switches from "@/components/ui/switch";
 import * as textarea from "@/components/ui/textarea";
 import { applyLine, type Part, type Profile } from "@fxbot/sdk/client";
 import { Blob } from "./blob.tsx";
+import { ModelField } from "./providers.tsx";
 import { client } from "./client.ts";
 import { Header } from "./header.tsx";
 import { go } from "./nav.ts";
@@ -41,13 +43,14 @@ type Places = {
   settings: ComponentType[];
   botSettings: ComponentType<{ bot: Profile }>[];
   botPanel: ComponentType<{ bot: Profile }>[];
+  chat: ComponentType<{ bot: Profile }>[];
   // Places other plugins leave with Slot, by name, such as `chat-rooms.room-header`.
   slots: Map<string, ComponentType<any>[]>;
 };
 // `key` is the URLs it loaded from, which change with its files.
 type Loaded = { name: string; iconKey: string; key: string; css?: HTMLLinkElement; places: Places };
 
-const emptyPlaces = (): Places => ({ routes: [], sidebar: [], nav: [], composer: [], toolViews: new Map(), settings: [], botSettings: [], botPanel: [], slots: new Map() });
+const emptyPlaces = (): Places => ({ routes: [], sidebar: [], nav: [], composer: [], toolViews: new Map(), settings: [], botSettings: [], botPanel: [], chat: [], slots: new Map() });
 
 // The loaded plugins, by name. A change makes a new array, which the places read through usePlugins.
 let loaded: Loaded[] = [];
@@ -71,6 +74,7 @@ const ui = () => ({
   ...empty,
   ...input,
   ...message,
+  ...nativeSelect,
   ...scroller,
   ...sidebar,
   ...switches,
@@ -79,6 +83,7 @@ const ui = () => ({
   Header,
   Blob,
   Reply,
+  ModelField,
 });
 
 // `@fxbot/app` for one plugin: the client, its own routes, the app's navigation and bots, and the app's components.
@@ -124,6 +129,7 @@ async function run(name: string, version: string, url: string): Promise<Places> 
     settings: (Component: ComponentType) => places.settings.push(Component),
     botSettings: (Component: ComponentType<{ bot: Profile }>) => places.botSettings.push(Component),
     botPanel: (Component: ComponentType<{ bot: Profile }>) => places.botPanel.push(Component),
+    chat: (Component: ComponentType<{ bot: Profile }>) => places.chat.push(Component),
     slot: (name: string, Component: ComponentType<any>) => places.slots.set(name, [...(places.slots.get(name) ?? []), Component]),
   });
   return places;

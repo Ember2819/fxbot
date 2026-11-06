@@ -11,8 +11,10 @@ export type HookEvents = {
   message: { bot: string; session: string; text: string; files: Upload[]; from?: string };
   /** Each time a chat opens: add, change, or remove entries. */
   instructions: { bot: string; session: string; instructions: string[] };
-  /** Before every tool call: change `input`, or answer `{ block: reason }`, which the model gets as a failed call. */
-  "tool.before": { bot: string; session: string; messageId: string; tool: string; input: unknown };
+  /** Before every tool call: change `input`, or answer `{ block: reason }`, which the model gets as a failed call, or
+   * `{ wait }`, for what takes longer than a hook may. `callId` holds across a restart, and `safe` is the tool's own word
+   * that it only reads, or writes the bot's own notes. */
+  "tool.before": { bot: string; session: string; messageId: string; callId: string; tool: string; description: string; input: unknown; safe: boolean };
   /** After it: change `result`. A call that failed has `error` instead. */
   "tool.after": { bot: string; session: string; messageId: string; tool: string; input: unknown; result?: unknown; error?: string };
   /** Once libfx accepts the prompt, or in a bot's own chat, when a turn it waited behind ends. Only observes. */
@@ -26,7 +28,12 @@ export type HookEvents = {
 };
 // A message hook handles the message, or starts the bot's own chat over from a summary that answers `ask`, and then the
 // message goes to the new chat.
-export type HookAnswers = { message: { handled: true } | { startOver: { ask: string } }; "tool.before": { block: string } };
+// A tool.before hook's `wait` runs after every hook, with no time limit but the call's own, on the final input. It answers
+// `{ block: reason }`, or nothing, and the call runs.
+export type HookAnswers = {
+  message: { handled: true } | { startOver: { ask: string } };
+  "tool.before": { block: string } | { wait: (call: { input: unknown }) => Promise<{ block: string } | void> };
+};
 export type Hook<E extends keyof HookEvents> = (event: HookEvents[E]) => unknown;
 
 // A tool for bots, named `<plugin>_<name>` when they see it. `bot` and `session` are the chat's that called it, and
@@ -37,6 +44,8 @@ export type PluginTool = {
   inputSchema: Record<string, unknown>;
   /** Running a call twice is harmless, so a call cut off by a crash runs again. */
   idempotent: boolean;
+  /** It only reads, or writes the bot's own notes, and reaches nothing outside. Since 0.6.0. */
+  safe?: boolean;
   execute: (input: any, call: { bot: string; session: string; messageId: string; signal: AbortSignal }) => unknown;
 };
 
@@ -97,9 +106,16 @@ export type PluginApi = {
     send(bot: string, message: { text: string; shown?: string; label?: string; steer?: boolean; files?: Upload[]; session?: string; messageId?: string }): Promise<{ messageId: string; sessionId: string; joined?: string }>;
     /** A session's lines as NDJSON, from `cursor` on, then each new one. */
     stream(bot: string, session: string, cursor?: number): Promise<ReadableStream<Uint8Array>>;
+    /** The owner's newest messages in the bot's own chat, oldest first: no plugin's, and no other bot's. Since 0.6.0. */
+    ownerSaid(bot: string, limit: number): Promise<string[]>;
     /** Stops the turn running in one of the plugin's own sessions, if one runs: it ends `cancelled`. With no session,
      * the one running in the bot's own chat, if this plugin started it. Since 0.6.0. */
     cancel(bot: string, session?: string): Promise<void>;
+  };
+  models: {
+    /** One tool-free request, on the bot's provider and model unless `provider` and `model` name others. It answers the
+     * text, and throws on a failure or after `timeoutMs`, 60 seconds by default. Keys stay on the server. Since 0.6.0. */
+    ask(bot: string, request: { instructions: string; text: string; provider?: string; model?: string; timeoutMs?: number }): Promise<string>;
   };
   /** The added plugins that need this one, each with its block for this one, and what it provides. */
   dependents(): Dependent[];

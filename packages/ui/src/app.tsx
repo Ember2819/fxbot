@@ -755,6 +755,12 @@ function Chat({ id, profiles, onChange, onShown }: { id: string; profiles: Profi
                 <MessageScrollerButton />
               </MessageScroller>
             )}
+            {/* A plugin's part of the chat, above the message box, such as a call waiting for an answer. */}
+            {profile && (
+              <div className="mx-auto grid w-full max-w-3xl gap-2 px-4 pb-2 empty:hidden">
+                <Place pick={(places) => places.chat} props={{ bot: profile }} />
+              </div>
+            )}
             <form onSubmit={submit} className="relative mx-auto w-full max-w-3xl px-4 pb-[max(1rem,env(safe-area-inset-bottom))]">
               <SkillMenu picker={skills} />
               {notice && <p className="px-4 pb-2 text-sm text-destructive">{notice}</p>}

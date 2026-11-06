@@ -176,6 +176,15 @@ export async function createFxbot(options: FxbotOptions) {
         save: async (bot, memory) => (await get(bot), memories.save(bot, memory)),
         remove: async (bot, id) => (await get(bot), memories.remove(bot, id)),
       },
+      // One tool-free request, on the bot's provider and model, or the ones named.
+      models: {
+        async ask(bot, { instructions, text, provider, model, timeoutMs = 60_000 }) {
+          started();
+          const profile = await get(bot);
+          const record = await providers.get(provider ?? profile.provider);
+          return summarize(await providers.options(record), model ?? (provider ? record.model : await modelFor(profile)), [instructions], text, undefined, undefined, timeoutMs);
+        },
+      },
       machine: options.machine ?? null,
       timeZone: () => timeZone || Intl.DateTimeFormat().resolvedOptions().timeZone,
       chats: {
@@ -187,6 +196,7 @@ export async function createFxbot(options: FxbotOptions) {
           await store.sql`insert into plugin_sessions (id, profile_id, provider, plugin) values (${id}, ${bot}, ${profile.provider}, ${plugin})`;
           return id;
         },
+        ownerSaid: async (bot, limit) => (await get(bot), history.ownerSaid(bot, limit)),
         send: async (plugin, bot, { text, shown, label, steer, files, session, messageId = crypto.randomUUID() }) =>
           (started(), deliver(bot, { text, files, messageId }, { session, from: plugin, shown, label, steer })),
         async stream(plugin, bot, session, cursor = 0) {
@@ -231,8 +241,10 @@ export async function createFxbot(options: FxbotOptions) {
       return answer;
     } };
   };
+  // fxbot's own tools are safe: they read, or write the bot's own notes. An MCP tool never is: a server's readOnlyHint is
+  // its own word, and a read can carry data out in its query.
   const toolsNow = async () =>
-    [history.tool, ...memories.tools, ...library.tools, ...(skills.any() ? [skills.tool] : []), ...(await mcp.tools()), ...packages.tools()].map(packages.wrap).map(keepAnswer);
+    [...[history.tool, ...memories.tools, ...library.tools, ...(skills.any() ? [skills.tool] : [])].map((tool) => packages.wrap(tool, true)), ...(await mcp.tools()).map((tool) => packages.wrap(tool)), ...packages.tools()].map(keepAnswer);
   const providers = await createProviders({ store, secretKey: key, durability: sessions.durability, vercelClientId, fetch, tools: await toolsNow() });
   // Vectors that rows lack, from where Settings says, in the background.
   embeddings.nudge();

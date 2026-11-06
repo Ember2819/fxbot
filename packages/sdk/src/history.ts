@@ -156,6 +156,15 @@ export function createHistory(sql: Sql, embeddings?: Embeddings) {
       }
       return [...turns.values()];
     },
+    // What the owner wrote in the bot's own chats, newest `limit`, oldest first. Plugins' messages, other bots' among them,
+    // have a row in `sent` that names them.
+    async ownerSaid(bot: string, limit: number) {
+      const rows = await sql<{ text: string }[]>`select m.text from messages m
+        left join sent s on s.profile_id = m.profile_id and s.message_id = m.message_id
+        where m.profile_id = ${bot} and m.role = 'user' and s.plugin is null and m.session_id not in (select id from plugin_sessions)
+        order by m.id desc limit ${limit}`;
+      return rows.map((row) => row.text).reverse();
+    },
     // A session's messages, oldest first, as many of the newest as fit `maxChars`, or the last 100.
     async transcript(bot: string, sessionId: string, maxChars: number) {
       const rows = await sql<{ role: string; text: string }[]>`
@@ -174,20 +183,20 @@ export function createHistory(sql: Sql, embeddings?: Embeddings) {
 }
 
 // One tool-free request to a throwaway engine, asking `ask`. With `checkpoint`, the engine starts from the old
-// session's own history; without it, `input` carries the transcript. Gives up after 2 minutes.
-export async function summarize(options: Record<string, unknown>, model: string, instructions: string[], ask: string, checkpoint?: Uint8Array, transcript?: string) {
+// session's own history; without it, `input` carries the transcript. Gives up after 2 minutes, or `timeoutMs`.
+export async function summarize(options: Record<string, unknown>, model: string, instructions: string[], ask: string, checkpoint?: Uint8Array, transcript?: string, timeoutMs = 120_000) {
   // The provider options come from the same code that makes the provider's agent.
   const engine = await createFxEngine({ ...options, model, instructions, ...(checkpoint ? { checkpoint } : {}) } as unknown as Parameters<typeof createFxEngine>[0]);
   try {
     // A failed request rejects here; a refusal or a cut-off ends the turn with another stop reason.
-    const turn = engine.prompt(transcript ? `${transcript}\n\n---\n\n${ask}` : ask, { signal: AbortSignal.timeout(120_000) });
+    const turn = engine.prompt(transcript ? `${transcript}\n\n---\n\n${ask}` : ask, { signal: AbortSignal.timeout(timeoutMs) });
     let text = "";
     for await (const event of turn) if (event.type === "text_delta") text += event.delta;
     const { stopReason } = await turn.result;
     // libfx retries a failing provider until the time runs out, which ends the turn cancelled.
-    if (stopReason === "cancelled") throw new Error("the model didn't answer within 2 minutes.");
-    if (stopReason !== "end_turn") throw new Error(`The summary stopped: ${stopReason}.`);
-    if (!text.trim()) throw new Error("The summary came back empty.");
+    if (stopReason === "cancelled") throw new Error(`the model didn't answer within ${Math.round(timeoutMs / 1000)} seconds.`);
+    if (stopReason !== "end_turn") throw new Error(`The request stopped: ${stopReason}.`);
+    if (!text.trim()) throw new Error("The answer came back empty.");
     return text.trim();
   } finally {
     await engine.close();

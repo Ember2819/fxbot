@@ -162,6 +162,8 @@ function within<T>(run: () => T | Promise<T>, ms: number, what: string): Promise
   return Promise.race([Promise.resolve().then(run), late]).finally(() => clearTimeout(timer));
 }
 
+type Wait = (call: { input: unknown }) => Promise<{ block: string } | void>;
+
 // What fxbot's core gives plugins: its bots, and turns marked as the plugin's.
 export type PluginHost = {
   bots: Omit<PluginApi["bots"], "on">;
@@ -169,11 +171,13 @@ export type PluginHost = {
   library: PluginApi["library"];
   skills: Pick<PluginApi["skills"], "files">;
   memories: PluginApi["memories"];
+  models: PluginApi["models"];
   machine: PluginApi["machine"];
   chats: {
     newSession(plugin: string, bot: string): Promise<string>;
     send(plugin: string, bot: string, message: Parameters<PluginApi["chats"]["send"]>[1]): Promise<{ messageId: string; sessionId: string; joined?: string }>;
     stream(plugin: string, bot: string, session: string, cursor?: number): Promise<ReadableStream<Uint8Array>>;
+    ownerSaid: PluginApi["chats"]["ownerSaid"];
     cancel(plugin: string, bot: string, session?: string): Promise<void>;
   };
   // A package's remote MCP server, added as an MCP plugin of its own, which follows the package's switch and bots, and
@@ -554,11 +558,13 @@ export async function createPlugins(options: {
         },
       },
       memories: host.memories,
+      models: host.models,
       machine: host.machine,
       chats: {
         newSession: (bot) => host.chats.newSession(record.name, bot),
         send: (bot, message) => host.chats.send(record.name, bot, message),
         stream: (bot, session, cursor) => host.chats.stream(record.name, bot, session, cursor),
+        ownerSaid: host.chats.ownerSaid,
         cancel: (bot, session) => host.chats.cancel(record.name, bot, session),
       },
       log: (...parts) => write(plugin, parts.map((p) => (typeof p === "string" ? p : JSON.stringify(p))).join(" ")),
@@ -610,15 +616,17 @@ export async function createPlugins(options: {
   // hook may block the call; either ends the run with its answer. A message hook may also ask to start the chat over:
   // the first such answer counts, and the other hooks still run. A handler that throws or runs late is logged and
   // skipped, except before a tool call, where it blocks, so a broken guard never lets a call through.
-  async function run<E extends keyof HookEvents>(event: E, payload: HookEvents[E] & { bot: string }): Promise<{ handled?: true; block?: string; startOver?: { ask: string } } | undefined> {
+  async function run<E extends keyof HookEvents>(event: E, payload: HookEvents[E] & { bot: string }): Promise<{ handled?: true; block?: string; startOver?: { ask: string }; waits?: Wait[] } | undefined> {
     let startOver: { ask: string } | undefined;
+    const waits: Wait[] = [];
     for (const plugin of plugins.values()) {
       if (!applies(plugin, payload.bot)) continue;
       for (const handler of plugin.loaded!.hooks.get(event) ?? []) {
         try {
-          const answer = (await within(() => handler(payload), limit, `A ${event} hook`)) as { handled?: unknown; block?: unknown; startOver?: { ask?: unknown } } | undefined;
+          const answer = (await within(() => handler(payload), limit, `A ${event} hook`)) as { handled?: unknown; block?: unknown; startOver?: { ask?: unknown }; wait?: unknown } | undefined;
           if (event === "message" && answer?.handled === true) return { handled: true };
           if (event === "tool.before" && typeof answer?.block === "string") return { block: answer.block };
+          if (event === "tool.before" && typeof answer?.wait === "function") waits.push(answer.wait as Wait);
           if (event === "message" && answer?.startOver && !startOver) {
             const ask = answer.startOver.ask;
             if (typeof ask === "string" && ask.trim() && Buffer.byteLength(ask) <= 16 * 1024) startOver = { ask };
@@ -630,7 +638,7 @@ export async function createPlugins(options: {
         }
       }
     }
-    return startOver && { startOver };
+    return startOver || waits.length ? { ...(startOver ? { startOver } : {}), waits } : undefined;
   }
 
   // turn.start and turn.end only observe, so they never hold up a turn.
@@ -641,7 +649,7 @@ export async function createPlugins(options: {
   }
 
   // Every tool, core and plugin alike, passes through the tool hooks. With none, it runs as it is.
-  function wrap(tool: FxAgentTool): FxAgentTool {
+  function wrap(tool: FxAgentTool, safe = false): FxAgentTool {
     if (tool.providerExecuted) return tool;
     const { execute } = tool;
     return {
@@ -649,9 +657,15 @@ export async function createPlugins(options: {
       async execute(input, context) {
         if (!hooked("tool.before") && !hooked("tool.after")) return execute(input, context);
         const { bot = "", messageId = "" } = (context.context ?? {}) as { bot?: string; messageId?: string };
-        const call = { bot, session: context.sessionId, messageId, tool: tool.name, input };
+        const call = { bot, session: context.sessionId, messageId, callId: context.executionId, tool: tool.name, description: tool.description ?? "", input, safe };
         const answer = await run("tool.before", call);
         if (answer?.block) throw new Error(answer.block);
+        // A wait outlasts a hook's time, for a person or a model, and ends with the call.
+        for (const wait of answer?.waits ?? []) {
+          const stopped = new Promise<never>((_, fail) => context.signal.addEventListener("abort", () => fail(new Error("The turn was stopped.")), { once: true }));
+          const verdict = await Promise.race([wait({ input: call.input }), stopped]);
+          if (verdict?.block) throw new Error(verdict.block);
+        }
         const after: HookEvents["tool.after"] & { bot: string } = { ...call };
         try {
           after.result = await execute(call.input, context);
@@ -667,8 +681,8 @@ export async function createPlugins(options: {
   }
 
   // A plugin's tools, as bots see them: `<plugin>_<name>`, refusing a bot the plugin isn't on for.
-  function toolsOf(plugin: Package): FxAgentHostTool[] {
-    return (plugin.loaded?.tools ?? []).map((tool) => ({
+  function toolsOf(plugin: Package): FxAgentTool[] {
+    return (plugin.loaded?.tools ?? []).map((tool) => wrap({
       name: `${plugin.record.name}_${tool.name}`,
       description: tool.description,
       inputSchema: tool.inputSchema as FxAgentHostTool["inputSchema"],
@@ -678,7 +692,7 @@ export async function createPlugins(options: {
         if (!bot || !applies(plugin, bot)) throw new Error(`${plugin.record.name} is off for this bot.`);
         return tool.execute(input, { bot, session: context.sessionId, messageId, signal: context.signal });
       },
-    }));
+    }, tool.safe === true));
   }
 
   // Who made a plugin, for its icon: its repository's owner, or for a checkout's folder, the owner of fxbot's list entry
