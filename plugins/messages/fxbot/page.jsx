@@ -1,8 +1,9 @@
 // The messages in the app: the Messages screen, each conversation as one thread across the bots' chats, how a send shows
-// in a reply, a line in each bot's settings saying what it does, and tagging a bot with @ in the message box. Built into
+// in a reply, a line in each bot's settings saying what it does, and the message box, where @ tags a bot. Built into
 // page.js; see the README.
-import { useEffect, useLayoutEffect, useRef, useState } from "react";
-import { api, createPortal, go, ui, useBots } from "@fxbot/app";
+import { useEffect, useState } from "react";
+import { api, go, ui, useBots } from "@fxbot/app";
+import { Box, tagLink } from "./box.jsx";
 
 async function call(path, method = "GET", body) {
   const res = await api(path, { method, ...(body ? { headers: { "content-type": "application/json" }, body: JSON.stringify(body) } : {}) });
@@ -176,144 +177,7 @@ function About({ bot }) {
   );
 }
 
-// A tag: the box shows @Name, and it's sent as a link to that bot, which holds its id, so two Bobs can't be confused. It
-// reads as a name to a bot, and in any Markdown, with or without this plugin.
-const tagLink = /\[@([^\]\n]*)\]\(\/profiles\/([0-9a-f]{12})\)/g;
 const named = (text) => text?.replace(tagLink, "@$1");
-const safeName = (name) => name.replace(/[[\]\n]/g, "");
-const escaped = (text) => text.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-const inBox = (text, tag) => new RegExp(`(^|\\s)${escaped(`@${tag.name}`)}(?!\\w)`).test(text);
-
-// What the box has tagged, for app.sending, which runs outside it.
-let tagged = [];
-
-// The text with each tag as its link. Two tags of one name go in the order they were picked.
-function linked(text) {
-  if (!tagged.length) return text;
-  const left = [...tagged];
-  const names = [...new Set(left.map((tag) => tag.name))].sort((a, b) => b.length - a.length).map((name) => escaped(`@${name}`));
-  return text.replace(new RegExp(`(^|\\s)(${names.join("|")})(?!\\w)`, "g"), (whole, before, shown) => {
-    const at = left.findIndex((tag) => `@${tag.name}` === shown);
-    if (at < 0) return whole;
-    const [tag] = left.splice(at, 1);
-    return `${before}[@${safeName(tag.name)}](/profiles/${tag.id})`;
-  });
-}
-
-// `@` at the start of the box or after a space lists the bots this one can reach, by the start of the name first. The
-// pick goes in as @Name, with the bot's face beside the box to show which one it is. The list sits above the box, and
-// its keys come first: this listens on the textarea, so the app's own handler doesn't see them.
-function Tags({ bot, draft, box, setDraft }) {
-  const bots = useBots() ?? [];
-  const [reach, setReach] = useState([]);
-  const [picked, setPicked] = useState([]);
-  const [token, setToken] = useState(null);
-  const [active, setActive] = useState(0);
-  const caret = useRef(null);
-  tagged = picked;
-
-  const load = () => void call(`/tags/${bot.id}`).then(setReach, () => {});
-  useEffect(() => void (setPicked([]), setToken(null), load()), [bot.id]);
-  useEffect(() => void (token && load()), [Boolean(token)]);
-  useEffect(() => {
-    if (!draft) setPicked([]);
-    const at = box.current?.selectionStart ?? draft.length;
-    const typed = /(?:^|\s)@([^\s@]*)$/.exec(draft.slice(0, at));
-    setToken(typed ? { start: at - typed[1].length - 1, query: typed[1].toLowerCase() } : null);
-    setActive(0);
-  }, [draft]);
-  useLayoutEffect(() => {
-    if (caret.current === null || !box.current) return;
-    box.current.setSelectionRange(caret.current, caret.current);
-    caret.current = null;
-  }, [draft]);
-
-  const about = new Map(reach.map((one) => [one.id, one.about]));
-  const lower = (b) => b.name.toLowerCase();
-  const matches = token
-    ? bots
-        .filter((b) => about.has(b.id) && lower(b).includes(token.query))
-        .sort((a, b) => Number(lower(b).startsWith(token.query)) - Number(lower(a).startsWith(token.query)))
-        .slice(0, 8)
-    : [];
-  const open = matches.length > 0;
-
-  function choose(pick) {
-    const shown = `@${pick.name} `;
-    setDraft(draft.slice(0, token.start) + shown + draft.slice(token.start + 1 + token.query.length).replace(/^ /, ""));
-    setPicked((all) => [...all, { id: pick.id, name: pick.name }]);
-    setToken(null);
-    caret.current = token.start + shown.length;
-  }
-
-  useEffect(() => {
-    const el = box.current;
-    if (!el || !open) return;
-    const keys = (e) => {
-      if (e.key === "ArrowDown" || e.key === "ArrowUp") setActive((i) => (i + (e.key === "ArrowDown" ? 1 : -1) + matches.length) % matches.length);
-      else if ((e.key === "Enter" || e.key === "Tab") && !e.shiftKey) choose(matches[active]);
-      else if (e.key === "Escape") setToken(null);
-      else return;
-      e.preventDefault();
-      e.stopPropagation();
-    };
-    const blur = () => setToken(null);
-    el.addEventListener("keydown", keys);
-    el.addEventListener("blur", blur);
-    el.setAttribute("aria-expanded", "true");
-    el.setAttribute("aria-controls", "tag-picker");
-    el.setAttribute("aria-activedescendant", `tag-option-${active}`);
-    return () => {
-      el.removeEventListener("keydown", keys);
-      el.removeEventListener("blur", blur);
-      el.setAttribute("aria-expanded", "false");
-      el.setAttribute("aria-controls", "skill-picker");
-      el.removeAttribute("aria-activedescendant");
-    };
-  });
-
-  const form = box.current?.closest("form");
-  return (
-    <>
-      {picked
-        .filter((tag) => inBox(draft, tag))
-        .map((tag, i) => {
-          const face = bots.find((b) => b.id === tag.id);
-          return face ? (
-            <span key={i} title={`@${tag.name}`} aria-label={`Tagged ${tag.name}`} style={{ display: "inline-flex" }}>
-              <ui.Blob shape={face.shape} color={face.color} size={18} />
-            </span>
-          ) : null;
-        })}
-      {open &&
-        form &&
-        createPortal(
-          <div id="tag-picker" role="listbox" aria-label="Bots" className="absolute right-4 bottom-full left-4 z-10 mb-2 max-h-72 overflow-y-auto rounded-2xl border bg-popover p-1 text-popover-foreground shadow-md">
-            {matches.map((b, i) => (
-              <button
-                key={b.id}
-                id={`tag-option-${i}`}
-                type="button"
-                role="option"
-                aria-selected={i === active}
-                // Keeps the box focused, so the pick lands where the caret was.
-                onMouseDown={(e) => e.preventDefault()}
-                onClick={() => choose(b)}
-                className={`flex w-full min-w-0 items-start gap-2.5 rounded-xl px-2.5 py-2 text-left text-sm ${i === active ? "bg-accent text-accent-foreground" : ""}`}
-              >
-                <ui.Blob shape={b.shape} color={b.color} size={20} />
-                <span className="grid min-w-0 flex-1">
-                  <span className="font-medium">{b.name}</span>
-                  <span className="line-clamp-1 text-xs text-muted-foreground">{about.get(b.id) || b.id}</span>
-                </span>
-              </button>
-            ))}
-          </div>,
-          form,
-        )}
-    </>
-  );
-}
 
 // A tag in a sent message: the bot's face and its name now, or the name it had, if it's gone.
 function Tag({ match }) {
@@ -326,8 +190,7 @@ function Tag({ match }) {
 }
 
 export default function setup(app) {
-  app.composer(Tags);
-  app.sending(linked);
+  app.box(Box);
   app.said(tagLink, Tag);
   app.nav({ label: "Messages", path: "/" });
   app.route("/", Screen);

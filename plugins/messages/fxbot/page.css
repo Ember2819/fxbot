@@ -1,0 +1,86 @@
+/* The messages plugin's page: the message box and its chips, in classes of its own, since the app's styles hold only the
+   classes the app uses. Then the rules ProseMirror needs, from prosemirror-view/style. */
+
+.fm-box {
+  position: relative;
+  min-width: 0;
+  flex: 1 1 0%;
+}
+.fm-editor {
+  width: 100%;
+  padding-inline: 0.625rem;
+  font-size: 1rem;
+  line-height: 1.5rem;
+  overflow-y: auto;
+  outline: none;
+}
+@media (min-width: 48rem) {
+  .fm-editor {
+    font-size: 0.875rem;
+    line-height: 1.25rem;
+  }
+}
+.fm-editor[contenteditable="false"] {
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+.fm-editor p {
+  margin: 0;
+}
+.fm-placeholder {
+  position: absolute;
+  top: 0.75rem;
+  left: 0.625rem;
+  right: 0.625rem;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  font-size: 1rem;
+  line-height: 1.5rem;
+  color: var(--muted-foreground);
+  pointer-events: none;
+}
+@media (min-width: 48rem) {
+  .fm-placeholder {
+    font-size: 0.875rem;
+    line-height: 1.25rem;
+  }
+}
+.fm-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  padding: 0 0.4rem 0 0.15rem;
+  border-radius: 9999px;
+  background: var(--secondary);
+  color: var(--secondary-foreground);
+  font-weight: 500;
+  vertical-align: bottom;
+  white-space: nowrap;
+}
+.fm-chip-face {
+  display: inline-flex;
+}
+
+.ProseMirror {
+  position: relative;
+  word-wrap: break-word;
+  white-space: pre-wrap;
+  white-space: break-spaces;
+  font-variant-ligatures: none;
+  font-feature-settings: "liga" 0;
+}
+.ProseMirror-hideselection *::selection {
+  background: transparent;
+}
+.ProseMirror-hideselection {
+  caret-color: transparent;
+}
+.ProseMirror [draggable][contenteditable="false"] {
+  user-select: text;
+}
+img.ProseMirror-separator {
+  display: inline !important;
+  border: none !important;
+  margin: 0 !important;
+}

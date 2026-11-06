@@ -13,7 +13,7 @@ Add it from **Plugins**, where fxbot's list has it. It runs inside fxbot: read i
 
 ## Tags
 
-In a bot's chat, `@` at the start of the box or after a space lists the bots it can reach, each with its line, or its id if it has none. Picking one puts `@Name` in the box, with the bot's face beside it. It's sent as a link, `[@Name](/profiles/<id>)`, so the bot knows exactly which one you mean, even with two of one name, and it shows as a chip in the message. A name typed by hand stays plain text.
+This plugin replaces the message box in a bot's chat with an editor, as a room's is. `@` at the start of a line or after a space lists the bots it can reach, each with its line, or its id if it has none. The one you pick is a chip with its face, in the sentence, which deletes as one piece. It's sent as a link, `[@Name](/profiles/<id>)`, so the bot knows exactly which one you mean, even with two of one name, and it shows as a chip in the message too. A name you type out stays plain text.
 
 A tag names a bot, and wakes no one. The bot you're talking to does the sending, with `messages_send`, and everything here applies to it. `to` takes the whole tag, as well as a name or an id.
 
@@ -77,6 +77,7 @@ Each send deletes conversations older than 30 days. Removing the plugin drops th
 - **A message to an idle bot:** one turn at its whole chat, cached where the provider caches. This is the cost to watch: a conversation of 20 messages is at most 20 turns.
 - **A message to a working bot:** no new turn.
 - **Storage:** 30 days of rows. The turns are in the chats, so a message adds no session.
+- **The page:** `page.js` is about 370 KB, most of it ProseMirror, which a plugin bundles for itself.
 
 ## Files
 
@@ -85,12 +86,16 @@ Each send deletes conversations older than 30 days. Removing the plugin drops th
 | `plugin.json` | Its name, its parts, and its settings |
 | `fxbot/server.ts` | The tool and its guards, delivery, the reply rule, limits, and the routes |
 | `fxbot/migrations/0001_messages.sql` | Its three tables |
-| `fxbot/page.jsx` | The Messages screen, the card in a reply, and the line in a bot's settings |
-| `fxbot/page.js` | `page.jsx`, built |
-| `package.json` | `"type": "module"`, for the server code |
+| `fxbot/page.jsx` | The Messages screen, the card in a reply, the line in a bot's settings, and a tag in a sent message |
+| `fxbot/box.jsx` | The message box, with `@` and its chips |
+| `fxbot/page.css` | The box's styles, and the rules ProseMirror needs |
+| `fxbot/page.js` | `page.jsx` and `box.jsx`, built |
+| `fxbot/page-licenses.txt` | The licenses of what `page.js` bundles |
+| `package.json` | `"type": "module"`, for the server code, and what the page is built from |
 
-Build `page.js` from this folder with:
+Build `page.js` from this folder with these. It's built without comments, since ProseMirror's are long. When the bundled packages change, write `fxbot/page-licenses.txt` again from their `LICENSE` files.
 
 ```sh
-npx rolldown fxbot/page.jsx --format cjs -e react -e react/jsx-runtime -e @fxbot/app --file fxbot/page.js
+npm install
+npx rolldown fxbot/page.jsx --format cjs -e react -e react/jsx-runtime -e @fxbot/app --no-comments --file fxbot/page.js
 ```

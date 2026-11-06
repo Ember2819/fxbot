@@ -1,5 +1,14 @@
 {
   "name": "@fxbot/plugin-messages",
   "private": true,
-  "type": "module"
+  "type": "module",
+  "description": "What the messages plugin's page is built from: ProseMirror, for the message box.",
+  "devDependencies": {
+    "prosemirror-commands": "1.7.2",
+    "prosemirror-history": "1.5.1",
+    "prosemirror-keymap": "1.2.3",
+    "prosemirror-model": "1.25.12",
+    "prosemirror-state": "1.4.4",
+    "prosemirror-view": "1.42.6"
+  }
 }

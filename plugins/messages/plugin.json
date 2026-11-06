@@ -8,6 +8,7 @@
       "server": "./fxbot/server.ts",
       "page": "./fxbot/page.js",
       "migrations": "./fxbot/migrations",
+      "css": "./fxbot/page.css",
       "settings": [
         { "name": "conversation", "description": "The most messages in one conversation, 1 to 100", "default": "20" },
         { "name": "perTurn", "description": "The most messages one turn sends, 1 to 20", "default": "5" },
