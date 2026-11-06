@@ -41,6 +41,12 @@
       "description": "Your bots message each other in their own chats, and you watch them work together.",
       "repo": "iammrduncan/fxbot",
       "path": "plugins/messages"
+    },
+    {
+      "name": "permissions",
+      "description": "Decide what each bot can do on its own: ask, a reviewer model, or run everything.",
+      "repo": "iammrduncan/fxbot",
+      "path": "plugins/permissions"
     }
   ]
 }

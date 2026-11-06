@@ -1,0 +1,20 @@
+{
+  "name": "permissions",
+  "version": "0.1.0",
+  "description": "Decide what each bot can do on its own: ask, a reviewer model, or run everything.",
+  "license": "Apache-2.0",
+  "extensions": {
+    "sh.fxbot": {
+      "server": "./fxbot/server.ts",
+      "page": "./fxbot/page.js",
+      "migrations": "./fxbot/migrations",
+      "settings": [
+        { "name": "mode", "description": "A bot's mode until you set one: ask, auto, or yolo", "default": "auto" },
+        { "name": "seconds", "description": "The most seconds a review takes, 5 to 300", "default": "60" },
+        { "name": "expires", "description": "The minutes a background card waits, 1 to 1440", "default": "30" },
+        { "name": "trusted", "description": "Plugins whose turn text counts as the owner's words", "default": "routines" },
+        { "name": "exact", "description": "Tools whose rules are the exact action", "default": "computer_shell, computer_terminal, computer_desktop" }
+      ]
+    }
+  }
+}

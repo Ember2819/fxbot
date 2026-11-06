@@ -1,0 +1,5 @@
+{
+  "name": "@fxbot/plugin-permissions",
+  "private": true,
+  "type": "module"
+}
