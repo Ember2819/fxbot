@@ -2,7 +2,7 @@
 
 Each release of fxbot, newest first. A release that adds migrations, bumps libfx, or needs a step by hand opens with **Before upgrading**. Lines for the next release collect under Unreleased. GitHub Releases and Settings show a short version of each section.
 
-## Unreleased
+## 0.6.0 (2026-11-06)
 
 **Before upgrading.** Migrations `0009_time_zone` and `0010_turns_at_once` add `time_zone` and `turns_at_once` columns to `settings`. A time zone set in dreams moves to **Settings** › **General**: the first browser to open fxbot sets it there, so check it if yours should be another.
 
