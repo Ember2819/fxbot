@@ -7,9 +7,13 @@ Add it from **Plugins**, where fxbot's list has it. It runs inside fxbot: read i
 ## A message
 
 - **Sending:** a bot calls `messages_send` with `to`, `text`, and optionally `reply: false` and `files`. Who it's from, its conversation, and what it answers come from the call and the rows, never from the model.
-- **Where it goes:** the receiver's own chat, shown as "From Bob" with the sender's words. A working bot takes it in where it is, through core's steering, and an idle one wakes. A message with an image waits for the running turn, since joining would end it, and so does a message to a turn that takes none.
+- **Where it goes:** the receiver's own chat, in a pill that opens to "From Bob" with the sender's words. A working bot takes it in where it is, through core's steering, and an idle one wakes. A message with an image waits for the running turn, since joining would end it, and so does a message to a turn that takes none.
 - **What the model gets:** a frame that opens by saying this isn't from the owner, with the words quoted, what the sender can't OK, and whether a reply is expected. libfx labels every steer as the user's, so the frame is what says otherwise. When libfx lets a steer name its author, core passes it.
 - **Who a bot can reach:** the others the plugin is on for, named in its instructions, each with its line from **Messages** in its settings. Any can reach any: the plugin's switch for each bot is how an owner narrows it.
+
+## In a chat
+
+Messages between bots fold into a pill in the middle of the chat, with each bot's face, such as **2 received, 1 sent · Philly**, through `app.fold`. A send that went counts as sent, and its card goes in the pill. One that was refused stays a card, in view. A run of them makes one pill, until the owner or the bot says something to the other, and a click opens it. A message that expects a reply folds with its turn, since that turn's answer goes to the other bot: its id is `messages-ask-<row>-<sender>`. After any other, `messages-in-<row>-<sender>`, what the bot says is for the owner, so it stays in view. The sender's id is what picks the face, so two of one name aren't confused. A turn the owner wrote into stays in view too.
 
 ## Tags
 
@@ -44,7 +48,7 @@ Nothing is retried. A turn has effects, and a bot can ask again.
 
 ## The screen
 
-**Messages**, at `/messages`, shows each conversation as one thread, newest first, with its count, each message's state, **Stop** while one runs, and **Older**. It reads again every 5 seconds while a message is out. A row opens that bot's chat. **Stop** marks the conversation, cancels the turns its messages started, and cancels a waiting one when it starts. The sender hears nothing, and a turn a message only joined goes on.
+**Open conversations**, on the plugin's tab in **Settings**, opens `/messages`, which shows each conversation as one thread, newest first, with its count, each message's state, **Stop** while one runs, and **Older**. It reads again every 5 seconds while a message is out. A row opens that bot's chat. **Stop** marks the conversation, cancels the turns its messages started, and cancels a waiting one when it starts. The sender hears nothing, and a turn a message only joined goes on.
 
 A send shows in the sender's reply as a card: who it's to, the words, and how it went.
 

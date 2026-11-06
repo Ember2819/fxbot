@@ -179,6 +179,19 @@ function About({ bot }) {
 
 const named = (text) => text?.replace(tagLink, "@$1");
 
+// The way to the Messages screen, on the plugin's tab in Settings: it's for looking back, and the chats have the pills.
+function Conversations() {
+  return (
+    <section className="grid gap-2 text-sm" aria-label="Conversations">
+      <h2 className="font-medium">Conversations</h2>
+      <p className="text-muted-foreground">Read what your bots have said to each other, and stop a conversation that's running.</p>
+      <ui.Button variant="outline" size="sm" className="justify-self-start" onClick={() => go("/messages")}>
+        Open conversations
+      </ui.Button>
+    </section>
+  );
+}
+
 // A tag in a sent message: the bot's face and its name now, or the name it had, if it's gone.
 function Tag({ match }) {
   const bot = (useBots() ?? []).find((b) => b.id === match[2]);
@@ -192,8 +205,23 @@ function Tag({ match }) {
 export default function setup(app) {
   app.box(Box);
   app.said(tagLink, Tag);
-  app.nav({ label: "Messages", path: "/" });
+  // Bots' messages to each other fold into a pill. One that expects a reply takes its turn with it, since that turn's
+  // answer goes to the other bot. After any other, what the bot says is for the owner, so it stays in view.
+  app.fold({
+    message(id) {
+      const [, kind, bot] = /^messages-(in|ask|again)-\d+(?:-([0-9a-f]{12}))?$/.exec(id) ?? [];
+      return kind ? { fold: kind === "in" ? "message" : "turn", bot } : undefined;
+    },
+    // A send that went is counted too. One that was refused stays a card, so the owner sees it.
+    tool(call) {
+      if (call.name !== "messages_send" || (call.done && !/^Sent to /.test(call.output ?? ""))) return;
+      const to = call.input?.to ?? "";
+      const bot = /\/profiles\/([0-9a-f]{12})/i.exec(to)?.[1] ?? (/^[0-9a-f]{12}$/i.test(to) ? to : undefined);
+      return { bot: bot?.toLowerCase(), name: named(to).replace(/^@/, "") };
+    },
+  });
   app.route("/", Screen);
+  app.settings(Conversations);
   app.toolView("send", Sent, { open: true });
   app.botSettings(About);
 }

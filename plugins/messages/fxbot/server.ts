@@ -35,7 +35,7 @@ const minute = 60_000;
 // A last message with nothing in it: the marker, as chat rooms reads it, or no text, which libfx gives as "Done.".
 const quiet = /^(\(?\s*no reply\s*\)?\.?|done\.)?$/i;
 // A turn a message started, or the one that reminds a bot of a message.
-const started = (turn: string) => Number(/^messages-(?:in|again)-(\d+)$/.exec(turn)?.[1] ?? 0);
+const started = (turn: string) => Number(/^messages-(?:in|ask|again)-(\d+)(?:-[0-9a-f]{12})?$/.exec(turn)?.[1] ?? 0);
 const hash = (...parts: string[]) => createHash("sha256").update(parts.join("\0")).digest("hex");
 const joinNames = (names: string[]) => (names.length < 2 ? names.join("") : names.length === 2 ? names.join(" and ") : `${names.slice(0, -1).join(", ")}, and ${names.at(-1)}`);
 const json = (body: unknown, status = 200) => Response.json(body, { status });
@@ -146,7 +146,8 @@ export default async function setup(fx: PluginApi) {
   async function deliver(row: Row, post: Post) {
     const busy = (await fx.bots.get(post.to.id)).busy;
     const text = frame({ id: row.id, from: post.from.name, words: post.text, reply: post.reply, answers: post.answers, joining: busy, named: post.named ?? [] });
-    const turn = `messages-in-${row.id}`;
+    // "ask" is a message whose turn answers its sender, so a chat can fold the two together. The sender is for its face.
+    const turn = `messages-${post.reply === "yes" ? "ask" : "in"}-${row.id}-${post.from.id}`;
     await fx.sql`update messages set turn = ${turn} where id = ${row.id}`;
     const { joined } = await fx.chats.send(post.to.id, { messageId: turn, text, shown: post.text, label: post.from.name, steer: true, files: post.files ?? [] });
     if (!joined) return;
@@ -202,7 +203,7 @@ export default async function setup(fx: PluginApi) {
     if (!row) return;
     const from = await nameOf(row.from_bot);
     const text = `You haven't answered ${from}'s message m:${id}, below. Answer it now.\n\n${frame({ id, from, words: row.text, reply: "yes", joining: false, named: [] })}`;
-    const messageId = `messages-again-${id}`;
+    const messageId = `messages-again-${id}-${row.from_bot}`;
     await fx.sql`update messages set turn = ${messageId}, state = 'waiting', ended_at = null where id = ${id}`;
     const { joined } = await fx.chats.send(row.to_bot, { messageId, text, shown: `You haven't answered ${from}'s message m:${id}.`, label: "Messages", steer: true });
     if (joined) await fx.sql`update messages set turn = ${joined}, state = 'working' where id = ${id}`;
@@ -379,7 +380,7 @@ export default async function setup(fx: PluginApi) {
   fx.route("POST", "/conversations/:id/stop", async (_request, { id }) => {
     const [stopped] = await fx.sql`update conversations set stopped_at = coalesce(stopped_at, now()) where id = ${Number(id)} returning id`;
     if (!stopped) return json({ error: "There's no such conversation." }, 404);
-    const rows = await fx.sql<Row[]>`select * from messages where conversation = ${Number(id)} and state in ('waiting', 'working') and turn ~ '^messages-(in|again)-'`;
+    const rows = await fx.sql<Row[]>`select * from messages where conversation = ${Number(id)} and state in ('waiting', 'working') and turn ~ '^messages-(in|ask|again)-'`;
     await fx.sql`update messages set state = 'stopped', ended_at = now() where id in ${fx.sql(rows.length ? rows.map((row) => row.id) : [0])}`;
     // One still waiting is cancelled when its turn starts.
     for (const row of rows) if (row.state === "working") await fx.chats.cancel(row.to_bot).catch((error) => fx.log(`Stopping m:${row.id} failed: ${error.message}`));
@@ -406,7 +407,7 @@ export default async function setup(fx: PluginApi) {
   });
 
   // A restart leaves turns running, which core resumes: their limits go on from when they started.
-  for (const row of await fx.sql<Row[]>`select * from messages where state = 'working' and turn ~ '^messages-(in|again)-'`) arm(row.turn!, row.to_bot, row.at.getTime() + limit("minutes") * minute - Date.now());
+  for (const row of await fx.sql<Row[]>`select * from messages where state = 'working' and turn ~ '^messages-(in|ask|again)-'`) arm(row.turn!, row.to_bot, row.at.getTime() + limit("minutes") * minute - Date.now());
 
   return () => {
     for (const timer of timers.values()) clearTimeout(timer);

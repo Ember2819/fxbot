@@ -10154,6 +10154,29 @@ function About({ bot }) {
 	});
 }
 const named = (text) => text?.replace(tagLink, "@$1");
+function Conversations() {
+	return (0, react_jsx_runtime.jsxs)("section", {
+		className: "grid gap-2 text-sm",
+		"aria-label": "Conversations",
+		children: [
+			(0, react_jsx_runtime.jsx)("h2", {
+				className: "font-medium",
+				children: "Conversations"
+			}),
+			(0, react_jsx_runtime.jsx)("p", {
+				className: "text-muted-foreground",
+				children: "Read what your bots have said to each other, and stop a conversation that's running."
+			}),
+			(0, react_jsx_runtime.jsx)(_fxbot_app.ui.Button, {
+				variant: "outline",
+				size: "sm",
+				className: "justify-self-start",
+				onClick: () => (0, _fxbot_app.go)("/messages"),
+				children: "Open conversations"
+			})
+		]
+	});
+}
 function Tag({ match }) {
 	const bot = ((0, _fxbot_app.useBots)() ?? []).find((b) => b.id === match[2]);
 	return (0, react_jsx_runtime.jsxs)("span", {
@@ -10181,11 +10204,25 @@ function Tag({ match }) {
 function setup(app) {
 	app.box(Box);
 	app.said(tagLink, Tag);
-	app.nav({
-		label: "Messages",
-		path: "/"
+	app.fold({
+		message(id) {
+			const [, kind, bot] = /^messages-(in|ask|again)-\d+(?:-([0-9a-f]{12}))?$/.exec(id) ?? [];
+			return kind ? {
+				fold: kind === "in" ? "message" : "turn",
+				bot
+			} : void 0;
+		},
+		tool(call) {
+			if (call.name !== "messages_send" || call.done && !/^Sent to /.test(call.output ?? "")) return;
+			const to = call.input?.to ?? "";
+			return {
+				bot: (/\/profiles\/([0-9a-f]{12})/i.exec(to)?.[1] ?? (/^[0-9a-f]{12}$/i.test(to) ? to : void 0))?.toLowerCase(),
+				name: named(to).replace(/^@/, "")
+			};
+		}
 	});
 	app.route("/", Screen);
+	app.settings(Conversations);
 	app.toolView("send", Sent, { open: true });
 	app.botSettings(About);
 }
