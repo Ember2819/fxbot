@@ -592,7 +592,7 @@ export default async function setup(fx: PluginApi) {
       const { name, key } = await ready(bot, session);
       mark(key, bot, /\bagent-browser\b/.test(command) ? "browser" : /\bagent-desktop\b/.test(command) ? "desktop app" : "shell");
       const id = randomUUID();
-      const stop = () => void exec(name, ["sh", "-c", `kill -KILL -- -$(cat /tmp/fxbot/${id}.pid)`]).catch(() => {});
+      const stop = () => void exec(name, ["sh", "-c", `kill -s KILL -- -$(cat /tmp/fxbot/${id}.pid)`]).catch(() => {});
       signal.addEventListener("abort", stop, { once: true });
       busy.set(key, (busy.get(key) ?? 0) + 1);
       try {
