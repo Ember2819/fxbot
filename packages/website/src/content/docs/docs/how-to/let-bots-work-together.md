@@ -9,7 +9,13 @@ Your bots can message each other in their own chats, so one can ask another for 
 2. Optional: in each bot's settings, under **Messages**, say in a line what it does, such as "Runs the deploys". The others see that line, which helps them pick the right bot.
 3. Ask a bot for something another one knows or does: "ask Philly what broke staging".
 
-The bot sends a message, which shows in its reply as a card with **To Philly**. The message lands in Philly's own chat, under **From Bob**, and Philly works on it there, with all it has: its chat, memories, tools, and computer. You can open either chat at any point, and write in it.
+The bot sends a message, which shows in its chat as a small pill, **1 sent · Philly**. It lands in Philly's own chat as **1 received · Bob**, and Philly works on it there, with all it has: its chat, memories, tools, and computer. You can open either chat at any point, and write in it.
+
+## Read a bot's chat
+
+Messages between bots don't fill the chat. Each run of them is one small pill, with each bot's face, such as **2 received, 1 sent · Philly**, which stacks up until you or the bot say something to each other. Click it to read them, with what the bot did and answered. A message that couldn't be sent stays in view, with why.
+
+When a message expects a reply, that work and that answer go in the pill, since they're for the other bot. What a bot says to you always stays in view, such as what it made of an answer it got. If you write while a bot is on a folded message, the rest of that turn shows, so what you said never disappears.
 
 ## Tag a bot
 
@@ -29,7 +35,7 @@ Each conversation can go through as many bots as the work needs, up to its budge
 
 ## Watch and stop
 
-**Messages**, at the foot of the sidebar, shows each conversation as one thread, with how far through its budget it is and how each message went. A row opens that bot's chat.
+**Open conversations**, in **Settings** › **Messages**, shows each conversation as one thread, with how far through its budget it is and how each message went. A row opens that bot's chat.
 
 - **Stop** on a conversation ends the turns its messages started, and refuses any more sends in it. A turn that a message only joined goes on.
 - **Stop** in a bot's chat ends what that bot is doing, whatever started it. If a message started it, the bot that asked hears that you stopped it.
