@@ -1,13 +1,14 @@
 # Pages
 
 A bot writes something to keep, and the owner reads it outside the chat:
-- **A page.** A report, a guide, a plan, or a summary of a project, in Markdown, with tables, code, diagrams, and images from the library.
+- **A page.** A report, a guide, a plan, or a summary of a project, in Markdown, with tables, code, diagrams, and images from the library. When it needs more, such as a chart with filters, it's HTML, in a frame of its own.
 - **A card in the chat.** The page's title and **Open**, and a sentence from the bot, in place of the whole thing in a reply.
 - **A place to read it.** The page fills the screen at an address of its own, on a phone too, and it prints.
 - **In the library.** The owner finds it there, and the bot finds it with the library's tools. It stays there if the plugin is removed.
 - **Every version.** Asking for a change revises the same page, and the owner can go back to any earlier one.
+- **In Essentials.** A new install gets it with the pack.
 
-Status: planned on 2026-11-07, not built. Researched against the research directive's references, and Claude, ChatGPT, Gemini, Open WebUI, LibreChat, OpenClaw, and Hermes Agent.
+Status: planned on 2026-11-07, with the owner's answers, not built. Researched against the research directive's references, and Claude, ChatGPT, Gemini, Open WebUI, LibreChat, OpenClaw, and Hermes Agent.
 
 ## What's asked
 
@@ -62,14 +63,15 @@ Read on 2026-11-07. The references are from source, in clones made by 2026-11-04
 - "Reuse its stable lowercase slug name to publish a new immutable numbered version." Whole content each time, with no small edit.
 - "Viewers open an isolated preview from the card in the transcript."
 - The list of artifacts is kept apart from the chat: "reset and compaction never rewind it."
-- Markdown draws with the app's own renderer. HTML and SVG go in `sandbox="allow-scripts allow-modals allow-pointer-lock"`, and the route adds a CSP. Markdown served as a file gets `default-src 'none'; … sandbox`.
+- Markdown draws with the app's own renderer. HTML and SVG load from a route in `sandbox="allow-scripts allow-modals allow-pointer-lock"`, and the route's CSP header carries `sandbox` too, with `frame-ancestors 'self'`. It lets scripts load over `https:`. Markdown served as a file gets `default-src 'none'; … sandbox`.
 
 **fx0** (`lib/tools.ts`, `lib/design-artifact.ts`): one HTML design for each chat.
 - `publish_design { html }` for the first version or a broad rewrite.
 - `edit_design { edits }` for the rest, up to 20 exact replacements, each matching once, applied "atomically, as one version".
 - Versions are rows, and only each turn's last is kept (see the [library's research](../_completed/phases/library.md)).
 - A lesson on telling a model what to do next: "A rule in the instructions alone was skipped; the reminder lands where the model decides to reply." So its reminder is in the tool's result.
-- `sandbox="allow-scripts"`, and `connect-src 'none'`, at most 512 KiB.
+- `sandbox="allow-scripts"`, and `connect-src 'none'`, at most 512 KiB. It embeds images before the design runs, so `img-src` needs only `data:`.
+- What that's worth, in its README: "They can't read the app's cookies, storage or credentials, and their Content Security Policy blocks network requests (`connect-src 'none'`). It's still the browser enforcing all of this, though, not a sealed VM."
 
 **OpenBot, openmuse, fx, eve, durable-harness, agent-browser, agent-desktop:** no page tool. Searched source for `make_page`, `write_page`, `save_page`, `create_page`, `create_document`, and `write_document`. The one match, in agent-browser, is a browser call. OpenBot's changelog calls OpenDuet, OpenDots, and OpenMuse skins over its own features.
 
@@ -85,7 +87,7 @@ Read on 2026-11-07. The references are from source, in clones made by 2026-11-04
 
 **LibreChat** ([its prompt](https://raw.githubusercontent.com/danny-avila/LibreChat/main/packages/api/src/prompts/artifacts/index.ts)): "Use an artifact for content the user will likely reuse, modify, or run on its own", "usually over 15 lines", and "Don't use one for short snippets, explanations, examples, answers to one-off questions". To update: "write the complete new content".
 
-**OpenClaw** ([`show_widget`](https://raw.githubusercontent.com/openclaw/openclaw/main/docs/tools/show-widget.md)): HTML in a sandboxed frame, or for a data report, a native `report` that renders "using its native typography and layout, without a document frame". A warning: "Canvas retains at most 32 widgets per session", and a new one removes the oldest.
+**OpenClaw** ([`show_widget`](https://raw.githubusercontent.com/openclaw/openclaw/main/docs/tools/show-widget.md)): HTML in a sandboxed frame, or for a data report, a native `report` that renders "using its native typography and layout, without a document frame". It checks each inline script before it accepts a widget, and refuses one that doesn't parse. A warning: "Canvas retains at most 32 widgets per session", and a new one removes the oldest.
 
 **Hermes Agent** ([its store](https://raw.githubusercontent.com/NousResearch/hermes-agent/main/apps/desktop/src/store/artifacts.ts)): "the transcript is the durable copy". Nothing to find later.
 
@@ -95,8 +97,11 @@ Read on 2026-11-07. The references are from source, in clones made by 2026-11-04
 - **The library is content-addressed.** One row for each SHA-256, with a tag for each bot and chat, and `tsv`, its search words, is a generated column.
 - **Changing a row in place is safe.** The file route sends `no-cache` with the hash as its ETag, and the service worker keeps nothing under `/api/`.
 - **`library_read` reads 60,000 bytes,** under libfx's 64 KiB for a tool result.
-- **The library's preview draws Markdown already,** with Streamdown, and has **Download** and **Delete**. Only `Library.remove` deletes an item.
+- **The library's preview draws Markdown already,** with Streamdown, and has **Download** and **Delete**. Anything else shows as text, and its grid shows an item's first 200 characters. Only `Library.remove` deletes an item.
 - **Removing a plugin drops its schema.** Pages kept only there would go with it.
+- **No page of a bot's runs on the app's origin today.** The library sends every document as plain text, under a `sandbox` CSP. The app itself has no CSP.
+- **A plugin's route sets its own headers,** so it can send a CSP. Its request's URL is `http://localhost`, so it can't name the app's address.
+- **`safe` belongs to a tool, not to a call.** On **Ask**, `permissions` lets a `safe` tool through, and folds a long input on its card.
 - **`pages` is a reserved name.** `fxbotsOwn` holds it for `GET /api/plugins/pages`, the list of plugins' page code. That route matches only with nothing after it, so `/api/plugins/pages/<id>` already falls through to a plugin's routes.
 - **A plugin's tools reach every bot.** A call from a bot the plugin is off for fails, with `pages is off for this bot.`
 - **`app.toolView(tool, Component, { open: true })`** is a card that stays in sight. `messages` and `routines` use it.
@@ -112,36 +117,37 @@ Read on 2026-11-07. The references are from source, in clones made by 2026-11-04
 2. **It's a library item.** "A page lives in the Bot's Library", as Grok says, and fxbot's stub said the same. Search, the panel, and `library_read` all come free.
 3. **It survives the plugin.** A document a bot wrote shouldn't vanish because a plugin was removed, and a plugin's tables go with it.
 4. **One identity, new versions.** Grok, Claude, Pi, fx0, and LibreChat all revise the same thing. Overwriting with no history is what people complain of with Canvas.
-5. **Markdown first.** Grok's and OpenDuet's richer pages take a block format and thousands of lines. Claude, OpenDots, and Pi draw Markdown with what they already have, and so does fxbot. It needs no sandbox, reads on a phone, and is what the library searches.
-6. **HTML is a separate decision.** Everyone who runs it uses a frame with no same-origin access, and the careful ones cut the network too. It isn't needed for "a report, a guide, or a summary".
-7. **Two ways to write.** A whole rewrite for broad changes, and exact replacements for small ones, so one fixed line doesn't redraft 20 screens (fx0, Claude).
-8. **No revision check.** OpenDuet and OpenDots need one because people edit pages too. Here only the bot writes, and every version is kept, so a lost race costs nothing but a click. It's one less thing for a model to copy wrongly.
-9. **Say it in the result.** fx0's lesson: the reminder not to paste the page goes in the tool's answer, where the model is deciding what to say.
-10. **A bot's own page isn't a risky act.** OpenDuet's argument holds, so both tools are `safe`.
-11. **Routines should write pages.** Grok does. OpenDuet refuses because a page nobody asked for is clutter, but here the owner asked by saving the routine.
+5. **Markdown for most pages.** Claude, OpenDots, and Pi draw it with what they already have, and so does fxbot. It needs no sandbox, reads on a phone, costs the fewest tokens, and is what the library searches.
+6. **HTML for what Markdown can't do.** Grok's charts and controls need code. HTML gets there in tens of lines, where OpenDuet's block format took thousands.
+7. **HTML runs in a frame with no way back into the app.** Everyone who runs it uses a frame with no same-origin access, and the careful ones cut the network too. Strict is right here: a bot's page has nothing to fetch, and an owner with no login has a lot to lose. It's still "not a sealed VM", so it isn't treated as harmless.
+8. **Two ways to write Markdown.** A whole rewrite for broad changes, and exact replacements for small ones, so one fixed line doesn't redraft 20 screens (fx0, Claude). HTML is rewritten whole, as Pi and LibreChat do, to keep a `safe` tool from touching it.
+9. **No revision check.** OpenDuet and OpenDots need one because people edit pages too. Here only the bot writes, and every version is kept, so a lost race costs nothing but a click. It's one less thing for a model to copy wrongly.
+10. **Say it in the result.** fx0's lesson: the reminder not to paste the page goes in the tool's answer, where the model is deciding what to say.
+11. **A bot's own Markdown isn't a risky act.** OpenDuet's argument holds, so those tools are `safe`. HTML is code that runs when the owner opens it, so its tool isn't.
+12. **Routines should write pages.** Grok does. OpenDuet refuses because a page nobody asked for is clutter, but here the owner asked by saving the routine.
 
 ## 3. Implementation
 
 ### What changes from the stub
 
-- **No `page` kind.** A page is a `document` of type `text/markdown`. A new kind would show a filter with nothing in it on every install without the plugin, and teach `library_search` nothing it needs.
-- **No sandboxed viewer,** because Markdown goes through the app's own renderer. If pages take HTML later, that's where one goes.
+- **No `page` kind.** A page is a `document` of type `text/markdown` or `text/html`. A new kind would show a filter with nothing in it on every install without the plugin, and teach `library_search` nothing it needs.
+- **A sandboxed viewer for HTML only.** Markdown goes through the app's own renderer.
 - **Versions, yes,** in the plugin's tables.
 
 ### A page is a library document
 
 A page's id is its library item's id, and it never changes. The bot uses it as `library:<id>`, the owner as `/pages/<id>`.
 
-- **Writing** saves the Markdown through `fx.library.save`, named `<title>.md`, tagged for the bot and chat.
+- **Writing** saves it through `fx.library.save`, named `<title>.md` or `<title>.html`, tagged for the bot and chat.
 - **Revising** changes that same item through `fx.library.replace`, so the library always holds one row for a page, with the newest text, and it moves to the top.
 - **Finding** needs nothing: `library_search` and `library_read` already do it, and a page is under what `library_read` reads, so the bot always sees all of it.
-- **Removing the plugin** leaves every page in the library as a Markdown document, at its newest version.
+- **Removing the plugin** leaves every page in the library as a document, at its newest version.
 
-That's why there are only two tools.
+So bots need no tool to find or read a page.
 
 ### The tools
 
-Both are `safe`, and neither needs a setting.
+The two Markdown tools are `safe`, and `pages_html` isn't. None needs a setting.
 
 **`pages_write { title, text, id? }`**
 
@@ -161,10 +167,23 @@ match exactly once. The edits apply in order and save as one version, or not at 
 library_read shows the page as it stands.
 ```
 
+**`pages_html { title, html, id? }`**
+
+```text
+Write a page as one HTML document, for what Markdown can't do: a chart, filters and controls, or a
+designed layout. Use pages_write for everything else, since this costs far more to write.
+It's self-contained, at most 60,000 bytes, with its CSS and JavaScript inline, and it can load
+nothing: no network, no CDN, and no outside fonts. Images come from the library, as
+<img src="library:<id>">. It must read on a phone 375 pixels wide, in light and dark.
+Give outside links target="_blank". To change a page, give its library:<id> and the whole document.
+```
+
 - **The answer:** `Saved "Trip plan" as library:<id>, version 3. The owner sees a card here that opens it, so don't repeat the page: say in a sentence or two what it covers. Anywhere else, such as a room, link it as [Trip plan](/pages/<id>).`
-- **Limits:** a title of 1 to 120 characters on one line, text of at most 60,000 bytes, and up to 20 edits. That's about 10,000 words, and it means a page always fits one read, so there's no paging.
+- **Limits:** a title of 1 to 120 characters on one line, at most 60,000 bytes, and up to 20 edits. That's about 10,000 words of Markdown, and it means a page always fits one read, so there's no paging. For HTML, it leaves no room for a chart library, so a bot draws charts with SVG or a canvas.
+- **HTML is rewritten whole.** `pages_edit` on an HTML page answers `library:<id> is HTML, so change it with pages_html.`, so a `safe` tool never touches a page's scripts. A page can change format: each version is what it was.
+- **A script that doesn't parse is refused,** saying which, as OpenClaw does. Each inline classic script goes through `new vm.Script()`, which compiles it and runs nothing. It also catches a page cut off partway through a script. A module script isn't judged.
 - **Only its bot changes a page.** Another bot gets `No page library:<id> of yours.`, and so does an id that isn't a page.
-- **The same text again** changes nothing, and answers the same page. That makes `pages_write` `idempotent`, so a call cut off by a crash can run again. `pages_edit` isn't: its old string would be gone.
+- **The same text again** changes nothing, and answers the same page. That makes `pages_write` and `pages_html` `idempotent`, so a call cut off by a crash can run again. `pages_edit` isn't: its old string would be gone.
 - **Text the library already holds,** which is rare, since each text has one row. `fx.library.save` hands back that item, so a new page with the text of a document a bot saved becomes that item. One with the text of an upload is refused, so a bot can't take over what the owner sent. A revision that matches another item is refused too, naming it.
 
 ### Versions
@@ -179,7 +198,7 @@ library_read shows the page as it stands.
 ```sql
 create table pages (id text primary key, bot text not null);
 create table versions (page text not null references pages on delete cascade, n integer not null,
-  message_id text, session text not null, title text not null, text text not null,
+  message_id text, session text not null, title text not null, type text not null, text text not null,
   at timestamptz not null default now(), primary key (page, n));
 ```
 
@@ -190,7 +209,8 @@ create table versions (page text not null references pages on delete cascade, n 
 | Route | What it does |
 | --- | --- |
 | `GET /api/plugins/pages/:id` | `{ id, bot, title, at, versions: [{ n, title, at }] }`, newest first. 404 for an item that isn't a page, which is how the library's button knows. |
-| `GET /api/plugins/pages/:id/versions/:n` | `{ title, text, at }` |
+| `GET /api/plugins/pages/:id/versions/:n` | `{ title, type, text, at }` |
+| `GET /api/plugins/pages/:id/versions/:n/frame` | An HTML version as a document, under the headers in [HTML pages](#html-pages). 404 for Markdown. |
 | `POST /api/plugins/pages/:id/restore` | `{ n }`: that version again, as the newest. Refused once the bot is gone, since `replace` needs its tag. |
 
 ### The card
@@ -217,45 +237,69 @@ create table versions (page text not null references pages on delete cascade, n 
 ≡  Trip plan
 ─────────────────────────────────────────────
    ● Scout · Nov 7, 2:14 PM   [ Version 3 ▾ ]
+   [ Copy ]  [ Print ]  [ Delete ]
+   Open Scout's chat
 
    Three days in Lisbon, on foot where we can…
 
    ## Where to stay
    | Area | Why | Nightly |
    …
-
-   [ Copy ]  [ Print ]  [ Delete ]
-   Open Scout's chat
 ```
 
-- **The text:** Streamdown, in a reading column as wide as a chat, in `static` mode. A first line of `# <title>` isn't drawn twice.
+- **Markdown:** Streamdown, in a reading column as wide as a chat, in `static` mode. A first line of `# <title>` isn't drawn twice.
+- **HTML:** a frame that fills the rest of the screen, and scrolls inside.
 - **Versions:** a `NativeSelect`, there only when a page has more than one. On an older one, a line says `Version 2 of 3, Nov 6` with **Restore** and **Back to the newest**.
-- **Images:** `library:<id>` becomes the item's file URL. Any other image shows as a link with its alt text, and doesn't load: the owner opened a report, not a request to wherever a bot's sources pointed.
-- **Copy** copies the Markdown of the version showing.
-- **Print** calls `window.print()`, with `page.css` showing only the page. The app's frame clips to one screen, so without it a long page prints its first screen only. This is how a page leaves fxbot: Save as PDF.
+- **Images in Markdown:** `library:<id>` becomes the item's file URL. Any other image shows as a link with its alt text, and doesn't load: the owner opened a report, not a request to wherever a bot's sources pointed.
+- **Copy** copies the source of the version showing.
+- **Print** calls `window.print()` on a Markdown page, with `page.css` showing only the page. The app's frame clips to one screen, so without it a long page prints its first screen only. This is how a page leaves fxbot: Save as PDF. An HTML page has **Open in a tab** in its place, since a sandboxed frame can't print, and the browser prints it from there.
 - **Delete** asks as the library does, then calls `client.library.remove`, so there's one way to delete.
 - **Open Scout's chat** goes to the bot. A removed bot's page has neither it nor **Restore**, and says `A bot you removed`.
 - **A page that's gone:** `This page was removed.`, with a link to the library.
 
+### HTML pages
+
+The frame loads a route, as Pi's does, not `srcdoc`. A header can't be undone by anything in the page, and it holds when the address is opened alone in a tab.
+
+```html
+<iframe sandbox="allow-scripts allow-popups allow-popups-to-escape-sandbox"
+        src="/api/plugins/pages/<id>/versions/<n>/frame" title="Trip plan"></iframe>
+```
+
+```text
+content-security-policy: default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline';
+  img-src data:; font-src data:; media-src data:; base-uri 'none'; form-action 'none';
+  frame-ancestors 'self'; sandbox allow-scripts allow-popups allow-popups-to-escape-sandbox
+x-content-type-options: nosniff
+cache-control: no-store
+```
+
+- **No way into the app.** `sandbox` without `allow-same-origin` gives it an opaque origin, so it can't read the app's storage or call its API.
+- **It loads nothing.** With `default-src 'none'`, no request, script, stylesheet, or font comes from outside. It's stricter than Pi's, like fx0's.
+- **Images are embedded.** The route turns `library:<id>` into a `data:` URL, through `fx.library.read`, so only the bot's own items work. Nothing else changes: the rest is what the bot wrote.
+- **Links.** One with `target="_blank"` opens a tab, which is why `allow-popups` is there, and it's why the tool says to use it. One without moves the frame, and the browser's back button returns.
+- **Controls** change what's on screen, and a reload clears them. As Grok says, "Nothing you do on the page is saved."
+- **It isn't sealed.** A script can still move its own frame to another address, with what's on the page in that address, and a CSP doesn't stop that. So `pages_html` isn't `safe`, and a bot on **Ask** waits for the owner.
+
 ### The library
 
-- **The list:** a page is a row under **Documents**, named `Trip plan.md`. It's also on the bot's panel.
-- **The preview** shows it as Markdown, as any such document, and `app.libraryItem` adds **Open page**, which goes to `/pages/<id>`. The part asks the plugin's route, and draws nothing for an item that isn't a page.
+- **The list:** a page is a row under **Documents**, named `Trip plan.md` or `Trip plan.html`. It's also on the bot's panel. An HTML page's tile shows the start of its source.
+- **The preview** shows Markdown drawn, and HTML as its source, and never runs it. `app.libraryItem` adds **Open page**, which goes to `/pages/<id>`. The part asks the plugin's route, and draws nothing for an item that isn't a page.
 
 ### Rooms, routines, and permissions
 
 - **A room** shows no card, so the tool's answer tells the bot to link the page. A link in a reply asks **Open link?** first, as any link does.
-- **A routine** can write pages with nothing added. Its result comes back with the page attached, as anything else it saves.
-- **Permissions:** both tools are `safe`, so a bot on **Ask** doesn't stop for a page.
+- **A routine** can write Markdown pages with nothing added. On **Ask**, `pages_html` in a run leaves a card like any other call: it expires after 30 minutes, and the page isn't written. Its result comes back with the page attached, as anything else it saves.
+- **Permissions:** on **Ask**, a Markdown page goes straight through, and `pages_html` waits at a card, with the document folded. On **Auto**, the reviewer sees it as any risky call.
 - **Cross-bot messages:** a bot can write a page in a turn another bot started. The card folds into the pill with the rest of the turn.
 
 ### The core pieces
 
-**`fx.library.replace({ bot, session, id, name, bytes })`**, in `library.ts`. One statement, like `save`:
-- It updates `sha256`, `name`, `size`, `data`, and `text`. `tsv` follows by itself.
+**`fx.library.replace({ bot, session, id, name, type, bytes })`**, in `library.ts`. One statement, like `save`:
+- It updates `sha256`, `name`, `type`, `size`, `data`, and `text`. `tsv` follows by itself.
 - It adds the tag for the bot and chat, or moves it to now, so the item goes to the top of the list.
 - It refuses an image, an upload, an item not tagged for the bot, and text another item holds. Uploads stay as the owner sent them.
-- It answers the item. `type` stays.
+- It answers the item.
 
 **`library.removed { id }`**, a hook. `fxbot.library.remove` fires it after the delete, to every plugin, since an item has no one bot. It observes, like `turn.end`. `observe` checks a bot, so this one loops as `settings` does.
 
@@ -266,15 +310,18 @@ create table versions (page text not null references pages on delete cascade, n 
 ### Cost
 
 - **Idle:** nothing. No process, no timer, no request.
-- **In a chat:** two tool descriptions in each turn, about 200 tokens. A plugin's tools reach every bot, so that's on bots it's off for too. Nothing in the instructions.
-- **A page:** the model's output, as if it had written it in the chat. An edit costs what it changes.
+- **In a chat:** three tool descriptions in each turn, about 300 tokens. A plugin's tools reach every bot, so that's on bots it's off for too, and Essentials makes it the default. Nothing in the instructions.
+- **A Markdown page:** the model's output, as if it had written it in the chat. An edit costs what it changes.
+- **An HTML page:** several times that, and any change rewrites it. On **Auto**, the reviewer reads the call too.
 - **Storage:** each version's text in Postgres.
 - **In the page:** a few KB, in `page.js`.
 
 ### Not in this phase
 
-- **HTML, charts with controls, and other live pages.** See [the first question](#5-open-questions).
-- **The chat beside the page,** as Grok has on a computer. A plugin can't embed the chat today.
+- **The chat beside the page,** as Grok has on a computer. The owner chose a link to the chat, and a plugin can't embed it today.
+- **Small edits to an HTML page.** They'd need a tool that isn't `safe`, and a third way to write. If rewrites cost too much, this comes first.
+- **Anything an HTML page loads,** such as a chart library from a CDN, or a font. Claude allows a few hosts. An allowed host is a way out for a page's data.
+- **A bot seeing its HTML.** fx0's bots screenshot their work, and OpenClaw's hear runtime errors. Here the only check is that scripts parse.
 - **Editing by hand.** The owner asks the bot, as in Grok. It would bring back the revision check.
 - **A public link.** fxbot has no login, and a page reaches anyone on the tailnet, as the app does. **Print** is how one goes further.
 - **A list of pages, or a Pages filter.** The library is the list, and a button in the sidebar is what the owner took out for Messages.
@@ -289,13 +336,13 @@ create table versions (page text not null references pages on delete cascade, n 
 | `packages/sdk/src/library.ts` | `replace` | about 16 |
 | `packages/sdk/src/plugin-api.ts`, `plugins.ts`, `index.ts` | `fx.library.replace`, `library.removed`, the name | about 15 |
 | `packages/ui/src/plugins.tsx`, `library.tsx` | `app.libraryItem` | about 5 |
-| `plugins/pages/fxbot/server.ts` | The tools, routes, and hook | about 120 |
-| `plugins/pages/fxbot/page.jsx`, `page.css` | The card, the reader, printing, and **Open page** | about 185 |
+| `plugins/pages/fxbot/server.ts` | The tools, routes, frame, and hook | about 165 |
+| `plugins/pages/fxbot/page.jsx`, `page.css` | The card, the reader, the frame, printing, and **Open page** | about 205 |
 | `plugins/pages/plugin.json`, its migration | | about 20 |
-| `packages/sdk/src/plugins-registry.json` | fxbot's list | 1 |
+| `packages/sdk/src/plugins-registry.json` | fxbot's list, and Essentials | 2 |
 | `plugins/pages/README.md`, website, `README.md`, `AGENTS.md`, `CHANGELOG.md` | The docs | about 90 |
 
-Size: about 35 core lines, about 325 of the plugin, and about 90 of docs.
+Size: about 35 core lines, about 390 of the plugin, and about 90 of docs.
 
 ## 4. Checklist
 
@@ -304,12 +351,12 @@ Checks use the harness the last phases used: a disposable Postgres, a check serv
 Print a check's setup, and match exact fields: one that tested nothing can't pass.
 
 **The bound:**
-- **Size:** at most 45 core lines, and 360 of the plugin, without its README and `page.js`.
+- **Size:** at most 45 core lines, and 430 of the plugin, without its README and `page.js`.
 - **Out of scope:** [Not in this phase](#not-in-this-phase).
-- **If it must be cut,** **Print** goes first, then **Open page** with `app.libraryItem`. The tools, the card, the reader, and versions stay.
+- **If it must be cut,** **Print** goes first, then **Open page** with `app.libraryItem`, then the script check. The tools, the card, the reader, versions, and HTML's isolation stay.
 
 **M1. What the plugin needs from core**
-- [ ] `fx.library.replace` changes a document's text, name, and size under the same id. `library_search` finds the new words, and no longer the old ones.
+- [ ] `fx.library.replace` changes a document's text, name, type, and size under the same id. `library_search` finds the new words, and no longer the old ones.
 - [ ] The item moves to the top of the library, and a new chat's tag joins the old ones.
 - [ ] It refuses an image, an upload, an item not tagged for the bot, and text another item holds, each saying why, and the item is unchanged.
 - [ ] The same text again changes nothing.
@@ -350,7 +397,26 @@ Print a check's setup, and match exact fields: one that tested nothing can't pas
 - [ ] At 375 pixels, nothing goes sideways on the reader, with a wide table on the page, or on the card.
 - [ ] No page errors, on any of these.
 
-**M4. Everywhere else**
+**M4. HTML pages**
+- [ ] `pages_html` makes a `text/html` library item named `<title>.html`, at version 1, and with an id, version 2 of the same item.
+- [ ] A script that doesn't parse is refused, saying which. A module script isn't judged, and no script runs on the server.
+- [ ] `pages_edit` on an HTML page refuses, naming `pages_html`.
+- [ ] A page goes from Markdown to HTML and back, and each version draws as what it was.
+- [ ] The frame draws in the reader, and its script runs: a chart draws, and a filter changes it.
+- [ ] Inside the frame, `fetch`, `XMLHttpRequest`, a WebSocket, an outside script, stylesheet, image, and font all fail, and a stub server sees no request.
+- [ ] Inside the frame, `location.origin` is `null`, and `document.cookie`, `localStorage`, and `parent.document` give nothing.
+- [ ] A form post and a change to `top.location` go nowhere.
+- [ ] Opened alone in a tab, the address has the same headers and an opaque origin, and can't reach `/api/profiles`.
+- [ ] A site that isn't fxbot can't frame it.
+- [ ] A `library:<id>` image draws as `data:`, and another bot's item doesn't.
+- [ ] A `target="_blank"` link opens a tab.
+- [ ] `/frame` answers 404 for a Markdown version.
+- [ ] The library still sends an HTML page as plain text, and its preview shows the source, with no script running.
+- [ ] **Open in a tab** prints the whole document.
+- [ ] A document with no background of its own reads in dark mode.
+- [ ] At 375 pixels, the frame fills the width, and nothing goes sideways.
+
+**M5. Everywhere else**
 - [ ] A page shows under **Documents** in the library and on the bot's panel, and its preview has **Open page**. Other items don't.
 - [ ] Removing an item in the library removes its versions, with no row left in `versions`.
 - [ ] Removing the plugin drops its schema, and every page stays in the library, at its newest text, and opens in the preview.
@@ -358,13 +424,17 @@ Print a check's setup, and match exact fields: one that tested nothing can't pas
 - [ ] With the plugin not added, nothing is different: no tool, route, timer, or part.
 - [ ] A bot in a room writes a page and links it, and the link opens it, after **Open link?**.
 - [ ] A routine writes a page, and its result reaches the bot's chat with it attached.
-- [ ] A bot on **Ask** writes a page without a card stopping it.
+- [ ] A bot on **Ask** writes a Markdown page, and edits it, without a card stopping it.
+- [ ] A bot on **Ask** waits at a card for `pages_html`, with the document folded. **Allow** saves it, and **Deny** saves nothing.
+- [ ] On **Auto**, the reviewer gets a `pages_html` call.
+- [ ] A routine's `pages_html` on **Ask** leaves a card, and after it expires, no page exists.
+- [ ] `pages` is in Essentials, before `computer`: a first run adds it, and it shows in the pack on **Browse**.
 - [ ] A turn another bot started folds with its page in the pill.
 - [ ] `scripts/check-plugins.mjs` passes, with `minFxbot` at the release that ships this.
 
-**M5. Docs and closing**
+**M6. Docs and closing**
 - [ ] `plugins/pages/README.md`, with the rolldown command, and `page.js` built and committed.
-- [ ] `pages` in `plugins-registry.json`, and in the site's directory.
+- [ ] `pages` in `plugins-registry.json`, in its `essentials`, and in the site's directory, with the pack's words on the site and in the tutorial still true.
 - [ ] A how-to on the site, listed in `src/sidebar.ts`, and `npm run build-site` passes.
 - [ ] `README.md`'s line ticked, `AGENTS.md`'s built scope, and `CHANGELOG.md`.
 - [ ] This doc moved to `docs/_completed/phases/`, with a **What the build changed**, and the links to it in `library.md` and `routines.md` updated.
@@ -374,15 +444,17 @@ Print a check's setup, and match exact fields: one that tested nothing can't pas
 
 **The human runs these:**
 - **With a real model:** ask for a report on something you care about, then a small change, then a big one. Does it use a page when it should, and stay quiet about what's on it?
+- **An HTML page:** ask for a chart with filters. Does it work the first time, on a phone too, and does a real model keep to no outside scripts? Does it pick HTML only when it should?
 - **The long wait:** does a bot writing a long page feel stuck?
-- **On a phone:** reading a long page, and **Print** from the installed app, which may not work on an iPhone.
+- **On a phone:** reading a long page, a frame that scrolls inside the reader, and **Print** from the installed app, which may not work on an iPhone.
 - **A routine:** a weekly report as a page.
 - **After a week:** do you go to the library, or wish for a list of pages?
 
 ## 5. Open questions
 
-Each has a default the build follows unless the owner changes it.
+**Decided by the owner on 2026-11-07:**
+- **"HTML too".** Pages are Markdown or HTML. The plan had proposed Markdown alone, with HTML at about 40 lines. It's about 65, with its own tool, so an HTML page can ask first where a Markdown one doesn't.
+- **"link in the chat".** No chat beside the page. The card in the chat opens the page, and the reader links back to the chat.
+- **"pages are part of the essentials".** `pages` joins the pack, before `computer`, whose setup restarts fxbot.
 
-1. **Markdown only, or HTML too?** *Default:* Markdown. It covers a report, a guide, and a summary, with tables, code, and diagrams, at no risk and few tokens. HTML is what gives Grok's charts with filters and switches, and the look of a designed page. It would be about 40 more lines in the plugin and none in core: an iframe with `sandbox="allow-scripts"`, no same-origin access, and a CSP that cuts the network, as fx0 and Pi do. The bot spends several times the tokens, and a page may not fit a phone. It can follow later, with `type` on the same item, and nothing here changes.
-2. **The chat beside the page?** *Default:* no, with a link to the chat. On a computer, Grok keeps the chat open beside the page, so you ask for a change as you read. It's the best thing about theirs, but a plugin can't embed the chat today, so it needs a place in core. A smaller step would be one box under the page, **Message Scout about this page**, that sends and goes to the chat, about 15 lines.
-3. **Is `pages` in Essentials?** *Default:* not yet. Try it first, then add one line to the list.
+Nothing is left open.
