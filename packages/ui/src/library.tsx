@@ -41,7 +41,7 @@ function Bots({ ids, profiles }: { ids: (string | null)[]; profiles: Profile[] |
     <span className="flex items-center -space-x-1">
       {ids.slice(0, 3).map((id, i) => {
         const p = bot(profiles, id);
-        return p ? <Blob key={id} shape={p.shape} color={p.color} size={20} /> : <Removed key={`removed-${i}`} size={16} />;
+        return p ? <Blob key={id} {...p} size={20} /> : <Removed key={`removed-${i}`} size={16} />;
       })}
       {ids.length > 3 && <span className="pl-2 text-xs text-muted-foreground">+{ids.length - 3}</span>}
     </span>
@@ -220,7 +220,7 @@ export function Preview({ item, profiles, onClose, onRemoved }: { item: LibraryI
                 <li key={id ?? `removed-${i}`} className="flex items-center gap-1.5">
                   {p ? (
                     <a href={`/profiles/${p.id}`} onClick={(e) => (follow(e), onClose())} className="flex items-center gap-1.5 underline-offset-4 hover:underline">
-                      <Blob shape={p.shape} color={p.color} size={20} />
+                      <Blob {...p} size={20} />
                       {p.name}
                     </a>
                   ) : (

@@ -20,8 +20,8 @@ export type PluginRecord<Config = unknown> = {
   allowed: string[] | null;
   status: string | null;
 };
-// A profile as stored. Whether its bot is busy is known only to the running process.
-export type StoredProfile = Omit<Profile, "busy">;
+// A profile as stored. Whether its bot is busy or waiting is known only to the running process.
+export type StoredProfile = Omit<Profile, "busy" | "waiting">;
 
 // Every record fxbot owns, in tables its migrations make (migrate.ts). libfx's sessions are beside them (sessions.ts).
 // Each change is one statement or one transaction, so concurrent requests cannot interleave a read-modify-write.
@@ -34,7 +34,7 @@ export async function createStore({ databaseUrl, dataDir, backupsDir }: MigrateO
   });
   const one = <T>(rows: readonly T[]) => rows[0] ?? null;
   const profile = (rows: readonly StoredProfile[]) => one(rows);
-  const columns = sql`id, name, instructions, coalesce(provider, '') as provider, model, shape, color, session_id, handoff, preview, pinned_at is not null as pinned,
+  const columns = sql`id, name, instructions, coalesce(provider, '') as provider, model, shape, color, mood, head, face, outfit, tint, session_id, handoff, preview, pinned_at is not null as pinned,
     exists (select 1 from settings where default_profile = profiles.id) as is_default`;
 
   return {
@@ -46,8 +46,8 @@ export async function createStore({ databaseUrl, dataDir, backupsDir }: MigrateO
       list: async (): Promise<StoredProfile[]> => sql<StoredProfile[]>`select ${columns} from profiles order by pinned_at nulls last, lower(name), id`,
       get: async (id: string) => profile(await sql<StoredProfile[]>`select ${columns} from profiles where id = ${id}`),
       create: async (fields: Fields) =>
-        profile(await sql<StoredProfile[]>`insert into profiles (id, name, instructions, provider, model, shape, color, pinned_at)
-          values (${newId()}, ${fields.name}, ${fields.instructions}, ${fields.provider || null}, ${fields.model}, ${fields.shape}, ${fields.color},
+        profile(await sql<StoredProfile[]>`insert into profiles (id, name, instructions, provider, model, shape, color, mood, head, face, outfit, tint, pinned_at)
+          values (${newId()}, ${fields.name}, ${fields.instructions}, ${fields.provider || null}, ${fields.model}, ${fields.shape}, ${fields.color}, ${fields.mood}, ${fields.head}, ${fields.face}, ${fields.outfit}, ${fields.tint},
             case when exists (select 1 from profiles) then null else now() end)
           returning ${columns}`)!,
       update: async (id: string, fields: Partial<Fields & { sessionId: string | null; handoff: string | null; preview: string }>) => {

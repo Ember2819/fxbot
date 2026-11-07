@@ -207,6 +207,8 @@ export async function createPlugins(options: {
   dirs: string[];
   taken: () => string[];
   onChange: () => void;
+  // Counts a call a plugin's `wait` holds, by bot.
+  hold: (bot: string, by: number) => void;
   host: PluginHost;
   // The owner of fxbot's list entry with a plugin's name, for a checkout's folder of it.
   listedOwner: (name: string) => string | undefined;
@@ -691,7 +693,8 @@ export async function createPlugins(options: {
         // A wait outlasts a hook's time, for a person or a model, and ends with the call.
         for (const wait of answer?.waits ?? []) {
           const stopped = new Promise<never>((_, fail) => context.signal.addEventListener("abort", () => fail(new Error("The turn was stopped.")), { once: true }));
-          const verdict = await Promise.race([wait({ input: call.input }), stopped]);
+          options.hold(bot, 1);
+          const verdict = await Promise.race([wait({ input: call.input }), stopped]).finally(() => options.hold(bot, -1));
           if (verdict?.block) throw new Error(verdict.block);
         }
         const after: HookEvents["tool.after"] & { bot: string } = { ...call };

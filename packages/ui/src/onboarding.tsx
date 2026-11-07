@@ -48,7 +48,7 @@ export function Onboarding({ step, profiles, onStep, onRefresh, onDone }: { step
   else if (kind === "bot" || kind === "plugins")
     screen = (
       <Step title="Make your first bot">
-        <BotForm id="first-bot" className="grid gap-6" onCreated={() => (move("plugins"), onRefresh())} footer={(disabled) => <Button type="submit" form="first-bot" className="justify-self-start" disabled={disabled}>Create</Button>} />
+        <BotForm id="first-bot" className="grid gap-6" surface="bg-background" onCreated={() => (move("plugins"), onRefresh())} footer={(disabled) => <Button type="submit" form="first-bot" className="justify-self-start" disabled={disabled}>Create</Button>} />
       </Step>
     );
   else if (kind === "provider") screen = <FirstProvider onNext={() => move("bot")} />;

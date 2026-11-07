@@ -37,8 +37,9 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/comp
 import { maxPinned, unreachable, type Color, type Fields, type Profile, type Provider, type Shape, type Turn, type Upload } from "@fxbot/sdk/client";
 import { client } from "./client.ts";
 import { maxFiles, readFile } from "./attachments.ts";
-import { Blob, LookPicker } from "./blob.tsx";
+import { Blob } from "./blob.tsx";
 import { BotForm } from "./bot-form.tsx";
+import { LookPicker, surprise } from "./look-picker.tsx";
 import { Fold, type Folded } from "./fold.tsx";
 import { Onboarding } from "./onboarding.tsx";
 import { BotPanel, usePanel } from "./bot-panel.tsx";
@@ -178,13 +179,13 @@ export function App() {
 function NewBot({ open, onOpenChange, onCreated }: { open: boolean; onOpenChange: (open: boolean) => void; onCreated: (profile: Profile) => void }) {
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent aria-describedby={undefined} className="gap-0 p-0 sm:max-w-md">
+      <DialogContent aria-describedby={undefined} className="gap-0 p-0 sm:max-w-3xl">
         <DialogHeader className="border-b px-6 py-4">
-          <DialogTitle className="text-lg">Create New Bot</DialogTitle>
+          <DialogTitle className="text-lg">New bot</DialogTitle>
         </DialogHeader>
         <BotForm
           id="new-bot"
-          className="grid max-h-[70dvh] gap-6 overflow-y-auto px-6 py-6"
+          className="grid h-[min(70dvh,34rem)] content-start gap-6 overflow-y-auto px-4 pb-6 pt-3 sm:px-6 @2xl:pt-6"
           onCreated={onCreated}
           footer={(disabled) => (
             <DialogFooter className="mx-0 mb-0 px-6 py-4">
@@ -215,7 +216,7 @@ function BotSidebar({ profiles, offline, active, onNew, onChange }: { profiles: 
   };
   const watch = (id: string) => ({ onPointerEnter: () => setHovered(id), onPointerLeave: () => setHovered(null) });
   const blob = (profile: Profile, size: number, className = "") => (
-    <Blob shape={profile.shape} color={profile.color} size={size} follow={profile.id === active || profile.id === hovered} busy={profile.busy} className={className} />
+    <Blob {...profile} size={size} follow={profile.id === active || profile.id === hovered} className={className} />
   );
   const pin = (profile: Profile, pinned: boolean) => client.profiles.update(profile.id, { pinned }).then(() => (setProblem(""), onChange()), (e: Error) => setProblem(e.message));
   // Pinned bots sit on top, large and centered; the rest are the list.
@@ -400,7 +401,7 @@ function Home({ profiles, offline, onNew }: { profiles: Profile[] | null; offlin
 }
 
 function ProfileForm({ id, onSaved }: { id: string; onSaved: () => void }) {
-  const [fields, setFields] = useState<Fields>({ name: "", instructions: "", model: "", provider: "", shape: "circle", color: "brown" });
+  const [fields, setFields] = useState<Fields>({ name: "", instructions: "", model: "", provider: "", shape: "circle", color: "brown", mood: "bright", head: "none", face: "none", outfit: "none", tint: "own" });
   const [loaded, setLoaded] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
@@ -412,9 +413,9 @@ function ProfileForm({ id, onSaved }: { id: string; onSaved: () => void }) {
     client.providers.list().then(setProviders, () => {});
     client.profiles.get(id).then(
       (profile) => {
-        const { name, instructions, model, provider, shape, color, sessionId } = profile;
+        const { name, instructions, model, provider, shape, color, mood, head, face, outfit, tint, sessionId } = profile;
         setBot(profile);
-        setFields({ name, instructions, model, provider, shape, color });
+        setFields({ name, instructions, model, provider, shape, color, mood, head, face, outfit, tint });
         setChat({ provider, sessionId });
         setLoaded(true);
       },
@@ -459,8 +460,11 @@ function ProfileForm({ id, onSaved }: { id: string; onSaved: () => void }) {
         <form onSubmit={save} className="mx-auto grid max-w-xl gap-5">
           {loaded && (
             <div className="grid gap-5">
-              <Blob shape={fields.shape} color={fields.color} size={96} follow className="mx-auto" />
-              <LookPicker shape={fields.shape} color={fields.color} onShape={(shape) => setFields({ ...fields, shape })} onColor={(color) => setFields({ ...fields, color })} />
+              <Blob {...fields} provider={undefined} size={120} follow className="mx-auto" />
+              <Button type="button" variant="outline" className="mx-auto" onClick={() => setFields({ ...fields, ...surprise() })}>
+                Surprise me
+              </Button>
+              <LookPicker look={fields} onChange={(look) => setFields({ ...fields, ...look })} />
             </div>
           )}
           <label className={label}>
@@ -733,7 +737,7 @@ function Chat({ id, profiles, onChange, onShown }: { id: string; profiles: Profi
                   </div>
                 ) : (
                   <div className="grid justify-items-center gap-4">
-                    {profile && <Blob shape={profile.shape} color={profile.color} size={112} follow busy={running} />}
+                    {profile && <Blob {...profile} size={112} follow busy={running} />}
                     <h2 className="text-center text-2xl font-semibold">{profile ? `Talk to ${profile.name}` : "Loading…"}</h2>
                   </div>
                 )}

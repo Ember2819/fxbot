@@ -1,28 +1,40 @@
 // What the agent side and the client share. No imports, so a browser bundle can take them.
 
-// A bot's look: one of these shapes, in one of these colors. A UI draws them; the names are the contract.
-export const shapes = ["circle", "cloud", "squircle", "star", "clover", "heart", "flower", "egg", "bean", "triangle", "diamond", "sparkle", "hexagon", "pumpkin"] as const;
+// A bot's look: one of these shapes, in one of these colors, with a feeling and what it wears. A UI draws them; the names
+// are the contract.
+export const shapes = ["circle", "cloud", "squircle", "star", "clover", "heart", "flower", "egg", "bean", "triangle", "diamond", "sparkle", "hexagon", "pumpkin", "mochi", "gumdrop", "toast", "arch", "pill", "drop", "peanut", "puff", "mushroom", "bear", "cat", "mouse", "bunny", "frog", "imp", "bot", "ghost", "sprout"] as const;
 export type Shape = (typeof shapes)[number];
 export const colors = {
-  black: "#1f1f1f",
-  brown: "#9b6a3f",
-  red: "#e5484d",
-  orange: "#f06b2b",
-  amber: "#ec9a2e",
-  green: "#56bf73",
-  teal: "#4fb3a2",
-  blue: "#3b82f6",
-  purple: "#8b5cf6",
-  pink: "#e64ba0",
-  gray: "#9a9a9a",
+  black: "#343539",
+  brown: "#d09b71",
+  red: "#ff9cac",
+  orange: "#ffa27c",
+  amber: "#fed25f",
+  green: "#afe97d",
+  teal: "#71e2ca",
+  blue: "#79c8fa",
+  purple: "#a7b1fa",
+  pink: "#eba1e0",
+  gray: "#a9b2be",
 } as const;
 export type Color = keyof typeof colors;
+export const moods = ["bright", "happy", "calm", "focus", "doubt", "wow", "shy", "wink"] as const;
+export type Mood = (typeof moods)[number];
+export const heads = ["none", "headphones", "beanie", "cap", "beret", "headband", "swoop"] as const;
+export type Head = (typeof heads)[number];
+export const faces = ["none", "glasses", "shades", "mustache"] as const;
+export type Face = (typeof faces)[number];
+export const outfits = ["none", "blazer", "turtleneck", "hoodie", "scarf", "bowtie", "badge"] as const;
+export type Outfit = (typeof outfits)[number];
+// What it wears takes a deep shade of the bot's own color, or black, or white.
+export const tints = ["own", "black", "white"] as const;
+export type Tint = (typeof tints)[number];
 
 // `provider` is a provider id, or empty for none. An empty model follows the provider's default model.
-export type Fields = { name: string; instructions: string; model: string; provider: string; shape: Shape; color: Color };
+export type Fields = { name: string; instructions: string; model: string; provider: string; shape: Shape; color: Color; mood: Mood; head: Head; face: Face; outfit: Outfit; tint: Tint };
 // `preview` is the start of the latest reply, for a list of bots. `handoff` is the summary a provider switch carried
-// over, which the current chat starts from. `busy` is true while a turn runs. Pinned bots head the list.
-export type Profile = Fields & { id: string; sessionId: string | null; preview: string | null; handoff: string | null; busy: boolean; pinned: boolean; isDefault: boolean };
+// over, which the current chat starts from. `busy` is true while a turn runs, and `waiting` while a plugin holds one of its calls. Pinned bots head the list.
+export type Profile = Fields & { id: string; sessionId: string | null; preview: string | null; handoff: string | null; busy: boolean; waiting: boolean; pinned: boolean; isDefault: boolean };
 // An update takes any field, and `pinned`. The first bot starts pinned, and at most `maxPinned` are.
 export type ProfileUpdate = Partial<Fields> & { pinned?: boolean };
 export const maxPinned = 3;

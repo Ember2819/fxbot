@@ -1,188 +1,221 @@
 import { useEffect, useMemo, useRef } from "react";
-import { colors, shapes, type Color, type Shape } from "@fxbot/sdk/client";
+import type { Color, Face, Head, Mood, Outfit, Shape, Tint } from "@fxbot/sdk/client";
+import { drawBlob, eye, feeling, glintAt, glintShows, layout, type Eye, type Look } from "./blob-draw.ts";
 
-// The shapes, drawn once in a 100×100 box. Each starts as an exact outline, corners and all. Its points are spaced
-// evenly, its corners rounded by averaging each point with its neighbours, and the result is turned, stretched, and
-// fitted to the same box, then drawn as one smooth closed curve (Catmull-Rom segments as cubic Béziers).
 type Point = [number, number];
-const f = (n: number) => n.toFixed(1);
-const ring = (count: number, point: (t: number) => Point) => Array.from({ length: count }, (_, i) => point((i / count) * 2 * Math.PI));
-const polar = (radius: (t: number) => number) => ring(360, (t): Point => [radius(t) * Math.cos(t), radius(t) * Math.sin(t)]);
-// A regular polygon with a corner at the top.
-const corners = (sides: number) => ring(sides, (t): Point => [Math.sin(t), -Math.cos(t)]);
-const lobes = (count: number, base: number, power = 1) => (t: number) => base + (1 - base) * ((1 + Math.cos(count * t)) / 2) ** power;
+type Doing = { mood: string; follow: boolean; busy: boolean; waiting: boolean; asleep: boolean };
+type Mate = { node: SVGSVGElement; next: number; tick: (t: number) => boolean; set: (doing: Doing) => void; poke: () => void };
 
-// `count` points spaced evenly along a closed outline.
-function even(points: Point[], count: number): Point[] {
-  const n = points.length;
-  const along = [0];
-  for (let i = 1; i <= n; i++) along.push(along[i - 1] + Math.hypot(points[i % n][0] - points[i - 1][0], points[i % n][1] - points[i - 1][1]));
-  const out: Point[] = [];
-  for (let k = 0, j = 0; k < count; k++) {
-    const at = (k / count) * along[n];
-    while (along[j + 1] < at) j++;
-    const [a, b] = [points[j], points[(j + 1) % n]];
-    const t = (at - along[j]) / (along[j + 1] - along[j] || 1);
-    out.push([a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t]);
-  }
-  return out;
-}
-
-// Each pass moves every point toward its neighbours, which rounds corners and leaves straight edges straight.
-function soften(points: Point[], passes: number) {
-  const at = (list: Point[], i: number) => list[(i + list.length) % list.length];
-  for (let pass = 0; pass < passes; pass++)
-    points = points.map(([x, y], i): Point => [(at(points, i - 1)[0] + 2 * x + at(points, i + 1)[0]) / 4, (at(points, i - 1)[1] + 2 * y + at(points, i + 1)[1]) / 4]);
-  return points;
-}
-
-// Stretched, turned by `turn` degrees, then scaled and centred so the larger side spans 82 of the 100.
-function fit(points: Point[], turn: number, sx: number, sy: number) {
-  const a = (turn * Math.PI) / 180;
-  const moved = points.map(([x, y]): Point => [x * sx * Math.cos(a) - y * sy * Math.sin(a), x * sx * Math.sin(a) + y * sy * Math.cos(a)]);
-  const [xs, ys] = [moved.map((p) => p[0]), moved.map((p) => p[1])];
-  const [left, top] = [Math.min(...xs), Math.min(...ys)];
-  const [width, height] = [Math.max(...xs) - left, Math.max(...ys) - top];
-  const scale = 82 / Math.max(width, height);
-  return moved.map(([x, y]): Point => [50 + (x - left - width / 2) * scale, 50 + (y - top - height / 2) * scale]);
-}
-
-function smooth(points: Point[]) {
-  const at = (i: number) => points[(i + points.length) % points.length];
-  let d = `M${f(at(0)[0])} ${f(at(0)[1])}`;
-  for (let i = 0; i < points.length; i++) {
-    const [p0, p1, p2, p3] = [at(i - 1), at(i), at(i + 1), at(i + 2)];
-    d += `C${f(p1[0] + (p2[0] - p0[0]) / 6)} ${f(p1[1] + (p2[1] - p0[1]) / 6)} ${f(p2[0] - (p3[0] - p1[0]) / 6)} ${f(p2[1] - (p3[1] - p1[1]) / 6)} ${f(p2[0])} ${f(p2[1])}`;
-  }
-  return d + "Z";
-}
-
-// The middle of the area, where the eyes go, so they sit inside a triangle as well as a circle.
-function centroid(points: Point[]): Point {
-  let [area, x, y] = [0, 0, 0];
-  points.forEach(([x0, y0], i) => {
-    const [x1, y1] = points[(i + 1) % points.length];
-    const cross = x0 * y1 - x1 * y0;
-    [area, x, y] = [area + cross, x + (x0 + x1) * cross, y + (y0 + y1) * cross];
-  });
-  return [x / (3 * area), y / (3 * area)];
-}
-
-// The path, where its eyes go, and its top above them, where a pumpkin's stem grows. `lower` moves the eyes down,
-// as below a heart's notch.
-function blob(outline: Point[], { round = 0, turn = 0, sx = 1, sy = 1, lower = 0 } = {}) {
-  const points = even(fit(soften(even(outline, 120), round), turn, sx, sy), 64);
-  const [cx, cy] = centroid(points);
-  const center: Point = [cx, cy + lower];
-  const top = points.filter(([x, y]) => y < center[1] && Math.abs(x - center[0]) < 8).sort((a, b) => a[1] - b[1])[0] ?? [50, 9];
-  return { d: smooth(points), center, top };
-}
-
-const drawn: Record<Shape, ReturnType<typeof blob>> = {
-  circle: blob(polar(() => 1)),
-  cloud: blob(polar((t) => 1 + 0.24 * Math.abs(Math.cos(2.5 * t))), { round: 2, turn: 18 }),
-  squircle: blob(corners(4), { round: 70, turn: 57 }),
-  star: blob(polar(lobes(4, 0.64, 1.2)), { round: 8, turn: 10 }),
-  clover: blob(polar((t) => 0.68 + 0.32 * Math.abs(Math.cos(2 * t))), { round: 3, turn: 45 }),
-  heart: blob(ring(240, (t): Point => [16 * Math.sin(t) ** 3, -(13 * Math.cos(t) - 5 * Math.cos(2 * t) - 2 * Math.cos(3 * t) - Math.cos(4 * t))]), { round: 8, turn: -10, lower: 7 }),
-  flower: blob(polar((t) => 1 + 0.13 * Math.cos(8 * t)), { round: 1 }),
-  egg: blob(polar((t) => 1 + 0.15 * Math.sin(t)), { turn: -16, sy: 1.08 }),
-  bean: blob([[-1.5, -1], [1.5, -1], [1.5, 1], [-1.5, 1]], { round: 160, turn: -8 }),
-  triangle: blob(corners(3), { round: 90, turn: -6 }),
-  diamond: blob(corners(4), { round: 60, turn: 12, sy: 1.18 }),
-  sparkle: blob(polar(lobes(6, 0.64, 1.4)), { round: 3 }),
-  hexagon: blob(corners(6), { round: 45, turn: 30 }),
-  pumpkin: blob(polar((t) => 1 - 0.18 * Math.abs(Math.sin(t)) ** 12), { round: 2, sx: 1.3 }),
-};
-
-// The pointer's last position, for every blob that follows it: one listener for the page, and one update a frame.
-const watchers = new Set<(x: number, y: number) => void>();
-let pointer: Point | null = null;
+// Every bot on the page shares one loop, which runs frames only while one is moving. Otherwise it's one timer, for the
+// next blink. `next` is when a bot at rest wants to move again.
+const mates = new Set<Mate>();
 let frame = 0;
-function move(event: PointerEvent) {
-  pointer = [event.clientX, event.clientY];
-  frame ||= requestAnimationFrame(() => {
-    frame = 0;
-    for (const watch of watchers) watch(...pointer!);
-  });
+let timer: ReturnType<typeof setTimeout> | undefined;
+let pointer: { x: number; y: number; at: number } | null = null;
+const wake = () => {
+  clearTimeout(timer);
+  frame ||= requestAnimationFrame(run);
+};
+function run(t: number) {
+  frame = 0;
+  let moving = false;
+  let next = Infinity;
+  for (const mate of mates) {
+    if (mate.tick(t)) moving = true;
+    next = Math.min(next, mate.next);
+  }
+  if (moving) frame = requestAnimationFrame(run);
+  else if (next < Infinity) timer = setTimeout(wake, Math.max(16, next - performance.now()));
 }
-function watchPointer(watch: (x: number, y: number) => void) {
-  if (!watchers.size) addEventListener("pointermove", move, { passive: true });
-  watchers.add(watch);
-  if (pointer) watch(...pointer);
+function moved(event: PointerEvent) {
+  pointer = { x: event.clientX, y: event.clientY, at: performance.now() };
+  wake();
+}
+function join(mate: Mate) {
+  if (!mates.size) addEventListener("pointermove", moved, { passive: true });
+  mates.add(mate);
+  wake();
   return () => {
-    watchers.delete(watch);
-    if (!watchers.size) removeEventListener("pointermove", move);
+    mates.delete(mate);
+    if (!mates.size) removeEventListener("pointermove", moved);
   };
 }
 
-const label = (name: string) => name[0].toUpperCase() + name.slice(1);
+const keys = ["w", "h", "lt", "lb", "st", "ct", "cb", "n"] as const;
+const center = (node: Element) => {
+  const box = node.getBoundingClientRect();
+  return { x: box.left + box.width / 2, y: box.top + box.height / 2, width: box.width };
+};
 
-// A bot's look. With `follow`, its eyes follow the pointer and its body leans toward it. `busy` makes it hop and look
-// around instead. A fixed `look` points the eyes, as in the shape picker. index.css holds the motion, which stops under
-// reduced motion.
-export function Blob({ shape, color, size = 40, follow = false, busy = false, look, className = "" }: { shape: Shape; color: Color; size?: number; follow?: boolean; busy?: boolean; look?: Point; className?: string }) {
-  const svg = useRef<SVGSVGElement>(null);
-  const lean = useRef<SVGGElement>(null);
-  const eyes = useRef<SVGGElement>(null);
-  // Blinks at their own times, not all at once.
-  const blink = useMemo(() => ({ animationDelay: `${-Math.random() * 6}s` }), []);
-  useEffect(() => {
-    if (!follow || busy) return;
-    const stop = watchPointer((x, y) => {
-      const box = svg.current?.getBoundingClientRect();
-      if (!box) return;
-      const [dx, dy] = [x - (box.left + box.width / 2), y - (box.top + box.height / 2)];
-      const distance = Math.hypot(dx, dy) || 1;
-      const reach = Math.min(1, distance / (box.width * 1.5));
-      eyes.current?.setAttribute("transform", `translate(${f((dx / distance) * 9 * reach)} ${f((dy / distance) * 7 * reach)})`);
-      lean.current?.setAttribute("transform", `rotate(${f((dx / distance) * 6 * reach)} 50 60)`);
-    });
-    return () => {
-      stop();
-      eyes.current?.removeAttribute("transform");
-      lean.current?.removeAttribute("transform");
-    };
-  }, [follow, busy]);
+// One bot's motion: what it's doing picks where it looks, how it moves, and how its eyes are, and each eases there.
+function animate(node: SVGSVGElement, look: Look, size: number, start: Doing): Mate {
+  const one = (name: string) => node.querySelector(`.${name}`);
+  const lean = one("blob-lean")!, eyes = one("blob-eyes")!, shine = one("blob-shine"), left = one("blob-eye-l")!, right = one("blob-eye-r")!, glints = [one("blob-glint-l"), one("blob-glint-r")];
+  const layers = [...node.querySelectorAll(".blob-far, .blob-mid")].map((group) => ({ group, by: group.classList.contains("blob-mid") ? 0.62 : 0.24, anti: [...group.querySelectorAll(".blob-anti")], inner: [...group.querySelectorAll(".blob-in")] }));
+  const { cx, cy, gap, k } = layout(look, size);
+  const [lx, rx] = [cx - gap / 2, cx + gap / 2];
+  let doing = start;
+  let shown = "";
+  let wanted = feeling(start.mood, k);
+  const [l, r]: Eye[] = [{ ...wanted.l }, { ...wanted.r }];
+  let [gx, gy, tilt, near, last] = [0, 0, 0, 0, performance.now()];
+  let glance: Point = [0, 0];
+  let [nextLook, nextBlink, blinkAt, pokedAt, happyUntil] = [last + Math.random() * 3000, last + 800 + Math.random() * 4000, -1e9, -1e9, 0];
 
-  const { d, center, top } = drawn[shape];
-  const [x, y] = [top[0], top[1]];
-  return (
-    <svg ref={svg} viewBox="0 0 100 100" width={size} height={size} aria-hidden="true" data-shape={shape} data-busy={busy || undefined} className={`blob shrink-0 overflow-visible ${className}`}>
-      <g className="blob-body">
-        <g ref={lean}>
-          <path className="blob-shape" d={d} fill={colors[color]} />
-          {shape === "pumpkin" && <path d={`M${f(x - 1)} ${f(y + 4)} C${f(x - 2)} ${f(y - 3)} ${f(x + 1)} ${f(y - 8)} ${f(x + 7)} ${f(y - 9)}`} fill="none" stroke="#3f3a36" strokeWidth="4.5" strokeLinecap="round" />}
-          <g transform={`translate(${f(center[0] - 50 + (look?.[0] ?? 0))} ${f(center[1] - 50 + (look?.[1] ?? 0))})`}>
-            <g ref={eyes} className="blob-eyes">
-              <g className="blob-look">
-                <rect className="blob-eye" x="37" y="38" width="8" height="21" rx="4" fill="white" style={blink} />
-                <rect className="blob-eye" x="55" y="38" width="8" height="21" rx="4" fill="white" style={blink} />
-              </g>
-            </g>
-          </g>
-        </g>
-      </g>
-    </svg>
-  );
+  function lookAround(t: number, x: number, y: number) {
+    if (t < nextLook) return;
+    nextLook = t + (1300 + Math.random() * 3400) * (1 + mates.size / 6);
+    const others = [...mates].filter((mate) => mate.node !== node && mate.node.isConnected), chance = Math.random();
+    const other = others.length && chance >= 0.42 && chance < 0.8 ? center(others[Math.floor(Math.random() * others.length)].node) : null;
+    if (other?.width) {
+      const [dx, dy] = [other.x - x, other.y - y], distance = Math.hypot(dx, dy) || 1;
+      glance = [(dx / distance) * 7.5, (dy / distance) * 5.5];
+    } else glance = chance < 0.42 ? [0, 0] : [(Math.random() - 0.5) * 13, (Math.random() - 0.5) * 8];
+  }
+
+  const mate: Mate = {
+    node,
+    next: Math.min(nextBlink, nextLook),
+    set(next) {
+      if (doing.busy && !next.busy && !next.asleep) happyUntil = performance.now() + 4000;
+      doing = next;
+      wake();
+    },
+    poke() {
+      pokedAt = performance.now();
+      wake();
+    },
+    tick(t) {
+      const dt = Math.min(48, t - last);
+      last = t;
+      const ease = (ms: number) => 1 - Math.exp(-dt / ms);
+      const { busy, waiting, asleep } = doing;
+      const fresh = doing.follow && pointer !== null && t - pointer.at < 3200;
+      const here = fresh || size >= 32 ? center(node) : { x: 0, y: 0, width: 0 };
+      let [dx, dy] = fresh ? [pointer!.x - here.x, pointer!.y - here.y] : [0, 0];
+      const distance = Math.hypot(dx, dy) || 1, reach = fresh ? Math.min(1, distance / (here.width * 1.5)) : 0;
+      [dx, dy] = [dx / distance, dy / distance];
+      let mood = doing.mood;
+      let target: Point = [dx * 8.5 * reach, dy * 6.5 * reach];
+      let [turn, lift, sx, sy] = [dx * 6 * reach, 0, 1, 1];
+      if (asleep) {
+        mood = "asleep";
+        target = [0, 0];
+        turn = 0;
+      } else if (waiting) {
+        const bob = Math.max(0, Math.sin(t / 300)) ** 3 * (t % 2400 < 940 ? 1 : 0);
+        lift = -bob * 5;
+        sy += bob * 0.03;
+        sx -= bob * 0.03;
+        if (!fresh) target = [0, -2];
+      } else if (busy) {
+        mood = "focus";
+        const hop = (t % 1100) / 1100, round = (t % 2600) / 2600, swing = Math.sin(hop * 2 * Math.PI), squash = Math.cos(hop * 4 * Math.PI) * 0.035;
+        lift = -Math.abs(swing) * 6;
+        turn = swing * 4.5;
+        sx += squash;
+        sy -= squash;
+        target = round < 0.1 ? [0, 0] : round < 0.42 ? [-7, -3.5] : round < 0.72 ? [7, -3] : round < 0.92 ? [3, 5] : [0, 0];
+      } else {
+        if (t < happyUntil) mood = "happy";
+        if (!fresh && size >= 32) {
+          lookAround(t, here.x, here.y);
+          target = glance;
+        }
+      }
+      const since = t - pokedAt, poked = since < 1100;
+      if (poked) {
+        const tau = since / 1000, wobble = Math.exp(-5 * tau) * Math.sin(17 * tau);
+        sx += wobble * 0.17;
+        sy -= wobble * 0.17;
+        lift -= Math.exp(-6 * tau) * Math.abs(Math.sin(9 * tau)) * 7;
+        if (!asleep) mood = "happy";
+      }
+      if (mood !== shown) wanted = feeling((shown = mood), k);
+      target = [target[0] + wanted.gaze[0], target[1] + wanted.gaze[1]];
+
+      const moves = Math.abs(target[0] - gx) + Math.abs(target[1] - gy) + Math.abs(turn - tilt) > 0.04;
+      gx += (target[0] - gx) * ease(55);
+      gy += (target[1] - gy) * ease(55);
+      tilt += (turn - tilt) * ease(150);
+      const close = fresh && distance < here.width * 0.6 ? 1 : 0, widens = Math.abs(close - near) > 0.01;
+      near += (close - near) * ease(120);
+      let changes = false;
+      for (const key of keys) {
+        if (Math.abs(wanted.l[key] - l[key]) + Math.abs(wanted.r[key] - r[key]) > 0.01) changes = true;
+        l[key] += (wanted.l[key] - l[key]) * ease(85);
+        r[key] += (wanted.r[key] - r[key]) * ease(85);
+      }
+      if (t > nextBlink && !asleep) {
+        blinkAt = t;
+        nextBlink = t + (Math.random() < 0.18 ? 240 : (1800 + Math.random() * 4600) * (1 + mates.size / 12));
+      }
+      const blinkPart = (t - blinkAt) / 150, blink = blinkPart >= 0 && blinkPart <= 1 && !asleep ? Math.sin(blinkPart * Math.PI) : 0;
+      const hopping = busy || waiting || poked;
+
+      if (changes || widens || blink > 0 || blinkPart < 1.3) {
+        const lidded = (e: Eye): Eye => ({ ...e, lt: e.lt + (0.5 - e.lt) * blink, lb: e.lb + (0.5 - e.lb) * blink, w: e.w * (1 + 0.07 * near), h: e.h * (1 + 0.07 * near) });
+        const [el, er] = [lidded(l), lidded(r)];
+        left.setAttribute("d", eye(lx, cy, el));
+        right.setAttribute("d", eye(rx, cy, er));
+        [[glints[0], lx, el], [glints[1], rx, er]].forEach(([glint, x, e]) => {
+          if (!glint) return;
+          const [px, py] = glintAt(x as number, cy, e as Eye), node = glint as Element;
+          node.setAttribute("cx", px.toFixed(2));
+          node.setAttribute("cy", py.toFixed(2));
+          node.setAttribute("r", (wanted.glint || 0.01).toFixed(2));
+          node.setAttribute("opacity", Math.max(0, glintShows(e as Eye) - blink * 2.5).toFixed(2));
+        });
+      }
+      if (moves || hopping) {
+        eyes.setAttribute("transform", `translate(${gx.toFixed(2)} ${gy.toFixed(2)})`);
+        shine?.setAttribute("transform", `translate(${(-gx * 0.55).toFixed(2)} ${(-gy * 0.55).toFixed(2)})`);
+        for (const { group, by, anti, inner } of layers) {
+          const [x, y] = [(gx * by).toFixed(2), (gy * by).toFixed(2)];
+          group.setAttribute("transform", `translate(${x} ${y})`);
+          for (const cut of anti) cut.setAttribute("transform", `translate(${-x} ${-y})`);
+          for (const worn of inner) worn.setAttribute("transform", `translate(${x} ${y})`);
+        }
+        lean.setAttribute("transform", `translate(0 ${lift.toFixed(2)}) rotate(${tilt.toFixed(2)} 50 62) translate(50 92) scale(${sx.toFixed(3)} ${sy.toFixed(3)}) translate(-50 -92)`);
+      }
+      mate.next = Math.min(asleep ? Infinity : nextBlink, !asleep && size >= 32 ? nextLook : Infinity, t < happyUntil ? happyUntil : Infinity, fresh ? pointer!.at + 3200 : Infinity);
+      return moves || hopping || changes || widens || blink > 0;
+    },
+  };
+  return mate;
 }
 
-// The shape and color choices, each drawn in the bot's current look.
-export function LookPicker({ shape, color, onShape, onColor }: { shape: Shape; color: Color; onShape: (shape: Shape) => void; onColor: (color: Color) => void }) {
-  return (
-    <div className="grid gap-6">
-      <div role="group" aria-label="Shape" className="mx-auto flex max-w-[22rem] flex-wrap justify-center gap-x-3 gap-y-2">
-        {shapes.map((s) => (
-          <button key={s} type="button" aria-label={label(s)} aria-pressed={s === shape} onClick={() => onShape(s)} className={`rounded-full p-1.5 transition ${s === shape ? "ring-2 ring-foreground/20" : "hover:bg-muted"}`}>
-            <Blob shape={s} color={color} size={44} look={[4, -4]} />
-          </button>
-        ))}
-      </div>
-      <div role="group" aria-label="Color" className="mx-auto flex max-w-[18rem] flex-wrap justify-center gap-3">
-        {(Object.keys(colors) as Color[]).map((c) => (
-          <button key={c} type="button" aria-label={label(c)} aria-pressed={c === color} onClick={() => onColor(c)} className={`size-9 rounded-full ring-offset-2 ring-offset-background transition ${c === color ? "ring-2 ring-foreground/25" : "hover:scale-110"}`} style={{ background: colors[c] }} />
-        ))}
-      </div>
-    </div>
-  );
+let drawn = 0;
+const stillPlease = () => matchMedia("(prefers-reduced-motion: reduce)").matches;
+
+// A bot's look. Pass a whole bot, as in <Blob {...bot} size={24} />, and it shows what the bot is doing: `busy` makes it
+// hop and look around, `waiting` look at you, and an empty `provider` sleep, since it can't answer. With `follow`, its eyes
+// and lean follow the pointer. `still` draws it once, for a list of choices, as does reduced motion.
+export function Blob({ shape, color, mood = "bright", head = "none", face = "none", outfit = "none", tint = "own", size = 40, follow = false, busy = false, waiting = false, provider, still = false, className = "" }: { shape: Shape; color: Color; mood?: Mood; head?: Head; face?: Face; outfit?: Outfit; tint?: Tint; size?: number; follow?: boolean; busy?: boolean; waiting?: boolean; provider?: string; still?: boolean; className?: string }) {
+  const svg = useRef<SVGSVGElement>(null);
+  const mate = useRef<Mate | null>(null);
+  const seen = useRef(false);
+  const id = useMemo(() => `blob${++drawn}`, []);
+  const asleep = provider === "";
+  const held = still || stillPlease();
+  const doing = { mood, follow, busy, waiting, asleep };
+  const first = useRef(mood);
+  const shown = asleep ? "asleep" : busy && !waiting ? "focus" : mood;
+  const look: Look = { shape, color, head, face, outfit, tint };
+  // A change of feeling melts in the motion, so only a bot held still draws again for one.
+  const html = useMemo(() => drawBlob(look, held ? shown : first.current, size, id), [shape, color, head, face, outfit, tint, size, id, held, held && shown]);
+  useEffect(() => {
+    if (held) return;
+    const live = animate(svg.current!, look, size, doing);
+    mate.current = live;
+    const leave = join(live);
+    if (seen.current) live.poke();
+    seen.current = true;
+    return () => {
+      mate.current = null;
+      leave();
+    };
+  }, [html, held]);
+  useEffect(() => mate.current?.set(doing), [mood, follow, busy, waiting, asleep]);
+  return <svg ref={svg} viewBox="0 0 100 100" width={size} height={size} aria-hidden="true" data-shape={shape} data-busy={busy || undefined} data-waiting={waiting || undefined} data-asleep={asleep || undefined} onPointerDown={() => mate.current?.poke()} className={`blob shrink-0 overflow-visible ${className}`} dangerouslySetInnerHTML={{ __html: html }} />;
 }

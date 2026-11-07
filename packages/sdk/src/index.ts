@@ -14,11 +14,11 @@ import { openSessions } from "./sessions.ts";
 import { readKey } from "./secrets.ts";
 import { createSkills } from "./skills.ts";
 import { createStore, isId, type StoredProfile } from "./store.ts";
-import { colors, maxPinned, shapes, type BotSkill, type Plugin, type PluginRef, type RepoRef, type PluginSecrets, type Fields, type Kind, type LibraryQuery, type Message, type NewProvider, type Profile, type ProfileUpdate, type ProviderUpdate, type Settings, type StreamLine, embeddingKinds, type SkillRef, type Upload } from "./types.ts";
+import { colors, faces, heads, maxPinned, moods, outfits, shapes, tints, type BotSkill, type Plugin, type PluginRef, type RepoRef, type PluginSecrets, type Fields, type Kind, type LibraryQuery, type Message, type NewProvider, type Profile, type ProfileUpdate, type ProviderUpdate, type Settings, type StreamLine, embeddingKinds, type SkillRef, type Upload } from "./types.ts";
 
 export type * from "./types.ts";
 export type * from "./plugin-api.ts";
-export { colors, embeddingKinds, itemKinds, kinds, maxPinned, shapes } from "./types.ts";
+export { colors, embeddingKinds, faces, heads, itemKinds, kinds, maxPinned, moods, outfits, shapes, tints } from "./types.ts";
 export { readKey, rotateSecrets } from "./secrets.ts";
 export { compareVersions, isStable, isVersion, releasesUrlFor } from "./releases.ts";
 
@@ -72,10 +72,13 @@ const isRepo = (ref: PluginRef): ref is RepoRef => typeof (ref as RepoRef | unde
 const maxImage = 3.75 * 2 ** 20;
 const maxImages = 6 * 2 ** 20;
 
+// What a bot feels and wears, each from its list.
+const looks = { mood: moods, head: heads, face: faces, outfit: outfits, tint: tints };
+
 // Create needs only a name; the rest start empty, and the look a brown circle. Update takes any of them. Other keys
 // are ignored.
 function fields(input: Partial<Fields>, create: boolean): Partial<Fields> {
-  const out: Partial<Fields> = create ? { instructions: "", model: "", provider: "", shape: "circle", color: "brown" } : {};
+  const out: Partial<Fields> = create ? { instructions: "", model: "", provider: "", shape: "circle", color: "brown", mood: "bright", head: "none", face: "none", outfit: "none", tint: "own" } : {};
   for (const key of ["name", "instructions", "model", "provider"] as const) {
     const value: unknown = input[key];
     if (value === undefined) continue;
@@ -85,6 +88,10 @@ function fields(input: Partial<Fields>, create: boolean): Partial<Fields> {
   }
   if (input.shape !== undefined) out.shape = shapes.includes(input.shape) ? input.shape : fail(400, `shape must be one of ${shapes.join(", ")}`);
   if (input.color !== undefined) out.color = input.color in colors ? input.color : fail(400, `color must be one of ${Object.keys(colors).join(", ")}`);
+  for (const [key, list] of Object.entries(looks) as [keyof typeof looks, readonly string[]][]) {
+    const value = input[key];
+    if (value !== undefined) Object.assign(out, { [key]: list.includes(value) ? value : fail(400, `${key} must be one of ${list.join(", ")}`) });
+  }
   if ((create || out.name !== undefined) && !out.name) fail(400, "name is required");
   if (Buffer.byteLength(out.instructions ?? "") > 64 * 1024) fail(400, "instructions are over 64 KiB");
   return out;
@@ -102,7 +109,10 @@ export async function createFxbot(options: FxbotOptions) {
   // How many turns each bot has running in this process, for `busy`.
   const running = new Map<string, number>();
   const count = (id: string, by: number) => running.set(id, (running.get(id) ?? 0) + by);
-  const withBusy = (profile: StoredProfile): Profile => ({ ...profile, busy: (running.get(profile.id) ?? 0) > 0 });
+  // And how many of each bot's calls a plugin's `wait` is holding, for `waiting`.
+  const held = new Map<string, number>();
+  const holding = (id: string, by: number) => held.set(id, (held.get(id) ?? 0) + by);
+  const withBusy = (profile: StoredProfile): Profile => ({ ...profile, busy: (running.get(profile.id) ?? 0) > 0, waiting: (held.get(profile.id) ?? 0) > 0 });
   const releases = createReleases({ version, url: options.releasesUrl, fetch });
   // Memory search's vectors: from the machine's local embedder, a provider's /embeddings, or none.
   const embeddings = createEmbeddings({ sql: store.sql, fetch, localUrl: options.embedUrl?.replace(/\/+$/, ""), target: (id) => providers.embeddingsTarget(id) });
@@ -155,6 +165,7 @@ export async function createFxbot(options: FxbotOptions) {
   let { timeZone } = await store.settings.get();
   const packages = await createPlugins({
     store,
+    hold: holding,
     databaseUrl,
     secretKey: key,
     dataDir,

@@ -449,7 +449,7 @@ function BotsChoice({ addon, profiles, onChange }: { addon: Plugin; profiles: Pr
       {addon.bots === "each" &&
         profiles?.map((p) => (
           <label key={p.id} className="flex items-center gap-3 text-sm">
-            <Blob shape={p.shape} color={p.color} size={24} />
+            <Blob {...p} size={24} />
             <span className="min-w-0 flex-1 truncate">{p.name}</span>
             <Switch checked={addon.on.includes(p.id)} onCheckedChange={(on) => forBot(p.id, on)} />
           </label>

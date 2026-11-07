@@ -22,7 +22,7 @@ export function Fold({ items, busy, children }: { items: Folded[]; busy?: boolea
         {faces.length > 0 && (
           <span className="flex shrink-0 -space-x-1" aria-hidden="true">
             {faces.slice(0, 3).map((bot) => (
-              <Blob key={bot.id} shape={bot.shape} color={bot.color} size={18} />
+              <Blob key={bot.id} {...bot} size={18} />
             ))}
           </span>
         )}

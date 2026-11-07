@@ -115,44 +115,23 @@
   }
 }
 
-/* Bot blobs (blob.tsx): while busy, a hop and eyes that look around; otherwise a blink now and then. */
+/* Bot blobs (blob.tsx), whose motion is there, but for one asleep, breathing. What's worn in black shows on a dark page. */
 .blob-body {
     transform-box: fill-box;
     transform-origin: 50% 90%;
 }
-.blob-eye {
-    transform-box: fill-box;
-    transform-origin: center;
-    animation: blob-blink 6s ease-in-out infinite;
+.blob[data-asleep] .blob-body {
+    animation: blob-breath 5s ease-in-out infinite;
 }
-.blob[data-busy] .blob-body {
-    animation: blob-hop 1.1s ease-in-out infinite;
-}
-.blob[data-busy] .blob-look {
-    animation: blob-look 2.6s ease-in-out infinite;
-}
-@keyframes blob-hop {
-    0%, 100% { transform: translateY(0) rotate(0) scale(1, 1); }
-    25% { transform: translateY(-6%) rotate(-5deg) scale(0.96, 1.04); }
-    50% { transform: translateY(0) rotate(0) scale(1.05, 0.95); }
-    75% { transform: translateY(-4%) rotate(5deg) scale(0.97, 1.03); }
-}
-@keyframes blob-look {
-    0%, 100% { transform: translate(0, 0); }
-    15%, 32% { transform: translate(-8px, -4px); }
-    48%, 64% { transform: translate(8px, -3px); }
-    80% { transform: translate(3px, 6px); }
-}
-@keyframes blob-blink {
-    0%, 93%, 100% { transform: scaleY(1); }
-    96% { transform: scaleY(0.1); }
+@keyframes blob-breath {
+    50% { transform: scale(0.985, 1.02); }
 }
 @media (prefers-reduced-motion: reduce) {
     .blob * { animation: none !important; }
 }
-/* A faint rim, so a black blob shows on a dark background. */
+:root { --blob-ink-hi: #3d3d3d; --blob-ink: #171717; --blob-ink-lo: #050505; }
 @media (prefers-color-scheme: dark) {
-    .blob-shape { stroke: oklch(1 0 0 / 0.15); stroke-width: 1.5; }
+    :root { --blob-ink-hi: #565656; --blob-ink: #3a3a3a; --blob-ink-lo: #262626; }
 }
 /* A plugin's icon: its light colors, or its dark ones (plugin-icon.tsx). */
 .plugin-icon { --c0: var(--l0); --c1: var(--l1); --c2: var(--l2); --c3: var(--l3); }
