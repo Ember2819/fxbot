@@ -1,5 +1,5 @@
 {
-  "essentials": ["permissions", "fresh", "routines", "messages", "chat-rooms", "computer", "chat-rooms-computer"],
+  "essentials": ["permissions", "fresh", "routines", "messages", "pages", "chat-rooms", "computer", "chat-rooms-computer"],
   "plugins": [
     {
       "name": "computer",
@@ -49,6 +49,12 @@
       "description": "Decide what each bot can do on its own: ask, a reviewer model, or run everything.",
       "repo": "iammrduncan/fxbot",
       "path": "plugins/permissions"
+    },
+    {
+      "name": "pages",
+      "description": "Bots write reports, guides, and plans to read outside the chat, kept in the library with every version.",
+      "repo": "iammrduncan/fxbot",
+      "path": "plugins/pages"
     }
   ]
 }
