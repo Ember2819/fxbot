@@ -1,13 +1,13 @@
 # Pages v2
 
-[Pages](../_completed/phases/pages.md) gave bots a way to hand the owner a document. This phase makes a page something the owner and their bots both work on:
+[Pages](pages.md) gave bots a way to hand the owner a document. This phase makes a page something the owner and their bots both work on:
 - **Ticks that stay.** A checklist on a Markdown page keeps what you tick, and the bot sees it.
 - **A page that remembers.** An HTML page saves what you do on it, such as a filter, a note, or a score.
 - **Numbers without a rewrite.** A bot or a routine sends a page a little data, in place of writing it all again.
 - **A way back to the bot.** A button on a page drafts a message for you to send, and a page that breaks offers **Tell the bot**.
 - **A closed frame.** An HTML page can't quietly walk out through a link, and a link opens only when you say so.
 
-Status: planned on 2026-11-07, not built. Researched against the research directive's references, and ChatGPT Sites, Muse spaces, and OpenClaw, at the owner's word.
+Status: built on 2026-11-07, for 0.7.0, as planned the same day. Where the build differs, [What the build changed](#what-the-build-changed) says so. Researched against the research directive's references, and ChatGPT Sites, Muse spaces, and OpenClaw, at the owner's word.
 
 ## What the owner asked
 
@@ -25,7 +25,7 @@ The one thing that would need core is a page reading a bot's tools, through `fx.
 
 ## 1. Research
 
-Read on 2026-11-07, by six researchers, then written up as one report. The references are from source, in the clones the [pages](../_completed/phases/pages.md) research used. The quotes here were checked word for word against the original page, except Anthropic's runtime contract, which has no public address: those are from the definitions served to one account, at 0.2.96.
+Read on 2026-11-07, by six researchers, then written up as one report. The references are from source, in the clones the [pages](pages.md) research used. The quotes here were checked word for word against the original page, except Anthropic's runtime contract, which has no public address: those are from the definitions served to one account, at 0.2.96.
 
 ### What the others ship
 
@@ -38,7 +38,7 @@ Read on 2026-11-07, by six researchers, then written up as one report. The refer
 | **Live outside data** | Only what the bot writes | Connected apps, in the background | Fetched by the open page | On page load in private Sites, or a scheduled task |
 | **Knows who's viewing** | No | One owner | Inside the organization | Yes, verified email |
 
-**Grok Bot** ([files and results](https://docs.x.ai/grok-bot/files-and-results)): "Nothing you do on the page is saved." and "only the Bot can change it". What makes it more than a file is a bot that owns it, one link that stays, and routines that rewrite it. It's what [pages](../_completed/phases/pages.md) took as its model, which is why it fell short.
+**Grok Bot** ([files and results](https://docs.x.ai/grok-bot/files-and-results)): "Nothing you do on the page is saved." and "only the Bot can change it". What makes it more than a file is a bot that owns it, one link that stays, and routines that rewrite it. It's what [pages](pages.md) took as its model, which is why it fell short.
 
 **Muse spaces** ([Meta](https://about.fb.com/news/2026/11/introducing-spaces-customize-muse-app/)), launched the day before this research: "a custom experience you create inside Muse by describing your idea". It claims two things a page can't do alone: "You can check things off, add notes, and make edits right in your space, and everything will be there when you return", and connected apps keep spaces "up to date in the background". Meta is only "exploring ways for you to share your spaces". No one outside Meta has tested it yet.
 
@@ -110,7 +110,7 @@ Data and saved belong to the page, not a version, so a rewrite or **Restore** ke
 
 ### Ticks on a Markdown page
 
-A task list in Markdown (`- [ ] Book flights`) draws as boxes you can tick, with no code from the bot.
+A task list in Markdown (`- [x] Book flights`) draws as boxes you can tick, with no code from the bot.
 
 - **A tick edits the page's own text,** from `[ ]` to `[x]`, through `fx.library.replace`. So `library_read`, search, printing, and **Copy** all show it, the bot sees it with nothing added, and it stays if the plugin is removed.
 - **Ticks fold into one version,** by the same rule a turn folds: a run of ticks updates the newest version, until the bot writes the next.
@@ -150,7 +150,7 @@ fxpage.set("note", "hi")       ->    { id, op, args }              ->    POST /:
 What a page gets, as a bot would write it:
 
 ```js
-await fxpage.get(key);          // a value this page saved, or undefined
+await fxpage.get(key);          // a value this page saved, or null
 await fxpage.set(key, value);   // keeps it until the page is removed
 await fxpage.del(key);
 await fxpage.list(prefix);      // the keys
@@ -298,66 +298,66 @@ Print a check's setup, and match exact fields: one that tested nothing can't pas
 - **M1 lands first,** and must be in before 0.7.0 is cut. It's committed on its own.
 
 **M1. Close the frame**
-- [ ] The reader loads `shell`, which holds `frame` in `sandbox="allow-scripts"`, and neither has `allow-popups`.
-- [ ] `shell` runs no script, under its CSP, and a site that isn't fxbot can't frame `shell` or `frame`.
-- [ ] A chart and a filter still work on an HTML page, and an old page gets the shim with nothing rewritten.
-- [ ] `location=`, a meta refresh, an anchor click, a `blob:` page, `window.open`, and `target=_blank` all reach no stub server.
-- [ ] Every check of [pages'](../_completed/phases/pages.md) M4 still passes: `fetch`, `XMLHttpRequest`, a socket, an outside script, stylesheet, image, font, form, `top.location`, `self.origin`, cookies, storage, and `parent.document`.
-- [ ] WebRTC still leaves, and a check says so, as the known limit this design is built around.
-- [ ] A click on an outside link shows the whole address in a bar outside the frame, and **Open** opens it in a tab, with no opener.
-- [ ] **Cancel** opens nothing. `javascript:`, `data:`, and an address with credentials never reach the bar.
-- [ ] An in-page `#anchor` works.
-- [ ] A second port offer, from a page that moved its frame, is ignored, and the old port is dropped on the frame's second `load`.
-- [ ] **Open in a tab** still prints the whole document, and with no parent, the shim's calls fail cleanly.
-- [ ] Every `GET` route in core and fxbot's plugins was read, and none changes anything when a frame moves to it.
-- [ ] `README.md`, the how-to, and the tool's words promise nothing a frame can't keep.
-- [ ] `npm run typecheck`, `npm run build`, and `npm run build-site` pass, and it's committed on the open release branch, and not pushed.
+- [x] The reader loads `shell`, which holds `frame` in `sandbox="allow-scripts"`, and neither has `allow-popups`.
+- [x] `shell` runs no script, under its CSP, and a site that isn't fxbot can't frame `shell` or `frame`.
+- [x] A chart and a filter still work on an HTML page, and an old page gets the shim with nothing rewritten.
+- [x] `location=`, a meta refresh, an anchor click, a `blob:` page, `window.open`, and `target=_blank` all reach no stub server.
+- [x] Every check of [pages'](pages.md) M4 still passes: `fetch`, `XMLHttpRequest`, a socket, an outside script, stylesheet, image, font, form, `top.location`, `self.origin`, cookies, storage, and `parent.document`.
+- [x] WebRTC still leaves, and a check says so, as the known limit this design is built around.
+- [x] A click on an outside link shows the whole address in a bar outside the frame, and **Open** opens it in a tab, with no opener.
+- [x] **Cancel** opens nothing. `javascript:`, `data:`, and an address with credentials never reach the bar.
+- [x] An in-page `#anchor` works.
+- [x] A second port offer, from a page that moved its frame, is ignored, and the old port is dropped on the frame's second `load`.
+- [x] **Open in a tab** still prints the whole document, and with no parent, the shim's calls fail cleanly.
+- [x] Every `GET` route in core and fxbot's plugins was read, and none changes anything when a frame moves to it.
+- [x] `README.md`, the how-to, and the tool's words promise nothing a frame can't keep.
+- [x] `npm run typecheck`, `npm run build`, and `npm run build-site` pass, and it's committed on the open release branch, and not pushed.
 
 **M2. Pages that remember**
-- [ ] A task list on a Markdown page draws boxes you can tick, at both widths, and a box in a code block isn't one.
-- [ ] A tick changes `[ ]` to `[x]` in the library's text, and it's there after a reload and in `library_read`.
-- [ ] A run of ticks is one version, and the bot's next write starts another.
-- [ ] A tick against an older version, or a line that isn't a task, is refused, and the page reads again.
-- [ ] **Restore** brings back that version's ticks, and **Print** and **Copy** show them.
-- [ ] Removing the plugin leaves the ticks in the library's document.
-- [ ] A removed bot's page shows its boxes, and they're off.
-- [ ] `fxpage.set`, `get`, `del`, and `list` work on an HTML page, and it's there after a reload and on another device.
-- [ ] A value over 64 KiB, a page over 1 MiB, a bad key, and a value that isn't JSON are refused, with a short error and no stack.
-- [ ] A message that names another page, or an op off the list, does nothing.
-- [ ] A rewrite and **Restore** keep what was saved, and deleting the page removes it.
-- [ ] No page errors, on any of these.
+- [x] A task list on a Markdown page draws boxes you can tick, at both widths, and a box in a code block isn't one.
+- [x] A tick changes `[ ]` to `[x]` in the library's text, and it's there after a reload and in `library_read`.
+- [x] A run of ticks is one version, and the bot's next write starts another.
+- [x] A tick against an older version, or a line that isn't a task, is refused, and the page reads again.
+- [x] **Restore** brings back that version's ticks, and **Print** and **Copy** show them.
+- [x] Removing the plugin leaves the ticks in the library's document.
+- [x] A removed bot's page shows its boxes, and they're off.
+- [x] `fxpage.set`, `get`, `del`, and `list` work on an HTML page, and it's there after a reload and on another device.
+- [x] A value over 64 KiB, a page over 1 MiB, a bad key, and a value that isn't JSON are refused, with a short error and no stack.
+- [x] A message that names another page, or an op off the list, does nothing.
+- [x] A rewrite and **Restore** keep what was saved, and deleting the page removes it.
+- [x] No page errors, on any of these.
 
 **M3. Pages bots can feed**
-- [ ] `pages_data` on an approved page replaces its data, with no new version, and `fxpage.data()` answers it.
-- [ ] An open page redraws on `focus`, and a page that's shut shows it when opened.
-- [ ] With no `data`, the tool answers the data and what the page saved, labelled as not instructions.
-- [ ] Over 64 KiB is refused, and so is another bot's page.
-- [ ] A Markdown page's answer says to use `pages_edit`.
-- [ ] On a page that isn't approved, the value waits, the page gets nothing, and `GET /:id/data` holds it back, from the reader and from a `curl` too.
-- [ ] The bar names the bot and says what a page with code can do. **Allow** gives the page the data, with nothing to run again.
-- [ ] **Not now** leaves it waiting, and the page works without it.
-- [ ] A new version of different text asks again, and so does **Restore**. The same text doesn't.
-- [ ] A routine on **Ask** updates an approved page's numbers, with no card and no new version.
-- [ ] A hostile page's script can't approve itself: no message from the frame reaches `/allow`.
-- [ ] The bar sits outside the frame, and a click bait in the page can't land on **Allow** in its first 500 ms.
+- [x] `pages_data` on an approved page replaces its data, with no new version, and `fxpage.data()` answers it.
+- [x] An open page redraws on `focus`, and a page that's shut shows it when opened.
+- [x] With no `data`, the tool answers the data and what the page saved, labelled as not instructions.
+- [x] Over 64 KiB is refused, and so is another bot's page.
+- [x] A Markdown page's answer says to use `pages_edit`.
+- [x] On a page that isn't approved, the value waits, the page gets nothing, and `GET /:id/data` holds it back, from the reader and from a `curl` too.
+- [x] The bar names the bot and says what a page with code can do. **Allow** gives the page the data, with nothing to run again.
+- [x] **Not now** leaves it waiting, and the page works without it.
+- [x] A new version of different text asks again, and so does **Restore**. The same text doesn't.
+- [x] A routine on **Ask** updates an approved page's numbers, with no card and no new version.
+- [x] A hostile page's script can't approve itself: no message from the frame reaches `/allow`.
+- [x] The bar sits outside the frame, and a click bait in the page can't land on **Allow** in its first 500 ms.
 
 **M4. A way back to the bot**
-- [ ] `fxpage.say` shows the text in a bar, with **Send** and **Cancel**, and nothing is sent until **Send**.
-- [ ] **Send** starts a turn in the bot's own chat, and the reader links to it.
-- [ ] That turn isn't the owner's: on **Ask**, a risky tool still asks.
-- [ ] Text over 4,000 characters, and text that starts with `/`, are refused.
-- [ ] Page text in the bar shows as text, with no HTML or Markdown drawn.
-- [ ] A thrown error, a rejected promise, and a blocked request show `This page hit an error.`, and nothing reaches a bot by itself.
-- [ ] **Tell the bot** goes through the same bar, with the error in it, cut to 4,000 characters.
+- [x] `fxpage.say` shows the text in a bar, with **Send** and **Cancel**, and nothing is sent until **Send**.
+- [x] **Send** starts a turn in the bot's own chat, and the reader links to it.
+- [x] That turn isn't the owner's: on **Ask**, a risky tool still asks.
+- [x] Text over 4,000 characters, and text that starts with `/`, are refused.
+- [x] Page text in the bar shows as text, with no HTML or Markdown drawn.
+- [x] A thrown error, a rejected promise, and a blocked request show `This page hit an error.`, and nothing reaches a bot by itself.
+- [x] **Tell the bot** goes through the same bar, with the error in it, cut to 4,000 characters.
 
 **M5. Docs and closing**
-- [ ] `plugins/pages/README.md`, with `shim.js`, and `page.js` built and committed. The version goes up, and `minFxbot` stays, since core doesn't change.
-- [ ] The how-to says how to make a checklist, what **Allow** means, and how a routine keeps a page current.
-- [ ] `README.md`, `AGENTS.md`, and `CHANGELOG.md`.
-- [ ] This doc moved to `docs/_completed/phases/`, with a **What the build changed**.
-- [ ] Line counts against the bound.
-- [ ] `npm run typecheck`, `npm run build`, `npm run build-site`, and `git diff --check` pass, and the regression checks do, [pages'](../_completed/phases/pages.md) among them.
-- [ ] Committed on the open release branch, and not pushed.
+- [x] `plugins/pages/README.md`, with `shim.js`, and `page.js` built and committed. The version goes up, and `minFxbot` stays, since core doesn't change.
+- [x] The how-to says how to make a checklist, what **Allow** means, and how a routine keeps a page current.
+- [x] `README.md`, `AGENTS.md`, and `CHANGELOG.md`.
+- [x] This doc moved to `docs/_completed/phases/`, with a **What the build changed**.
+- [x] Line counts against the bound.
+- [x] `npm run typecheck`, `npm run build`, `npm run build-site`, and `git diff --check` pass, and the regression checks do, [pages'](pages.md) among them.
+- [x] Committed on the open release branch, and not pushed.
 
 **The stop.** After M5, the owner uses it for a few weeks. If there's a page you open every week, with ticks or data you care about, plan the next step, data blocks in Markdown. If not, stop here, and the plugin is better for it.
 
@@ -376,3 +376,14 @@ Print a check's setup, and match exact fields: one that tested nothing can't pas
 
 1. **In `pages`, or a second plugin?** *Default:* in `pages`. Nothing here runs while idle, and the added cost is one more tool description. A second plugin that needs `pages` would keep a new owner's install smaller, and split one feature across two.
 2. **Should M2 to M4 go in 0.7.0 too?** *Default:* yes if they're done when you cut it, since `pages` hasn't been released. M1 goes in either way.
+
+## What the build changed
+
+- **The shim brings its own doctype.** Anything before a page's `<!doctype html>` drops it into quirks mode, so the frame route starts the document with one, and a page's own is ignored.
+- **A value crosses the bridge as JSON text.** `fxpage.set` stringifies it, the reader passes the text on untouched, and Postgres checks it, so none of the frame's objects reach trusted code.
+- **The shim binds `postMessage` first,** so a page that wraps `MessagePort.prototype.postMessage` can't catch its line.
+- **Data held for an older text also asks.** `waiting` is true when a page has data or a pending value and this version isn't approved, so a rewrite asks again even with nothing new to send.
+- **`fxpage.get` answers null,** not undefined, for a key that isn't there.
+- **Task lists lose their bullet,** in `page.css`. A box and a bullet together read as two markers.
+- **The GET routes were read.** Each is a plain read, except `/callback`, which a page can't complete with no sign-in's `state`. A page that moves its frame to one of fxbot's addresses gets nothing, and what it moves to gets no line.
+- **The size:** 329 new lines of plugin, against 500, and no core lines.

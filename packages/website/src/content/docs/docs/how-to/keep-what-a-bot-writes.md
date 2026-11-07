@@ -23,6 +23,10 @@ Ask the bot, in its chat: "move day two to the coast". It changes the same page,
 
 Each request makes one version. To go back, pick an earlier one on the page, and choose **Restore**. That makes it the newest, so nothing is lost.
 
+## Tick things off
+
+Ask for a checklist: "make me a packing list as a page". Each item has a box, and what you tick stays. The bot sees it too, so you can ask "what's left?", and if it rewrites the page, it keeps your ticks. An older version shows the ticks it had, and **Restore** brings them back.
+
 ## Find it later
 
 A page is in the library, under **Documents**, and on the bot's panel beside its chat. **Open page**, in its preview, opens it. Ask the bot for it too: it finds its pages by what's in them.
@@ -34,8 +38,16 @@ When a page needs more than text, such as a chart with filters, ask for that, an
 - It stands alone, in a frame of its own, so the bot draws its charts itself.
 - A link shows its whole address above the page, and opens when you say so.
 - If the bot is set to **Ask** in [what it can do alone](/docs/how-to/choose-what-a-bot-can-do-alone/), it waits for your OK first, since a page's code runs when you open it.
-- What you do with its controls isn't saved, and a reload clears it. To change the page, ask the bot.
+- A page can save what you do on it, such as a note or a filter, if the bot built it to. To change the page itself, ask the bot.
+- A button on a page can draft a message to the bot. You read it, and choose **Send**.
+- If a page hits an error, a line below it says so, and **Tell the bot** drafts a message about it.
 - **Open in a tab** opens it alone, to print.
+
+## Keep its numbers current
+
+A bot can send an HTML page new numbers without rewriting it, which costs a fraction of a rewrite. Ask for a dashboard, then a routine: "every morning, update the sales page's numbers".
+
+The first time, a bar on the page says the bot wants to give it data. A page with code can send what it holds elsewhere, so only choose **Allow** for a page you're happy to trust with that data. What was waiting then arrives. If the bot rewrites the page, it asks again. An open page shows new numbers when you come back to it.
 
 ## From a routine or a room
 
