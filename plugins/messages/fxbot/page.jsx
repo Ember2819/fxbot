@@ -29,7 +29,7 @@ const column = { display: "grid", gridTemplateColumns: "minmax(0, 1fr)" };
 const wraps = { overflowWrap: "anywhere" };
 
 function Face({ bot }) {
-  return bot ? <ui.Blob shape={bot.shape} color={bot.color} size={20} /> : null;
+  return bot ? <ui.Blob {...bot} size={20} /> : null;
 }
 
 function Row({ message, bots }) {
@@ -197,7 +197,7 @@ function Tag({ match }) {
   const bot = (useBots() ?? []).find((b) => b.id === match[2]);
   return (
     <span style={{ display: "inline-flex", alignItems: "center", gap: 4, padding: "0 6px 0 3px", borderRadius: 9999, background: "rgb(255 255 255 / 0.2)", fontWeight: 500, verticalAlign: "bottom" }}>
-      {bot && <ui.Blob shape={bot.shape} color={bot.color} size={16} />}@{bot?.name ?? match[1]}
+      {bot && <ui.Blob {...bot} size={16} />}@{bot?.name ?? match[1]}
     </span>
   );
 }

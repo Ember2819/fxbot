@@ -9594,8 +9594,7 @@ function Chip({ id }) {
 				className: "cr-chip-face",
 				"aria-hidden": "true",
 				children: (0, react_jsx_runtime.jsx)(_fxbot_app.ui.Blob, {
-					shape: bot.shape,
-					color: bot.color,
+					...bot,
 					size: 16
 				})
 			}),
@@ -9613,8 +9612,7 @@ function Stack({ ids, size = 18, busy }) {
 		"aria-hidden": "true",
 		style: { "--cr-size": `${size}px` },
 		children: [shown.map((bot) => (0, react_jsx_runtime.jsx)("span", { children: (0, react_jsx_runtime.jsx)(_fxbot_app.ui.Blob, {
-			shape: bot.shape,
-			color: bot.color,
+			...bot,
 			size,
 			busy: bot.busy || bot.id === busy
 		}) }, bot.id)), bots.length > 4 && (0, react_jsx_runtime.jsxs)("span", {
@@ -9854,8 +9852,7 @@ function Composer({ bots, placeholder, disabled, onSend, submitRef, onEmpty }) {
 					onClick: () => pick(choice),
 					className: `flex w-full min-w-0 items-center gap-2.5 rounded-xl px-2.5 py-2 text-left text-sm ${i === list.active ? "bg-accent text-accent-foreground" : ""}`,
 					children: [choice.bot ? (0, react_jsx_runtime.jsx)(_fxbot_app.ui.Blob, {
-						shape: choice.bot.shape,
-						color: choice.bot.color,
+						...choice.bot,
 						size: 24
 					}) : (0, react_jsx_runtime.jsx)(Stack, {
 						ids: bots.map((bot) => bot.id),
@@ -9951,8 +9948,7 @@ function BotPicker({ chosen, onChange }) {
 					onCheckedChange: (on) => toggle(bot.id, on === true)
 				}),
 				(0, react_jsx_runtime.jsx)(_fxbot_app.ui.Blob, {
-					shape: bot.shape,
-					color: bot.color,
+					...bot,
 					size: 24
 				}),
 				(0, react_jsx_runtime.jsx)("span", {
@@ -10277,8 +10273,7 @@ function Said({ message, bot }) {
 	return (0, react_jsx_runtime.jsxs)("div", {
 		className: "flex items-start gap-3",
 		children: [bot ? (0, react_jsx_runtime.jsx)(_fxbot_app.ui.Blob, {
-			shape: bot.shape,
-			color: bot.color,
+			...bot,
 			size: 28,
 			className: "shrink-0"
 		}) : null, (0, react_jsx_runtime.jsxs)("div", {
@@ -10325,8 +10320,7 @@ function RoomScreen({ params }) {
 						room.members.map((member) => {
 							const bot = botOf(member);
 							return bot ? (0, react_jsx_runtime.jsx)(_fxbot_app.ui.Blob, {
-								shape: bot.shape,
-								color: bot.color,
+								...bot,
 								size: 24,
 								busy: state.replying?.bot === member
 							}, member) : null;
@@ -10365,8 +10359,7 @@ function RoomScreen({ params }) {
 							className: "flex items-start gap-3",
 							"data-replying": true,
 							children: [writer ? (0, react_jsx_runtime.jsx)(_fxbot_app.ui.Blob, {
-								shape: writer.shape,
-								color: writer.color,
+								...writer,
 								size: 28,
 								busy: true,
 								className: "shrink-0"

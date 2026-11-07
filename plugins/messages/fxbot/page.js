@@ -9685,8 +9685,7 @@ function Chip({ id, name }) {
 				className: "fm-chip-face",
 				"aria-hidden": "true",
 				children: (0, react_jsx_runtime.jsx)(_fxbot_app.ui.Blob, {
-					shape: bot.shape,
-					color: bot.color,
+					...bot,
 					size: 16
 				})
 			}),
@@ -9882,8 +9881,7 @@ function Box({ bot, value, onChange, onKeyDown, onPaste, onFocus, onBlur, placeh
 					onClick: () => pick(choice),
 					className: `flex w-full min-w-0 items-start gap-2.5 rounded-xl px-2.5 py-2 text-left text-sm ${i === list.active ? "bg-accent text-accent-foreground" : ""}`,
 					children: [(0, react_jsx_runtime.jsx)(_fxbot_app.ui.Blob, {
-						shape: choice.shape,
-						color: choice.color,
+						...choice,
 						size: 20
 					}), (0, react_jsx_runtime.jsxs)("span", {
 						className: "grid min-w-0 flex-1",
@@ -9940,8 +9938,7 @@ const column = {
 const wraps = { overflowWrap: "anywhere" };
 function Face({ bot }) {
 	return bot ? (0, react_jsx_runtime.jsx)(_fxbot_app.ui.Blob, {
-		shape: bot.shape,
-		color: bot.color,
+		...bot,
 		size: 20
 	}) : null;
 }
@@ -10192,8 +10189,7 @@ function Tag({ match }) {
 		},
 		children: [
 			bot && (0, react_jsx_runtime.jsx)(_fxbot_app.ui.Blob, {
-				shape: bot.shape,
-				color: bot.color,
+				...bot,
 				size: 16
 			}),
 			"@",

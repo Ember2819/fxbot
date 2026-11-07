@@ -237,8 +237,7 @@ function Waiting() {
 		return /* @__PURE__ */ (0, react_jsx_runtime.jsx)(_fxbot_app.ui.SidebarMenuItem, { children: /* @__PURE__ */ (0, react_jsx_runtime.jsxs)(_fxbot_app.ui.SidebarMenuButton, {
 			onClick: () => (0, _fxbot_app.go)(`/profiles/${ask.bot}`),
 			children: [bot && /* @__PURE__ */ (0, react_jsx_runtime.jsx)(_fxbot_app.ui.Blob, {
-				shape: bot.shape,
-				color: bot.color,
+				...bot,
 				size: 20
 			}), /* @__PURE__ */ (0, react_jsx_runtime.jsxs)("span", {
 				className: "truncate",

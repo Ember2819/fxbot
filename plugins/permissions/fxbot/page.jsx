@@ -173,7 +173,7 @@ function Waiting() {
           return (
             <ui.SidebarMenuItem key={ask.id}>
               <ui.SidebarMenuButton onClick={() => go(`/profiles/${ask.bot}`)}>
-                {bot && <ui.Blob shape={bot.shape} color={bot.color} size={20} />}
+                {bot && <ui.Blob {...bot} size={20} />}
                 <span className="truncate">
                   {bot?.name ?? "A bot"}: {ask.tool}
                 </span>

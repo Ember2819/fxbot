@@ -11,7 +11,7 @@ export function Chip({ id }) {
     <span className="cr-chip">
       {bot && (
         <span className="cr-chip-face" aria-hidden="true">
-          <ui.Blob shape={bot.shape} color={bot.color} size={16} />
+          <ui.Blob {...bot} size={16} />
         </span>
       )}
       @{bot?.name ?? "a bot that's gone"}
@@ -29,7 +29,7 @@ export function Stack({ ids, size = 18, busy }) {
     <span className="cr-stack" aria-hidden="true" style={{ "--cr-size": `${size}px` }}>
       {shown.map((bot) => (
         <span key={bot.id}>
-          <ui.Blob shape={bot.shape} color={bot.color} size={size} busy={bot.busy || bot.id === busy} />
+          <ui.Blob {...bot} size={size} busy={bot.busy || bot.id === busy} />
         </span>
       ))}
       {bots.length > 4 && <span className="cr-more">+{bots.length - 3}</span>}

@@ -74,7 +74,7 @@ function BotPicker({ chosen, onChange }) {
       {bots.map((bot) => (
         <label key={bot.id} className="flex items-center gap-3 text-sm">
           <ui.Checkbox checked={chosen.includes(bot.id)} onCheckedChange={(on) => toggle(bot.id, on === true)} />
-          <ui.Blob shape={bot.shape} color={bot.color} size={24} />
+          <ui.Blob {...bot} size={24} />
           <span className="min-w-0 flex-1 truncate">{bot.name}</span>
           {chosen[0] === bot.id ? (
             <span className="text-xs text-muted-foreground">Leads</span>
@@ -312,7 +312,7 @@ function Said({ message, bot }) {
     );
   return (
     <div className="flex items-start gap-3">
-      {bot ? <ui.Blob shape={bot.shape} color={bot.color} size={28} className="shrink-0" /> : null}
+      {bot ? <ui.Blob {...bot} size={28} className="shrink-0" /> : null}
       <div className="grid min-w-0 flex-1 grid-cols-1 gap-1 wrap-break-word">
         <span className="text-sm font-medium">{bot?.name ?? "A bot that's gone"}</span>
         <Markdown text={message.text} />
@@ -359,7 +359,7 @@ function RoomScreen({ params }) {
             <div className="flex items-center gap-1">
               {room.members.map((member) => {
                 const bot = botOf(member);
-                return bot ? <ui.Blob key={member} shape={bot.shape} color={bot.color} size={24} busy={state.replying?.bot === member} /> : null;
+                return bot ? <ui.Blob key={member} {...bot} size={24} busy={state.replying?.bot === member} /> : null;
               })}
               {/* A place for plugins that need chat rooms, such as chat-rooms-computer's button. fxbot 0.4 has no Slot. */}
               {Slot && <Slot name="chat-rooms.room-header" props={{ room }} />}
@@ -383,7 +383,7 @@ function RoomScreen({ params }) {
           ))}
           {state?.replying && (
             <div className="flex items-start gap-3" data-replying>
-              {writer ? <ui.Blob shape={writer.shape} color={writer.color} size={28} busy className="shrink-0" /> : null}
+              {writer ? <ui.Blob {...writer} size={28} busy className="shrink-0" /> : null}
               <div className="grid min-w-0 flex-1 grid-cols-1 gap-1 wrap-break-word">
                 <span className="text-sm font-medium">{writer?.name ?? "A bot"}</span>
                 {state.replying.text ? <Markdown text={state.replying.text} /> : <p className="animate-pulse text-muted-foreground">Thinking…</p>}

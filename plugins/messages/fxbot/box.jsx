@@ -114,7 +114,7 @@ function Chip({ id, name }) {
     <span className="fm-chip">
       {bot && (
         <span className="fm-chip-face" aria-hidden="true">
-          <ui.Blob shape={bot.shape} color={bot.color} size={16} />
+          <ui.Blob {...bot} size={16} />
         </span>
       )}
       @{bot?.name ?? name}
@@ -285,7 +285,7 @@ export function Box({ bot, value, onChange, onKeyDown, onPaste, onFocus, onBlur,
                 onClick={() => pick(choice)}
                 className={`flex w-full min-w-0 items-start gap-2.5 rounded-xl px-2.5 py-2 text-left text-sm ${i === list.active ? "bg-accent text-accent-foreground" : ""}`}
               >
-                <ui.Blob shape={choice.shape} color={choice.color} size={20} />
+                <ui.Blob {...choice} size={20} />
                 <span className="grid min-w-0 flex-1">
                   <span className="font-medium">{choice.name}</span>
                   <span className="line-clamp-1 text-xs text-muted-foreground">{choice.about || choice.id}</span>

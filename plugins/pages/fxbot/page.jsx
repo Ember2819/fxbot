@@ -228,7 +228,7 @@ function Reader({ params: { id } }) {
       <Header title={shown.title} />
       <div className="pages-column pages-bar grid gap-2 text-sm">
         <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
-          {bot && <Blob shape={bot.shape} color={bot.color} size={20} />}
+          {bot && <Blob {...bot} size={20} />}
           <span className="min-w-0 text-muted-foreground">{bot ? bot.name : "A bot you removed"} · {when(shown.at)}</span>
           {page.versions.length > 1 && (
             <NativeSelect aria-label="Version" value={n} onChange={(e) => setPicked(Number(e.target.value))}>

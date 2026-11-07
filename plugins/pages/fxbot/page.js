@@ -316,8 +316,7 @@ function Reader({ params: { id } }) {
 					className: "flex flex-wrap items-center gap-x-3 gap-y-2",
 					children: [
 						bot && (0, react_jsx_runtime.jsx)(Blob, {
-							shape: bot.shape,
-							color: bot.color,
+							...bot,
 							size: 20
 						}),
 						(0, react_jsx_runtime.jsxs)("span", {
