@@ -53,7 +53,7 @@ Tailscale prints the address it serves, `https://<machine>.<tailnet>.ts.net`. Op
 
 Install it as an app:
 
-- **Android, in Chrome:** open **Settings** at the bottom of the sidebar, and on **General**, tap **Install**.
+- **Android, in Chrome:** open Chrome's menu, and tap **Add to Home screen** or **Install app**.
 - **iPhone:** tap **Share**, then **Add to Home Screen**, and leave Open as Web App on.
 
 Open fxbot from the home screen. It opens on its own, without the browser's bars.

@@ -5,7 +5,6 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { AddPlugins, PluginLine, readPack } from "./add-plugins.tsx";
 import { BotForm } from "./bot-form.tsx";
 import { client } from "./client.ts";
-import { Header } from "./header.tsx";
 import { ModelField, Providers } from "./providers.tsx";
 
 const list = "grid gap-3 rounded-xl border p-3";
@@ -64,20 +63,18 @@ export function Onboarding({ step, profiles, onStep, onRefresh, onDone }: { step
   else screen = <Choose pack={read.pack} onEssentials={() => add(read.pack.map((card) => card.name))} onCustom={() => move("custom")} />;
 
   return (
-    <>
-      <Header title="Set up fxbot" />
-      <div className="min-h-0 flex-1 overflow-y-auto">
-        <div className="mx-auto grid w-full max-w-xl gap-6 px-4 pt-4 pb-10">
-          {screen}
-          {error && <p role="alert" className="text-sm text-destructive">{error}</p>}
-          {kind !== "plugins" && (
-            <button type="button" className={`justify-self-start ${later}`} onClick={() => finish()}>
-              Skip for now
-            </button>
-          )}
-        </div>
+    <div className="min-h-0 flex-1 overflow-y-auto pt-[env(safe-area-inset-top)]">
+      <div className="mx-auto grid w-full max-w-xl gap-6 px-4 py-10">
+        <h1 className="font-medium">Set up fxbot</h1>
+        {screen}
+        {error && <p role="alert" className="text-sm text-destructive">{error}</p>}
+        {kind !== "plugins" && (
+          <button type="button" className={`justify-self-start ${later}`} onClick={() => finish()}>
+            Skip for now
+          </button>
+        )}
       </div>
-    </>
+    </div>
   );
 }
 

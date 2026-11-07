@@ -108,7 +108,13 @@ export function App() {
   // The owner's time zone, from the first browser that opens fxbot. After that, only Settings › General changes it.
   useEffect(() => {
     const { timeZone } = Intl.DateTimeFormat().resolvedOptions();
-    void client.settings.get().then((settings) => (setFirstRun(settings.onboarded ? null : settings.onboardingStep || "choose"), settings.timeZone ? settings : client.settings.update({ timeZone }))).catch(() => setFirstRun(null));
+    void client.settings.get().then(
+      (settings) => {
+        setFirstRun(settings.onboarded ? null : settings.onboardingStep || "choose");
+        if (!settings.timeZone) void client.settings.update({ timeZone }).catch(() => {});
+      },
+      () => setFirstRun(null),
+    );
   }, []);
   const pluginScreen = usePluginScreen(path);
 
@@ -137,9 +143,10 @@ export function App() {
     return () => clearTimeout(late);
   }, []);
   let screen: ReactNode;
-  // First-run setup, at / while it's open. A bot made some other way ends it, except its own, for the screen after it.
-  const onboarding = Boolean(firstRun) && profiles !== null && (profiles.length === 0 || firstRun!.startsWith("plugins"));
-  if (path === "/" && onboarding) screen = <Onboarding step={firstRun!} profiles={profiles!} onStep={setFirstRun} onRefresh={refresh} onDone={(bot) => (setFirstRun(null), bot && go(`/profiles/${bot}`))} />;
+  // First-run setup, at / while it's open, on its own with no sidebar. A bot made some other way ends it, except its
+  // own, for the screen after it.
+  const onboarding = path === "/" && Boolean(firstRun) && profiles !== null && (profiles.length === 0 || firstRun!.startsWith("plugins"));
+  if (onboarding) screen = <Onboarding step={firstRun!} profiles={profiles!} onStep={setFirstRun} onRefresh={refresh} onDone={(bot) => (setFirstRun(null), bot && go(`/profiles/${bot}`))} />;
   else if (path === "/") screen = <Home profiles={profiles} offline={offline} onNew={() => setCreating(true)} />;
   else if (top === "settings") screen = <SettingsScreen tab={path.split("/").slice(2).join("/")} profiles={profiles} />;
   else if (path === "/library") screen = <LibraryPage profiles={profiles} />;
@@ -154,7 +161,7 @@ export function App() {
     <BotsProvider value={profiles}>
       <TooltipProvider>
         <SidebarProvider className={shown || whole ? undefined : hidden}>
-          <BotSidebar profiles={profiles} offline={offline} active={id} onNew={() => setCreating(true)} onChange={refresh} />
+          {!onboarding && <BotSidebar profiles={profiles} offline={offline} active={id} onNew={() => setCreating(true)} onChange={refresh} />}
           {/* An installed app draws under the notch and the home indicator (viewport-fit=cover), so each edge pads by its
               inset. The left one belongs to the sidebar while it is open beside the page. */}
           <SidebarInset className="h-dvh overflow-hidden pr-[env(safe-area-inset-right)] pl-[env(safe-area-inset-left)] md:peer-data-[state=expanded]:pl-0">

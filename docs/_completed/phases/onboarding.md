@@ -248,7 +248,7 @@ update settings set onboarded_at = now() where exists (select 1 from profiles) o
 ### The app
 
 - **`/`** shows `Onboarding` in place of `Home` while it's open. Other paths work as they do, so **Settings** and a link from a doc still open.
-- **The sidebar stays,** so the last screen can point at what's really there.
+- **It has no sidebar.** Setup is a screen of its own, with no sidebar, toggle, or buttons around it, until it ends.
 - **It's a page in the app, not a modal,** with a width like a chat's, and it fits at 375 pixels.
 
 ### When things go wrong
@@ -391,6 +391,8 @@ Print a check's setup, and match exact fields: one that tested nothing can't pas
 ## What the build changed
 
 - **The open questions took their defaults:** the choice screen stays, and the pack is at the top of **Browse** only.
+- **The sidebar goes during setup.** The plan kept it, so the last screen could point at it. The owner tried a first run and wanted it hidden, with the sidebar's toggle and buttons. The tutorial's Android step opened **Settings** from that sidebar, so it uses Chrome's menu now.
+- **A time zone that fails to save no longer hides setup.** One catch covered reading the settings and saving the zone, so a failed save ended setup until the next load.
 - **The provider step asks for a model too.** The plan missed this. Every provider starts with no default model, so a new owner could finish setup and have their first message answered "Not sent: No model." The check that the bot answers caught it. So once there's a provider, the step offers `ModelField`, and **Continue** waits for both: "READY MEANS IT WORKS, NOT THAT SOMETHING IS SET." It's passed only when the default provider has a model.
 - **A plugin's warning is data.** Core can't name `computer`, so its line is `note` on its entry in `plugins-registry.json`, which reaches `PackageCard`. It shows on the first screen, and on **Choose my own** while it's ticked.
 - **The step holds what's being added,** as `adding:<names>`, so a reload or a restart knows what's left, on either path.
