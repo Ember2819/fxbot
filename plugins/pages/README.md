@@ -34,11 +34,12 @@ Only the bot that wrote a page changes it. To change one, you ask the bot.
 
 For what Markdown can't do, such as a chart with filters, or a designed layout. An HTML page is rewritten whole, with no small edits, and the bot can't see how it looks. `pages_html` refuses a page whose inline scripts don't parse, without running them.
 
-It runs in a frame, from `/api/plugins/pages/<id>/versions/<n>/frame`, in a sandbox with no same-origin access, under a CSP that loads nothing from outside. So everything is inline, a bot draws charts itself, and `library:<id>` images are embedded before it's served, from the bot's own library.
+It runs in a frame, from `/api/plugins/pages/<id>/versions/<n>/frame`, in a sandbox with no same-origin access, inside a small `shell` page. Everything is inline, so a bot draws charts itself, and `library:<id>` images are embedded before it's served, from the bot's own library.
 
 - What you do with its controls isn't saved, and a reload clears it.
-- A link with `target="_blank"` opens a tab. One without moves the frame.
-- **Open in a tab** opens it alone, to print.
+- A link shows its whole address in a bar above the page, and **Open** opens it in a tab.
+- **Open in a tab** opens the page alone, to print.
+- `shim.js` goes first in each page, and is its line to the reader.
 - In the library, an HTML page shows its source, and doesn't run.
 
 ## Tables

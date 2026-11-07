@@ -31,7 +31,8 @@ A page is in the library, under **Documents**, and on the bot's panel beside its
 
 When a page needs more than text, such as a chart with filters, ask for that, and the bot writes the page in HTML. It costs more to write, and any change rewrites it.
 
-- It runs in a frame of its own, and loads nothing from outside, so the bot draws its charts itself.
+- It stands alone, in a frame of its own, so the bot draws its charts itself.
+- A link shows its whole address above the page, and opens when you say so.
 - If the bot is set to **Ask** in [what it can do alone](/docs/how-to/choose-what-a-bot-can-do-alone/), it waits for your OK first, since a page's code runs when you open it.
 - What you do with its controls isn't saved, and a reload clears it. To change the page, ask the bot.
 - **Open in a tab** opens it alone, to print.

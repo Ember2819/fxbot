@@ -20,7 +20,7 @@ const when = (at) => new Date(at).toLocaleString(void 0, {
 	hour: "numeric",
 	minute: "2-digit"
 });
-const frameOf = (id, n) => `/api/plugins/pages/${id}/versions/${n}/frame`;
+const frameOf = (id, n, part = "frame") => `/api/plugins/pages/${id}/versions/${n}/${part}`;
 function Card({ call: tool }) {
 	const found = /^Saved "(.*)" as library:([0-9a-f]{12}), version (\d+)\./.exec(tool.output ?? "");
 	const id = found?.[2];
@@ -91,6 +91,80 @@ function Markdown({ title, text }) {
 		})
 	});
 }
+function Bar({ words, detail, yes, no, onYes, onNo }) {
+	const [armed, setArmed] = (0, react.useState)(false);
+	(0, react.useEffect)(() => {
+		const later = setTimeout(() => setArmed(true), 500);
+		return () => clearTimeout(later);
+	}, []);
+	return (0, react_jsx_runtime.jsx)("div", {
+		className: "pages-column",
+		children: (0, react_jsx_runtime.jsxs)("div", {
+			className: "grid gap-2 rounded-lg border p-3 text-sm",
+			children: [
+				(0, react_jsx_runtime.jsx)("p", { children: words }),
+				detail && (0, react_jsx_runtime.jsx)("p", {
+					className: "break-words text-muted-foreground",
+					children: detail
+				}),
+				(0, react_jsx_runtime.jsxs)("div", {
+					className: "flex flex-wrap gap-2",
+					children: [(0, react_jsx_runtime.jsx)(_fxbot_app.ui.Button, {
+						size: "sm",
+						disabled: !armed,
+						onClick: onYes,
+						children: yes
+					}), (0, react_jsx_runtime.jsx)(_fxbot_app.ui.Button, {
+						size: "sm",
+						variant: "outline",
+						onClick: onNo,
+						children: no
+					})]
+				})
+			]
+		})
+	});
+}
+function Frame({ id, n, title, onOp }) {
+	const shell = (0, react.useRef)(null);
+	const line = (0, react.useRef)(null);
+	const taken = (0, react.useRef)(false);
+	const ops = (0, react.useRef)(onOp);
+	ops.current = onOp;
+	(0, react.useLayoutEffect)(() => {
+		const offer = (event) => {
+			if (taken.current || event.data?.fxpage !== 1 || !event.ports[0] || event.source !== shell.current?.contentWindow?.frames[0]) return;
+			taken.current = true;
+			line.current = event.ports[0];
+			line.current.onmessage = ({ data }) => {
+				const { id: call, op, args } = data ?? {};
+				if (!Number.isSafeInteger(call) || !Array.isArray(args)) return;
+				const answer = (body) => line.current?.postMessage({
+					id: call,
+					...body
+				});
+				Promise.resolve().then(() => ops.current(op, args)).then((value) => answer({
+					ok: true,
+					value
+				}), (e) => answer({
+					ok: false,
+					error: e.message
+				}));
+			};
+		};
+		addEventListener("message", offer);
+		return () => (removeEventListener("message", offer), line.current?.close());
+	}, []);
+	const held = (event) => event.target.contentDocument?.querySelector("iframe")?.addEventListener("load", () => (line.current?.close(), line.current = null));
+	return (0, react_jsx_runtime.jsx)("iframe", {
+		ref: shell,
+		title,
+		src: frameOf(id, n, "shell"),
+		onLoad: held,
+		referrerPolicy: "no-referrer",
+		className: "pages-frame min-h-0 w-full flex-1 border-0"
+	});
+}
 function Reader({ params: { id } }) {
 	const { Button, Blob, Header, NativeSelect } = _fxbot_app.ui;
 	const [page, setPage] = (0, react.useState)();
@@ -99,6 +173,7 @@ function Reader({ params: { id } }) {
 	const [shown, setShown] = (0, react.useState)(null);
 	const [copied, setCopied] = (0, react.useState)(false);
 	const [error, setError] = (0, react.useState)("");
+	const [bar, setBar] = (0, react.useState)(null);
 	const read = () => call(id).then(setPage, (e) => e.status === 404 ? setPage(null) : setError(e.message));
 	(0, react.useEffect)(() => void read(), [id]);
 	const newest = page?.versions[0].n;
@@ -124,6 +199,18 @@ function Reader({ params: { id } }) {
 		await _fxbot_app.client.library.remove(id).then(() => (0, _fxbot_app.go)("/library"), (e) => setError(e.message));
 	};
 	const copy = () => navigator.clipboard.writeText(shown.text).then(() => setCopied(true), (e) => setError(e.message));
+	const onOp = (op, args) => {
+		if (op !== "open") throw new Error("A page can't do that.");
+		const url = URL.canParse(args[0]) ? new URL(args[0]) : null;
+		if (!url || !["http:", "https:"].includes(url.protocol) || url.username || url.password) throw new Error("That address can't be opened.");
+		setBar({
+			words: "This page wants to open:",
+			detail: url.href,
+			yes: "Open",
+			no: "Cancel",
+			onYes: () => (window.open(url.href, "_blank", "noopener,noreferrer"), setBar(null))
+		});
+	};
 	return (0, react_jsx_runtime.jsxs)(react_jsx_runtime.Fragment, { children: [
 		(0, react_jsx_runtime.jsx)(Header, { title: shown.title }),
 		(0, react_jsx_runtime.jsxs)("div", {
@@ -228,12 +315,15 @@ function Reader({ params: { id } }) {
 				})
 			]
 		}),
-		isHtml ? (0, react_jsx_runtime.jsx)("iframe", {
+		bar && (0, react_jsx_runtime.jsx)(Bar, {
+			...bar,
+			onNo: () => setBar(null)
+		}),
+		isHtml ? (0, react_jsx_runtime.jsx)(Frame, {
+			id,
+			n,
 			title: shown.title,
-			src: frameOf(id, n),
-			sandbox: "allow-scripts allow-popups allow-popups-to-escape-sandbox",
-			referrerPolicy: "no-referrer",
-			className: "pages-frame min-h-0 w-full flex-1 border-0"
+			onOp
 		}, n) : (0, react_jsx_runtime.jsx)(Markdown, {
 			title: shown.title,
 			text: shown.text

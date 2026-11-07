@@ -1,3 +1,4 @@
+import { readFileSync } from "node:fs";
 import { Script } from "node:vm";
 import type { PluginApi } from "@fxbot/sdk";
 
@@ -14,15 +15,23 @@ const html = "text/html";
 // Under what library_read reads, so a page always fits one read, and the bot sees all of it.
 const most = 60_000;
 const mostEdits = 20;
-const sandbox = "sandbox allow-scripts allow-popups allow-popups-to-escape-sandbox";
 // An HTML page gets an opaque origin, so it can't reach the app, and it loads nothing. Images are embedded before it's
 // served. A header can't be undone by the page, and it holds when the address is opened alone in a tab.
 const frame = {
   "content-type": "text/html; charset=utf-8",
-  "content-security-policy": `default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; img-src data:; font-src data:; media-src data:; base-uri 'none'; form-action 'none'; frame-ancestors 'self'; ${sandbox}`,
+  "content-security-policy": `default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; img-src data:; font-src data:; media-src data:; base-uri 'none'; form-action 'none'; frame-ancestors 'self'; sandbox allow-scripts`,
   "x-content-type-options": "nosniff",
   "cache-control": "no-store",
 };
+// What holds the frame. Its frame-src is what stops a page moving its own frame off fxbot, and the only way a plugin can
+// set one. It runs nothing. A script can still get out, by WebRTC, so a page with code is trusted with nothing it
+// shouldn't be able to send (docs/_completed/phases/pages-v2.md).
+const shell = {
+  body: '<!doctype html><meta charset="utf-8"><title>Page</title><style>html,body,iframe{border:0;display:block;height:100%;margin:0;width:100%}</style><iframe sandbox="allow-scripts" src="frame"></iframe>',
+  headers: { ...frame, "content-security-policy": "default-src 'none'; style-src 'unsafe-inline'; frame-src 'self'; base-uri 'none'; form-action 'none'; frame-ancestors 'self'" },
+};
+// First in the document, so a page's text can't get ahead of it. A doctype of its own keeps the page out of quirks mode.
+const shim = `<!doctype html><script>${readFileSync(new URL("shim.js", import.meta.url), "utf8")}</script>`;
 
 const idOf = (value: unknown) => String(value ?? "").trim().replace(/^library:/, "");
 const nameOf = (title: string, type: string) => `${title}.${type === html ? "html" : "md"}`;
@@ -159,7 +168,7 @@ export default async function setup(fx: PluginApi) {
     description:
       "Write a page as one HTML document, for what Markdown can't do: a chart, filters and controls, or a designed layout. Use pages_write for everything else, since this costs far more to write. " +
       `It's self-contained, at most ${most.toLocaleString("en-US")} bytes, with its CSS and JavaScript inline, and it can load nothing: no network, no CDN, and no outside fonts. ` +
-      'Images come from the library, as <img src="library:<id>">. It must read on a phone 375 pixels wide, in light and dark. Give outside links target="_blank". ' +
+      'Images come from the library, as <img src="library:<id>">. It must read on a phone 375 pixels wide, in light and dark. A link opens once the owner agrees. ' +
       "To change a page, give its library:<id> and the whole document.",
     inputSchema: {
       type: "object",
@@ -199,8 +208,10 @@ export default async function setup(fx: PluginApi) {
       const item = await fx.library.read(bot, image).catch(() => null);
       if (item?.type.startsWith("image/")) body = body.replaceAll(`library:${image}`, `data:${item.type};base64,${item.bytes.toString("base64")}`);
     }
-    return new Response(body, { headers: frame });
+    return new Response(shim + body, { headers: frame });
   });
+
+  fx.route("GET", "/:id/versions/:n/shell", async (_request, { id, n }) => ((await version(id, n))?.type === html ? new Response(shell.body, { headers: shell.headers }) : gone()));
 
   // That version again, as the newest, so going back loses nothing.
   fx.route("POST", "/:id/restore", async (request, { id }) => {

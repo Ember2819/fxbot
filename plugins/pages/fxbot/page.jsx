@@ -1,6 +1,6 @@
 // How a page shows in a reply, the screen that reads it, and Open page in the library's preview. Built into page.js; see
 // the README.
-import { useEffect, useState } from "react";
+import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { api, client, go, ui, useBots } from "@fxbot/app";
 
 async function call(path, method = "GET", body) {
@@ -11,7 +11,7 @@ async function call(path, method = "GET", body) {
 }
 
 const when = (at) => new Date(at).toLocaleString(undefined, { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" });
-const frameOf = (id, n) => `/api/plugins/pages/${id}/versions/${n}/frame`;
+const frameOf = (id, n, part = "frame") => `/api/plugins/pages/${id}/versions/${n}/${part}`;
 
 // The page's version from a call's answer, and the page as it stands now: undefined until read, null if it's gone.
 function Card({ call: tool }) {
@@ -55,6 +55,58 @@ function Markdown({ title, text }) {
   );
 }
 
+// What a page asks for, in a bar outside its frame. A button waits half a second, so a page can't time one under a click
+// already coming.
+function Bar({ words, detail, yes, no, onYes, onNo }) {
+  const [armed, setArmed] = useState(false);
+  useEffect(() => {
+    const later = setTimeout(() => setArmed(true), 500);
+    return () => clearTimeout(later);
+  }, []);
+  return (
+    <div className="pages-column">
+      <div className="grid gap-2 rounded-lg border p-3 text-sm">
+        <p>{words}</p>
+        {detail && <p className="break-words text-muted-foreground">{detail}</p>}
+        <div className="flex flex-wrap gap-2">
+          <ui.Button size="sm" disabled={!armed} onClick={onYes}>{yes}</ui.Button>
+          <ui.Button size="sm" variant="outline" onClick={onNo}>{no}</ui.Button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// An HTML page, in the shell that holds it. Its line to the reader is the first one it offers: a frame's `origin` and
+// `source` can't tell the page from whatever it moved itself to, so a second offer is ignored, and a second load cuts the
+// line. Everything else about a message is untrusted.
+function Frame({ id, n, title, onOp }) {
+  const shell = useRef(null);
+  const line = useRef(null);
+  const taken = useRef(false);
+  const ops = useRef(onOp);
+  ops.current = onOp;
+  useLayoutEffect(() => {
+    const offer = (event) => {
+      if (taken.current || event.data?.fxpage !== 1 || !event.ports[0] || event.source !== shell.current?.contentWindow?.frames[0]) return;
+      taken.current = true;
+      line.current = event.ports[0];
+      line.current.onmessage = ({ data }) => {
+        const { id: call, op, args } = data ?? {};
+        if (!Number.isSafeInteger(call) || !Array.isArray(args)) return;
+        const answer = (body) => line.current?.postMessage({ id: call, ...body });
+        Promise.resolve()
+          .then(() => ops.current(op, args))
+          .then((value) => answer({ ok: true, value }), (e) => answer({ ok: false, error: e.message }));
+      };
+    };
+    addEventListener("message", offer);
+    return () => (removeEventListener("message", offer), line.current?.close());
+  }, []);
+  const held = (event) => event.target.contentDocument?.querySelector("iframe")?.addEventListener("load", () => (line.current?.close(), (line.current = null)));
+  return <iframe ref={shell} title={title} src={frameOf(id, n, "shell")} onLoad={held} referrerPolicy="no-referrer" className="pages-frame min-h-0 w-full flex-1 border-0" />;
+}
+
 function Reader({ params: { id } }) {
   const { Button, Blob, Header, NativeSelect } = ui;
   const [page, setPage] = useState();
@@ -63,6 +115,7 @@ function Reader({ params: { id } }) {
   const [shown, setShown] = useState(null);
   const [copied, setCopied] = useState(false);
   const [error, setError] = useState("");
+  const [bar, setBar] = useState(null);
   const read = () => call(id).then(setPage, (e) => (e.status === 404 ? setPage(null) : setError(e.message)));
   useEffect(() => void read(), [id]);
   const newest = page?.versions[0].n;
@@ -90,6 +143,13 @@ function Reader({ params: { id } }) {
     await client.library.remove(id).then(() => go("/library"), (e) => setError(e.message));
   };
   const copy = () => navigator.clipboard.writeText(shown.text).then(() => setCopied(true), (e) => setError(e.message));
+  // A page's requests, from a fixed list. Its id, version, and bot come from here, never from a message.
+  const onOp = (op, args) => {
+    if (op !== "open") throw new Error("A page can't do that.");
+    const url = URL.canParse(args[0]) ? new URL(args[0]) : null;
+    if (!url || !["http:", "https:"].includes(url.protocol) || url.username || url.password) throw new Error("That address can't be opened.");
+    setBar({ words: "This page wants to open:", detail: url.href, yes: "Open", no: "Cancel", onYes: () => (window.open(url.href, "_blank", "noopener,noreferrer"), setBar(null)) });
+  };
   return (
     <>
       <Header title={shown.title} />
@@ -118,8 +178,9 @@ function Reader({ params: { id } }) {
         </div>
         {error && <p role="alert" className="text-destructive">{error}</p>}
       </div>
+      {bar && <Bar {...bar} onNo={() => setBar(null)} />}
       {isHtml ? (
-        <iframe key={n} title={shown.title} src={frameOf(id, n)} sandbox="allow-scripts allow-popups allow-popups-to-escape-sandbox" referrerPolicy="no-referrer" className="pages-frame min-h-0 w-full flex-1 border-0" />
+        <Frame key={n} id={id} n={n} title={shown.title} onOp={onOp} />
       ) : (
         <Markdown title={shown.title} text={shown.text} />
       )}
