@@ -149,7 +149,18 @@
     }
 }
 
-/* Bot blobs (blob.tsx): a blink now and then, and while busy, a hop and eyes that look around. */
+/* Bot blobs (blob.tsx): a blink now and then, and while busy, a hop and eyes that look around. What's worn in black shows
+   on a dark page. */
+.blob {
+    --blob-ink-hi: #3d3d3d;
+    --blob-ink: #171717;
+    --blob-ink-lo: #050505;
+    @variant dark {
+        --blob-ink-hi: #565656;
+        --blob-ink: #3a3a3a;
+        --blob-ink-lo: #262626;
+    }
+}
 .blob-body {
     transform-box: fill-box;
     transform-origin: 50% 90%;
@@ -158,11 +169,16 @@
     transform-box: fill-box;
     transform-origin: center;
     animation: blob-blink 6s ease-in-out infinite;
+    animation-delay: var(--blink);
+}
+.blob-glint-l, .blob-glint-r {
+    animation: blob-glint 6s ease-in-out infinite;
+    animation-delay: var(--blink);
 }
 .blob[data-busy] .blob-body {
     animation: blob-hop 1.1s ease-in-out infinite;
 }
-.blob[data-busy] .blob-look {
+.blob[data-busy] .blob-eyes {
     animation: blob-look 2.6s ease-in-out infinite;
 }
 @keyframes blob-hop {
@@ -181,15 +197,12 @@
     0%, 93%, 100% { transform: scaleY(1); }
     96% { transform: scaleY(0.1); }
 }
+@keyframes blob-glint {
+    0%, 93%, 100% { visibility: visible; }
+    94%, 98% { visibility: hidden; }
+}
 @media (prefers-reduced-motion: reduce) {
     .blob * { animation: none !important; }
-}
-/* A faint rim, so a black blob shows on a dark background. */
-.blob-shape {
-    @variant dark {
-        stroke: oklch(1 0 0 / 0.15);
-        stroke-width: 1.5;
-    }
 }
 /* The home page's row of blobs shrinks together on a narrow screen. */
 .crowd .blob {

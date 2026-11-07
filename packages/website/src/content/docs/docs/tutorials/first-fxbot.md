@@ -76,7 +76,7 @@ Then pick the model your bots use, and tap **Continue**.
 
 ### Make a bot
 
-Name the bot `Scout`, pick a shape and a color, and tap **Create**. As you choose, the bot watches.
+Name the bot `Scout`, pick how it looks, or tap **Surprise me**, and tap **Create**. As you choose, the bot watches.
 
 fxbot says where plugins live for later. Tap **Start chatting**, and Scout's chat opens.
 

@@ -2,7 +2,7 @@ import { cn } from "cn";
 import { ArrowRight } from "lucide-react";
 import type { ReactNode } from "react";
 import screenshot from "../../../docs/screenshot.png";
-import { Blob, colorCount, shapeCount, type Color, type Shape } from "./blob.tsx";
+import { Blob, colorCount, shapeCount } from "./blob.tsx";
 import { Command } from "./code.tsx";
 import { buttonVariants } from "./components/ui/button.tsx";
 import { latest } from "./release.ts";
@@ -10,17 +10,17 @@ import { Shell } from "./layout.tsx";
 import { agentPrompt, changelogPath, href, installCommand, repo } from "./site.ts";
 
 // Bob, Fernando, and Securely from the screenshot, and a few friends. One is busy, as a bot is during a turn.
-const crowd: { shape: Shape; color: Color; size: number; busy?: boolean }[] = [
-  { shape: "circle", color: "black", size: 76 },
-  { shape: "clover", color: "green", size: 58 },
-  { shape: "triangle", color: "amber", size: 62 },
-  { shape: "heart", color: "pink", size: 52 },
-  { shape: "sparkle", color: "blue", size: 66, busy: true },
-  { shape: "cloud", color: "purple", size: 56 },
-  { shape: "pumpkin", color: "orange", size: 48 },
+const crowd: { shape: string; color: string; size: number; mood?: string; head?: string; face?: string; outfit?: string; busy?: boolean }[] = [
+  { shape: "circle", color: "blue", head: "headphones", size: 76 },
+  { shape: "egg", color: "amber", mood: "happy", head: "beret", outfit: "scarf", size: 66 },
+  { shape: "squircle", color: "purple", mood: "calm", face: "glasses", outfit: "turtleneck", size: 60 },
+  { shape: "toast", color: "orange", mood: "focus", head: "cap", size: 58 },
+  { shape: "sprout", color: "teal", size: 68, busy: true },
+  { shape: "arch", color: "pink", mood: "doubt", outfit: "bowtie", size: 60 },
+  { shape: "cat", color: "red", mood: "shy", outfit: "badge", size: 56 },
 ];
 
-const features: { shape: Shape; color: Color; title: string; link: string; body: ReactNode }[] = [
+const features: { shape: string; color: string; title: string; link: string; body: ReactNode }[] = [
   {
     shape: "heart",
     color: "pink",
@@ -28,7 +28,7 @@ const features: { shape: Shape; color: Color; title: string; link: string; body:
     link: "/docs/explanation/bots-and-chats/",
     body: (
       <>
-        Give each bot a name, instructions, a provider and model, and a look: one of {shapeCount} shapes in {colorCount} colors. Its chat streams, survives reloads and restarts, and takes images and text files. It keeps what it learns as memories you can edit, and searches them and its past chats.
+        Give each bot a name, instructions, a provider and model, and a look: one of {shapeCount} shapes in {colorCount} colors, with a feeling and things to wear. Its chat streams, survives reloads and restarts, and takes images and text files. It keeps what it learns as memories you can edit, and searches them and its past chats.
       </>
     ),
   },

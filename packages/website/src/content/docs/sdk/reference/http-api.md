@@ -138,7 +138,7 @@ A file's answer has these headers:
 | Method | Path | Body or query | Answer |
 | --- | --- | --- | --- |
 | `GET` | `/api/profiles` | | `Profile[]` |
-| `POST` | `/api/profiles` | `name`, and any of `instructions`, `model`, `provider`, `shape`, `color` | 201 and `Profile` |
+| `POST` | `/api/profiles` | `name`, and any of `instructions`, `model`, `provider`, `shape`, `color`, `mood`, `head`, `face`, `outfit`, `tint` | 201 and `Profile` |
 | `GET` | `/api/profiles/<id>` | | `Profile` |
 | `PATCH` | `/api/profiles/<id>` | Any of the fields, and `pinned` | `Profile` |
 | `DELETE` | `/api/profiles/<id>` | | `{ "ok": true }` |

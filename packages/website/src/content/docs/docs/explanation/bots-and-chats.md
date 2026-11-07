@@ -7,7 +7,7 @@ A bot in fxbot is meant to be talked to for months, not for one task. This page 
 
 ## A bot is a profile
 
-A bot is a name, instructions, a provider and a model, and a look: one of fourteen shapes in one of eleven colors, drawn as a blob that blinks, hops while it works, and watches the pointer. Up to three bots can be pinned to the top of the list.
+A bot is a name, instructions, a provider and a model, and a look: one of 32 shapes in one of eleven colors, with a feeling, and something on its head, its face, and its body. It blinks and watches the pointer, hops while it works, looks at you while a call waits on an answer, smiles when it finishes, and sleeps when it has no provider. Up to three bots can be pinned to the top of the list.
 
 ## One chat that lasts
 

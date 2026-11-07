@@ -30,6 +30,11 @@ The fields of a bot:
 | `model` | Trimmed, up to 200 characters. `""` follows the provider's default model. | `""` |
 | `shape` | One of `shapes` | `circle` |
 | `color` | A key of `colors` | `brown` |
+| `mood` | One of `moods` | `bright` |
+| `head` | One of `heads` | `none` |
+| `face` | One of `faces` | `none` |
+| `outfit` | One of `outfits` | `none` |
+| `tint` | One of `tints`: what the bot wears is its `own` color, `black`, or `white` | `own` |
 
 Other keys are ignored. An update also takes `pinned`:
 
@@ -239,8 +244,9 @@ From `@fxbot/sdk`, besides `createFxbot`:
 
 | Table | What it holds |
 | --- | --- |
+| `moods`, `heads`, `faces`, `outfits`, `tints` | What a bot can feel and wear, by name |
 | `colors` | A bot's colors, from name to hex: `black`, `brown`, `red`, `orange`, `amber`, `green`, `teal`, `blue`, `purple`, `pink`, `gray` |
-| `shapes` | A bot's shapes: `circle`, `cloud`, `squircle`, `star`, `clover`, `heart`, `flower`, `egg`, `bean`, `triangle`, `diamond`, `sparkle`, `hexagon`, `pumpkin` |
+| `shapes` | A bot's shapes: `circle`, `cloud`, `squircle`, `star`, `clover`, `heart`, `flower`, `egg`, `bean`, `triangle`, `diamond`, `sparkle`, `hexagon`, `pumpkin`, `mochi`, `gumdrop`, `toast`, `arch`, `pill`, `drop`, `peanut`, `puff`, `mushroom`, `bear`, `cat`, `mouse`, `bunny`, `frog`, `imp`, `bot`, `ghost`, `sprout` |
 | `kinds` | Each provider kind's `label`, `connect` (`device`, `key`, or `url`), and `baseUrl` where it is fixed or a default |
 | `itemKinds` | `image`, `document` |
 | `embeddingKinds` | The provider kinds that serve `/embeddings`: `openai`, `openrouter`, `gateway`, `vercel`, `ollama`, `lmstudio`, `custom` |
@@ -251,7 +257,7 @@ Every type the calls take or return is exported too, with `FxbotOptions` and `Fx
 ## Types
 
 ```ts
-type Fields = { name: string; instructions: string; model: string; provider: string; shape: Shape; color: Color };
+type Fields = { name: string; instructions: string; model: string; provider: string; shape: Shape; color: Color; mood: Mood; head: Head; face: Face; outfit: Outfit; tint: Tint };
 
 type Profile = Fields & {
   id: string;
@@ -259,6 +265,7 @@ type Profile = Fields & {
   preview: string | null; // the start of the latest reply
   handoff: string | null; // the summary a provider switch carried over
   busy: boolean; // a turn runs in this process
+  waiting: boolean; // a plugin's `wait` holds one of its calls
   pinned: boolean;
 };
 

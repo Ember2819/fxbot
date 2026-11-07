@@ -283,7 +283,7 @@ Each part sits in its own error boundary: one that throws shows a short card in 
 | `useBots()` | The app's list of bots, or `null` while it loads |
 | `createPortal(children, node)` | React's, from `react-dom`, for drawing a component into DOM the plugin doesn't render with React, such as an editor's node. Since 0.4.1. |
 | `Slot` | `<Slot name="<plugin>.<place>" props={…} />` leaves a place other plugins fill with `app.slot`, each part in its own error boundary. One nobody fills draws nothing. Since 0.5.0. |
-| `ui` | The app's components: Button, Input, Textarea, Badge, Switch, Checkbox, the Dialog, Empty, Sidebar (with `useSidebar`), Attachment, Message, Bubble, and MessageScroller parts, `Streamdown` for Markdown, `Header` for a screen's top bar, `Blob` for a bot's look, `NativeSelect`, `ModelField` for the app's model picker, since 0.6.0, and `Reply` for a turn's reply |
+| `ui` | The app's components: Button, Input, Textarea, Badge, Switch, Checkbox, the Dialog, Empty, Sidebar (with `useSidebar`), Attachment, Message, Bubble, and MessageScroller parts, `Streamdown` for Markdown, `Header` for a screen's top bar, `Blob` for a bot's look, given a whole bot, as in `<ui.Blob {...bot} size={24} />`, `NativeSelect`, `ModelField` for the app's model picker, since 0.6.0, and `Reply` for a turn's reply |
 
 The page's styles hold only the classes the app uses. A plugin brings its own CSS for anything else.
 

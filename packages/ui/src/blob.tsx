@@ -62,9 +62,10 @@ function animate(node: SVGSVGElement, look: Look, size: number, start: Doing): M
   let glance: Point = [0, 0];
   let [nextLook, nextBlink, blinkAt, pokedAt, happyUntil] = [last + Math.random() * 3000, last + 800 + Math.random() * 4000, -1e9, -1e9, 0];
 
-  function lookAround(t: number, x: number, y: number) {
+  function lookAround(t: number) {
     if (t < nextLook) return;
     nextLook = t + (1300 + Math.random() * 3400) * (1 + mates.size / 6);
+    const { x, y } = center(node);
     const others = [...mates].filter((mate) => mate.node !== node && mate.node.isConnected), chance = Math.random();
     const other = others.length && chance >= 0.42 && chance < 0.8 ? center(others[Math.floor(Math.random() * others.length)].node) : null;
     if (other?.width) {
@@ -91,7 +92,7 @@ function animate(node: SVGSVGElement, look: Look, size: number, start: Doing): M
       const ease = (ms: number) => 1 - Math.exp(-dt / ms);
       const { busy, waiting, asleep } = doing;
       const fresh = doing.follow && pointer !== null && t - pointer.at < 3200;
-      const here = fresh || size >= 32 ? center(node) : { x: 0, y: 0, width: 0 };
+      const here = fresh ? center(node) : { x: 0, y: 0, width: 0 };
       let [dx, dy] = fresh ? [pointer!.x - here.x, pointer!.y - here.y] : [0, 0];
       const distance = Math.hypot(dx, dy) || 1, reach = fresh ? Math.min(1, distance / (here.width * 1.5)) : 0;
       [dx, dy] = [dx / distance, dy / distance];
@@ -119,7 +120,7 @@ function animate(node: SVGSVGElement, look: Look, size: number, start: Doing): M
       } else {
         if (t < happyUntil) mood = "happy";
         if (!fresh && size >= 32) {
-          lookAround(t, here.x, here.y);
+          lookAround(t);
           target = glance;
         }
       }
@@ -158,14 +159,15 @@ function animate(node: SVGSVGElement, look: Look, size: number, start: Doing): M
         const [el, er] = [lidded(l), lidded(r)];
         left.setAttribute("d", eye(lx, cy, el));
         right.setAttribute("d", eye(rx, cy, er));
-        [[glints[0], lx, el], [glints[1], rx, er]].forEach(([glint, x, e]) => {
-          if (!glint) return;
-          const [px, py] = glintAt(x as number, cy, e as Eye), node = glint as Element;
-          node.setAttribute("cx", px.toFixed(2));
-          node.setAttribute("cy", py.toFixed(2));
-          node.setAttribute("r", (wanted.glint || 0.01).toFixed(2));
-          node.setAttribute("opacity", Math.max(0, glintShows(e as Eye) - blink * 2.5).toFixed(2));
-        });
+        const place = (glint: Element | null, x: number, e: Eye) => {
+          const [px, py] = glintAt(x, cy, e);
+          glint?.setAttribute("cx", px.toFixed(2));
+          glint?.setAttribute("cy", py.toFixed(2));
+          glint?.setAttribute("r", (wanted.glint || 0.01).toFixed(2));
+          glint?.setAttribute("opacity", Math.max(0, glintShows(e) - blink * 2.5).toFixed(2));
+        };
+        place(glints[0], lx, el);
+        place(glints[1], rx, er);
       }
       if (moves || hopping) {
         eyes.setAttribute("transform", `translate(${gx.toFixed(2)} ${gy.toFixed(2)})`);
@@ -186,7 +188,7 @@ function animate(node: SVGSVGElement, look: Look, size: number, start: Doing): M
 }
 
 let drawn = 0;
-const stillPlease = () => matchMedia("(prefers-reduced-motion: reduce)").matches;
+const reducedMotion = () => matchMedia("(prefers-reduced-motion: reduce)").matches;
 
 // A bot's look. Pass a whole bot, as in <Blob {...bot} size={24} />, and it shows what the bot is doing: `busy` makes it
 // hop and look around, `waiting` look at you, and an empty `provider` sleep, since it can't answer. With `follow`, its eyes
@@ -197,7 +199,7 @@ export function Blob({ shape, color, mood = "bright", head = "none", face = "non
   const seen = useRef(false);
   const id = useMemo(() => `blob${++drawn}`, []);
   const asleep = provider === "";
-  const held = still || stillPlease();
+  const held = still || reducedMotion();
   const doing = { mood, follow, busy, waiting, asleep };
   const first = useRef(mood);
   const shown = asleep ? "asleep" : busy && !waiting ? "focus" : mood;
