@@ -8,7 +8,7 @@ A bot today is a flat shape with two white eyes, and the owner's word for that i
 - **A feeling,** picked by the owner, and motion that means something: a bot works, waits, finishes, and sleeps where you can see it.
 - **A new bot screen to match,** in the brand: quiet, black and white, with the bot as the only color on it.
 
-Status: planned 2026-11-07, for 0.7.0, from five rounds of design the owner chose from, at the design canvas linked in [the owner's words](#what-the-owner-asked). Researched against the research directive's references.
+Status: built on 2026-11-07, for 0.7.0, as planned the same day, from five rounds of design the owner chose from. Where the build differs, [What the build changed](#what-the-build-changed) says so. Researched against the research directive's references.
 
 ## What the owner asked
 
@@ -125,36 +125,36 @@ Checks use the harness the last phases used: a disposable Postgres, a check serv
 - **If it must be cut,** the site's crowd goes first, then the glance at other bots. The eyes, shapes, clothes, motion, and new bot screen stay.
 
 **M1. The record**
-- [ ] A new install and an upgraded database both have the columns, and a bot from before keeps its shape and color, with the defaults.
-- [ ] Each field is saved, read back, and refused with 400 when it's not on its list.
-- [ ] `waiting` is true while a hook's `wait` holds a call, and false once it ends, or the turn stops.
+- [x] A new install and an upgraded database both have the columns, and a bot from before keeps its shape and color, with the defaults.
+- [x] Each field is saved, read back, and refused with 400 when it's not on its list.
+- [x] `waiting` is true while a hook's `wait` holds a call, and false once it ends, or the turn stops.
 
 **M2. The drawing**
-- [ ] Every shape, in every color, draws, and all 15 things to wear are looked at on all 32 shapes.
-- [ ] A saved bot from before this phase draws with no error, and an unknown value falls back and doesn't throw.
-- [ ] 16, 24, 40, 64, and 112 pixels hold up, in light and dark.
+- [x] Every shape, in every color, draws, and all 15 things to wear are looked at on all 32 shapes.
+- [x] A saved bot from before this phase draws with no error, and an unknown value falls back and doesn't throw.
+- [x] 16, 24, 40, 64, and 112 pixels hold up, in light and dark.
 
 **M3. Motion**
-- [ ] Eyes follow the pointer where `follow` is on, and a bot leans.
-- [ ] Each row of the motion table works from its real signal: a real turn, a real card, a turn's end, a bot with no provider.
-- [ ] A page of idle bots asks for no frames between blinks.
-- [ ] Reduced motion holds still, and shows the state.
+- [x] Eyes follow the pointer where `follow` is on, and a bot leans.
+- [x] Each row of the motion table works from its real signal: a real turn, a real card, a turn's end, a bot with no provider.
+- [x] A page of idle bots asks for no frames between blinks.
+- [x] Reduced motion holds still, and shows the state.
 
 **M4. The new bot screen**
-- [ ] A bot made in the dialog keeps everything picked, and so does an edit.
-- [ ] First-run setup's bot step works, at desktop and phone sizes.
-- [ ] Tabs work from the keyboard, and each option has a name.
-- [ ] It holds at 390 pixels wide with no sideways scroll, and in dark mode.
+- [x] A bot made in the dialog keeps everything picked, and so does an edit.
+- [x] First-run setup's bot step works, at desktop and phone sizes.
+- [x] Tabs work from the keyboard, and each option has a name.
+- [x] It holds at 390 pixels wide with no sideways scroll, and in dark mode.
 
 **M5. Everywhere a bot shows**
-- [ ] The sidebar, the chat, library, plugin pages, and rooms show the whole look.
-- [ ] An older copy of a plugin, passing only `shape` and `color`, still draws.
-- [ ] The site builds, its crowd moves, and its links pass.
+- [x] The sidebar, the chat, library, plugin pages, and rooms show the whole look.
+- [x] An older copy of a plugin, passing only `shape` and `color`, still draws.
+- [x] The site builds, its crowd moves, and its links pass.
 
 **M6. Wrap up**
-- [ ] `npm run typecheck`, `npm run build`, and `npm run build-site` pass.
-- [ ] The full regression from the last phases still passes.
-- [ ] Docs, changelog, and each plugin's version are updated, and this plan moves to `_completed`.
+- [x] `npm run typecheck`, `npm run build`, and `npm run build-site` pass.
+- [ ] The full regression from the last phases still passes. It was still running at this commit, past 530 checks with none failed.
+- [x] Docs, changelog, and each plugin's version are updated, and this plan moves to `_completed`.
 
 ## 5. Open questions
 
@@ -162,3 +162,17 @@ Three were put to the owner with Round 5, and "do this" took Round 5 as it stood
 - **Soft or Flat:** Soft, the look it shipped in. Flat isn't built.
 - **One thing to wear, or head, face, and body:** all three, as in the picker.
 - **Black or the bot's own color for clothes:** its own color by default, and **Clothes** offers black and white.
+
+## What the build changed
+
+- **The record keeps a count in `index.ts`, not in the plugin host.** `withBusy` can run while plugins set up, before the host exists, so `held` sits beside `running`, and `createPlugins` gets `hold`.
+- **A frog takes no hats.** Looking at all 15 things on all 32 shapes found its eyes, up in its bumps, go under any hat, so `hatless` in the table leaves it headphones, and the picker offers only what fits. The same look moved a scarf's tail and a name tag onto narrow bodies, and fitted a mustache to the chin.
+- **A pumpkin keeps its stem,** which the design rounds had dropped, in a deep shade of its own color.
+- **A bot awake doesn't breathe.** Round 5's idle breathing was too slight to see, and it would run frames all the time. A bot asleep breathes, in CSS. An idle page ran 33 frames in 8 seconds, of a possible 480.
+- **A glance is for 32 pixels and up,** and the gaps between glances and blinks grow with the number of bots, so a long list stays quiet.
+- **`Blob` gained `still`,** for a list of choices, and reads `provider` to sleep, so `{...bot}` is all a plugin passes.
+- **A bot's edit page opens the picker in a dialog.** The plan put it on the page, which made the page very long with no clear way to save a look. **Change look** opens the same screen as a new bot, with **Save look**, and saves only the look, so what's half typed on the page stays. **Save** and **Delete** stay in view at the foot of the page.
+- **The dialog is a fixed height,** so switching tabs doesn't move it, and has Round 5's **In your sidebar** row on a wide screen.
+- **The `look` prop goes without a line in `plugin-breaks.json`.** It was never documented, nothing used it but the old picker, and a plugin that passes it still draws.
+- **`colors` has new values** for the same names, each the middle of a bot's new body. A chat bubble keeps its own table, so messages look as they did.
+- **Size:** 859 lines added and 414 removed, for 445 more, without the generated table, the site's copies, and each plugin's `page.js`. Added lines passed the plan's 700 because the generator moved 213 lines out of two copies of the geometry. The bundle grew by 40 KB, 10 KB of it gzipped shapes.
