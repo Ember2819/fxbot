@@ -1,0 +1,1 @@
+{ "private": true, "type": "module", "description": "Its page bundles nothing of its own; see the README. fxbot reads only type, for the server code." }

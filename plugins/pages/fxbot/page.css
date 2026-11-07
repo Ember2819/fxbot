@@ -1,0 +1,38 @@
+/* The title prints with the page, and the header doesn't. The app's frame clips to one screen, so printing lets go of it,
+   or a long page would print its first screen only. */
+.pages-title {
+  display: none;
+}
+.pages-column {
+  box-sizing: border-box;
+  margin-inline: auto;
+  max-width: 44rem;
+  padding: 0 1rem 1rem;
+  width: 100%;
+}
+/* An HTML page with no background of its own reads as it would in a tab, in dark mode too. */
+.pages-frame {
+  background: white;
+}
+
+@media print {
+  [data-slot="sidebar"], [data-slot="sidebar-gap"], header, .pages-bar {
+    display: none !important;
+  }
+  html, body, [data-slot="sidebar-wrapper"], [data-slot="sidebar-inset"], .pages-scroll {
+    display: block !important;
+    height: auto !important;
+    min-height: 0 !important;
+    overflow: visible !important;
+  }
+  .pages-print {
+    max-width: none;
+    padding: 0;
+  }
+  .pages-title {
+    display: block;
+    font-size: 1.5rem;
+    font-weight: 500;
+    margin-bottom: 1rem;
+  }
+}
