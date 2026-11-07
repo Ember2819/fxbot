@@ -4,8 +4,15 @@ Each release of fxbot, newest first. A release that adds migrations, bumps libfx
 
 ## Unreleased
 
-**Before upgrading.** Migration `0011_onboarding` adds `onboarding_step` and `onboarded_at` columns to `settings`. An install with a bot, a plugin, or a provider is marked done, so it never sees first-run setup.
+**Before upgrading.** Migration `0011_onboarding` adds `onboarding_step` and `onboarded_at` columns to `settings`. An install with a bot, a plugin, or a provider is marked done, so it never sees first-run setup. Migration `0012_looks` adds `mood`, `head`, `face`, `outfit`, and `tint` columns to `profiles`. Every bot keeps its shape and its color, drawn the new way.
 
+- **Bots have a new look.** Big dark eyes, soft color, and more shapes: the fourteen you know and eighteen more, such as toast, cat, frog, and ghost.
+- **A feeling, and things to wear.** Give a bot a feeling, from bright to doubtful, and something for its head, its face, and its body, each cut to fit its shape, in the bot's own color, black, or white. A blazer on a heart sits as well as a blazer on a circle.
+- **A bot shows what it's doing.** It focuses and hops while it works, looks at you and bobs while a call waits on an answer, smiles when it finishes, and sleeps when it has no provider. Its head seems to turn as it watches the pointer, and a click gets a squish and a smile. With reduced motion on, it holds still.
+- **A new bot screen.** Pick from tabs for **Shape**, **Color**, **Feeling**, **Head**, **Face**, and **Body**, with each choice drawn on your bot, or tap **Surprise me**. It's the same in first-run setup and on a bot's edit page, and on a phone the bot stays in view as you scroll.
+- **Chat rooms 0.3.1, Messages 0.1.1, Permissions 0.1.1, and Pages 0.2.1** show each bot's whole look. Update them from **Plugins**.
+- **For plugins:** pass a whole bot to `Blob`, as in `<ui.Blob {...bot} size={24} />`, and it shows what the bot wears and is doing, and an older fxbot ignores what it doesn't know. `waiting` on a bot is true while a `tool.before` hook's `{ wait }` holds one of its calls.
+- **For the SDK:** a `Profile` gains `mood`, `head`, `face`, `outfit`, `tint`, and `waiting`, and `moods`, `heads`, `faces`, `outfits`, and `tints` list what each takes. `shapes` has 32, and `colors` keeps its names with softer values.
 - **Pages.** A bot writes a report, a guide, or a plan to read outside the chat, from the new `pages` plugin, in **Essentials**. A card in its chat opens the page, and the library keeps it, with every version. When a page needs more than text, such as a chart with filters, the bot writes it in HTML, in a frame of its own. A task list has boxes you tick, and the bot sees them. An HTML page saves what you do on it, a routine can send it new numbers without rewriting it, once you allow it, and a button on a page can draft a message to the bot.
 - **First-run setup.** A new install walks through plugins, a provider and a model, and a first bot, then opens its chat. It saves each step, so a restart comes back to it, and **Skip for now** is on every step.
 - **Essentials.** A pack of what most people want from fxbot, at the top of **Browse**, with **Add the other 3**. Each plugin in it stays its own.

@@ -43,8 +43,10 @@ packages/
         ├── library.tsx          the Library page and the item preview
         ├── bot-panel.tsx        the panel beside a chat: Details and Library tabs
         ├── providers.tsx        Settings' providers, sign-in dialog, key form
-        ├── blob.tsx             bot looks: shapes, eyes that follow the pointer,
-        │                        busy motion, the look picker
+        ├── blob.tsx             a bot's look on the page, and its motion
+        ├── blob-draw.ts         a look as SVG: eyes, what's worn. The site has a copy
+        ├── blob-data.ts         shapes and color tones, from scripts/blob-data.mjs
+        ├── look-picker.tsx      the look's tabs, and Surprise me
         ├── client.ts            the page's HTTP client instance
         ├── use-turn-stream.ts   React state and subscription lifecycle
         ├── attachments.ts       browser file reading, previews, image resizing
