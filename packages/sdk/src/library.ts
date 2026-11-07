@@ -80,6 +80,24 @@ export function createLibrary(sql: Sql) {
     return get(id);
   }
 
+  // A document a bot made, changed in place, so it keeps its id and tags. The chat that changed it gets a tag, or its tag
+  // moves to now, which brings the item to the top. What the owner sent stays as they sent it.
+  async function replace({ profileId, sessionId, id, name, type, bytes }: Omit<NewItem, "origin"> & { id: string }) {
+    const { kind, type: kept, text } = check({ name, type, bytes });
+    const [row] = isId(id) ? await sql<{ kind: string; origin: string; name: string; type: string; sha256: string }[]>`
+      select kind, origin, name, type, sha256 from library l where id = ${id} and exists (select 1 from library_tags t where t.item_id = l.id and t.profile_id = ${profileId})` : [];
+    if (!row) return fail(404, `This bot's library has no item library:${id}.`);
+    if (kind !== "document" || row.kind !== "document" || row.origin !== "generated") fail(400, `library:${id} isn't a document a bot made`);
+    const sha256 = createHash("sha256").update(bytes).digest("hex");
+    if (row.sha256 === sha256 && row.name === name.trim() && row.type === kept) return get(id);
+    const [other] = await sql<{ id: string }[]>`select id from library where sha256 = ${sha256} and id <> ${id}`;
+    if (other) fail(400, `the library already has this text as library:${other.id}`);
+    await sql`with item as (update library set sha256 = ${sha256}, name = ${name.trim()}, type = ${kept}, size = ${bytes.length}, data = ${bytes}, text = ${text} where id = ${id} returning id)
+      insert into library_tags (item_id, profile_id, session_id) select id, ${profileId}, ${sessionId} from item
+      on conflict (item_id, profile_id, session_id) do update set created_at = now()`;
+    return get(id);
+  }
+
   // Ordered by each item's newest tag among those the query covers, then by id, so `before` pages without repeats.
   async function list(query: LibraryQuery = {}): Promise<LibraryPage> {
     const { q = "", profileId, sessionId, kind, before, limit = 60 } = query ?? {};
@@ -208,6 +226,7 @@ export function createLibrary(sql: Sql) {
   return {
     check,
     save,
+    replace,
     readFor,
     list,
     get,

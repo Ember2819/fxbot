@@ -24,8 +24,9 @@ const pluginName = /^[a-z0-9]+(-[a-z0-9]+)*$/;
 // Core tools' prefixes, which a plugin's name would collide with.
 const reserved = ["chat", "memory", "library", "skill"];
 // Names fxbot uses beside packages: the words under /api/plugins/, and the app's own paths. A plugin's id is 12 hex
-// characters, so a name can't look like one.
-const fxbotsOwn = ["pages", "preview", "search", "addons", "plugins", "settings", "library", "profiles"];
+// characters, so a name can't look like one. `pages` isn't here: fxbot's list of page code is only /api/plugins/pages
+// itself, so a plugin of that name has its routes, and none at its root.
+const fxbotsOwn = ["preview", "search", "addons", "plugins", "settings", "library", "profiles"];
 // A message, instructions, or tool hook gets this long before it counts as failed; setup gets twice as long.
 const limit = 5000;
 // From GitHub: up to 2 MiB a file, text only, and 20 MB in all.
@@ -669,6 +670,12 @@ export async function createPlugins(options: {
         for (const handler of plugin.loaded!.hooks.get(event) ?? []) void within(() => handler(payload), 60_000, `A ${event} hook`).catch((error) => report(plugin, `A ${event} hook`, error));
   }
 
+  // An item has no one bot, so every running plugin hears that it went.
+  function libraryRemoved(id: string) {
+    for (const plugin of plugins.values())
+      for (const handler of plugin.loaded?.hooks.get("library.removed") ?? []) void within(() => handler({ id }), 60_000, "A library.removed hook").catch((error) => report(plugin, "A library.removed hook", error));
+  }
+
   // Every tool, core and plugin alike, passes through the tool hooks. With none, it runs as it is.
   function wrap(tool: FxAgentTool, safe = false): FxAgentTool {
     if (tool.providerExecuted) return tool;
@@ -865,6 +872,7 @@ export async function createPlugins(options: {
     hooked,
     run,
     observe,
+    libraryRemoved,
     wrap,
     tools: () => [...plugins.values()].flatMap(toolsOf),
     list: () => [...plugins.values()].map(view),

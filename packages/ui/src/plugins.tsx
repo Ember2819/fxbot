@@ -18,7 +18,7 @@ import * as scroller from "@/components/ui/message-scroller";
 import * as sidebar from "@/components/ui/sidebar";
 import * as switches from "@/components/ui/switch";
 import * as textarea from "@/components/ui/textarea";
-import { applyLine, type Part, type Profile } from "@fxbot/sdk/client";
+import { applyLine, type LibraryItem, type Part, type Profile } from "@fxbot/sdk/client";
 import { Blob } from "./blob.tsx";
 import { ModelField } from "./providers.tsx";
 import { client } from "./client.ts";
@@ -50,6 +50,7 @@ type Places = {
   settings: ComponentType[];
   botSettings: ComponentType<{ bot: Profile }>[];
   botPanel: ComponentType<{ bot: Profile }>[];
+  libraryItem: ComponentType<{ item: LibraryItem }>[];
   chat: ComponentType<{ bot: Profile }>[];
   box: ComponentType<any>[];
   fold: Fold[];
@@ -60,7 +61,7 @@ type Places = {
 // `key` is the URLs it loaded from, which change with its files.
 type Loaded = { name: string; iconKey: string; key: string; css?: HTMLLinkElement; places: Places; pageError?: string };
 
-const emptyPlaces = (): Places => ({ routes: [], sidebar: [], nav: [], composer: [], toolViews: new Map(), settings: [], botSettings: [], botPanel: [], chat: [], box: [], fold: [], said: [], slots: new Map() });
+const emptyPlaces = (): Places => ({ routes: [], sidebar: [], nav: [], composer: [], toolViews: new Map(), settings: [], botSettings: [], botPanel: [], libraryItem: [], chat: [], box: [], fold: [], said: [], slots: new Map() });
 
 // The loaded plugins, by name. A change makes a new array, which the places read through usePlugins.
 let loaded: Loaded[] = [];
@@ -140,6 +141,7 @@ async function run(name: string, version: string, url: string): Promise<Places> 
     settings: (Component: ComponentType) => places.settings.push(Component),
     botSettings: (Component: ComponentType<{ bot: Profile }>) => places.botSettings.push(Component),
     botPanel: (Component: ComponentType<{ bot: Profile }>) => places.botPanel.push(Component),
+    libraryItem: (Component: ComponentType<{ item: LibraryItem }>) => places.libraryItem.push(Component),
     chat: (Component: ComponentType<{ bot: Profile }>) => places.chat.push(Component),
     box: (Component: ComponentType<any>) => places.box.push(Component),
     fold: (fold: Fold) => places.fold.push(fold),

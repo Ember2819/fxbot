@@ -170,6 +170,7 @@ export async function createFxbot(options: FxbotOptions) {
       library: {
         read: (bot, id) => library.readFor(bot, id),
         save: ({ bot, session, name, type, bytes }) => library.save({ profileId: bot, sessionId: session, origin: "generated", name, type, bytes }),
+        replace: ({ bot, session, ...item }) => library.replace({ profileId: bot, sessionId: session, ...item }),
         list: async (bot, session) => (await library.list({ profileId: bot, sessionId: session, limit: 100 })).items,
       },
       skills: { files: (bot, name) => skills.files(bot, name) },
@@ -905,7 +906,7 @@ export async function createFxbot(options: FxbotOptions) {
       get: (id: string) => library.get(id),
       file: (id: string, ifNoneMatch?: string) => library.file(id, ifNoneMatch),
       upload: (id: string, name: string, ifNoneMatch?: string) => (isId(id) ? library.upload(name, ifNoneMatch) : fail(404, "not found")),
-      remove: (id: string) => library.remove(id),
+      remove: async (id: string) => (await library.remove(id), packages.libraryRemoved(id)),
     },
 
     // Plugins: MCP servers, skills, and packages, one list. Adding one takes the `hash` its preview showed, and fails if

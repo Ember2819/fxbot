@@ -21,6 +21,8 @@ export type HookEvents = {
   "turn.start": { bot: string; session: string; messageId: string; text: string; from?: string };
   /** When the turn ends, with its reply, or `error` when it failed, or `cancelled` when it was stopped. Only observes. */
   "turn.end": { bot: string; session: string; messageId: string; text: string; reply: string; error?: string; cancelled?: boolean; from?: string };
+  /** An item left the library, for every bot. It reaches every running plugin, and only observes. Since 0.7.0. */
+  "library.removed": { id: string };
   /** The plugin's settings changed. */
   settings: { settings: Record<string, string> };
   /** A plugin that needs this one was added, updated, or removed: the ones that need it now. */
@@ -130,6 +132,9 @@ export type PluginApi = {
     read(bot: string, id: string): Promise<{ name: string; type: string; bytes: Buffer }>;
     /** Saves to the bot's library, tagged for the chat, through the library's checks: an image, or UTF-8 text. */
     save(item: { bot: string; session: string; name: string; type: string; bytes: Buffer }): Promise<LibraryItem>;
+    /** Changes a document a bot made, in place: its id and tags stay, this chat gets a tag, and it comes to the top. It
+     * refuses an image, an upload, an item not tagged for the bot, and text another item holds. Since 0.7.0. */
+    replace(item: { bot: string; session: string; id: string; name: string; type: string; bytes: Buffer }): Promise<LibraryItem>;
     /** The items saved in one chat of the bot, newest first. Since 0.6.0. */
     list(bot: string, session: string): Promise<LibraryItem[]>;
   };

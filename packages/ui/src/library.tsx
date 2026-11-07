@@ -11,6 +11,7 @@ import { itemKinds, type ItemKind, type LibraryItem, type LibraryPage as Page, t
 import { Blob } from "./blob.tsx";
 import { client } from "./client.ts";
 import { follow } from "./nav.ts";
+import { Place } from "./plugins.tsx";
 
 const kindLabels: Record<ItemKind, string> = { image: "Images", document: "Documents" };
 
@@ -239,6 +240,7 @@ export function Preview({ item, profiles, onClose, onRemoved }: { item: LibraryI
             <DownloadIcon />
             Download
           </a>
+          <Place pick={(places) => places.libraryItem} props={{ item }} />
           <Button variant="destructive" onClick={remove}>
             <Trash2Icon />
             Delete
