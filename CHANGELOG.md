@@ -6,6 +6,7 @@ Each release of fxbot, newest first. A release that adds migrations, bumps libfx
 
 **Before upgrading.** Migration `0011_onboarding` adds `onboarding_step` and `onboarded_at` columns to `settings`. An install with a bot, a plugin, or a provider is marked done, so it never sees first-run setup.
 
+- **Pages.** A bot writes a report, a guide, or a plan to read outside the chat, from the new `pages` plugin, in **Essentials**. A card in its chat opens the page, and the library keeps it, with every version. When a page needs more than text, such as a chart with filters, the bot writes it in HTML, in a frame of its own.
 - **First-run setup.** A new install walks through plugins, a provider and a model, and a first bot, then opens its chat. It saves each step, so a restart comes back to it, and **Skip for now** is on every step.
 - **Essentials.** A pack of what most people want from fxbot, at the top of **Browse**, with **Add the other 3**. Each plugin in it stays its own.
 - **fxbot knows which plugins can run on it.** A plugin that needs a newer fxbot says so on its page, and **Add** stays off. A newer version that needs a newer fxbot shows **Needs fxbot** in place of **Update available**, and the one you have keeps running.
@@ -13,6 +14,7 @@ Each release of fxbot, newest first. A release that adds migrations, bumps libfx
 - **Settings warns before an update,** naming the plugins that wouldn't run on the new release.
 - **A plugin's page that fails to load says so** on its tab, where before only the browser's console knew.
 - **Each of fxbot's plugins says the oldest fxbot it runs on,** so they show **Update available** once, with nothing to do but update.
+- **For plugins:** `fx.library.replace` changes a document in place, the `library.removed` hook says an item went, and `app.libraryItem` is a place in an item's preview. A plugin can be named `pages`, though not have a route at its root. See the [plugin API](https://fxbot.sh/sdk/reference/plugin-api/).
 - **For plugins:** `minFxbot` in `plugin.json` is the oldest fxbot a plugin runs on, and fxbot publishes what each release broke in [plugin-breaks.json](https://fxbot.sh/plugin-breaks.json). See [Which fxbot it runs on](https://fxbot.sh/sdk/reference/plugin-api/#which-fxbot-it-runs-on). It adds no migration.
 
 ## 0.6.0 (2026-11-06)

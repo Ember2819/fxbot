@@ -14,7 +14,7 @@ One place for everything the bots' chats hold.
 | Documents a bot writes | `generated` | this phase, through `library_save` |
 | Images, video, and audio a bot generates | `generated` | [media generation](../../phases/media-generation.md) |
 | Voice memos | `uploaded` | [voice memos](../../phases/voice-memos.md) |
-| Pages | `generated` | [pages](../../phases/pages.md) |
+| Pages | `generated` | [pages](pages.md) |
 
 Before this phase:
 - fxbot keeps each image a message sends in `images`, per bot, and shows it only in that bot's chat.
@@ -138,7 +138,7 @@ These are read from source and docs, as of November 2026. Each path is relative 
 - **Right panel** beside the chat. Its header is the bot's large blob and name, with a close button.
   - **Tabs:** Details, Library, and Computer.
   - **The Library tab** lists the bot's items in two cards, "This week" and "Older". Each row is a small icon or thumbnail and a one-line title, and each card ends in "Show more".
-- **Chat.** A page the bot made shows as a card in its chat, which is [pages](../../phases/pages.md) work.
+- **Chat.** A page the bot made shows as a card in its chat, which is [pages](pages.md) work.
 
 **Checked here**
 - **Postgres 17.11, in disposable databases.**
@@ -445,7 +445,7 @@ What the build found or changed, checked against libfx 0.0.16, Postgres 17, and 
   - Decides how large an item may be. The default storage held 48 MiB without trouble, and beyond some size the bytes may belong on disk.
   - Shows a bot's new item as a card in its chat.
 - **[Voice memos](../../phases/voice-memos.md):** `audio` items, `uploaded`.
-- **[Pages](../../phases/pages.md):** `page` items, with their own format, a sandboxed viewer, and whether a page has versions.
+- **[Pages](pages.md):** `page` items, with their own format, a sandboxed viewer, and whether a page has versions.
 - **[Past sessions](../../phases/past-sessions.md):** a tag's chat link goes to that tag's own session, not only the bot's current one.
 - **[Memories](memories.md) and the [knowledge base](../../phases/knowledge-base.md):** search by meaning, with vectors over library documents.
 

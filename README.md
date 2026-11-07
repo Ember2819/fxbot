@@ -48,12 +48,12 @@ In order of execution priority. Checked phases are built. Each is marked **core*
 - [x] [Routines](docs/_completed/phases/routines.md) (plugin, with a core time zone; 0.6.0): saved tasks a bot runs on a schedule, with everything it has, telling the owner in its chat
 - [x] [Plugin compatibility](docs/_completed/phases/plugin-compatibility.md) (core; 0.7.0): a minimum fxbot for each plugin, a list of what each release broke, and **Unsupported** where a plugin can't run
 - [x] [Onboarding](docs/_completed/phases/onboarding.md) (core; 0.7.0): an Essentials pack at the top of Browse, and a first-run flow that adds plugins, sets up the first bot, and says where plugins live
+- [x] [Pages](docs/_completed/phases/pages.md) (plugin, with small core hooks; 0.7.0): reports and guides bots write for reading outside the chat, in Markdown or HTML, kept in the library with every version
 - [ ] [Triggers](docs/phases/triggers.md) (plugins): webhooks and new email start a bot's turn
 - [ ] [Soul](docs/phases/soul.md) (plugin): a written persona behind each bot's system prompt
 - [ ] [Context management](docs/phases/context-management.md) (core): one never-ending chat that fits the model's context window, past the compaction libfx does
 - [ ] [Past sessions](docs/phases/past-sessions.md) (core): earlier conversations stay browsable
 - [ ] [Knowledge base](docs/phases/knowledge-base.md) (plugin): knowledge the bots draw on
-- [ ] [Pages](docs/phases/pages.md) (plugin): reports and guides bots write for reading outside the chat
 - [ ] [herdr screen](docs/phases/herdr-screen.md) (plugin): the [herdr](https://herdr.dev) interface in the app, from a herdr plugin
 - [ ] [Remote control](docs/phases/remote-control.md) (plugin): heavy work handed to coding agents through herdr
 - [ ] [Web search](docs/phases/web-search.md) (plugin): bots search and read the web, and cite it

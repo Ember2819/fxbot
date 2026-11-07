@@ -1,24 +1,24 @@
 # Pages
 
 A bot writes something to keep, and the owner reads it outside the chat:
-- **A page.** A report, a guide, a plan, or a summary of a project, in Markdown, with tables, code, diagrams, and images from the library. When it needs more, such as a chart with filters, it's HTML, in a frame of its own.
+- **A page.** A report, a guide, a plan, or a summary of a project, in Markdown, with tables, code, and images from the library. When it needs more, such as a chart with filters or a diagram, it's HTML, in a frame of its own.
 - **A card in the chat.** The page's title and **Open**, and a sentence from the bot, in place of the whole thing in a reply.
 - **A place to read it.** The page fills the screen at an address of its own, on a phone too, and it prints.
 - **In the library.** The owner finds it there, and the bot finds it with the library's tools. It stays there if the plugin is removed.
 - **Every version.** Asking for a change revises the same page, and the owner can go back to any earlier one.
 - **In Essentials.** A new install gets it with the pack.
 
-Status: planned on 2026-11-07, with the owner's answers, not built. Researched against the research directive's references, and Claude, ChatGPT, Gemini, Open WebUI, LibreChat, OpenClaw, and Hermes Agent.
+Status: built on 2026-11-07, for 0.7.0, as planned the same day with the owner's answers. Researched against the research directive's references, and Claude, ChatGPT, Gemini, Open WebUI, LibreChat, OpenClaw, and Hermes Agent. Where the build differs from the plan, [What the build changed](#what-the-build-changed) says so.
 
 ## What's asked
 
 The stub: "Pages a bot writes for reading outside the live chat, such as a report, a guide, or a summary of a project." It said the library keeps each page "as an item of kind `page`, tagged with the bot and session that wrote it", and that it's "a plugin with a tool bots write pages with, and a screen to read them".
 
-The [library](../_completed/phases/library.md) left three things to this phase: "`page` items, with their own format, a sandboxed viewer, and whether a page has versions". [Routines](../_completed/phases/routines.md) counted on it too: "A future page is a library item too, so a page tool works in a run with nothing added here."
+The [library](library.md) left three things to this phase: "`page` items, with their own format, a sandboxed viewer, and whether a page has versions". [Routines](routines.md) counted on it too: "A future page is a library item too, so a page tool works in a run with nothing added here."
 
 ## 0. Core or plugin
 
-**Plugin** ([Core or plugin](../../CONVENTIONS.md#core-or-plugin)). Not every bot needs pages, and a plugin that isn't added costs nothing. The plugin is `pages`, in `plugins/`, added from GitHub like fxbot's others.
+**Plugin** ([Core or plugin](../../../CONVENTIONS.md#core-or-plugin)). Not every bot needs pages, and a plugin that isn't added costs nothing. The plugin is `pages`, in `plugins/`, added from GitHub like fxbot's others.
 
 The plugin API can't do three things it needs, so it widens by the smallest step for each:
 - **`fx.library.replace`:** a plugin can save to the library, but can't change what it saved.
@@ -68,7 +68,7 @@ Read on 2026-11-07. The references are from source, in clones made by 2026-11-04
 **fx0** (`lib/tools.ts`, `lib/design-artifact.ts`): one HTML design for each chat.
 - `publish_design { html }` for the first version or a broad rewrite.
 - `edit_design { edits }` for the rest, up to 20 exact replacements, each matching once, applied "atomically, as one version".
-- Versions are rows, and only each turn's last is kept (see the [library's research](../_completed/phases/library.md)).
+- Versions are rows, and only each turn's last is kept (see the [library's research](library.md)).
 - A lesson on telling a model what to do next: "A rule in the instructions alone was skipped; the reminder lands where the model decides to reply." So its reminder is in the tool's result.
 - `sandbox="allow-scripts"`, and `connect-src 'none'`, at most 512 KiB. It embeds images before the design runs, so `img-src` needs only `data:`.
 - What that's worth, in its README: "They can't read the app's cookies, storage or credentials, and their Content Security Policy blocks network requests (`connect-src 'none'`). It's still the browser enforcing all of this, though, not a sealed VM."
@@ -154,8 +154,8 @@ The two Markdown tools are `safe`, and `pages_html` isn't. None needs a setting.
 ```text
 Write a page for the owner to read and keep: a report, a guide, a plan, or a summary of a project.
 Use it when they ask for something to keep or come back to, not for a short answer.
-It's Markdown, at most 60,000 bytes: headings, tables, code, Mermaid diagrams, and images from the
-library, as ![what it shows](library:<id>). Leave the title out of the text.
+It's Markdown, at most 60,000 bytes: headings, tables, code, and images from the library, as
+![what it shows](library:<id>). Leave the title out of the text.
 To rewrite a page, give its library:<id>. For a small change, use pages_edit.
 ```
 
@@ -356,91 +356,92 @@ Print a check's setup, and match exact fields: one that tested nothing can't pas
 - **If it must be cut,** **Print** goes first, then **Open page** with `app.libraryItem`, then the script check. The tools, the card, the reader, versions, and HTML's isolation stay.
 
 **M1. What the plugin needs from core**
-- [ ] `fx.library.replace` changes a document's text, name, type, and size under the same id. `library_search` finds the new words, and no longer the old ones.
-- [ ] The item moves to the top of the library, and a new chat's tag joins the old ones.
-- [ ] It refuses an image, an upload, an item not tagged for the bot, and text another item holds, each saying why, and the item is unchanged.
-- [ ] The same text again changes nothing.
-- [ ] `/api/library/<id>/file` with the old ETag answers the new text, not a 304.
-- [ ] `library.removed` reaches a plugin that's on for no bots. A handler that throws is logged, and the item is still removed.
-- [ ] An `app.libraryItem` part draws in the preview from the library and from a bot's panel, and one that throws leaves the preview working.
-- [ ] A plugin named `pages` adds. `GET /api/plugins/pages` still lists page code, `/api/plugins/pages/<id>` reaches the plugin, and `preview` and `search` are still refused as names.
-- [ ] `npm run typecheck` passes, and no plugin's name is in core's code.
-- [ ] A note under `## Unreleased`, and the three additions in the plugin API reference, each with its version.
+- [x] `fx.library.replace` changes a document's text, name, type, and size under the same id. `library_search` finds the new words, and no longer the old ones.
+- [x] The item moves to the top of the library, and a new chat's tag joins the old ones.
+- [x] It refuses an image, an upload, an item not tagged for the bot, and text another item holds, each saying why, and the item is unchanged.
+- [x] The same text again changes nothing.
+- [x] `/api/library/<id>/file` with the old ETag answers the new text, not a 304.
+- [x] `library.removed` reaches a plugin that's on for no bots. A handler that throws is logged, and the item is still removed.
+- [x] An `app.libraryItem` part draws in the preview from the library and from a bot's panel, and one that throws leaves the preview working.
+- [x] A plugin named `pages` adds. `GET /api/plugins/pages` still lists page code, `/api/plugins/pages/<id>` reaches the plugin, and `preview` and `search` are still refused as names.
+- [x] `npm run typecheck` passes, and no plugin's name is in core's code.
+- [x] A note under `## Unreleased`, and the three additions in the plugin API reference, each with its version.
 
 **M2. The tools**
-- [ ] `pages_write` with no id makes a page: one `text/markdown` library item named `<title>.md`, tagged for the bot and chat, and version 1.
-- [ ] With an id, it's the same item, version 2, and still one row in the library.
-- [ ] `library_search` finds it by a word in it, and `library_read` gives back all of it at the limit, with no cut.
-- [ ] `pages_edit` applies several edits in order, as one version.
-- [ ] An old string that matches nothing, or twice, saves nothing and says which one.
-- [ ] Two writes in one turn make one version, and the next turn makes another.
-- [ ] Each limit refuses with a message that says what to fix: the title, 60,000 bytes, and 20 edits.
-- [ ] Another bot's page, an upload, and an id that's no page answer `No page library:<id> of yours.`, and nothing changes.
-- [ ] A new page with an upload's text is refused, and one with the text of a document a bot saved becomes that item.
-- [ ] A revision that matches another item is refused, naming it, and the page is unchanged.
-- [ ] A `pages_write` run twice, as after a crash, leaves one page and one version.
-- [ ] The answer says not to repeat the page, and gives the link.
-- [ ] On a bot the plugin is off for, a call fails with `pages is off for this bot.`, and saves nothing.
+- [x] `pages_write` with no id makes a page: one `text/markdown` library item named `<title>.md`, tagged for the bot and chat, and version 1.
+- [x] With an id, it's the same item, version 2, and still one row in the library.
+- [x] `library_search` finds it by a word in it, and `library_read` gives back all of it at the limit, with no cut.
+- [x] `pages_edit` applies several edits in order, as one version.
+- [x] An old string that matches nothing, or twice, saves nothing and says which one.
+- [x] Two writes in one turn make one version, and the next turn makes another.
+- [x] Each limit refuses with a message that says what to fix: the title, 60,000 bytes, and 20 edits.
+- [x] Another bot's page, an upload, and an id that's no page answer `No page library:<id> of yours.`, and nothing changes.
+- [x] A new page with an upload's text is refused, and one with the text of a document a bot saved becomes that item.
+- [x] A revision that matches another item is refused, naming it, and the page is unchanged.
+- [x] A `pages_write` run twice, as after a crash, leaves one page and one version.
+- [x] The answer says not to repeat the page, and gives the link.
+- [x] On a bot the plugin is off for, a call fails with `pages is off for this bot.`, and saves nothing.
 
 **M3. Reading**
-- [ ] The card shows the title and **Open** in a bot's chat, in sight below the folded steps, and it's there after a reload.
-- [ ] While the call runs, it says `Writing a page…`.
-- [ ] After a later version, an older card says `Updated since`, and **Open** shows the newest.
-- [ ] A failed call shows the tool's words, and a removed page's card says so, with no button.
-- [ ] `/pages/<id>` draws the page: a table, a code block, and a Mermaid diagram, with the title once.
-- [ ] A `library:<id>` image draws. An `https:` image makes no request, and shows as a link.
-- [ ] The version select shows only with more than one. An older version says so, and **Restore** makes it the newest, in the library and in `library_read` too.
-- [ ] **Copy** copies the Markdown of the version showing.
-- [ ] A PDF of a page several screens long has all of it, and none of the sidebar.
-- [ ] **Delete** asks, removes the library item and every version, and the address then says `This page was removed.`
-- [ ] A removed bot's page still reads, says `A bot you removed`, and has no **Restore** or chat link.
-- [ ] At 375 pixels, nothing goes sideways on the reader, with a wide table on the page, or on the card.
-- [ ] No page errors, on any of these.
+- [x] The card shows the title and **Open** in a bot's chat, in sight below the folded steps, and it's there after a reload.
+- [x] While the call runs, it says `Writing a page…`.
+- [x] After a later version, an older card says `Updated since`, and **Open** shows the newest.
+- [x] A failed call shows the tool's words, and a removed page's card says so, with no button.
+- [x] `/pages/<id>` draws the page: a table and a code block, in a reading column, with the title once.
+- [x] A `library:<id>` image draws. An `https:` image makes no request, and shows as a link.
+- [x] The version select shows only with more than one. An older version says so, and **Restore** makes it the newest, in the library and in `library_read` too.
+- [x] **Copy** copies the Markdown of the version showing.
+- [x] A PDF of a page several screens long has all of it, and none of the sidebar.
+- [x] **Delete** asks, removes the library item and every version, and the address then says `This page was removed.`
+- [x] A removed bot's page still reads, says `A bot you removed`, and has no **Restore** or chat link.
+- [x] At 375 pixels, nothing goes sideways on the reader, with a wide table on the page, or on the card.
+- [x] No page errors, on any of these.
 
 **M4. HTML pages**
-- [ ] `pages_html` makes a `text/html` library item named `<title>.html`, at version 1, and with an id, version 2 of the same item.
-- [ ] A script that doesn't parse is refused, saying which. A module script isn't judged, and no script runs on the server.
-- [ ] `pages_edit` on an HTML page refuses, naming `pages_html`.
-- [ ] A page goes from Markdown to HTML and back, and each version draws as what it was.
-- [ ] The frame draws in the reader, and its script runs: a chart draws, and a filter changes it.
-- [ ] Inside the frame, `fetch`, `XMLHttpRequest`, a WebSocket, an outside script, stylesheet, image, and font all fail, and a stub server sees no request.
-- [ ] Inside the frame, `location.origin` is `null`, and `document.cookie`, `localStorage`, and `parent.document` give nothing.
-- [ ] A form post and a change to `top.location` go nowhere.
-- [ ] Opened alone in a tab, the address has the same headers and an opaque origin, and can't reach `/api/profiles`.
-- [ ] A site that isn't fxbot can't frame it.
-- [ ] A `library:<id>` image draws as `data:`, and another bot's item doesn't.
-- [ ] A `target="_blank"` link opens a tab.
-- [ ] `/frame` answers 404 for a Markdown version.
-- [ ] The library still sends an HTML page as plain text, and its preview shows the source, with no script running.
-- [ ] **Open in a tab** prints the whole document.
-- [ ] A document with no background of its own reads in dark mode.
-- [ ] At 375 pixels, the frame fills the width, and nothing goes sideways.
+- [x] `pages_html` makes a `text/html` library item named `<title>.html`, at version 1, and with an id, version 2 of the same item.
+- [x] A script that doesn't parse is refused, saying which. A module script isn't judged, and no script runs on the server.
+- [x] `pages_edit` on an HTML page refuses, naming `pages_html`.
+- [x] A page goes from Markdown to HTML and back, and each version draws as what it was.
+- [x] The frame draws in the reader, and its script runs: a chart draws, and a filter changes it.
+- [x] Inside the frame, `fetch`, `XMLHttpRequest`, a WebSocket, an outside script, stylesheet, image, and font all fail, and a stub server sees no request.
+- [x] Inside the frame, `self.origin` is `null`, and `document.cookie`, `localStorage`, and `parent.document` give nothing.
+- [x] A form post and a change to `top.location` go nowhere.
+- [x] A script can still move its own frame out, which is the reason `pages_html` isn't `safe`, and the reader stays put.
+- [x] Opened alone in a tab, the address has the same headers and an opaque origin, and can't reach `/api/profiles`.
+- [x] A site that isn't fxbot can't frame it.
+- [x] A `library:<id>` image draws as `data:`, and another bot's item doesn't.
+- [x] A `target="_blank"` link opens a tab.
+- [x] `/frame` answers 404 for a Markdown version.
+- [x] The library still sends an HTML page as plain text, and its preview shows the source, with no script running.
+- [x] **Open in a tab** prints the whole document.
+- [x] A document with no background of its own reads in dark mode.
+- [x] At 375 pixels, the frame fills the width, and nothing goes sideways.
 
 **M5. Everywhere else**
-- [ ] A page shows under **Documents** in the library and on the bot's panel, and its preview has **Open page**. Other items don't.
-- [ ] Removing an item in the library removes its versions, with no row left in `versions`.
-- [ ] Removing the plugin drops its schema, and every page stays in the library, at its newest text, and opens in the preview.
-- [ ] Adding it back works, and a page from before is a plain document.
-- [ ] With the plugin not added, nothing is different: no tool, route, timer, or part.
-- [ ] A bot in a room writes a page and links it, and the link opens it, after **Open link?**.
-- [ ] A routine writes a page, and its result reaches the bot's chat with it attached.
-- [ ] A bot on **Ask** writes a Markdown page, and edits it, without a card stopping it.
-- [ ] A bot on **Ask** waits at a card for `pages_html`, with the document folded. **Allow** saves it, and **Deny** saves nothing.
-- [ ] On **Auto**, the reviewer gets a `pages_html` call.
-- [ ] A routine's `pages_html` on **Ask** leaves a card, and after it expires, no page exists.
-- [ ] `pages` is in Essentials, before `computer`: a first run adds it, and it shows in the pack on **Browse**.
-- [ ] A turn another bot started folds with its page in the pill.
-- [ ] `scripts/check-plugins.mjs` passes, with `minFxbot` at the release that ships this.
+- [x] A page shows under **Documents** in the library and on the bot's panel, and its preview has **Open page**. Other items don't.
+- [x] Removing an item in the library removes its versions, with no row left in `versions`.
+- [x] Removing the plugin drops its schema, and every page stays in the library, at its newest text, and opens in the preview.
+- [x] Adding it back works, and a page from before is a plain document.
+- [x] With the plugin not added, nothing is different: no tool, route, timer, or part.
+- [x] A bot in a room writes a page and links it, and the link opens it, after **Open link?**.
+- [x] A routine writes a page, and its result reaches the bot's chat with it attached.
+- [x] A bot on **Ask** writes a Markdown page, and edits it, without a card stopping it.
+- [x] A bot on **Ask** waits at a card for `pages_html`, with the document folded. **Allow** saves it, and **Deny** saves nothing.
+- [x] On **Auto**, the reviewer gets a `pages_html` call.
+- [x] A routine's `pages_html` on **Ask** leaves a card, and after it expires, no page exists.
+- [x] `pages` is in Essentials, before `computer`: a first run adds it, and it shows in the pack on **Browse**.
+- [x] A turn another bot started folds with its page in the pill.
+- [x] `scripts/check-plugins.mjs` passes, with `minFxbot` at the release that ships this.
 
 **M6. Docs and closing**
-- [ ] `plugins/pages/README.md`, with the rolldown command, and `page.js` built and committed.
-- [ ] `pages` in `plugins-registry.json`, in its `essentials`, and in the site's directory, with the pack's words on the site and in the tutorial still true.
-- [ ] A how-to on the site, listed in `src/sidebar.ts`, and `npm run build-site` passes.
-- [ ] `README.md`'s line ticked, `AGENTS.md`'s built scope, and `CHANGELOG.md`.
-- [ ] This doc moved to `docs/_completed/phases/`, with a **What the build changed**, and the links to it in `library.md` and `routines.md` updated.
-- [ ] Line counts against the bound.
-- [ ] `npm run typecheck`, `npm run build`, `npm run build-site`, and `git diff --check` pass, and the regression checks do.
-- [ ] Committed on the open release branch, core and docs apart, and not pushed.
+- [x] `plugins/pages/README.md`, with the rolldown command, and `page.js` built and committed.
+- [x] `pages` in `plugins-registry.json`, in its `essentials`, and in the site's directory, with the pack's words on the site and in the tutorial still true.
+- [x] A how-to on the site, listed in `src/sidebar.ts`, and `npm run build-site` passes.
+- [x] `README.md`'s line ticked, `AGENTS.md`'s built scope, and `CHANGELOG.md`.
+- [x] This doc moved to `docs/_completed/phases/`, with a **What the build changed**, and the links to it in `library.md` and `routines.md` updated.
+- [x] Line counts against the bound.
+- [x] `npm run typecheck`, `npm run build`, `npm run build-site`, and `git diff --check` pass, and the regression checks do.
+- [x] Committed on the open release branch, core and docs apart, and not pushed.
 
 **The human runs these:**
 - **With a real model:** ask for a report on something you care about, then a small change, then a big one. Does it use a page when it should, and stay quiet about what's on it?
@@ -458,3 +459,13 @@ Print a check's setup, and match exact fields: one that tested nothing can't pas
 - **"pages are part of the essentials".** `pages` joins the pack, before `computer`, whose setup restarts fxbot.
 
 Nothing is left open.
+
+## What the build changed
+
+- **Mermaid diagrams don't draw in fxbot.** The plan said they would. Streamdown needs a plugin of its own for them, which the app doesn't have, so a Mermaid block shows as code, in the chat too. A browser check caught it. The tool doesn't offer them, and a bot draws a diagram with `pages_html`.
+- **The reading column is in `page.css`.** The app's stylesheet holds only the classes it uses, and had no `max-w-2xl`, `pb-3`, `pb-10`, or `bg-white`, so the page first ran edge to edge.
+- **`pages` needed a line in `plugins` as well as `essentials`.** The pack leaves out a name that isn't listed, so it was silently missing until the check on a fresh install ran the real flow.
+- **A sandbox's origin is `self.origin`.** `location.origin` gives the URL's, even in a sandbox. The checks read the right one, and the page's script got no further in either case.
+- **A script can leave, and a check shows it.** It can move its own frame, and alone in a tab, it can move itself. So `pages_html` isn't `safe`, and the plan's reason holds.
+- **A link in a reply says too much.** Streamdown's dialog says "Open external link?" and "You're about to visit an external website." for `/pages/<id>` too. It's how every link behaves, so it stayed, as planned. It's a small change to the chat, for later.
+- **The size:** a net 37 core lines, against 45, and 417 of the plugin, against 430.

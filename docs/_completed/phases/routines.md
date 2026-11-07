@@ -173,7 +173,7 @@ The systems with tools give a scheduled run nearly all of them by default, and t
 14. **A run is the whole bot.** Nothing narrows it: not a tool list, not a mode. What a bot can do in its chat, a routine can do on a schedule, with the computer, an MCP server, a skill, or a plugin that doesn't exist yet. It costs no code, since a session has it all already, and the checks above saw it work. So Hermes's and OpenClaw's list per job isn't needed yet.
 15. **No one is watching, so the rules change, not the tools.** The computer's own rule says to ask the owner before sending, buying, signing in, or deleting, and a run has no one to ask. So the task is the owner's say-so for what it names, and for nothing else: what it doesn't name stays undone, and the run says so.
 16. **A login stops a run, and doesn't fail it.** `computer_ask_owner` already does the right thing unattended: the run ends with what it needs, the owner reads that in the chat, takes the computer, and hands it back, and the bot goes on in its own chat with the result in front of it.
-17. **What a run saves comes back with its result.** A report is a file as often as a message. `files` carries it to the chat, so the owner opens it there. A future [page](../../phases/pages.md) is a library item too, so a page tool works in a run with nothing added here.
+17. **What a run saves comes back with its result.** A report is a file as often as a message. `files` carries it to the chat, so the owner opens it there. A future [page](pages.md) is a library item too, so a page tool works in a run with nothing added here.
 18. **One time zone, in core, set by itself.** OpenClaw, Hermes, and Grok all have one. Most owners never open Settings › General, so the page sets it from the browser the first time it opens, as Grok's **Auto-detect** does.
 19. **Limits are settings.** The owner tunes how long a run goes and how much it does, on the plugin's tab in Settings. A computer task can need far longer than a summary, and a model can't change any of them.
 
@@ -361,7 +361,7 @@ Everything the bot has, because a run's session is one of the bot's sessions and
 | Memories, the library, `chat_history`, skills | Yes |
 | Each plugin's tools, such as the computer's | Yes, while the plugin is on for the bot |
 | MCP servers | Yes, the tools the owner allowed, for the bots they allowed |
-| A plugin not built yet, such as [pages](../../phases/pages.md) | Yes: its tools join the same list |
+| A plugin not built yet, such as [pages](pages.md) | Yes: its tools join the same list |
 | `routines_add`, `routines_change`, `routines_remove` | No: the bot's own chat only. `routines_list` works |
 | Any tool, in the turn that tells the owner | No: those turns only pass on a result |
 

@@ -96,6 +96,7 @@ export default async function setup(fx: PluginApi) {
 | `fx.need(name)` | What a plugin this one names under `needs` provides, or null while it isn't running. It throws for a plugin `needs` doesn't name. Since 0.5.0. |
 | `fx.library.read(bot, id)` | A library item's `name`, `type`, and `bytes`, if it's tagged for the bot; otherwise it throws |
 | `fx.library.save({ bot, session, name, type, bytes })` | Saves an image, or UTF-8 text, to the bot's library, tagged for the chat, through the library's checks. It answers the item. |
+| `fx.library.replace({ bot, session, id, name, type, bytes })` | Changes a document a bot made, in place: its id and tags stay, the chat gets a tag, and it comes to the top of the library. It refuses an image, an upload, an item not tagged for the bot, and text another item holds. It answers the item. Since 0.7.0. |
 | `fx.library.list(bot, session)` | The items saved in one chat of the bot, newest first. Since 0.6.0. |
 | `fx.skills.files(bot, name)` | The files besides `SKILL.md` of the skill the bot sees by that name, as `{ path, text }`. None when it has no such skill. |
 | `fx.skills.set(bot, skills)` | The skills the plugin gives one bot, in place of those it gave before, each `{ name, description, instructions }`, as a `SKILL.md`'s name, description, and body. They join the bot's catalog, its `skill` tool, and its `/` list while the plugin is on for it, and go when the plugin unloads, so a plugin keeps them and sets them again in its setup. It throws with status 400 for a bad name, a description over 1,024 characters, a name twice, or instructions over 64 KiB. Since 0.5.0. |
@@ -121,6 +122,7 @@ Handlers run in the order the plugins were added, and change the event's fields 
 | `tool.after` | After it | the same, with `result`, or `error` when it failed | Change `result` |
 | `turn.start` | Once libfx stores the prompt, or since 0.6.0, in a bot's own chat, when the turn it waited behind ends | `bot`, `session`, `messageId`, `text`, `from` | Observe |
 | `turn.end` | When the turn ends | the same, with `reply`, `error` when it failed, as when the provider answered with an error, and `cancelled` when it was stopped, since 0.6.0 | Observe |
+| `library.removed` | An item left the library, for every bot. It reaches every running plugin, whichever bots it's on for. Since 0.7.0. | `id` | Observe |
 | `settings` | The owner changed its settings | `settings` | Observe |
 | `dependents` | A plugin that needs this one was added, updated, or removed | `dependents`, as `fx.dependents()` gives them | Observe |
 
@@ -258,6 +260,7 @@ The computer and chat rooms provide objects of their own: see [the computer's](/
 | `app.nav({ label, path, icon? })` | A button in the sidebar's footer row, to `/<plugin><path>`. `icon` is a component; without one, the button shows the plugin's icon. |
 | `app.chat(Component)` | Above the message box in a bot's chat. It gets `bot`. Since 0.6.0. |
 | `app.botPanel(Component)` | Above the tabs of a bot's panel, beside its chat. It gets `bot`. |
+| `app.libraryItem(Component)` | Beside **Download** in an item's preview, from the library or a bot's panel. It gets `item`. Since 0.7.0. |
 | `app.composer(Component)` | A control beside the attach button. It gets `bot`, `setDraft(text)`, and `attach(files)`. `setDraft` also takes a function from the draft to the new text. |
 | `app.box(Component)` | Replaces the textarea in a bot's chat, for the first plugin that sets one. It gets `bot` and a textarea's props, and acts as one: `value` is the text, `onChange` gets `{ target: { value, selectionStart } }`, and its `ref` has `selectionStart` and `setSelectionRange`. One that throws falls back to the textarea. Since 0.6.0. |
 | `app.fold({ message, tool })` | Folds messages in a bot's chat into a pill, which counts what was received and sent, shows each bot's face, and opens to show them. `message(id)` gets a message's id, and answers `{ fold, bot }`, or nothing: `fold` is `"turn"` to fold it with the turn it starts, or `"message"` to fold it alone, and `bot` is the id of who it's from. `tool(call)` gets a tool call, and answers `{ bot, name }` when it sent a message, or nothing, and its card goes in a pill. A run of them makes one pill, until something that doesn't fold. A turn the owner wrote into stays in view. Since 0.6.0. |
