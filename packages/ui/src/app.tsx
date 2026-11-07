@@ -39,7 +39,7 @@ import { client } from "./client.ts";
 import { maxFiles, readFile } from "./attachments.ts";
 import { Blob } from "./blob.tsx";
 import { BotForm } from "./bot-form.tsx";
-import { LookPicker, surprise } from "./look-picker.tsx";
+import { LookDialog, type BotLook } from "./look-picker.tsx";
 import { Fold, type Folded } from "./fold.tsx";
 import { Onboarding } from "./onboarding.tsx";
 import { BotPanel, usePanel } from "./bot-panel.tsx";
@@ -425,6 +425,13 @@ function ProfileForm({ id, onSaved }: { id: string; onSaved: () => void }) {
 
   const nameOf = (provider: string) => providers.find((p) => p.id === provider)?.name ?? "another provider";
   const moving = Boolean(chat.sessionId && fields.provider !== chat.provider);
+  // A look saves by itself, so whatever else is half typed here stays half typed.
+  async function saveLook({ shape, color, mood, head, face, outfit, tint }: BotLook) {
+    const look = { shape, color, mood, head, face, outfit, tint };
+    setBot(await client.profiles.update(id, look));
+    setFields((now) => ({ ...now, ...look }));
+    onSaved();
+  }
   async function save(event: FormEvent) {
     event.preventDefault();
     if (moving && !confirm(`Moving ${fields.name} to ${nameOf(fields.provider)} starts a new chat. The current one is summarized and carried over, and ${fields.name} can search it.`)) return;
@@ -459,12 +466,9 @@ function ProfileForm({ id, onSaved }: { id: string; onSaved: () => void }) {
       <main className="flex-1 overflow-y-auto px-4 py-6">
         <form onSubmit={save} className="mx-auto grid max-w-xl gap-5">
           {loaded && (
-            <div className="grid gap-5">
-              <Blob {...fields} provider={undefined} size={120} follow className="mx-auto" />
-              <Button type="button" variant="outline" className="mx-auto" onClick={() => setFields({ ...fields, ...surprise() })}>
-                Surprise me
-              </Button>
-              <LookPicker look={fields} onChange={(look) => setFields({ ...fields, ...look })} />
+            <div className="grid justify-items-center gap-3">
+              <Blob {...fields} provider={undefined} size={112} follow />
+              <LookDialog name={fields.name} look={fields} onSave={saveLook} />
             </div>
           )}
           <label className={label}>
@@ -494,7 +498,7 @@ function ProfileForm({ id, onSaved }: { id: string; onSaved: () => void }) {
           <BotPlugins profileId={id} />
           {bot && <Place pick={(places) => places.botSettings} props={{ bot }} />}
           {error && <Problem>{error}</Problem>}
-          <div className="flex gap-2">
+          <div className="sticky -bottom-6 flex justify-between gap-2 border-t bg-background py-3">
             <Button type="submit" disabled={busy || !loaded}>
               {busy && moving ? "Summarizing the chat…" : "Save"}
             </Button>
