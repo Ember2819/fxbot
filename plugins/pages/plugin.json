@@ -1,6 +1,6 @@
 {
   "name": "pages",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Bots write reports, guides, and plans to read outside the chat, kept in the library with every version.",
   "license": "Apache-2.0",
   "extensions": {

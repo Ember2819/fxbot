@@ -10,6 +10,13 @@
   padding: 0 1rem 1rem;
   width: 100%;
 }
+.pages-box {
+  margin-right: 0.4rem;
+  vertical-align: middle;
+}
+.pages-print ul > li:has(.pages-box) {
+  list-style: none;
+}
 /* An HTML page with no background of its own reads as it would in a tab, in dark mode too. */
 .pages-frame {
   background: white;

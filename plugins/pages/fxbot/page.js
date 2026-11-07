@@ -74,18 +74,46 @@ function Picture({ src, alt }) {
 		children: alt || src
 	});
 }
-function Markdown({ title, text }) {
+function taskLines(text) {
+	const tasks = [];
+	let fence = null;
+	text.split("\n").forEach((line, i) => {
+		const mark = /^\s*(```+|~~~+)/.exec(line)?.[1];
+		if (mark) fence = !fence ? mark : mark.startsWith(fence) ? null : fence;
+		else if (!fence && /^\s*(?:[-*+]|\d+[.)])\s+\[[ xX]\]/.test(line)) tasks.push(i);
+	});
+	return tasks;
+}
+function Markdown({ title, text, onTick }) {
 	const body = text.replace(/^\s*#[ \t]+(.+)\n/, (line, heading) => heading.trim() === title ? "" : line).replace(/\]\(library:([0-9a-f]{12})/g, "](/api/library/$1/file");
+	const live = Boolean(onTick);
+	const components = (0, react.useMemo)(() => ({
+		img: Picture,
+		input: ({ checked, type }) => (0, react_jsx_runtime.jsx)("input", {
+			type,
+			checked: Boolean(checked),
+			disabled: !live,
+			onChange: () => {},
+			className: "pages-box"
+		})
+	}), [live]);
+	const tick = (event) => {
+		if (!live || event.target.type !== "checkbox") return;
+		const boxes = [...event.currentTarget.querySelectorAll("input[type=\"checkbox\"]")];
+		const tasks = taskLines(text);
+		if (boxes.length === tasks.length) onTick(tasks[boxes.indexOf(event.target)], event.target.checked);
+	};
 	return (0, react_jsx_runtime.jsx)("div", {
 		className: "pages-scroll min-h-0 flex-1 overflow-y-auto",
 		children: (0, react_jsx_runtime.jsxs)("article", {
 			className: "pages-column pages-print",
+			onClick: tick,
 			children: [(0, react_jsx_runtime.jsx)("h1", {
 				className: "pages-title",
 				children: title
 			}), (0, react_jsx_runtime.jsx)(_fxbot_app.ui.Streamdown, {
 				mode: "static",
-				components: { img: Picture },
+				components,
 				children: body
 			})]
 		})
@@ -125,7 +153,7 @@ function Bar({ words, detail, yes, no, onYes, onNo }) {
 		})
 	});
 }
-function Frame({ id, n, title, onOp }) {
+function Frame({ id, n, title, onOp, data }) {
 	const shell = (0, react.useRef)(null);
 	const line = (0, react.useRef)(null);
 	const taken = (0, react.useRef)(false);
@@ -155,6 +183,10 @@ function Frame({ id, n, title, onOp }) {
 		addEventListener("message", offer);
 		return () => (removeEventListener("message", offer), line.current?.close());
 	}, []);
+	(0, react.useEffect)(() => void line.current?.postMessage({
+		event: "data",
+		value: data?.data ?? null
+	}), [data?.at]);
 	const held = (event) => event.target.contentDocument?.querySelector("iframe")?.addEventListener("load", () => (line.current?.close(), line.current = null));
 	return (0, react_jsx_runtime.jsx)("iframe", {
 		ref: shell,
@@ -174,13 +206,36 @@ function Reader({ params: { id } }) {
 	const [copied, setCopied] = (0, react.useState)(false);
 	const [error, setError] = (0, react.useState)("");
 	const [bar, setBar] = (0, react.useState)(null);
+	const [fresh, setFresh] = (0, react.useState)(0);
+	const [data, setData] = (0, react.useState)(null);
+	const [notNow, setNotNow] = (0, react.useState)(false);
+	const [errors, setErrors] = (0, react.useState)([]);
+	const ticking = (0, react.useRef)(false);
 	const read = () => call(id).then(setPage, (e) => e.status === 404 ? setPage(null) : setError(e.message));
 	(0, react.useEffect)(() => void read(), [id]);
 	const newest = page?.versions[0].n;
 	const n = picked ?? newest;
 	(0, react.useEffect)(() => {
 		if (n) call(`${id}/versions/${n}`).then(setShown, (e) => setError(e.message));
-	}, [id, n]);
+	}, [
+		id,
+		n,
+		fresh
+	]);
+	const isHtml = shown?.type === "text/html";
+	const readData = () => isHtml && n === shown?.n ? call(`${id}/data?n=${n}`).then(setData, () => {}) : void 0;
+	(0, react.useEffect)(() => {
+		readData();
+		const again = () => document.visibilityState === "visible" && readData();
+		addEventListener("focus", again);
+		document.addEventListener("visibilitychange", again);
+		return () => (removeEventListener("focus", again), document.removeEventListener("visibilitychange", again));
+	}, [
+		id,
+		n,
+		isHtml,
+		shown?.n
+	]);
 	if (page === null) return (0, react_jsx_runtime.jsxs)(react_jsx_runtime.Fragment, { children: [(0, react_jsx_runtime.jsx)(Header, { title: "Page" }), (0, react_jsx_runtime.jsxs)("div", {
 		className: "pages-column grid gap-3 text-sm",
 		children: [(0, react_jsx_runtime.jsx)("p", { children: "This page was removed." }), (0, react_jsx_runtime.jsx)(Button, {
@@ -192,24 +247,65 @@ function Reader({ params: { id } }) {
 		})]
 	})] });
 	if (!page || !shown) return (0, react_jsx_runtime.jsx)(Header, { title: error || "Page" });
-	const isHtml = shown.type === "text/html";
 	const restore = () => call(`${id}/restore`, "POST", { n }).then(() => (setPicked(null), read()), (e) => setError(e.message));
 	const remove = async () => {
 		if (!confirm(`Remove ${shown.title} from the library, for every bot? The chats it came from keep what the bots saw.`)) return;
 		await _fxbot_app.client.library.remove(id).then(() => (0, _fxbot_app.go)("/library"), (e) => setError(e.message));
 	};
 	const copy = () => navigator.clipboard.writeText(shown.text).then(() => setCopied(true), (e) => setError(e.message));
-	const onOp = (op, args) => {
-		if (op !== "open") throw new Error("A page can't do that.");
-		const url = URL.canParse(args[0]) ? new URL(args[0]) : null;
-		if (!url || !["http:", "https:"].includes(url.protocol) || url.username || url.password) throw new Error("That address can't be opened.");
+	const tick = (line, done) => {
+		if (ticking.current) return;
+		ticking.current = true;
+		call(`${id}/tick`, "POST", {
+			n,
+			line,
+			done
+		}).catch((e) => setError(e.message)).then(read).then(() => setFresh((f) => f + 1)).finally(() => ticking.current = false);
+	};
+	const say = (text) => {
+		if (!bot) throw new Error("The bot that wrote this page is gone.");
+		if (typeof text !== "string" || !text.trim() || text.length > 4e3 || text.trimStart().startsWith("/")) throw new Error("A page can't say that.");
 		setBar({
-			words: "This page wants to open:",
-			detail: url.href,
-			yes: "Open",
+			words: `This page wants to tell ${bot.name}:`,
+			detail: text,
+			yes: "Send",
 			no: "Cancel",
-			onYes: () => (window.open(url.href, "_blank", "noopener,noreferrer"), setBar(null))
+			onYes: () => call(`${id}/say`, "POST", { text }).then(() => setBar({
+				words: `Sent to ${bot.name}.`,
+				yes: `Open ${bot.name}'s chat`,
+				no: "Close",
+				onYes: () => (0, _fxbot_app.go)(`/profiles/${bot.id}`)
+			}), (e) => (setError(e.message), setBar(null)))
 		});
+	};
+	const saved = (op, key, value) => call(`${id}/saved`, "POST", {
+		op,
+		key,
+		value
+	}).then((answer) => answer.value);
+	const ops = {
+		get: (key) => saved("get", key),
+		set: (key, value) => saved("set", key, value),
+		del: (key) => saved("del", key),
+		list: (prefix) => saved("list", prefix),
+		data: () => call(`${id}/data?n=${n}`).then((answer) => answer.data),
+		say,
+		error: (words) => setErrors((all) => [...all, String(words).slice(0, 4e3)].slice(-20)),
+		open(address) {
+			const url = URL.canParse(address) ? new URL(address) : null;
+			if (!url || !["http:", "https:"].includes(url.protocol) || url.username || url.password) throw new Error("That address can't be opened.");
+			setBar({
+				words: "This page wants to open:",
+				detail: url.href,
+				yes: "Open",
+				no: "Cancel",
+				onYes: () => (window.open(url.href, "_blank", "noopener,noreferrer"), setBar(null))
+			});
+		}
+	};
+	const onOp = (op, args) => {
+		if (!Object.hasOwn(ops, op)) throw new Error("A page can't do that.");
+		return ops[op](...args);
 	};
 	return (0, react_jsx_runtime.jsxs)(react_jsx_runtime.Fragment, { children: [
 		(0, react_jsx_runtime.jsx)(Header, { title: shown.title }),
@@ -319,14 +415,35 @@ function Reader({ params: { id } }) {
 			...bar,
 			onNo: () => setBar(null)
 		}),
+		!bar && data?.waiting && !notNow && n === newest && (0, react_jsx_runtime.jsx)(Bar, {
+			words: `${bot?.name ?? "A bot"} wants to give this page data. A page with code can send what it holds elsewhere.`,
+			yes: "Allow",
+			no: "Not now",
+			onYes: () => call(`${id}/allow`, "POST", { n }).then(readData, (e) => setError(e.message)),
+			onNo: () => setNotNow(true)
+		}),
 		isHtml ? (0, react_jsx_runtime.jsx)(Frame, {
 			id,
 			n,
 			title: shown.title,
-			onOp
+			onOp,
+			data
 		}, n) : (0, react_jsx_runtime.jsx)(Markdown, {
 			title: shown.title,
-			text: shown.text
+			text: shown.text,
+			onTick: bot && n === newest ? tick : null
+		}),
+		errors.length > 0 && (0, react_jsx_runtime.jsxs)("div", {
+			className: "pages-column pages-bar flex flex-wrap items-center gap-2 pt-2 text-sm",
+			children: [(0, react_jsx_runtime.jsx)("span", {
+				className: "text-muted-foreground",
+				children: "This page hit an error."
+			}), bot && (0, react_jsx_runtime.jsx)(Button, {
+				size: "sm",
+				variant: "outline",
+				onClick: () => say(`This page hit an error:\n\n${errors.join("\n").slice(0, 3900)}`),
+				children: "Tell the bot"
+			})]
 		})
 	] });
 }
