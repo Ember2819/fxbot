@@ -5,7 +5,7 @@ description: "Each bot can have a Linux computer of its own, with a desktop you 
 
 Each bot can have a Linux computer of its own: a Debian machine where it is root, with a desktop, a terminal, Chromium, and files that last. A bot runs commands there, browses, works in desktop apps, and saves what it makes to its library. You watch its desktop as it works, and take it over when it needs you. The computer is a plugin, and the engine it runs in is set up once on the machine.
 
-You need fxbot on Debian 13 or Ubuntu 24.04, with podman or docker: a release install has one already.
+You need fxbot on Debian 13 or Ubuntu 24.04, or on Arch, with podman or docker: a release install has one already.
 
 1. Open **Plugins**, choose **Browse**, and choose **computer**. Read what runs inside fxbot, then choose **Add computer**.
 2. The machine sets up the computer's engine by itself, in a minute or two: this machine's podman or docker, run rootless for a user of its own, `fxbot-computer`, with a firewall that keeps its computers to the internet. fxbot starts again when it's done. **Settings** › **Computer** shows it working, then names the engine, such as `podman 5.4.2, rootless`.

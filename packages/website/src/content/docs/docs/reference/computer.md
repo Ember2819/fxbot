@@ -124,7 +124,7 @@ What it sets up:
 
 | Thing | Where |
 | --- | --- |
-| Packages | `uidmap`, `dbus-user-session`, `nftables`, and `curl`; with podman, `podman` and `passt`; with docker, `rootlesskit` beside Debian's or Ubuntu's `docker.io`, or `docker-ce-rootless-extras` beside Docker's `docker-ce`, and `slirp4netns` |
+| Packages | `uidmap`, `dbus-user-session`, `nftables`, and `curl`; with podman, `podman` and `passt`; with docker, `rootlesskit` beside Debian's or Ubuntu's `docker.io`, or `docker-ce-rootless-extras` beside Docker's `docker-ce`, and `slirp4netns`. On Arch and its kin: `uidmap`, `dbus`, `nftables`, and `curl`; with podman, `podman` and `passt` |
 | The user | `fxbot-computer`, home `/var/lib/fxbot-computer`, 65,536 subordinate ids, lingering on |
 | Limits | `/etc/systemd/system/user@<uid>.service.d/fxbot-computer.conf` delegates cpu, memory, and pids to it |
 | The engine | Its socket at `/var/lib/fxbot-computer/run/engine.sock`. Podman starts when called and stops 5 seconds after; Docker's rootless daemon runs all the time, and holds about 180 MB. |

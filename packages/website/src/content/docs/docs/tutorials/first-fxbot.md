@@ -1,13 +1,13 @@
 ---
 title: "Your first fxbot"
-description: "In this tutorial you install fxbot on a Debian or Ubuntu machine, open it on your phone, and chat with a bot you made."
+description: "In this tutorial you install fxbot on a Debian or Ubuntu machine, or on Arch, open it on your phone, and chat with a bot you made."
 ---
 
-In this tutorial you install fxbot on a Debian or Ubuntu machine, open it on your phone, and chat with a bot you made.
+In this tutorial you install fxbot on a Debian or Ubuntu machine, or on Arch, open it on your phone, and chat with a bot you made.
 
 You need:
 
-- a Debian or Ubuntu machine, or one on a distro built on them, with systemd, where you can use `sudo`
+- a Debian or Ubuntu machine, or one on a distro built on them, or Arch, with systemd, where you can use `sudo`
 - [Tailscale](https://tailscale.com/download) on that machine and on your phone, in the same tailnet, with [HTTPS turned on](https://tailscale.com/kb/1153/enabling-https). This tutorial uses it to reach fxbot from your phone, the recommended way; fxbot itself doesn't need it.
 - a ChatGPT plan, or an API key from OpenAI or OpenRouter
 

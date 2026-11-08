@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Installs fxbot on Debian or Ubuntu as containers, from a release tag: the newest, or the one named.
+# Installs fxbot on Debian or Ubuntu, or on Arch, as containers, from a release tag: the newest, or the one named.
 #
 #   curl -fsSL https://fxbot.sh/setup.sh | sudo bash
 #   curl -fsSL https://fxbot.sh/setup.sh | sudo bash -s -- v0.3.0
@@ -26,15 +26,22 @@ die() {
 }
 
 [ "$(id -u)" -eq 0 ] || die "run it as root, such as with: curl -fsSL <this address> | sudo bash"
-command -v apt-get >/dev/null || die "this script is for Debian and Ubuntu. Elsewhere, follow the README's steps."
+# Debian and Ubuntu and their kin run apt-get; Arch and its kin run pacman. Elsewhere, follow the README's steps.
+if command -v apt-get >/dev/null; then
+  pkg=apt-get
+elif command -v pacman >/dev/null; then
+  pkg=pacman
+else
+  die "this script runs apt-get or pacman, as on Debian and Ubuntu or on Arch. Elsewhere, follow the README's steps."
+fi
+if [ "$pkg" = pacman ]; then nologin=/usr/bin/nologin; else nologin=/usr/sbin/nologin; fi
 case "$want" in "" | v[0-9]*.[0-9]*.[0-9]*) ;; *) die "name a release such as v0.3.0, not $want" ;; esac
 cd /
-export DEBIAN_FRONTEND=noninteractive
+if [ "$pkg" = apt-get ]; then export DEBIAN_FRONTEND=noninteractive; fi
 . /etc/os-release
 
 say "The container engine"
-apt-get update -qq
-apt-get install -y -qq --no-install-recommends ca-certificates curl >/dev/null
+if [ "$pkg" = apt-get ]; then apt-get update -qq; apt-get install -y -qq --no-install-recommends ca-certificates curl >/dev/null; else pacman -S --noconfirm ca-certificates curl >/dev/null; fi
 at_least() { [ "$(printf '%s\n%s\n' "$1" "$2" | sort -V | head -n 1)" = "$1" ]; }
 candidate() { apt-cache policy "$1" | sed -n 's/^ *Candidate: \([0-9][0-9.]*\).*/\1/p'; }
 # An install keeps its engine. Otherwise podman 4 or newer: before it, podman has no netavark, and Compose can't find the
@@ -45,20 +52,30 @@ if [ -z "$engine" ]; then
     engine=podman
   elif command -v docker >/dev/null; then
     engine=docker
-  elif at_least 4 "$(candidate podman)"; then
+  elif [ "$pkg" = apt-get ] && at_least 4 "$(candidate podman)"; then
     engine=podman
   else
-    apt-get install -y -qq --no-install-recommends docker.io >/dev/null
-    engine=docker
+    if [ "$pkg" = apt-get ]; then
+      apt-get install -y -qq --no-install-recommends docker.io >/dev/null
+      engine=docker
+    else
+      # Arch and its kin ship podman new enough, with netavark and aardvark-dns, which it recommends.
+      pacman -S --noconfirm podman netavark aardvark-dns nftables >/dev/null
+      engine=podman
+    fi
   fi
 fi
 if [ "$engine" = podman ]; then
   # Containers find each other by name through netavark and aardvark-dns, which podman only recommends. Debian 13's
-  # netavark needs nft.
-  apt-get install -y -qq --no-install-recommends podman netavark aardvark-dns nftables >/dev/null || echo "Couldn't install podman's network parts, so fxbot may not reach its database."
-  # A podman that has run on CNI, as Debian 12's does out of the box, stays on it, and needs this plugin for names.
-  if [ "$(podman info --format '{{.Host.NetworkBackend}}' 2>/dev/null)" = cni ]; then
-    apt-get install -y -qq --no-install-recommends golang-github-containernetworking-plugin-dnsname >/dev/null || echo "Couldn't install CNI's dnsname plugin, so fxbot may not reach its database."
+  # netavark needs nft; Arch's podman brings it and its network parts with it.
+  if [ "$pkg" = apt-get ]; then
+    apt-get install -y -qq --no-install-recommends podman netavark aardvark-dns nftables >/dev/null || echo "Couldn't install podman's network parts, so fxbot may not reach its database."
+    # A podman that has run on CNI, as Debian 12's does out of the box, stays on it, and needs this plugin for names.
+    if [ "$(podman info --format '{{.Host.NetworkBackend}}' 2>/dev/null)" = cni ]; then
+      apt-get install -y -qq --no-install-recommends golang-github-containernetworking-plugin-dnsname >/dev/null || echo "Couldn't install CNI's dnsname plugin, so fxbot may not reach its database."
+    fi
+  else
+    pacman -S --noconfirm podman netavark aardvark-dns nftables >/dev/null || echo "Couldn't install podman's network parts, so fxbot may not reach its database."
   fi
   # Compose reaches podman through its socket.
   [ ! -d /run/systemd/system ] || systemctl enable --now podman.socket >/dev/null 2>&1
@@ -120,7 +137,7 @@ find_compose || { compose_package && find_compose; } || { compose_download && fi
 echo "${compose:-$engine compose} $(version_of ${compose:-$engine compose})"
 
 say "The fxbot user, its folders, and its key"
-id fxbot >/dev/null 2>&1 || useradd --system --home-dir "$var" --create-home --shell /usr/sbin/nologin fxbot
+id fxbot >/dev/null 2>&1 || useradd --system --home-dir "$var" --create-home --shell "$nologin" fxbot
 install -d -o fxbot -g fxbot -m 700 "$var" "$var/data" "$var/backups"
 install -d -o fxbot -g fxbot -m 755 "$var/control" "$var/control/requests"
 install -d -m 755 "$etc"

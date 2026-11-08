@@ -26,7 +26,16 @@ done
 die() { echo "setup.sh: $*" >&2; exit 1; }
 [ "$(id -u)" = 0 ] || die "run it as root: sudo bash $0"
 [[ $name =~ ^[a-z][a-z0-9-]{0,30}$ ]] || die "--name must be a lowercase user name"
-command -v systemctl >/dev/null && command -v apt-get >/dev/null || die "it needs systemd and apt: Debian 13 or Ubuntu 24.04"
+if ! command -v systemctl >/dev/null; then die "it needs systemd"; fi
+if ! command -v apt-get >/dev/null && ! command -v pacman >/dev/null; then die "it needs apt or pacman: Debian 13 or Ubuntu 24.04, or Arch."; fi
+if command -v apt-get >/dev/null; then pkg=apt-get; elif command -v pacman >/dev/null; then pkg=pacman; fi
+nologin=/usr/sbin/nologin
+nft_bin=/usr/sbin/nft
+if [ "$pkg" = pacman ]; then nologin=/usr/bin/nologin; nft_bin=/usr/bin/nft; fi
+have_pkg() {
+  # dpkg on Debian and Ubuntu and their kin, pacman on Arch and its kin.
+  if command -v dpkg >/dev/null; then dpkg -s "$1" >/dev/null 2>&1; else pacman -Q "$1" >/dev/null 2>&1; fi
+}
 
 home=/var/lib/$name
 run=$home/run
@@ -76,22 +85,27 @@ if [ -z "$engine" ]; then
 fi
 [ "$engine" = podman ] || [ "$engine" = docker ] || die "--engine must be podman or docker"
 
-need=(uidmap dbus-user-session nftables curl)
+need=(uidmap nftables curl)
+if [ "$pkg" = apt-get ]; then need+=(dbus-user-session); else need+=(dbus); fi
 if [ "$engine" = podman ]; then
   need+=(podman passt)
-elif dpkg -s docker-ce >/dev/null 2>&1; then
+elif have_pkg docker-ce; then
   need+=(docker-ce-rootless-extras slirp4netns)
-elif dpkg -s docker.io >/dev/null 2>&1; then
+elif have_pkg docker.io; then
   need+=(rootlesskit slirp4netns)
 else
   die "docker here isn't Docker's docker-ce or the distribution's docker.io. Install one of those, or use --engine podman."
 fi
 missing=()
-for package in "${need[@]}"; do dpkg -s "$package" >/dev/null 2>&1 || missing+=("$package"); done
+for package in "${need[@]}"; do have_pkg "$package" || missing+=("$package"); done
 if [ ${#missing[@]} -gt 0 ]; then
   echo "Installing ${missing[*]}"
-  apt-get update -qq
-  DEBIAN_FRONTEND=noninteractive apt-get install -y -qq --no-install-recommends "${missing[@]}" >/dev/null
+  if [ "$pkg" = apt-get ]; then
+    apt-get update -qq
+    DEBIAN_FRONTEND=noninteractive apt-get install -y -qq --no-install-recommends "${missing[@]}" >/dev/null
+  else
+    pacman -S --noconfirm "${missing[@]}" >/dev/null
+  fi
 fi
 if [ "$engine" = podman ]; then
   version=$(podman --version | grep -oE '[0-9]+\.[0-9]+' | head -1)
@@ -109,7 +123,7 @@ fi
 
 # The user, its home, and 65,536 subordinate ids past every range taken.
 if ! id "$name" >/dev/null 2>&1; then
-  useradd --system --user-group --create-home --home-dir "$home" --shell /usr/sbin/nologin --comment "fxbot's computers" "$name"
+  useradd --system --user-group --create-home --home-dir "$home" --shell "$nologin" --comment "fxbot's computers" "$name"
 fi
 uid=$(id -u "$name")
 gid=$(id -g "$name")
@@ -220,8 +234,8 @@ Wants=network-pre.target
 [Service]
 Type=oneshot
 RemainAfterExit=yes
-ExecStart=/usr/sbin/nft -f $rules
-ExecStop=/usr/sbin/nft delete table inet $table
+ExecStart=$nft_bin -f $rules
+ExecStop=$nft_bin delete table inet $table
 
 [Install]
 WantedBy=multi-user.target

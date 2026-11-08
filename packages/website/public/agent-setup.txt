@@ -26,7 +26,7 @@ before you run it, and stop to ask the person when a step needs their choice or 
 
 fxbot needs:
 
-- Debian, Ubuntu, or a distro built on them, with systemd, on x86_64 or arm64. It doesn't run on
+- Debian, Ubuntu, or a distro built on them, or Arch and its kin, with systemd, on x86_64 or arm64. It doesn't run on
   macOS or Windows. If that is what you are on, ask the person which Linux machine to use, such as
   a home server or a small VPS, and how you can reach it.
 - curl, an internet connection, and sudo. In a root shell with no sudo, leave `sudo` out below.

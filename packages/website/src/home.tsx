@@ -74,7 +74,7 @@ const features: { shape: Shape; color: Color; title: string; link: string; body:
 ];
 
 const steps: { title: string; command?: string; body: ReactNode }[] = [
-  { title: "Install it", command: installCommand, body: <>On Debian or Ubuntu. It runs fxbot and its database as containers, with podman or docker, as a service on 127.0.0.1:8787.</> },
+  { title: "Install it", command: installCommand, body: <>On Debian or Ubuntu, or on Arch. It runs fxbot and its database as containers, with podman or docker, as a service on 127.0.0.1:8787.</> },
   {
     title: "Open it",
     command: "sudo tailscale serve --bg 8787",
@@ -188,7 +188,7 @@ export function Home() {
           </div>
           <dl className="grid content-start gap-px overflow-hidden rounded-xl border bg-border text-sm">
             {[
-              ["Machine", "Debian or Ubuntu, with systemd"],
+              ["Machine", "Debian or Ubuntu, or Arch, with systemd"],
               ["Runtime", "podman or docker, which setup.sh installs (podman) when neither is there"],
               ["Records", "Postgres with pgvector, in a container, with every key and token sealed"],
               ["Agents", "libfx, one agent per provider"],

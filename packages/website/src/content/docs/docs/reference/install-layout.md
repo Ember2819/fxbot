@@ -1,9 +1,9 @@
 ---
 title: "What setup.sh creates"
-description: "An install made by setup.sh, on Debian or Ubuntu. fxbot runs as three containers, from one compose file, under podman or docker: the app, its database, and the local embedder for memory search, which can be turned off."
+description: "An install made by setup.sh, on Debian or Ubuntu, or on Arch. fxbot runs as three containers, from one compose file, under podman or docker: the app, its database, and the local embedder for memory search, which can be turned off."
 ---
 
-An install made by [`setup.sh`](/docs/reference/commands/#setupsh), on Debian or Ubuntu. fxbot runs as three containers, from one compose file, under podman or docker: the app, its database, and the local embedder for memory search, which can be turned off.
+An install made by [`setup.sh`](/docs/reference/commands/#setupsh), on Debian or Ubuntu, or on Arch. fxbot runs as three containers, from one compose file, under podman or docker: the app, its database, and the local embedder for memory search, which can be turned off.
 
 ## Files and folders
 
@@ -60,7 +60,7 @@ The user `fxbot` is a system user, with its home in `/var/lib/fxbot` and no logi
 
 ## Packages
 
-`ca-certificates` and `curl`, from apt. When the machine has neither podman 4 or newer nor docker, `podman`, or `docker.io` where apt's podman is older than 4. With podman, `netavark`, `aardvark-dns`, and `nftables`, which containers find each other by name through and podman only recommends, and `golang-github-containernetworking-plugin-dnsname` for a podman that has run on CNI, as Debian 12's does out of the box. When the machine has no Compose 2.26 or newer, the first of `docker-compose-plugin`, `docker-compose-v2`, and `docker-compose` that apt has new enough, or else Compose 2.40.3 from its releases, as `/opt/fxbot/docker-compose`, checked against its SHA-256. With podman, `setup.sh` enables `podman.socket`, which Compose reaches podman through. It installs nothing for a GPU: the local embedder on one needs NVIDIA's driver and container toolkit, which you install yourself ([On a GPU](/docs/how-to/memory-search/#on-a-gpu)).
+`ca-certificates` and `curl`, from apt. When the machine has neither podman 4 or newer nor docker, `podman`, or `docker.io` where apt's podman is older than 4. With podman, `netavark`, `aardvark-dns`, and `nftables`, which containers find each other by name through and podman only recommends, and `golang-github-containernetworking-plugin-dnsname` for a podman that has run on CNI, as Debian 12's does out of the box. When the machine has no Compose 2.26 or newer, the first of `docker-compose-plugin`, `docker-compose-v2`, and `docker-compose` that apt has new enough, or else Compose 2.40.3 from its releases, as `/opt/fxbot/docker-compose`, checked against its SHA-256. With podman, `setup.sh` enables `podman.socket`, which Compose reaches podman through. It installs nothing for a GPU: the local embedder on one needs NVIDIA's driver and container toolkit, which you install yourself ([On a GPU](/docs/how-to/memory-search/#on-a-gpu)). On Arch and its kin, the same through `pacman`.
 
 ## After a move from 0.2
 

@@ -65,7 +65,7 @@ The previous design and spike are in [archive/](archive/README.md). The git host
 
 ## Install
 
-On Debian or Ubuntu, `setup.sh` installs the newest release, or the one you name:
+On Debian or Ubuntu, or on Arch, `setup.sh` installs the newest release, or the one you name:
 
 ```sh
 curl -fsSL https://fxbot.sh/setup.sh | sudo bash

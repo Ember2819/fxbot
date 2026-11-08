@@ -10,7 +10,7 @@ curl -fsSL https://fxbot.sh/setup.sh | sudo bash
 curl -fsSL https://fxbot.sh/setup.sh | sudo bash -s -- <tag>
 ```
 
-Installs fxbot on Debian, Ubuntu, or a distro built on them, as containers, as root. It reads the versions the machine has, and sets up what's missing:
+Installs fxbot on Debian, Ubuntu, or a distro built on them, or on Arch, as containers, as root. It reads the versions the machine has, and sets up what's missing:
 
 - **The engine:** podman 4 or newer, or docker when that's what's installed. With neither, it installs podman, or docker where the distro's podman is older than 4, such as Ubuntu 22.04.
 - **Compose:** 2.26 or newer. When the machine's is older, or is v1, or `podman compose` would run one of those, it installs the distro's package if that's new enough, and otherwise downloads Compose's own release into `/opt/fxbot` and checks it against its hash. podman-compose isn't used: it can't wait for health.
